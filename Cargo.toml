@@ -11,3 +11,6 @@ cmake = "0.1.48"
 libc = "0.2.125"
 serde = "1.0.136"
 serde_json = "1.0.79"
+tokio = { version = "1.18.0", features = ["rt-multi-thread", "sync", "macros", "time"] }
+uuid = { version = "1.0.0", features = ["v4", "fast-rng"] }
+futures = "0.3.21"

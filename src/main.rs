@@ -2,40 +2,30 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use serde_json::json;
-use crate::tonlib::Client;
+use futures::future::join_all;
+use crate::tonlib::{AsyncClient, Client};
 
 mod tonlib;
 
-fn main() {
-    let client = Arc::new(Client::new());
+#[tokio::main(worker_threads = 4)]
+async fn main() {
+    let client = Arc::new(AsyncClient::new());
 
-    client.send(json!({
-        "@type": "setLogVerbosityLevel",
-        "new_verbosity_level": 0
-    }).to_string().as_str());
+    let start = Instant::now();
 
-    let inner = Arc::clone(&client);
-    thread::spawn(move || {
-        for _ in 1..1000 {
-            let query = json!({
-                "@type": "blocks.getMasterchainInfo"
-            }).to_string();
-
-            inner.send(query.as_str());
-        }
+    let futures = (1..1000).map(|_| {
+        tokio::spawn({
+            let client = client.clone();
+            async move {
+                let query = json!({
+                    "@type": "blocks.getMasterchainInfo"
+                });
+                let resp = client.execute(query).await;
+            }
+        })
     });
 
-    let mut counter = 0;
-    let start = Instant::now();
-    while counter < 1000 {
-        let resp = client.receive(Duration::from_secs(5));
-        println!("{:#?}", resp);
+    join_all(futures).await;
 
-        counter += 1;
-
-        println!("{}", counter);
-
-    }
-
-    println!("{:?}", Instant::now() - start)
+    println!("{}", (Instant::now() - start).as_secs_f64());
 }
