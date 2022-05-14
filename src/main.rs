@@ -1,31 +1,62 @@
-use std::sync::{Arc, Mutex};
-use std::thread;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
-use serde_json::json;
+use crate::tonlib::{AccountTransactionId, AsyncClient, ClientBuilder, ShortTxId};
 use futures::future::join_all;
-use crate::tonlib::{AsyncClient, Client};
+use futures::{stream, Stream, StreamExt};
 
 mod tonlib;
 
 #[tokio::main(worker_threads = 4)]
-async fn main() {
-    let client = Arc::new(AsyncClient::new());
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Arc::new(ClientBuilder::from_file("./liteserver_config.json")?
+        .disable_logging()
+        .build().await?);
 
-    let start = Instant::now();
+    let now = Instant::now();
+    let info = client.get_masterchain_info().await;
+    // let txs = get_tx_from_seqno(&client, info.last.seqno, info.last.seqno).await;
+    let tw = stream::iter((info.last.seqno - 10000)..info.last.seqno)
+        .then(|seqno| {
+            let client = &client;
 
-    let futures = (1..1000).map(|_| {
-        tokio::spawn({
-            let client = client.clone();
             async move {
-                let query = json!({
-                    "@type": "blocks.getMasterchainInfo"
-                });
-                let resp = client.execute(query).await;
+                get_tx_from_seqno(client, seqno, info.last.seqno)
             }
-        })
-    });
+        }).buffer_unordered(1000)
+        .map(|r| r.unwrap_or(vec!()))
+        .concat().await;
 
-    join_all(futures).await;
+    println!("{:?}", tw);
 
-    println!("{}", (Instant::now() - start).as_secs_f64());
+    // stream::iter((info.last.seqno - 10000)..info.last.seqno)
+    //     .then(|seqno| async {
+    //         let client = client.clone();
+    //
+    //         get_tx_from_seqno(client, seqno)
+    //     }).collect::<Vec<ShortTxId>>();
+
+    // for seqno in info.last.seqno - 1000 .. info.last.seqno {
+    //     let shards = client.get_shards(seqno, 0).await;
+    //     for shard in shards {
+    //         let txs = client.get_transactions(&shard).await;
+    //         println!("{}, block contains {:#?} transactions", seqno, txs.len());
+    //     }
+    // }
+
+    println!("{}", (Instant::now() - now).as_secs_f64());
+
+    Ok(())
+}
+
+async fn get_tx_from_seqno(client: &AsyncClient, seqno: u64, max: u64) -> anyhow::Result<Vec<ShortTxId>> {
+    let shards = client.get_shards(seqno, 0).await?;
+    let txs = stream::iter(shards)
+        .flat_map(|shard| client.get_tx_stream(shard));
+
+   let txs = txs.collect::<Vec<ShortTxId>>().await;
+
+    println!("{}/{}, block contains {:#?} transactions", seqno, max, txs.len());
+
+
+    return Ok(txs);
 }

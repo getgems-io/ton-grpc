@@ -8,9 +8,11 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 cmake = "0.1.48"
 
 [dependencies]
-libc = "0.2.125"
-serde = "1.0.136"
+tonlibjson-rs = { git = "https://github.com/akostylev0/tonlibjson-rs.git" }
+anyhow = "1.0.57"
+serde = { version = "1.0.136", features = ["serde_derive"] }
 serde_json = "1.0.79"
-tokio = { version = "1.18.0", features = ["rt-multi-thread", "sync", "macros", "time"] }
+tokio = { version = "1.18.2", features = ["rt-multi-thread", "sync", "macros", "time"] }
 uuid = { version = "1.0.0", features = ["v4", "fast-rng"] }
 futures = "0.3.21"
+async-stream = "0.3.3"
