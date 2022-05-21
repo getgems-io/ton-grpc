@@ -1,5 +1,5 @@
 [package]
-name = "tonjson"
+name = "tonjsonrpc"
 version = "0.1.0"
 edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
@@ -8,7 +8,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 cmake = "0.1.48"
 
 [dependencies]
-tonlibjson-rs = { git = "https://github.com/akostylev0/tonlibjson-rs.git" }
+tonlibjson-rs = { path = "../tonlibjson-rs" }
 anyhow = "1.0.57"
 serde = { version = "1.0.136", features = ["serde_derive"] }
 serde_json = "1.0.79"

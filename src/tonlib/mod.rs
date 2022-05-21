@@ -1,13 +1,9 @@
-mod tx;
-pub mod pool;
-
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, format, Formatter, write};
 use std::fs::File;
 use std::io::BufReader;
-use std::os::macos::raw::stat;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -341,32 +337,6 @@ impl AsyncClient {
             return Some((stream::iter(txs.transactions), State {last_tx, incomplete: txs.incomplete, block: state.block}));
         }}).flatten();
     }
-
-    // pub fn get_tx_stream(&self, block: BlockIdExt) -> impl Stream<Item=ShortTxId> + '_ {
-    //     return stream! {
-    //         let mut last_tx = None;
-    //         loop {
-    //             let txs;
-    //             if let Some(tx) = last_tx {
-    //                 txs = self._get_transactions_after(&block, 30, tx).await;
-    //             } else {
-    //                 txs = self._get_transactions(&block, 30).await;
-    //             }
-    //
-    //             let count = txs.transactions.len();
-    //             last_tx = txs.transactions.last().map(AccountTransactionId::from);
-    //
-    //             for tx in txs.transactions {
-    //                 yield tx;
-    //             }
-    //
-    //             if txs.incomplete == false {
-    //                 break;
-    //             }
-    //             println!("got {} transactions", count);
-    //         }
-    //     };
-    // }
 
     async fn _get_transactions(&self, block: &BlockIdExt, count: u32) -> anyhow::Result<TransactionsResponse> {
         let request = json!({

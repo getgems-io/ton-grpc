@@ -343,7 +343,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tonjson"
+name = "tonjsonrpc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -360,7 +360,6 @@ dependencies = [
 [[package]]
 name = "tonlibjson-rs"
 version = "0.1.0"
-source = "git+https://github.com/akostylev0/tonlibjson-rs.git#694e8ea9704ade0459e7c04c3c0b47cce66d49c2"
 dependencies = [
  "anyhow",
  "cmake",
