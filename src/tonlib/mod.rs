@@ -1,4 +1,5 @@
 mod tx;
+pub mod pool;
 
 use std::borrow::Borrow;
 use std::collections::HashMap;
@@ -28,11 +29,7 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let config: Value = serde_json::from_reader(reader)?;
-
+    pub fn from_json_config(config: &Value) -> anyhow::Result<Self> {
         let full_config = json!({
             "@type": "init",
             "options": {
@@ -54,6 +51,14 @@ impl ClientBuilder {
             config: full_config,
             disable_logging: None,
         })
+    }
+
+    pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let file = File::open(path)?;
+        let reader = BufReader::new(file);
+        let config: Value = serde_json::from_reader(reader)?;
+
+        return ClientBuilder::from_json_config(&config);
     }
 
     pub fn disable_logging(&mut self) -> &mut Self {
@@ -133,7 +138,7 @@ impl TlType for BlockIdExt {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MasterchainInfoResponse {
     pub init: BlockIdExt,
     pub last: BlockIdExt,
