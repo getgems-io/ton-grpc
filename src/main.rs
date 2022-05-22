@@ -1,5 +1,6 @@
+use std::time::Duration;
 use jsonrpc_core::{BoxFuture, Params};
-use crate::tonlib::{AsyncClient, base64_to_hex, BlockIdExt, ClientBuilder, ShortTxId, TlBlock};
+use crate::tonlib::{AsyncClient, BlockIdExt, ClientBuilder, ShortTxId, TlBlock};
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use jsonrpc_http_server::tokio::runtime::Runtime;
 use jsonrpc_http_server::{ServerBuilder};
@@ -64,34 +65,60 @@ struct BlockTransactionsParams {
     count: Option<u8>
 }
 
+#[derive(Deserialize, Debug)]
+struct AddressParams {
+    address: String
+}
+
+#[derive(Deserialize, Debug)]
+struct TransactionsParams {
+    address: String,
+    limit: Option<u8>,
+    lt: Option<i64>,
+    hash: Option<String>,
+    to_lt: Option<i64>,
+    archival: Option<bool>
+}
+
+type RpcResponse = BoxFuture<Result<Value>>;
+
 #[rpc(server)]
 pub trait Rpc {
     #[rpc(name = "getMasterchainInfo")]
-    fn master_chain_info(&self) -> BoxFuture<Result<Value>>;
+    fn master_chain_info(&self) -> RpcResponse;
 
     #[rpc(name = "lookupBlock", raw_params)]
-    fn lookup_block(&self, params: Params) -> BoxFuture<Result<Value>>;
+    fn lookup_block(&self, params: Params) -> RpcResponse;
 
     #[rpc(name = "shards", raw_params)]
-    fn shards(&self, params: Params) -> BoxFuture<Result<Value>>;
+    fn shards(&self, params: Params) -> RpcResponse;
 
     #[rpc(name = "getBlockHeader", raw_params)]
-    fn get_block_header(&self, params: Params) -> BoxFuture<Result<Value>>;
+    fn get_block_header(&self, params: Params) -> RpcResponse;
 
     #[rpc(name = "getBlockTransactions", raw_params)]
-    fn get_block_transactions(&self, params: Params) -> BoxFuture<Result<Value>>;
+    fn get_block_transactions(&self, params: Params) -> RpcResponse;
+
+    #[rpc(name = "getAddressInformation", raw_params)]
+    fn get_address_information(&self, params: Params) -> RpcResponse;
+
+    #[rpc(name = "getExtendedAddressInformation", raw_params)]
+    fn get_extended_address_information(&self, params: Params) -> RpcResponse;
+
+    #[rpc(name = "getTransactions", raw_params)]
+    fn get_transactions(&self, params: Params) -> RpcResponse;
 }
 
 struct RpcImpl;
 
 impl Rpc for RpcImpl {
-    fn master_chain_info(&self) -> BoxFuture<Result<Value>> {
+    fn master_chain_info(&self) -> RpcResponse {
         Box::pin(async {
             jsonrpc_error(TON.get_masterchain_info().await)
         })
     }
 
-    fn lookup_block(&self, params: Params) -> BoxFuture<Result<Value>> {
+    fn lookup_block(&self, params: Params) -> RpcResponse {
         Box::pin(async move {
             let params = params.parse::<LookupBlockParams>()?;
 
@@ -106,7 +133,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn shards(&self, params: Params) -> BoxFuture<Result<Value>> {
+    fn shards(&self, params: Params) -> RpcResponse {
         Box::pin(async move {
             let params = params.parse::<ShardsParams>()?;
 
@@ -114,7 +141,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn get_block_header(&self, params: Params) -> BoxFuture<Result<Value>> {
+    fn get_block_header(&self, params: Params) -> RpcResponse {
         Box::pin(async move {
             let params = params.parse::<BlockHeaderParams>()?;
             let shard = params.shard.parse::<i64>().map_err(|_| Error::invalid_params("invalid shard"))?;
@@ -128,7 +155,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn get_block_transactions(&self, params: Params) -> BoxFuture<jsonrpc_core::Result<Value>> {
+    fn get_block_transactions(&self, params: Params) -> RpcResponse {
         Box::pin(async move {
             let params = params.parse::<BlockTransactionsParams>()?;
             let shard = params.shard.parse::<i64>().map_err(|_| Error::invalid_params("invalid shard"))?;
@@ -143,12 +170,15 @@ impl Rpc for RpcImpl {
 
             let stream = TON.get_tx_stream(block.clone()).await.map_err(|_| Error::internal_error())?;
             let tx: Vec<TlBlock> = stream
-                .map(|tx: ShortTxId| TlBlock::ShortTxId(ShortTxId {
-                    account: format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap()),
-                    hash: tx.hash,
-                    lt: tx.lt,
-                    mode: tx.mode
-                }))
+                .map(|tx: ShortTxId| {
+                    println!("{}", &tx.account);
+                    TlBlock::ShortTxId(ShortTxId {
+                        account: format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap()),
+                        hash: tx.hash,
+                        lt: tx.lt,
+                        mode: tx.mode
+                    })
+                })
                 .collect()
                 .await;
 
@@ -162,15 +192,55 @@ impl Rpc for RpcImpl {
             }))
         })
     }
+
+    fn get_address_information(&self, params: Params) -> RpcResponse {
+        Box::pin(async move {
+            let params = params.parse::<AddressParams>()?;
+
+            jsonrpc_error(TON.raw_get_account_state(&params.address).await)
+        })
+    }
+
+    fn get_extended_address_information(&self, params: Params) -> RpcResponse {
+        Box::pin(async move {
+            let params = params.parse::<AddressParams>()?;
+
+            jsonrpc_error(TON.get_account_state(&params.address).await)
+        })
+    }
+
+    fn get_transactions(&self, params: Params) -> RpcResponse {
+        Box::pin(async move {
+            let params = params.parse::<TransactionsParams>()?;
+            let address = params.address;
+
+            let state = TON.raw_get_account_state(&address)
+                .await.map_err(|_| Error::internal_error())?;
+
+            let lt_map = state["last_transaction_id"].as_object().ok_or(Error::internal_error())?;
+            let lt = lt_map.get("lt")
+                .and_then(Value::as_str)
+                .ok_or(Error::internal_error())?;
+
+            let hash = lt_map.get("hash")
+                .and_then(Value::as_str)
+                .ok_or(Error::internal_error())?;
+
+            let tx = TON._raw_get_transactions(&address, lt, hash).await;
+
+            jsonrpc_error(tx)
+        })
+
+    }
 }
 
-fn jsonrpc_error<T>(r: anyhow::Result<T>) -> jsonrpc_core::Result<T> {
-    r.map_err(|_| jsonrpc_core::Error::internal_error())
+fn jsonrpc_error<T>(r: anyhow::Result<T>) -> Result<T> {
+    r.map_err(|_| Error::internal_error())
 }
 
 fn main() {
     let mut rt = Runtime::new().unwrap();
-    println!("{:?}", rt.block_on(TON.get_masterchain_info()));
+    let _ = rt.block_on(TON.synchronize());
 
     let mut io = IoHandler::new();
     io.extend_with(RpcImpl.to_delegate());
@@ -184,39 +254,9 @@ fn main() {
     server.wait()
 }
 
-// #[tokio::main(flavor = "multi_thread")]
-// async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//     let client = Arc::new(
-//         ClientBuilder::from_file("./liteserver_config.json")?
-//             .disable_logging()
-//             .build()
-//             .await?,
-//     );
-//
-//     let _ = tokio::task::spawn_blocking({
-//         let client = client.clone();
-//
-//         move || {
-//             let mut io = jsonrpc_core::IoHandler::new();
-//             let client = client.clone();
-//             io.add_method("getMasterchainInfo", {
-//                 move |_params: Params| async {
-//                     client
-//                         .get_masterchain_info()
-//                         .await
-//                         .map_err(|e| jsonrpc_core::Error::new(ServerError(1)))
-//                 }
-//             });
-//
-//             let server = ServerBuilder::new(io)
-//                 .threads(3)
-//                 .start_http(&"127.0.0.1:3030".parse().unwrap())
-//                 .unwrap();
-//
-//             server.wait();
-//         }
-//     })
-//     .await;
-//
-//     Ok(())
-// }
+fn base64_to_hex(b: &str) -> anyhow::Result<String> {
+    let bytes = base64::decode(b)?;
+    let hex = hex::encode(bytes);
+
+    return Ok(hex)
+}

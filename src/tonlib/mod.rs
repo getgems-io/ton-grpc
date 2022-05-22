@@ -1,20 +1,17 @@
-use async_stream::stream;
 use futures::StreamExt;
-use futures::{pin_mut, stream, FutureExt, Stream};
+use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{format, write, Display, Formatter};
+use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::Semaphore;
 use tonlibjson_rs::Client;
 use uuid::Uuid;
@@ -149,6 +146,15 @@ impl TlType for MasterchainInfoResponse {
     }
 }
 
+pub struct InternalTransactionId {
+    hash: String,
+    lt: String
+}
+
+impl TlType for InternalTransactionId {
+    fn tl_type() -> String { "internal.transactionId".to_string() }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "@type")]
 pub enum TlBlock {
@@ -239,7 +245,7 @@ impl AsyncClient {
         };
     }
 
-    async fn send(&self, request: serde_json::Value) -> () {
+    async fn send(&self, request: Value) -> () {
         let _ = self.client.send(&request.to_string());
     }
 
@@ -259,7 +265,7 @@ impl AsyncClient {
         let mut value = rx.await?;
         drop(permit);
 
-        let mut obj = value.as_object_mut().unwrap();
+        let obj = value.as_object_mut().unwrap();
         let _ = obj.remove("@extra");
 
         let value = Value::Object(obj.clone());
@@ -297,6 +303,14 @@ impl AsyncClient {
         }
 
         return serde_json::from_value::<T>(value).map_err(anyhow::Error::from);
+    }
+
+    pub async fn synchronize(&self) -> anyhow::Result<Value> {
+        let query = json!({
+            "@type": "sync"
+        });
+
+        return self.execute(&query).await;
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<Value> {
@@ -390,6 +404,64 @@ impl AsyncClient {
         .flatten());
     }
 
+    pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
+        let request = json!({
+            "@type": "raw.getAccountState",
+            "account_address": {
+                "account_address": address
+            }
+        });
+
+        let mut response = self.execute(&request).await?;
+
+        let code = response["code"].as_str().unwrap_or("");
+        let state: &str = if code.len() == 0 || code.parse::<i64>().is_ok() {
+                if response["frozen_hash"].as_str().unwrap_or("").len() == 0 {
+                    "uninitialized"
+                } else {
+                    "frozen"
+                }
+            } else {
+            "active"
+        };
+
+        response["state"] = Value::from(state);
+        if let Some(balance) = response["balance"].as_i64() {
+            if balance < 0 {
+                response["balance"] = Value::from(0);
+            }
+        }
+
+        Ok(response)
+    }
+
+    pub async fn get_account_state(&self, address: &str) -> anyhow::Result<Value> {
+        let request = json!({
+            "@type": "getAccountState",
+            "account_address": {
+                "account_address": address
+            }
+        });
+
+        return self.execute(&request).await;
+    }
+
+    pub async fn _raw_get_transactions(&self, address: &str, from_lt: &str, from_hash: &str) -> anyhow::Result<Value>{
+        let request = json!({
+            "@type": "raw.getTransactions",
+            "account_address": {
+                "account_address": address
+            },
+            "from_transaction_id": {
+                "@type": "internal.transactionId",
+                "lt": from_lt,
+                "hash": from_hash
+            }
+        });
+
+        return self.execute(&request).await;
+    }
+
     async fn _get_transactions(
         &self,
         block: &BlockIdExt,
@@ -452,12 +524,4 @@ impl AsyncClient {
 
         return self.execute(&query).await;
     }
-}
-
-
-pub fn base64_to_hex(b: &str) -> anyhow::Result<String> {
-    let bytes = base64::decode(b)?;
-    let hex = hex::encode(bytes);
-
-    return Ok(hex)
 }
