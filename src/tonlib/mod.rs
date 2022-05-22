@@ -1,27 +1,27 @@
+use async_stream::stream;
+use futures::StreamExt;
+use futures::{pin_mut, stream, FutureExt, Stream};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::error::Error;
-use std::fmt::{Display, format, Formatter, write};
+use std::fmt::{format, write, Display, Formatter};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
-use async_stream::stream;
-use futures::{FutureExt, pin_mut, Stream, stream};
-use serde_json::{json, Value};
-use serde::{Serialize, Deserialize};
-use serde::de::DeserializeOwned;
-use futures::StreamExt;
 use tokio::sync::oneshot::error::RecvError;
 use tokio::sync::Semaphore;
-use uuid::Uuid;
 use tonlibjson_rs::Client;
+use uuid::Uuid;
 
 pub struct ClientBuilder {
-    config: serde_json::Value,
-    disable_logging: Option<serde_json::Value>,
+    config: Value,
+    disable_logging: Option<Value>,
 }
 
 impl ClientBuilder {
@@ -79,8 +79,7 @@ impl ClientBuilder {
 }
 
 const MAIN_WORKCHAIN: i64 = -1;
-const MAIN_SHARD: &str = "-9223372036854775808";
-
+const MAIN_SHARD: i64 = -9223372036854775808;
 
 pub trait TlType {
     fn tl_type() -> String;
@@ -88,10 +87,10 @@ pub trait TlType {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ShortTxId {
-    account: String,
-    hash: String,
-    lt: String,
-    mode: u8,
+    pub account: String,
+    pub hash: String,
+    pub lt: String,
+    pub mode: u8,
 }
 
 #[derive(Debug, Deserialize)]
@@ -102,7 +101,11 @@ pub struct TonError {
 
 impl Display for TonError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Ton api error occurred with code {}, message {}", self.code, self.message)
+        write!(
+            f,
+            "Ton api error occurred with code {}, message {}",
+            self.code, self.message
+        )
     }
 }
 
@@ -111,7 +114,6 @@ impl Error for TonError {
         None
     }
 }
-
 
 impl ShortTxId {
     fn ton_type() -> String {
@@ -149,9 +151,11 @@ impl TlType for MasterchainInfoResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "@type")]
-enum TlBlock {
+pub enum TlBlock {
     #[serde(rename = "ton.blockIdExt")]
     BlockIdExt(BlockIdExt),
+    #[serde(rename = "blocks.shortTxId")]
+    ShortTxId(ShortTxId),
     #[serde(rename = "blocks.getMasterchainInfo")]
     GetMasterchainInfoRequest,
     // #[serde(rename = "blocks.masterchainInfo")]
@@ -206,7 +210,8 @@ impl AsyncClient {
         let client_recv = client.clone();
         let semaphore = tokio::sync::Semaphore::new(500);
 
-        let responses: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Value>>>> = Arc::new(Mutex::new(HashMap::new()));
+        let responses: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Value>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
         let responses_rcv = Arc::clone(&responses);
 
         let _ = thread::spawn(move || {
@@ -238,7 +243,7 @@ impl AsyncClient {
         let _ = self.client.send(&request.to_string());
     }
 
-    async fn execute(&self, request: &serde_json::Value) -> Result<Value, RecvError> {
+    async fn execute(&self, request: &Value) -> anyhow::Result<Value> {
         let mut request = request.clone();
 
         let id = Uuid::new_v4().to_string();
@@ -251,13 +256,21 @@ impl AsyncClient {
         println!("{} available permits", self.semaphore.available_permits());
         let _ = self.client.send(&x);
 
-        let response = rx.await;
+        let mut value = rx.await?;
         drop(permit);
 
-        return response;
+        let mut obj = value.as_object_mut().unwrap();
+        let _ = obj.remove("@extra");
+
+        let value = Value::Object(obj.clone());
+
+        return Ok(value);
     }
 
-    async fn execute_typed<T: DeserializeOwned>(&self, request: &serde_json::Value) -> anyhow::Result<T> {
+    async fn execute_typed<T: DeserializeOwned>(
+        &self,
+        request: &serde_json::Value,
+    ) -> anyhow::Result<T> {
         let mut request = request.clone();
 
         let id = Uuid::new_v4().to_string();
@@ -279,66 +292,109 @@ impl AsyncClient {
         if value["@type"] == "error" {
             return match serde_json::from_value::<TonError>(value) {
                 Ok(e) => Err(anyhow::Error::from(e)),
-                Err(e) => Err(anyhow::Error::from(e))
+                Err(e) => Err(anyhow::Error::from(e)),
             };
         }
 
         return serde_json::from_value::<T>(value).map_err(anyhow::Error::from);
     }
 
-    pub async fn get_masterchain_info(&self) -> MasterchainInfoResponse {
+    pub async fn get_masterchain_info(&self) -> anyhow::Result<Value> {
         let query = json!(TlBlock::GetMasterchainInfoRequest);
 
-        return self.execute_typed::<MasterchainInfoResponse>(&query).await.unwrap();
+        return self.execute(&query).await;
     }
 
-    pub async fn look_up_block_by_seqno(&self, workchain: i64, shard: &str, seqno: u64) -> BlockIdExt {
+    pub async fn look_up_block_by_seqno(
+        &self,
+        workchain: i64,
+        shard: i64,
+        seqno: u64,
+    ) -> anyhow::Result<Value> {
         return self.look_up_block(workchain, shard, seqno, 0).await;
     }
 
-    pub async fn look_up_block_by_lt(&self, workchain: i64, shard: &str, lt: i64) -> BlockIdExt {
+    pub async fn look_up_block_by_lt(&self, workchain: i64, shard: i64, lt: i64) -> anyhow::Result<Value> {
         return self.look_up_block(workchain, shard, 0, lt).await;
     }
 
-    pub async fn get_shards(&self, master_seqno: u64, lt: i64) -> anyhow::Result<Vec<BlockIdExt>> {
-        let block = self.look_up_block(MAIN_WORKCHAIN, MAIN_SHARD, master_seqno, lt).await;
+    pub async fn get_shards(&self, master_seqno: u64) -> anyhow::Result<Value> {
+        let block = self
+            .look_up_block(MAIN_WORKCHAIN, MAIN_SHARD, master_seqno, 0)
+            .await?;
         let request = json!({
             "@type": "blocks.getShards",
             "id": block
         });
 
-        return Ok(self.execute_typed::<ShardsResponse>(&request).await?.shards);
+        return self.execute(&request).await;
     }
 
-    pub fn get_tx_stream(&self, block: BlockIdExt) -> impl Stream<Item=ShortTxId> + '_ {
+    pub async fn get_block_header(&self, workchain: i64, shard: i64, seqno: u64) -> anyhow::Result<Value> {
+        let block = self
+            .look_up_block(workchain, shard, seqno, 0)
+            .await?;
+
+        let request = json!({
+            "@type": "blocks.getBlockHeader",
+            "id": block
+        });
+
+        return self.execute(&request).await;
+    }
+
+    pub async fn get_tx_stream(&self, block: BlockIdExt) -> anyhow::Result<impl Stream<Item = ShortTxId> + '_> {
         struct State {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
-            block: BlockIdExt
+            block: BlockIdExt,
         }
 
-        return stream::unfold(State {last_tx: None, incomplete: true, block }, {
-            move |state: State| async move {
-            if state.incomplete == false {
-                return None;
-            }
+        return Ok(stream::unfold(
+            State {
+                last_tx: None,
+                incomplete: true,
+                block,
+            },
+            {
+                move |state: State| async move {
+                    if state.incomplete == false {
+                        return None;
+                    }
 
-            let txs;
-            if let Some(tx) = state.last_tx {
-                txs = self._get_transactions_after(&state.block, 30, tx).await.unwrap();
-            } else {
-                txs = self._get_transactions(&state.block, 30).await.unwrap();
-            }
+                    let txs;
+                    if let Some(tx) = state.last_tx {
+                        txs = self
+                            ._get_transactions_after(&state.block, 30, tx)
+                            .await
+                            .unwrap();
+                    } else {
+                        txs = self._get_transactions(&state.block, 30).await.unwrap();
+                    }
 
-            println!("got {} transactions", txs.transactions.len());
+                    println!("got {} transactions", txs.transactions.len());
 
-            let last_tx = txs.transactions.last().map(AccountTransactionId::from);
+                    let last_tx = txs.transactions.last().map(AccountTransactionId::from);
 
-            return Some((stream::iter(txs.transactions), State {last_tx, incomplete: txs.incomplete, block: state.block}));
-        }}).flatten();
+                    return Some((
+                        stream::iter(txs.transactions),
+                        State {
+                            last_tx,
+                            incomplete: txs.incomplete,
+                            block: state.block,
+                        },
+                    ));
+                }
+            },
+        )
+        .flatten());
     }
 
-    async fn _get_transactions(&self, block: &BlockIdExt, count: u32) -> anyhow::Result<TransactionsResponse> {
+    async fn _get_transactions(
+        &self,
+        block: &BlockIdExt,
+        count: u32,
+    ) -> anyhow::Result<TransactionsResponse> {
         let request = json!({
             "@type": "blocks.getTransactions",
             "id": block,
@@ -353,7 +409,12 @@ impl AsyncClient {
         return self.execute_typed(&request).await;
     }
 
-    async fn _get_transactions_after(&self, block: &BlockIdExt, count: u32, tx: AccountTransactionId) -> anyhow::Result<TransactionsResponse> {
+    async fn _get_transactions_after(
+        &self,
+        block: &BlockIdExt,
+        count: u32,
+        tx: AccountTransactionId,
+    ) -> anyhow::Result<TransactionsResponse> {
         let block = TlBlock::BlockIdExt(block.clone());
         let tx = TlBlock::AccountTransactionId(tx);
 
@@ -368,10 +429,14 @@ impl AsyncClient {
         return self.execute_typed(&request).await;
     }
 
-    async fn look_up_block(&self, workchain: i64, shard: &str, seqno: u64, lt: i64) -> BlockIdExt {
+    async fn look_up_block(&self, workchain: i64, shard: i64, seqno: u64, lt: i64) -> anyhow::Result<Value> {
         let mut mode: i32 = 0;
-        if seqno > 0 { mode += 1 }
-        if lt > 0 { mode += 2 }
+        if seqno > 0 {
+            mode += 1
+        }
+        if lt > 0 {
+            mode += 2
+        }
 
         let query = json!({
             "@type": "blocks.lookupBlock",
@@ -385,6 +450,14 @@ impl AsyncClient {
             "lt": lt
         });
 
-        return self.execute_typed(&query).await.unwrap();
+        return self.execute(&query).await;
     }
+}
+
+
+pub fn base64_to_hex(b: &str) -> anyhow::Result<String> {
+    let bytes = base64::decode(b)?;
+    let hex = hex::encode(bytes);
+
+    return Ok(hex)
 }
