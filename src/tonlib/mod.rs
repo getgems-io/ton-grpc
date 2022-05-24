@@ -312,10 +312,10 @@ impl AsyncClient {
         return self.execute_typed_with_timeout::<Value>(&query, Duration::from_secs(120)).await;
     }
 
-    pub async fn get_masterchain_info(&self) -> anyhow::Result<Value> {
+    pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
         let query = json!(GetMasterchainInfo {});
 
-        return self.execute_typed::<Value>(&query).await;
+        return self.execute_typed::<MasterchainInfo>(&query).await;
     }
 
     pub async fn look_up_block_by_seqno(

@@ -2,7 +2,7 @@ use std::error::Error as StdError;
 use futures::future::Either::{Left, Right};
 use futures::Stream;
 use jsonrpc_core::{BoxFuture, Params};
-use crate::tonlib::{AsyncClient, BlockIdExt, ClientBuilder, InternalTransactionId, RawTransaction, ShortTxId};
+use crate::tonlib::{AsyncClient, BlockIdExt, ClientBuilder, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId};
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use jsonrpc_http_server::tokio::runtime::Runtime;
 use jsonrpc_http_server::{ServerBuilder};
@@ -86,48 +86,48 @@ struct SendBocParams {
     boc: String
 }
 
-type RpcResponse = BoxFuture<Result<Value>>;
+type RpcResponse<T> = BoxFuture<Result<T>>;
 
 #[rpc(server)]
 pub trait Rpc {
     #[rpc(name = "getMasterchainInfo")]
-    fn master_chain_info(&self) -> RpcResponse;
+    fn master_chain_info(&self) -> RpcResponse<MasterchainInfo>;
 
     #[rpc(name = "lookupBlock", raw_params)]
-    fn lookup_block(&self, params: Params) -> RpcResponse;
+    fn lookup_block(&self, params: Params) -> RpcResponse<Value>;
 
     #[rpc(name = "shards", raw_params)]
-    fn shards(&self, params: Params) -> RpcResponse;
+    fn shards(&self, params: Params) -> RpcResponse<Value>;
 
     #[rpc(name = "getBlockHeader", raw_params)]
-    fn get_block_header(&self, params: Params) -> RpcResponse;
+    fn get_block_header(&self, params: Params) -> RpcResponse<Value>;
 
     #[rpc(name = "getBlockTransactions", raw_params)]
-    fn get_block_transactions(&self, params: Params) -> RpcResponse;
+    fn get_block_transactions(&self, params: Params) -> RpcResponse<Value>;
 
     #[rpc(name = "getAddressInformation", raw_params)]
-    fn get_address_information(&self, params: Params) -> RpcResponse;
+    fn get_address_information(&self, params: Params) -> RpcResponse<Value>;
 
     #[rpc(name = "getExtendedAddressInformation", raw_params)]
-    fn get_extended_address_information(&self, params: Params) -> RpcResponse;
+    fn get_extended_address_information(&self, params: Params) -> RpcResponse<Value>;
 
     #[rpc(name = "getTransactions", raw_params)]
-    fn get_transactions(&self, params: Params) -> RpcResponse;
+    fn get_transactions(&self, params: Params) -> RpcResponse<Value>;
 
     #[rpc(name = "sendBoc", raw_params)]
-    fn send_boc(&self, params: Params) -> RpcResponse;
+    fn send_boc(&self, params: Params) -> RpcResponse<Value>;
 }
 
 struct RpcImpl;
 
 impl Rpc for RpcImpl {
-    fn master_chain_info(&self) -> RpcResponse {
+    fn master_chain_info(&self) -> RpcResponse<MasterchainInfo> {
         Box::pin(async {
             jsonrpc_error(TON.get_masterchain_info().await)
         })
     }
 
-    fn lookup_block(&self, params: Params) -> RpcResponse {
+    fn lookup_block(&self, params: Params) -> RpcResponse<Value> {
         Box::pin(async move {
             let params = params.parse::<LookupBlockParams>()?;
 
@@ -142,7 +142,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn shards(&self, params: Params) -> RpcResponse {
+    fn shards(&self, params: Params) -> RpcResponse<Value> {
         Box::pin(async move {
             let params = params.parse::<ShardsParams>()?;
 
@@ -150,7 +150,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn get_block_header(&self, params: Params) -> RpcResponse {
+    fn get_block_header(&self, params: Params) -> RpcResponse<Value> {
         Box::pin(async move {
             let params = params.parse::<BlockHeaderParams>()?;
             let shard = params.shard.parse::<i64>().map_err(|_| Error::invalid_params("invalid shard"))?;
@@ -164,7 +164,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn get_block_transactions(&self, params: Params) -> RpcResponse {
+    fn get_block_transactions(&self, params: Params) -> RpcResponse<Value> {
         Box::pin(async move {
             let params = params.parse::<BlockTransactionsParams>()?;
             let shard = params.shard.parse::<i64>().map_err(|_| Error::invalid_params("invalid shard"))?;
@@ -202,7 +202,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn get_address_information(&self, params: Params) -> RpcResponse {
+    fn get_address_information(&self, params: Params) -> RpcResponse<Value> {
         Box::pin(async move {
             let params = params.parse::<AddressParams>()?;
 
@@ -210,7 +210,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn get_extended_address_information(&self, params: Params) -> RpcResponse {
+    fn get_extended_address_information(&self, params: Params) -> RpcResponse<Value> {
         Box::pin(async move {
             let params = params.parse::<AddressParams>()?;
 
@@ -218,7 +218,7 @@ impl Rpc for RpcImpl {
         })
     }
 
-    fn get_transactions(&self, params: Params) -> RpcResponse {
+    fn get_transactions(&self, params: Params) -> RpcResponse<Value> {
         Box::pin(async move {
             let params = params.parse::<TransactionsParams>()?;
             let address = params.address;
@@ -252,7 +252,7 @@ impl Rpc for RpcImpl {
 
     }
 
-    fn send_boc(&self, params: Params) -> RpcResponse {
+    fn send_boc(&self, params: Params) -> RpcResponse<Value> {
         Box::pin(async move {
             let params = params.parse::<SendBocParams>()?;
             let boc = base64::decode(params.boc)
