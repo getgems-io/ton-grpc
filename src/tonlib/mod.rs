@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -65,7 +65,7 @@ impl ClientBuilder {
 
     pub async fn build(&self) -> anyhow::Result<AsyncClient> {
         #[derive(Deserialize)]
-        struct Void {};
+        struct Void {}
 
         let client = AsyncClient::new();
         if let Some(ref disable_logging) = self.disable_logging {
@@ -463,7 +463,7 @@ impl AsyncClient {
         struct State {
             address: String,
             last_tx: InternalTransactionId
-        };
+        }
 
         return stream::unfold(State { address, last_tx}, move |state| async move {
             let txs = self._raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash).await.unwrap();
