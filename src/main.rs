@@ -1,3 +1,4 @@
+use std::error::Error as StdError;
 use futures::future::Either::{Left, Right};
 use futures::Stream;
 use jsonrpc_core::{BoxFuture, Params};
@@ -9,7 +10,6 @@ use jsonrpc_derive::rpc;
 use jsonrpc_core::{Result, Error};
 use serde_json::{json, Value};
 use serde::Deserialize;
-// use futures::StreamExt;
 use tokio_stream::StreamExt;
 #[macro_use]
 extern crate lazy_static;
@@ -228,11 +228,15 @@ impl Rpc for RpcImpl {
             let hash = params.hash;
 
             let stream = match (lt, hash) {
-                (Some(lt), Some(hash)) => Left(TON.get_account_tx_stream_from(address, InternalTransactionId {hash, lt})),
+                (Some(lt), Some(hash)) => Left(
+                    TON.get_account_tx_stream_from(address, InternalTransactionId {hash, lt})
+                ),
                 _ => Right(TON.get_account_tx_stream(address).await)
             };
             let stream = match max_lt {
-                Some(to_lt) => Left(stream.take_while(move |tx: &RawTransaction| tx.transaction_id.lt.parse::<i64>().unwrap() > to_lt)),
+                Some(to_lt) => Left(stream.take_while(move |tx: &RawTransaction|
+                    tx.transaction_id.lt.parse::<i64>().unwrap() > to_lt
+                )),
                 _ => Right(stream)
             };
 
@@ -251,8 +255,11 @@ impl Rpc for RpcImpl {
     fn send_boc(&self, params: Params) -> RpcResponse {
         Box::pin(async move {
             let params = params.parse::<SendBocParams>()?;
+            let boc = base64::decode(params.boc)
+                .map_err(|e| jsonrpc_core::Error::invalid_params(e.description()))?;
+            let b64 = base64::encode(boc);
 
-            jsonrpc_error(TON.send_message(&params.boc).await)
+            jsonrpc_error(TON.send_message(&b64).await)
         })
     }
 }
@@ -261,21 +268,23 @@ fn jsonrpc_error<T>(r: anyhow::Result<T>) -> Result<T> {
     r.map_err(|_| Error::internal_error())
 }
 
-fn main() {
-    let mut rt = Runtime::new().unwrap();
-    let _ = rt.block_on(async { TON.synchronize().await }); // TODO fix timeout
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> anyhow::Result<()> {
+    let block = TON.synchronize().await?;
     println!("Synchronized");
 
-    let mut io = IoHandler::new();
-    io.extend_with(RpcImpl.to_delegate());
+    tokio::task::spawn_blocking(|| {
+        let mut io = IoHandler::new();
+        io.extend_with(RpcImpl.to_delegate());
 
-    let server = ServerBuilder::new(io)
-        .event_loop_executor(rt.handle().clone())
-        .threads(1)
-        .start_http(&"127.0.0.1:3030".parse().unwrap())
-        .unwrap();
+        let server = ServerBuilder::new(io)
+            .start_http(&"127.0.0.1:3030".parse().unwrap())
+            .unwrap();
 
-    server.wait()
+        server.wait()
+    }).await;
+
+    Ok(())
 }
 
 fn base64_to_hex(b: &str) -> anyhow::Result<String> {

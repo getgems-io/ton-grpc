@@ -13,7 +13,6 @@ use std::thread;
 use std::time::Duration;
 use dashmap::DashMap;
 use tokio::sync::Semaphore;
-use tokio::time::timeout;
 use tonlibjson_rs::Client;
 use uuid::Uuid;
 
@@ -65,12 +64,15 @@ impl ClientBuilder {
     }
 
     pub async fn build(&self) -> anyhow::Result<AsyncClient> {
+        #[derive(Deserialize)]
+        struct Void {};
+
         let client = AsyncClient::new();
         if let Some(ref disable_logging) = self.disable_logging {
-            client.execute(disable_logging).await?;
+            client.execute_typed::<Void>(disable_logging).await?;
         }
 
-        client.execute(&self.config).await?;
+        client.execute_typed::<Void>(&self.config).await?;
 
         Ok(client)
     }
@@ -254,7 +256,15 @@ impl AsyncClient {
         let _ = self.client.send(&request.to_string());
     }
 
-    async fn execute(&self, request: &Value) -> anyhow::Result<Value> {
+    async fn execute_typed<T: DeserializeOwned>(&self, request: &serde_json::Value) -> anyhow::Result<T> {
+        return self.execute_typed_with_timeout(request, Duration::from_secs(20)).await;
+    }
+
+    async fn execute_typed_with_timeout<T: DeserializeOwned>(
+        &self,
+        request: &serde_json::Value,
+        timeout: Duration
+    ) -> anyhow::Result<T> {
         let mut request = request.clone();
 
         let id = Uuid::new_v4().to_string();
@@ -263,57 +273,35 @@ impl AsyncClient {
         self.responses.insert(id.clone(), tx);
 
         let x = request.to_string();
-        let permit = self.semaphore.acquire().await?;
-        println!("{} available permits", self.semaphore.available_permits());
-        let _ = self.client.send(&x);
-
-        let timeout = timeout(Duration::from_secs(20), rx).await?;
-        drop(permit);
-        if let Err(e) = timeout {
-            self.responses.remove(&id);
-
-            return Err(anyhow::Error::from(e));
-        }
-        let mut value = timeout.unwrap();
-
-        let obj = value.as_object_mut().unwrap();
-        let _ = obj.remove("@extra");
-
-        let value = Value::Object(obj.clone());
-
-        return Ok(value);
-    }
-
-    async fn execute_typed<T: DeserializeOwned>(
-        &self,
-        request: &serde_json::Value,
-    ) -> anyhow::Result<T> {
-        let mut request = request.clone();
-
-        let id = Uuid::new_v4().to_string();
-        request["@extra"] = json!(id);
-        let (tx, rx) = tokio::sync::oneshot::channel::<Value>();
-        self.responses.insert(id, tx);
-
-        let x = request.to_string();
         let permit = self.semaphore.acquire().await.unwrap();
         println!("{} available permits", self.semaphore.available_permits());
         // println!("{:#?}", x);
         let _ = self.client.send(&x);
 
-        let value = rx.await?;
-        println!("{:#?}", value);
-
+        let timeout = tokio::time::timeout(timeout, rx).await?;
         drop(permit);
 
-        if value["@type"] == "error" {
-            return match serde_json::from_value::<TonError>(value) {
-                Ok(e) => Err(anyhow::Error::from(e)),
-                Err(e) => Err(anyhow::Error::from(e)),
-            };
-        }
+        return match timeout {
+            Ok(mut value) => {
+                println!("{:#?}", value);
+                let obj = value.as_object_mut().unwrap();
+                let _ = obj.remove("@extra");
 
-        return serde_json::from_value::<T>(value).map_err(anyhow::Error::from);
+                if value["@type"] == "error" {
+                    return match serde_json::from_value::<TonError>(value) {
+                        Ok(e) => Err(anyhow::Error::from(e)),
+                        Err(e) => Err(anyhow::Error::from(e)),
+                    };
+                }
+
+                serde_json::from_value::<T>(value).map_err(anyhow::Error::from)
+            },
+            Err(e) => {
+                self.responses.remove(&id);
+
+                Err(anyhow::Error::from(e))
+            }
+        }
     }
 
     pub async fn synchronize(&self) -> anyhow::Result<Value> {
@@ -321,13 +309,13 @@ impl AsyncClient {
             "@type": "sync"
         });
 
-        return self.execute(&query).await;
+        return self.execute_typed_with_timeout::<Value>(&query, Duration::from_secs(120)).await;
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<Value> {
         let query = json!(GetMasterchainInfo {});
 
-        return self.execute(&query).await;
+        return self.execute_typed::<Value>(&query).await;
     }
 
     pub async fn look_up_block_by_seqno(
@@ -352,7 +340,7 @@ impl AsyncClient {
             "id": block
         });
 
-        return self.execute(&request).await;
+        return self.execute_typed::<Value>(&request).await;
     }
 
     pub async fn get_block_header(&self, workchain: i64, shard: i64, seqno: u64) -> anyhow::Result<Value> {
@@ -365,13 +353,13 @@ impl AsyncClient {
             "id": block
         });
 
-        return self.execute(&request).await;
+        return self.execute_typed::<Value>(&request).await;
     }
 
     pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
         let request = json!(RawSendMessage {body: message.to_string()});
 
-        return self.execute(&request).await;
+        return self.execute_typed::<Value>(&request).await;
     }
 
     pub async fn get_tx_stream(&self, block: BlockIdExt) -> impl Stream<Item = ShortTxId> + '_ {
@@ -429,7 +417,7 @@ impl AsyncClient {
             }
         });
 
-        let mut response = self.execute(&request).await?;
+        let mut response = self.execute_typed::<Value>(&request).await?;
 
         let code = response["code"].as_str().unwrap_or("");
         let state: &str = if code.len() == 0 || code.parse::<i64>().is_ok() {
@@ -460,7 +448,7 @@ impl AsyncClient {
             }
         });
 
-        return self.execute(&request).await;
+        return self.execute_typed::<Value>(&request).await;
     }
 
     pub async fn get_account_tx_stream(&self, address: String) -> impl Stream<Item = RawTransaction> + '_ {
@@ -565,6 +553,6 @@ impl AsyncClient {
             "lt": lt
         });
 
-        return self.execute(&query).await;
+        return self.execute_typed::<Value>(&query).await;
     }
 }
