@@ -1,6 +1,7 @@
-use std::time::Duration;
+use futures::future::Either::{Left, Right};
+use futures::Stream;
 use jsonrpc_core::{BoxFuture, Params};
-use crate::tonlib::{AsyncClient, BlockIdExt, ClientBuilder, ShortTxId, TlBlock};
+use crate::tonlib::{AsyncClient, BlockIdExt, ClientBuilder, InternalTransactionId, RawTransaction, ShortTxId};
 use jsonrpc_http_server::jsonrpc_core::IoHandler;
 use jsonrpc_http_server::tokio::runtime::Runtime;
 use jsonrpc_http_server::{ServerBuilder};
@@ -8,8 +9,8 @@ use jsonrpc_derive::rpc;
 use jsonrpc_core::{Result, Error};
 use serde_json::{json, Value};
 use serde::Deserialize;
-use futures::StreamExt;
-
+// use futures::StreamExt;
+use tokio_stream::StreamExt;
 #[macro_use]
 extern crate lazy_static;
 
@@ -20,7 +21,7 @@ lazy_static! {
         let client = Runtime::new().unwrap().block_on(async {
             ClientBuilder::from_file("./liteserver_config.json")
                 .unwrap()
-                .disable_logging()
+                // .disable_logging()
                 .build()
                 .await
                 .unwrap()
@@ -73,11 +74,16 @@ struct AddressParams {
 #[derive(Deserialize, Debug)]
 struct TransactionsParams {
     address: String,
-    limit: Option<u8>,
-    lt: Option<i64>,
+    limit: Option<u16>,
+    lt: Option<String>,
     hash: Option<String>,
-    to_lt: Option<i64>,
+    to_lt: Option<String>,
     archival: Option<bool>
+}
+
+#[derive(Deserialize, Debug)]
+struct SendBocParams {
+    boc: String
 }
 
 type RpcResponse = BoxFuture<Result<Value>>;
@@ -107,6 +113,9 @@ pub trait Rpc {
 
     #[rpc(name = "getTransactions", raw_params)]
     fn get_transactions(&self, params: Params) -> RpcResponse;
+
+    #[rpc(name = "sendBoc", raw_params)]
+    fn send_boc(&self, params: Params) -> RpcResponse;
 }
 
 struct RpcImpl;
@@ -168,16 +177,16 @@ impl Rpc for RpcImpl {
             let block = serde_json::from_value::<BlockIdExt>(block_json)
                 .map_err(|_| Error::internal_error())?;
 
-            let stream = TON.get_tx_stream(block.clone()).await.map_err(|_| Error::internal_error())?;
-            let tx: Vec<TlBlock> = stream
+            let stream = TON.get_tx_stream(block.clone()).await;
+            let tx: Vec<ShortTxId> = stream
                 .map(|tx: ShortTxId| {
                     println!("{}", &tx.account);
-                    TlBlock::ShortTxId(ShortTxId {
+                    ShortTxId {
                         account: format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap()),
                         hash: tx.hash,
                         lt: tx.lt,
                         mode: tx.mode
-                    })
+                    }
                 })
                 .collect()
                 .await;
@@ -185,7 +194,7 @@ impl Rpc for RpcImpl {
 
             Ok(json!({
                 "@type": "blocks.transactions",
-                "id": TlBlock::BlockIdExt(block),
+                "id": block,
                 "incomplete": false,
                 "req_count": count,
                 "transactions": &tx
@@ -213,24 +222,38 @@ impl Rpc for RpcImpl {
         Box::pin(async move {
             let params = params.parse::<TransactionsParams>()?;
             let address = params.address;
+            let count = params.limit.unwrap_or(10);
+            let max_lt = params.to_lt.and_then(|x| x.parse::<i64>().ok());
+            let lt = params.lt;
+            let hash = params.hash;
 
-            let state = TON.raw_get_account_state(&address)
-                .await.map_err(|_| Error::internal_error())?;
+            let stream = match (lt, hash) {
+                (Some(lt), Some(hash)) => Left(TON.get_account_tx_stream_from(address, InternalTransactionId {hash, lt})),
+                _ => Right(TON.get_account_tx_stream(address).await)
+            };
+            let stream = match max_lt {
+                Some(to_lt) => Left(stream.take_while(move |tx: &RawTransaction| tx.transaction_id.lt.parse::<i64>().unwrap() > to_lt)),
+                _ => Right(stream)
+            };
 
-            let lt_map = state["last_transaction_id"].as_object().ok_or(Error::internal_error())?;
-            let lt = lt_map.get("lt")
-                .and_then(Value::as_str)
-                .ok_or(Error::internal_error())?;
+            let txs: Vec<RawTransaction> = stream
+                .take(count as usize)
+                .collect()
+                .await;
 
-            let hash = lt_map.get("hash")
-                .and_then(Value::as_str)
-                .ok_or(Error::internal_error())?;
-
-            let tx = TON._raw_get_transactions(&address, lt, hash).await;
-
-            jsonrpc_error(tx)
+            serde_json::to_value(txs).map_err(|e| {
+                Error::internal_error()
+            })
         })
 
+    }
+
+    fn send_boc(&self, params: Params) -> RpcResponse {
+        Box::pin(async move {
+            let params = params.parse::<SendBocParams>()?;
+
+            jsonrpc_error(TON.send_message(&params.boc).await)
+        })
     }
 }
 
@@ -240,7 +263,8 @@ fn jsonrpc_error<T>(r: anyhow::Result<T>) -> Result<T> {
 
 fn main() {
     let mut rt = Runtime::new().unwrap();
-    let _ = rt.block_on(TON.synchronize());
+    let _ = rt.block_on(async { TON.synchronize().await }); // TODO fix timeout
+    println!("Synchronized");
 
     let mut io = IoHandler::new();
     io.extend_with(RpcImpl.to_delegate());

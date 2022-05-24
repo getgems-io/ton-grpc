@@ -1,18 +1,19 @@
 use futures::StreamExt;
 use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use serde_json::{json, Value};
-use std::collections::HashMap;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
 use std::io::BufReader;
 use std::path::{Path};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc};
 use std::thread;
 use std::time::Duration;
+use dashmap::DashMap;
 use tokio::sync::Semaphore;
+use tokio::time::timeout;
 use tonlibjson_rs::Client;
 use uuid::Uuid;
 
@@ -78,11 +79,8 @@ impl ClientBuilder {
 const MAIN_WORKCHAIN: i64 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
-pub trait TlType {
-    fn tl_type() -> String;
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "@type", rename = "blocks.shortTxId")]
 pub struct ShortTxId {
     pub account: String,
     pub hash: String,
@@ -112,13 +110,8 @@ impl Error for TonError {
     }
 }
 
-impl ShortTxId {
-    fn ton_type() -> String {
-        return "ton.shortTxId".to_string();
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {
     pub workchain: i64,
     pub shard: String,
@@ -127,48 +120,62 @@ pub struct BlockIdExt {
     pub file_hash: String,
 }
 
-impl TlType for BlockIdExt {
-    fn tl_type() -> String {
-        return "ton.blockIdExt".to_string();
-    }
-}
-
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct MasterchainInfoResponse {
+#[serde(tag = "@type", rename = "blocks.masterchainInfo")]
+pub struct MasterchainInfo {
     pub init: BlockIdExt,
     pub last: BlockIdExt,
     pub state_root_hash: String,
 }
 
-impl TlType for MasterchainInfoResponse {
-    fn tl_type() -> String {
-        return "blocks.masterchainInfo".to_string();
-    }
-}
-
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(tag = "@type", rename = "internal.transactionId")]
 pub struct InternalTransactionId {
-    hash: String,
-    lt: String
+    pub hash: String,
+    pub lt: String
 }
 
-impl TlType for InternalTransactionId {
-    fn tl_type() -> String { "internal.transactionId".to_string() }
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(tag = "@type", rename = "accountAddress")]
+pub struct AccountAddress {
+    account_address: String
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(tag = "@type", rename = "raw.message")]
+pub struct RawMessage {
+    source: AccountAddress,
+    destination: AccountAddress,
+    value: String,
+    fwd_fee: String,
+    ihr_fee: String,
+    created_lt: String,
+    body_hash: String,
+    msg_data: Value, // @todo maybe only msg.dataRaw
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(tag = "@type", rename = "raw.transaction")]
+pub struct RawTransaction {
+    pub utime: i64,
+    pub data: String,
+    pub transaction_id: InternalTransactionId,
+    pub fee: String,
+    pub storage_fee: String,
+    pub other_fee: String,
+    pub in_msg: Option<RawMessage>,
+    pub out_msgs: Vec<RawMessage>
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct RawTransactions {
+    transactions: Vec<RawTransaction>,
+    previous_transaction_id: InternalTransactionId
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "@type")]
-pub enum TlBlock {
-    #[serde(rename = "ton.blockIdExt")]
-    BlockIdExt(BlockIdExt),
-    #[serde(rename = "blocks.shortTxId")]
-    ShortTxId(ShortTxId),
-    #[serde(rename = "blocks.getMasterchainInfo")]
-    GetMasterchainInfoRequest,
-    // #[serde(rename = "blocks.masterchainInfo")]
-    // GetMasterchainInfoResponse(MasterchainInfoResponse),
-    #[serde(rename = "blocks.accountTransactionId")]
-    AccountTransactionId(AccountTransactionId),
-}
+#[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]
+struct GetMasterchainInfo {}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ShardsResponse {
@@ -184,9 +191,16 @@ pub struct TransactionsResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "@type", rename = "blocks.accountTransactionId")]
 pub struct AccountTransactionId {
     pub account: String,
     pub lt: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "@type", rename = "raw.sendMessage")]
+pub struct RawSendMessage {
+    pub body: String
 }
 
 impl From<&ShortTxId> for AccountTransactionId {
@@ -198,15 +212,9 @@ impl From<&ShortTxId> for AccountTransactionId {
     }
 }
 
-impl TlType for AccountTransactionId {
-    fn tl_type() -> String {
-        return "blocks.accountTransactionId".to_string();
-    }
-}
-
 pub struct AsyncClient {
     client: Arc<Client>,
-    responses: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Value>>>>,
+    responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>>,
     semaphore: Semaphore,
 }
 
@@ -214,10 +222,10 @@ impl AsyncClient {
     pub fn new() -> Self {
         let client = Arc::new(Client::new());
         let client_recv = client.clone();
-        let semaphore = tokio::sync::Semaphore::new(500);
+        let semaphore = tokio::sync::Semaphore::new(1000);
 
-        let responses: Arc<Mutex<HashMap<String, tokio::sync::oneshot::Sender<Value>>>> =
-            Arc::new(Mutex::new(HashMap::new()));
+        let responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>> =
+            Arc::new(DashMap::new());
         let responses_rcv = Arc::clone(&responses);
 
         let _ = thread::spawn(move || {
@@ -226,10 +234,7 @@ impl AsyncClient {
                 if let Ok(packet) = client_recv.receive(timeout) {
                     if let Ok(json) = serde_json::from_str::<Value>(packet) {
                         if let Some(Value::String(ref id)) = json.get("@extra") {
-                            let mut resps = responses_rcv.lock().unwrap();
-                            let s = resps.remove::<String>(id);
-                            drop(resps);
-                            if let Some(s) = s {
+                            if let Some((_, s)) = responses_rcv.remove(id) {
                                 let _ = s.send(json);
                             }
                         }
@@ -255,15 +260,21 @@ impl AsyncClient {
         let id = Uuid::new_v4().to_string();
         request["@extra"] = json!(id);
         let (tx, rx) = tokio::sync::oneshot::channel::<Value>();
-        self.responses.lock().unwrap().insert(id, tx);
+        self.responses.insert(id.clone(), tx);
 
         let x = request.to_string();
-        let permit = self.semaphore.acquire();
+        let permit = self.semaphore.acquire().await?;
         println!("{} available permits", self.semaphore.available_permits());
         let _ = self.client.send(&x);
 
-        let mut value = rx.await?;
+        let timeout = timeout(Duration::from_secs(20), rx).await?;
         drop(permit);
+        if let Err(e) = timeout {
+            self.responses.remove(&id);
+
+            return Err(anyhow::Error::from(e));
+        }
+        let mut value = timeout.unwrap();
 
         let obj = value.as_object_mut().unwrap();
         let _ = obj.remove("@extra");
@@ -282,7 +293,7 @@ impl AsyncClient {
         let id = Uuid::new_v4().to_string();
         request["@extra"] = json!(id);
         let (tx, rx) = tokio::sync::oneshot::channel::<Value>();
-        self.responses.lock().unwrap().insert(id, tx);
+        self.responses.insert(id, tx);
 
         let x = request.to_string();
         let permit = self.semaphore.acquire().await.unwrap();
@@ -291,7 +302,7 @@ impl AsyncClient {
         let _ = self.client.send(&x);
 
         let value = rx.await?;
-        // println!("{:#?}", value);
+        println!("{:#?}", value);
 
         drop(permit);
 
@@ -314,7 +325,7 @@ impl AsyncClient {
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<Value> {
-        let query = json!(TlBlock::GetMasterchainInfoRequest);
+        let query = json!(GetMasterchainInfo {});
 
         return self.execute(&query).await;
     }
@@ -357,14 +368,20 @@ impl AsyncClient {
         return self.execute(&request).await;
     }
 
-    pub async fn get_tx_stream(&self, block: BlockIdExt) -> anyhow::Result<impl Stream<Item = ShortTxId> + '_> {
+    pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
+        let request = json!(RawSendMessage {body: message.to_string()});
+
+        return self.execute(&request).await;
+    }
+
+    pub async fn get_tx_stream(&self, block: BlockIdExt) -> impl Stream<Item = ShortTxId> + '_ {
         struct State {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
             block: BlockIdExt,
         }
 
-        return Ok(stream::unfold(
+        return stream::unfold(
             State {
                 last_tx: None,
                 incomplete: true,
@@ -401,7 +418,7 @@ impl AsyncClient {
                 }
             },
         )
-        .flatten());
+        .flatten();
     }
 
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
@@ -446,7 +463,36 @@ impl AsyncClient {
         return self.execute(&request).await;
     }
 
-    pub async fn _raw_get_transactions(&self, address: &str, from_lt: &str, from_hash: &str) -> anyhow::Result<Value>{
+    pub async fn get_account_tx_stream(&self, address: String) -> impl Stream<Item = RawTransaction> + '_ {
+        let account_state = self.raw_get_account_state(&address).await.unwrap(); // @todo
+        let ltx = account_state.get("last_transaction_id").unwrap();
+        let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned()).unwrap();
+
+        return self.get_account_tx_stream_from(address, last_tx);
+    }
+
+    pub fn get_account_tx_stream_from(&self, address: String, last_tx: InternalTransactionId) -> impl Stream<Item = RawTransaction> + '_ {
+        struct State {
+            address: String,
+            last_tx: InternalTransactionId
+        };
+
+        return stream::unfold(State { address, last_tx}, move |state| async move {
+            let txs = self._raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash).await.unwrap();
+            if txs.transactions.is_empty() {
+                return None;
+            }
+
+            let last_tx = txs.transactions.last().unwrap().transaction_id.clone();
+
+            return Some((stream::iter(txs.transactions), State {
+                address: state.address,
+                last_tx
+            }));
+        }).flatten()
+    }
+
+    pub async fn _raw_get_transactions(&self, address: &str, from_lt: &str, from_hash: &str) -> anyhow::Result<RawTransactions>{
         let request = json!({
             "@type": "raw.getTransactions",
             "account_address": {
@@ -459,7 +505,7 @@ impl AsyncClient {
             }
         });
 
-        return self.execute(&request).await;
+        return self.execute_typed::<RawTransactions>(&request).await;
     }
 
     async fn _get_transactions(
@@ -487,9 +533,6 @@ impl AsyncClient {
         count: u32,
         tx: AccountTransactionId,
     ) -> anyhow::Result<TransactionsResponse> {
-        let block = TlBlock::BlockIdExt(block.clone());
-        let tx = TlBlock::AccountTransactionId(tx);
-
         let request = json!({
             "@type": "blocks.getTransactions",
             "id": block,
