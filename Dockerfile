@@ -1,4 +1,4 @@
-FROM rust:1.61-bullseye as builder
+FROM rust:1.61-bullseye
 
 RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common
 RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 14 all
@@ -14,10 +14,4 @@ ENV RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang -Clink-arg=-fuse-ld=lld"
 
 RUN cargo build -vv --release
 
-FROM rust:1.61-slim-bullseye AS runner
-
-COPY --from=builder /target/release/tonlibjson-jsonrpc /usr/bin/tonlibjson-jsonrpc
-COPY liteserver_config.json liteserver_config.json
-
-EXPOSE 3030
-CMD ["/usr/bin/tonlibjson-jsonrpc"]
+CMD ["./target/release/tonlibjson-jsonrpc"]
