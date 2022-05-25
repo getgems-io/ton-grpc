@@ -217,7 +217,13 @@ impl RpcServer {
         let count = params.limit.unwrap_or(10);
         let max_lt = params.to_lt.and_then(|x| x.parse::<i64>().ok());
         let lt = params.lt;
-        let hash = params.hash;
+        let hash = params.hash.and_then(|h| {
+            if h.len() == 64 {
+                hex_to_base64(&h).ok()
+            } else {
+                Some(h)
+            }
+        });
 
         let stream = match (lt, hash) {
             (Some(lt), Some(hash)) => Left(
@@ -331,5 +337,12 @@ fn base64_to_hex(b: &str) -> anyhow::Result<String> {
     let bytes = base64::decode(b)?;
     let hex = hex::encode(bytes);
 
-    return Ok(hex)
+    Ok(hex)
+}
+
+fn hex_to_base64(b: &str) -> anyhow::Result<String> {
+    let bytes = hex::decode(b)?;
+    let base64 = base64::encode(bytes);
+
+    Ok(base64)
 }
