@@ -1,0 +1,15 @@
+[package]
+name = "tonlibjson-tokio"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+
+[dependencies]
+tonlibjson-rs = { path = "../tonlibjson-rs" }
+anyhow = "1.0.57"
+serde = { version = "1.0.136", features = ["serde_derive"] }
+serde_json = "1.0.79"
+tokio = { version = "1.18.2", features = ["rt-multi-thread", "sync", "macros", "time", "rt"] }
+futures = "0.3.21"
+dashmap = "5.3.3"
+uuid = { version = "1.0.0", features = ["v4", "fast-rng"] }

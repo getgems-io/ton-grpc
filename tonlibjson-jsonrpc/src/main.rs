@@ -2,12 +2,10 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use axum::{Json, Router, routing::post};
 use futures::future::Either::{Left, Right};
-use crate::tonlib::{AsyncClient, BlockIdExt, ClientBuilder, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
 use tokio_stream::StreamExt;
-
-mod tonlib;
+use tonlibjson_tokio::{AsyncClient, BlockIdExt, ClientBuilder, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {

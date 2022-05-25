@@ -239,6 +239,8 @@ impl AsyncClient {
                             if let Some((_, s)) = responses_rcv.remove(id) {
                                 let _ = s.send(json);
                             }
+                        } else {
+                            println!("{:?}", json.to_string());
                         }
                     }
                 }
@@ -406,7 +408,7 @@ impl AsyncClient {
                 }
             },
         )
-        .flatten();
+            .flatten();
     }
 
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
@@ -421,12 +423,12 @@ impl AsyncClient {
 
         let code = response["code"].as_str().unwrap_or("");
         let state: &str = if code.len() == 0 || code.parse::<i64>().is_ok() {
-                if response["frozen_hash"].as_str().unwrap_or("").len() == 0 {
-                    "uninitialized"
-                } else {
-                    "frozen"
-                }
+            if response["frozen_hash"].as_str().unwrap_or("").len() == 0 {
+                "uninitialized"
             } else {
+                "frozen"
+            }
+        } else {
             "active"
         };
 
