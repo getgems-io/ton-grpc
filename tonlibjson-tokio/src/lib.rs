@@ -288,7 +288,7 @@ impl AsyncClient {
 
         return match timeout {
             Ok(mut value) => {
-                println!("{:#?}", value);
+                // println!("{:#?}", value);
                 let obj = value.as_object_mut().unwrap();
                 let _ = obj.remove("@extra");
 
