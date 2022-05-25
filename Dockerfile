@@ -14,7 +14,7 @@ ENV RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang -Clink-arg=-fuse-ld=lld"
 
 RUN cargo build -vv --release
 
-FROM debian:bullseye AS runner
+FROM rust:1.61-slim-bullseye AS runner
 
 COPY --from=builder /target/release/tonlibjson-jsonrpc /usr/bin/tonlibjson-jsonrpc
 COPY liteserver_config.json liteserver_config.json
