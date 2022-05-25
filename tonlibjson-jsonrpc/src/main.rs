@@ -2,6 +2,7 @@ use std::sync::Arc;
 use anyhow::anyhow;
 use axum::{Json, Router, routing::post};
 use futures::future::Either::{Left, Right};
+use futures::TryStreamExt;
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
 use tokio_stream::StreamExt;
@@ -85,10 +86,12 @@ enum Method {
     MasterchainInfo
 }
 
+type JsonRequestId = Value;
+
 #[derive(Debug, Deserialize)]
 struct JsonRequest {
     jsonrpc: String,
-    id: u64,
+    id: JsonRequestId,
     #[serde(flatten)]
     method: Method
 }
@@ -107,11 +110,11 @@ struct JsonResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     result: Option<Value>,
     jsonrpc: String,
-    id: u64
+    id: JsonRequestId
 }
 
 impl JsonResponse {
-    fn new(id: u64, result: Value) -> Self {
+    fn new(id: JsonRequestId, result: Value) -> Self {
         return Self {
             ok: true,
             result: Some(result),
@@ -121,7 +124,7 @@ impl JsonResponse {
         }
     }
 
-    fn error(id: u64, e: anyhow::Error) -> Self {
+    fn error(id: JsonRequestId, e: anyhow::Error) -> Self {
         return Self {
             ok: false,
             result: None,
@@ -234,7 +237,38 @@ impl RpcServer {
             .collect()
             .await;
 
-        Ok(serde_json::to_value(txs)?)
+
+        let mut response = serde_json::to_value(txs)?;
+
+        // TODO meh
+        let mapped: Vec<&mut Value> = response.as_array_mut().unwrap().iter_mut().map(|x| {
+            if let Some(in_msg) = x.get_mut("in_msg") {
+                if let Some(source) = in_msg.get_mut("source") {
+                    *source = source.get("account_address").unwrap().clone()
+                }
+
+                if let Some(destination) = in_msg.get_mut("destination") {
+                    *destination = destination.get("account_address").unwrap().clone()
+                }
+            }
+
+            if let Some(out_msgs) = x.get_mut("out_msgs") {
+                *out_msgs = Value::Array(out_msgs.as_array_mut().unwrap().iter_mut().map(|out_msg| {
+                    if let Some(source) = out_msg.get_mut("source") {
+                        *source = source.get("account_address").unwrap().clone()
+                    }
+
+                    if let Some(destination) = out_msg.get_mut("destination") {
+                        *destination = destination.get("account_address").unwrap().clone()
+                    }
+                    out_msg.clone()
+                }).collect())
+            }
+
+            x
+        }).collect();
+
+        Ok(serde_json::to_value(mapped)?)
     }
 
     async fn send_boc(&self, params: SendBocParams) -> RpcResponse<Value> {
@@ -246,8 +280,6 @@ impl RpcServer {
 }
 
 async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) -> Json<JsonResponse> {
-    println!("{:?}", payload);
-
     let result = match payload.method {
         Method::MasterchainInfo => rpc.master_chain_info().await.and_then(|x| Ok(serde_json::to_value(x)?)),
         Method::LookupBlock { params } => rpc.lookup_block(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
@@ -272,7 +304,7 @@ async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) 
 async fn main() -> anyhow::Result<()> {
     let client = ClientBuilder::from_file("./liteserver_config.json")
         .unwrap()
-        // .disable_logging()
+        .disable_logging()
         .build()
         .await?;
 

@@ -154,6 +154,7 @@ pub struct RawMessage {
     created_lt: String,
     body_hash: String,
     msg_data: Value, // @todo maybe only msg.dataRaw
+    // @todo deserialize boc
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -165,6 +166,8 @@ pub struct RawTransaction {
     pub fee: String,
     pub storage_fee: String,
     pub other_fee: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub in_msg: Option<RawMessage>,
     pub out_msgs: Vec<RawMessage>
 }
@@ -240,7 +243,7 @@ impl AsyncClient {
                                 let _ = s.send(json);
                             }
                         } else {
-                            println!("{:?}", json.to_string());
+                            println!("Unexpected response {:?}", json.to_string());
                         }
                     }
                 }
