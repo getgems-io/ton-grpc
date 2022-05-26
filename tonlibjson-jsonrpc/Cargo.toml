@@ -8,7 +8,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 cmake = "0.1.48"
 
 [dependencies]
-axum = "0.4.4"
+axum = "0.5.6"
 anyhow = "1.0.57"
 tokio = { version = "1.18.2", features = ["rt-multi-thread", "sync", "macros", "time", "rt"] }
 tokio-stream = "0.1.8"
