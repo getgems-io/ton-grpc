@@ -86,11 +86,11 @@ enum Method {
     MasterchainInfo
 }
 
-type JsonRequestId = Value;
+type JsonRequestId = Option<Value>;
 
 #[derive(Debug, Deserialize)]
 struct JsonRequest {
-    jsonrpc: String,
+    jsonrpc: Option<String>,
     id: JsonRequestId,
     #[serde(flatten)]
     method: Method
