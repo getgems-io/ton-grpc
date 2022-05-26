@@ -262,7 +262,7 @@ impl AsyncClient {
         let _ = self.client.send(&request.to_string());
     }
 
-    async fn execute_typed<T: DeserializeOwned>(&self, request: &serde_json::Value) -> anyhow::Result<T> {
+    async fn execute_typed<T: DeserializeOwned>(&self, request: &Value) -> anyhow::Result<T> {
         return self.execute_typed_with_timeout(request, Duration::from_secs(20)).await;
     }
 
@@ -279,7 +279,7 @@ impl AsyncClient {
         self.responses.insert(id.clone(), tx);
 
         let x = request.to_string();
-        let permit = self.semaphore.acquire().await.unwrap();
+        let permit = self.semaphore.acquire().await?;
         println!("{} available permits", self.semaphore.available_permits());
         // println!("{:#?}", x);
         let _ = self.client.send(&x);
@@ -290,7 +290,7 @@ impl AsyncClient {
         return match timeout {
             Ok(mut value) => {
                 // println!("{:#?}", value);
-                let obj = value.as_object_mut().unwrap();
+                let obj = value.as_object_mut().ok_or(anyhow!("Not an object"))?;
                 let _ = obj.remove("@extra");
 
                 if value["@type"] == "error" {
@@ -453,7 +453,7 @@ impl AsyncClient {
     pub async fn get_account_tx_stream(&self, address: String) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
         let account_state = self.raw_get_account_state(&address).await?;
         let ltx = account_state.get("last_transaction_id").ok_or(anyhow!("Unexpected missed last_transaction_id"))?;
-        let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned()).unwrap();
+        let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned())?;
 
         return Ok(self.get_account_tx_stream_from(address, last_tx));
     }
