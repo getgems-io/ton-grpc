@@ -11,6 +11,7 @@ use std::path::{Path};
 use std::sync::{Arc};
 use std::thread;
 use std::time::Duration;
+use anyhow::anyhow;
 use dashmap::DashMap;
 use tokio::sync::Semaphore;
 use tonlibjson_rs::Client;
@@ -456,12 +457,12 @@ impl AsyncClient {
         return self.execute_typed::<Value>(&request).await;
     }
 
-    pub async fn get_account_tx_stream(&self, address: String) -> impl Stream<Item = RawTransaction> + '_ {
-        let account_state = self.raw_get_account_state(&address).await.unwrap(); // @todo
-        let ltx = account_state.get("last_transaction_id").unwrap();
+    pub async fn get_account_tx_stream(&self, address: String) -> anyhow::Result<impl Stream<Item = RawTransaction> + '_> {
+        let account_state = self.raw_get_account_state(&address).await?;
+        let ltx = account_state.get("last_transaction_id").ok_or(anyhow!("Unexpected missed last_transaction_id"))?;
         let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned()).unwrap();
 
-        return self.get_account_tx_stream_from(address, last_tx);
+        return Ok(self.get_account_tx_stream_from(address, last_tx));
     }
 
     pub fn get_account_tx_stream_from(&self, address: String, last_tx: InternalTransactionId) -> impl Stream<Item = RawTransaction> + '_ {
