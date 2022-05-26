@@ -181,7 +181,9 @@ impl RpcServer {
         let block = serde_json::from_value::<BlockIdExt>(block_json)?;
 
         let stream = self.client.get_tx_stream(block.clone()).await;
-        let tx: Vec<ShortTxId> = stream
+        let txs: Vec<ShortTxId> = stream.try_collect().await?;
+
+        let txs: Vec<ShortTxId> = txs.into_iter()
             .map(|tx: ShortTxId| {
                 println!("{}", &tx.account);
                 ShortTxId {
@@ -190,17 +192,15 @@ impl RpcServer {
                     lt: tx.lt,
                     mode: tx.mode
                 }
-            })
-            .collect()
-            .await;
+            }).collect();
 
 
         Ok(json!({
                 "@type": "blocks.transactions",
-                "id": block,
+                "id": &block,
                 "incomplete": false,
                 "req_count": count,
-                "transactions": &tx
+                "transactions": &txs
             }))
     }
 

@@ -1,4 +1,4 @@
-use futures::{StreamExt, TryStreamExt};
+use futures::{TryStreamExt};
 use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -368,51 +368,44 @@ impl AsyncClient {
         return self.execute_typed::<Value>(&request).await;
     }
 
-    pub async fn get_tx_stream(&self, block: BlockIdExt) -> impl Stream<Item = ShortTxId> + '_ {
+    pub async fn get_tx_stream(&self, block: BlockIdExt) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ {
         struct State {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
             block: BlockIdExt,
         }
 
-        return stream::unfold(
+        return stream::try_unfold(
             State {
                 last_tx: None,
                 incomplete: true,
                 block,
-            },
-            {
-                move |state: State| async move {
+            }, move |state: State| async move {
                     if state.incomplete == false {
-                        return None;
+                        return anyhow::Ok(None);
                     }
 
                     let txs;
                     if let Some(tx) = state.last_tx {
-                        txs = self
-                            ._get_transactions_after(&state.block, 30, tx)
-                            .await
-                            .unwrap();
+                        txs = self._get_transactions_after(&state.block, 30, tx).await?
                     } else {
-                        txs = self._get_transactions(&state.block, 30).await.unwrap();
+                        txs = self._get_transactions(&state.block, 30).await?
                     }
 
                     println!("got {} transactions", txs.transactions.len());
 
                     let last_tx = txs.transactions.last().map(AccountTransactionId::from);
 
-                    return Some((
-                        stream::iter(txs.transactions),
+                    return anyhow::Ok(Some((
+                        stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
                         State {
                             last_tx,
                             incomplete: txs.incomplete,
                             block: state.block,
                         },
-                    ));
-                }
-            },
-        )
-            .flatten();
+                    )));
+                },
+        ).try_flatten();
     }
 
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
