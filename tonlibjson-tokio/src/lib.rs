@@ -1,4 +1,4 @@
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -457,7 +457,7 @@ impl AsyncClient {
         return self.execute_typed::<Value>(&request).await;
     }
 
-    pub async fn get_account_tx_stream(&self, address: String) -> anyhow::Result<impl Stream<Item = RawTransaction> + '_> {
+    pub async fn get_account_tx_stream(&self, address: String) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
         let account_state = self.raw_get_account_state(&address).await?;
         let ltx = account_state.get("last_transaction_id").ok_or(anyhow!("Unexpected missed last_transaction_id"))?;
         let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned()).unwrap();
@@ -465,25 +465,25 @@ impl AsyncClient {
         return Ok(self.get_account_tx_stream_from(address, last_tx));
     }
 
-    pub fn get_account_tx_stream_from(&self, address: String, last_tx: InternalTransactionId) -> impl Stream<Item = RawTransaction> + '_ {
+    pub fn get_account_tx_stream_from(&self, address: String, last_tx: InternalTransactionId) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
         struct State {
             address: String,
             last_tx: InternalTransactionId
         }
 
-        return stream::unfold(State { address, last_tx}, move |state| async move {
-            let txs = self._raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash).await.unwrap();
+        return stream::try_unfold(State { address, last_tx}, move |state| async move {
+            let txs = self._raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash).await?;
             if txs.transactions.is_empty() {
-                return None;
+                return anyhow::Ok(None);
             }
 
             let last_tx = txs.transactions.last().unwrap().transaction_id.clone();
 
-            return Some((stream::iter(txs.transactions), State {
+            return anyhow::Ok(Some((stream::iter(txs.transactions.into_iter().map(anyhow::Ok)), State {
                 address: state.address,
                 last_tx
-            }));
-        }).flatten()
+            })));
+        }).try_flatten()
     }
 
     pub async fn _raw_get_transactions(&self, address: &str, from_lt: &str, from_hash: &str) -> anyhow::Result<RawTransactions>{

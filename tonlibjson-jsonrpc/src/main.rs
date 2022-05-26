@@ -1,11 +1,11 @@
+use std::future;
 use std::sync::Arc;
 use anyhow::anyhow;
 use axum::{Json, Router, routing::post};
 use futures::future::Either::{Left, Right};
-use futures::TryStreamExt;
+use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
-use tokio_stream::StreamExt;
 use tonlibjson_tokio::{AsyncClient, BlockIdExt, ClientBuilder, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId};
 
 #[derive(Deserialize, Debug)]
@@ -229,19 +229,21 @@ impl RpcServer {
             (Some(lt), Some(hash)) => Left(
                 self.client.get_account_tx_stream_from(address, InternalTransactionId {hash, lt})
             ),
-            _ => Right(self.client.get_account_tx_stream(address).await?)
+            _ => Right(
+                self.client.get_account_tx_stream(address).await?
+            )
         };
         let stream = match max_lt {
-            Some(to_lt) => Left(stream.take_while(move |tx: &RawTransaction|
-                tx.transaction_id.lt.parse::<i64>().unwrap() > to_lt
+            Some(to_lt) => Left(stream.try_take_while(move |tx: &RawTransaction|
+                future::ready(Ok(tx.transaction_id.lt.parse::<i64>().unwrap() > to_lt))
             )),
             _ => Right(stream)
         };
 
         let txs: Vec<RawTransaction> = stream
             .take(count as usize)
-            .collect()
-            .await;
+            .try_collect()
+            .await?;
 
 
         let mut response = serde_json::to_value(txs)?;
