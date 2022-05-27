@@ -11,3 +11,9 @@ updates:
       interval: "daily"
     reviewers:
       - "akostylev0"
+  - package-ecosystem: gitsubmodule
+    directory: "/"
+    schedule:
+      interval: "daily"
+    reviewers:
+      - "akostylev0"
