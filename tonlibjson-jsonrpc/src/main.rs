@@ -1,5 +1,6 @@
 use std::future;
 use std::sync::Arc;
+use std::time::Duration;
 use anyhow::anyhow;
 use axum::{Json, Router, routing::post};
 use futures::future::Either::{Left, Right};
@@ -328,6 +329,9 @@ async fn main() -> anyhow::Result<()> {
     }));
 
     axum::Server::bind(&"0.0.0.0:3030".parse().unwrap())
+        .http1_keepalive(true)
+        .tcp_nodelay(true)
+        .tcp_keepalive(Some(Duration::from_secs(90)))
         .serve(app.into_make_service())
         .await
         .unwrap();
