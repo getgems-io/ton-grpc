@@ -2,7 +2,8 @@
 members = [
     "tonlibjson-rs",
     "tonlibjson-tokio",
-    "tonlibjson-jsonrpc"
+    "tonlibjson-jsonrpc",
+    "tonlibjson-experiment"
 ]
 
 [profile.release]

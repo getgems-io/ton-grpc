@@ -1,4 +1,6 @@
-use futures::{TryStreamExt};
+use anyhow::anyhow;
+use dashmap::DashMap;
+use futures::TryStreamExt;
 use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -6,16 +8,18 @@ use serde_json::{json, Value};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::fs::File;
+use std::future::Future;
 use std::io::BufReader;
-use std::path::{Path};
-use std::sync::{Arc};
+use std::path::Path;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
-use anyhow::anyhow;
-use dashmap::DashMap;
-use tokio::sync::Semaphore;
 use tonlibjson_rs::Client;
+use tower::Service;
 use uuid::Uuid;
+use pin_project::pin_project;
 
 pub struct ClientBuilder {
     config: Value,
@@ -23,7 +27,7 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
-    pub fn from_json_config(config: &Value) -> anyhow::Result<Self> {
+    pub fn from_json_config(config: &Value) -> Self {
         let full_config = json!({
             "@type": "init",
             "options": {
@@ -41,10 +45,10 @@ impl ClientBuilder {
             }
         });
 
-        Ok(Self {
+        Self {
             config: full_config,
             disable_logging: None,
-        })
+        }
     }
 
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
@@ -52,7 +56,7 @@ impl ClientBuilder {
         let reader = BufReader::new(file);
         let config: Value = serde_json::from_reader(reader)?;
 
-        return ClientBuilder::from_json_config(&config);
+        return Ok(ClientBuilder::from_json_config(&config));
     }
 
     pub fn disable_logging(&mut self) -> &mut Self {
@@ -135,13 +139,13 @@ pub struct MasterchainInfo {
 #[serde(tag = "@type", rename = "internal.transactionId")]
 pub struct InternalTransactionId {
     pub hash: String,
-    pub lt: String
+    pub lt: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "@type", rename = "accountAddress")]
 pub struct AccountAddress {
-    account_address: String
+    account_address: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -155,7 +159,7 @@ pub struct RawMessage {
     created_lt: String,
     body_hash: String,
     msg_data: Value, // @todo maybe only msg.dataRaw
-    // @todo deserialize boc
+                     // @todo deserialize boc
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -170,18 +174,18 @@ pub struct RawTransaction {
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub in_msg: Option<RawMessage>,
-    pub out_msgs: Vec<RawMessage>
+    pub out_msgs: Vec<RawMessage>,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RawTransactions {
     transactions: Vec<RawTransaction>,
-    previous_transaction_id: InternalTransactionId
+    previous_transaction_id: InternalTransactionId,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]
-struct GetMasterchainInfo {}
+pub struct GetMasterchainInfo {}
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ShardsResponse {
@@ -206,7 +210,7 @@ pub struct AccountTransactionId {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "raw.sendMessage")]
 pub struct RawSendMessage {
-    pub body: String
+    pub body: String,
 }
 
 impl From<&ShortTxId> for AccountTransactionId {
@@ -218,17 +222,17 @@ impl From<&ShortTxId> for AccountTransactionId {
     }
 }
 
+#[pin_project]
+#[derive(Clone)]
 pub struct AsyncClient {
     client: Arc<Client>,
-    responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>>,
-    semaphore: Semaphore,
+    responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>>
 }
 
 impl AsyncClient {
     pub fn new() -> Self {
         let client = Arc::new(Client::new());
         let client_recv = client.clone();
-        let semaphore = tokio::sync::Semaphore::new(1000);
 
         let responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>> =
             Arc::new(DashMap::new());
@@ -251,25 +255,29 @@ impl AsyncClient {
             }
         });
 
-        return AsyncClient {
-            client,
-            responses,
-            semaphore,
-        };
+        return AsyncClient { client, responses };
     }
 
     async fn send(&self, request: Value) -> () {
         let _ = self.client.send(&request.to_string());
     }
 
-    async fn execute_typed<T: DeserializeOwned>(&self, request: &Value) -> anyhow::Result<T> {
-        return self.execute_typed_with_timeout(request, Duration::from_secs(20)).await;
+    pub async fn execute_typed<T: DeserializeOwned>(&self, request: &Value) -> anyhow::Result<T> {
+        return self
+            .execute_typed_with_timeout(request, Duration::from_secs(20))
+            .await;
+    }
+
+    pub async fn execute(&self, request: Value) -> anyhow::Result<Value> {
+        return self
+            .execute_typed_with_timeout(&request, Duration::from_secs(20))
+            .await;
     }
 
     async fn execute_typed_with_timeout<T: DeserializeOwned>(
         &self,
         request: &serde_json::Value,
-        timeout: Duration
+        timeout: Duration,
     ) -> anyhow::Result<T> {
         let mut request = request.clone();
 
@@ -279,13 +287,10 @@ impl AsyncClient {
         self.responses.insert(id.clone(), tx);
 
         let x = request.to_string();
-        let permit = self.semaphore.acquire().await?;
-        println!("{} available permits", self.semaphore.available_permits());
         // println!("{:#?}", x);
         let _ = self.client.send(&x);
 
         let timeout = tokio::time::timeout(timeout, rx).await?;
-        drop(permit);
 
         return match timeout {
             Ok(mut value) => {
@@ -301,13 +306,13 @@ impl AsyncClient {
                 }
 
                 serde_json::from_value::<T>(value).map_err(anyhow::Error::from)
-            },
+            }
             Err(e) => {
                 self.responses.remove(&id);
 
                 Err(anyhow::Error::from(e))
             }
-        }
+        };
     }
 
     pub async fn synchronize(&self) -> anyhow::Result<Value> {
@@ -315,7 +320,9 @@ impl AsyncClient {
             "@type": "sync"
         });
 
-        return self.execute_typed_with_timeout::<Value>(&query, Duration::from_secs(120)).await;
+        return self
+            .execute_typed_with_timeout::<Value>(&query, Duration::from_secs(120))
+            .await;
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
@@ -333,7 +340,12 @@ impl AsyncClient {
         return self.look_up_block(workchain, shard, seqno, 0).await;
     }
 
-    pub async fn look_up_block_by_lt(&self, workchain: i64, shard: i64, lt: i64) -> anyhow::Result<Value> {
+    pub async fn look_up_block_by_lt(
+        &self,
+        workchain: i64,
+        shard: i64,
+        lt: i64,
+    ) -> anyhow::Result<Value> {
         return self.look_up_block(workchain, shard, 0, lt).await;
     }
 
@@ -349,10 +361,13 @@ impl AsyncClient {
         return self.execute_typed::<Value>(&request).await;
     }
 
-    pub async fn get_block_header(&self, workchain: i64, shard: i64, seqno: u64) -> anyhow::Result<Value> {
-        let block = self
-            .look_up_block(workchain, shard, seqno, 0)
-            .await?;
+    pub async fn get_block_header(
+        &self,
+        workchain: i64,
+        shard: i64,
+        seqno: u64,
+    ) -> anyhow::Result<Value> {
+        let block = self.look_up_block(workchain, shard, seqno, 0).await?;
 
         let request = json!({
             "@type": "blocks.getBlockHeader",
@@ -363,12 +378,17 @@ impl AsyncClient {
     }
 
     pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
-        let request = json!(RawSendMessage {body: message.to_string()});
+        let request = json!(RawSendMessage {
+            body: message.to_string()
+        });
 
         return self.execute_typed::<Value>(&request).await;
     }
 
-    pub async fn get_tx_stream(&self, block: BlockIdExt) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ {
+    pub async fn get_tx_stream(
+        &self,
+        block: BlockIdExt,
+    ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ {
         struct State {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
@@ -380,32 +400,34 @@ impl AsyncClient {
                 last_tx: None,
                 incomplete: true,
                 block,
-            }, move |state: State| async move {
-                    if state.incomplete == false {
-                        return anyhow::Ok(None);
-                    }
+            },
+            move |state: State| async move {
+                if state.incomplete == false {
+                    return anyhow::Ok(None);
+                }
 
-                    let txs;
-                    if let Some(tx) = state.last_tx {
-                        txs = self._get_transactions_after(&state.block, 30, tx).await?
-                    } else {
-                        txs = self._get_transactions(&state.block, 30).await?
-                    }
+                let txs;
+                if let Some(tx) = state.last_tx {
+                    txs = self._get_transactions_after(&state.block, 30, tx).await?
+                } else {
+                    txs = self._get_transactions(&state.block, 30).await?
+                }
 
-                    println!("got {} transactions", txs.transactions.len());
+                println!("got {} transactions", txs.transactions.len());
 
-                    let last_tx = txs.transactions.last().map(AccountTransactionId::from);
+                let last_tx = txs.transactions.last().map(AccountTransactionId::from);
 
-                    return anyhow::Ok(Some((
-                        stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
-                        State {
-                            last_tx,
-                            incomplete: txs.incomplete,
-                            block: state.block,
-                        },
-                    )));
-                },
-        ).try_flatten();
+                return anyhow::Ok(Some((
+                    stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
+                    State {
+                        last_tx,
+                        incomplete: txs.incomplete,
+                        block: state.block,
+                    },
+                )));
+            },
+        )
+        .try_flatten();
     }
 
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
@@ -450,36 +472,56 @@ impl AsyncClient {
         return self.execute_typed::<Value>(&request).await;
     }
 
-    pub async fn get_account_tx_stream(&self, address: String) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
+    pub async fn get_account_tx_stream(
+        &self,
+        address: String,
+    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
         let account_state = self.raw_get_account_state(&address).await?;
-        let ltx = account_state.get("last_transaction_id").ok_or(anyhow!("Unexpected missed last_transaction_id"))?;
+        let ltx = account_state
+            .get("last_transaction_id")
+            .ok_or(anyhow!("Unexpected missed last_transaction_id"))?;
         let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned())?;
 
         return Ok(self.get_account_tx_stream_from(address, last_tx));
     }
 
-    pub fn get_account_tx_stream_from(&self, address: String, last_tx: InternalTransactionId) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
+    pub fn get_account_tx_stream_from(
+        &self,
+        address: String,
+        last_tx: InternalTransactionId,
+    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
         struct State {
             address: String,
-            last_tx: InternalTransactionId
+            last_tx: InternalTransactionId,
         }
 
-        return stream::try_unfold(State { address, last_tx}, move |state| async move {
-            let txs = self._raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash).await?;
+        return stream::try_unfold(State { address, last_tx }, move |state| async move {
+            let txs = self
+                ._raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash)
+                .await?;
             if txs.transactions.is_empty() {
                 return anyhow::Ok(None);
             }
 
             let last_tx = txs.transactions.last().unwrap().transaction_id.clone();
 
-            return anyhow::Ok(Some((stream::iter(txs.transactions.into_iter().map(anyhow::Ok)), State {
-                address: state.address,
-                last_tx
-            })));
-        }).try_flatten()
+            return anyhow::Ok(Some((
+                stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
+                State {
+                    address: state.address,
+                    last_tx,
+                },
+            )));
+        })
+        .try_flatten();
     }
 
-    pub async fn _raw_get_transactions(&self, address: &str, from_lt: &str, from_hash: &str) -> anyhow::Result<RawTransactions>{
+    pub async fn _raw_get_transactions(
+        &self,
+        address: &str,
+        from_lt: &str,
+        from_hash: &str,
+    ) -> anyhow::Result<RawTransactions> {
         let request = json!({
             "@type": "raw.getTransactions",
             "account_address": {
@@ -531,7 +573,13 @@ impl AsyncClient {
         return self.execute_typed(&request).await;
     }
 
-    async fn look_up_block(&self, workchain: i64, shard: i64, seqno: u64, lt: i64) -> anyhow::Result<Value> {
+    async fn look_up_block(
+        &self,
+        workchain: i64,
+        shard: i64,
+        seqno: u64,
+        lt: i64,
+    ) -> anyhow::Result<Value> {
         let mut mode: i32 = 0;
         if seqno > 0 {
             mode += 1
@@ -553,5 +601,21 @@ impl AsyncClient {
         });
 
         return self.execute_typed::<Value>(&query).await;
+    }
+}
+
+impl Service<Value> for AsyncClient {
+    type Response = Value;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, req: Value) -> Self::Future {
+        let mut this = self.clone();
+
+        return Box::pin(async move { this.execute(req).await });
     }
 }
