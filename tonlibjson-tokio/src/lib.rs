@@ -17,7 +17,7 @@ use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
 use tonlibjson_rs::Client;
-use tower::Service;
+use tower::{Service, ServiceExt};
 use uuid::Uuid;
 use pin_project::pin_project;
 
@@ -325,11 +325,7 @@ impl AsyncClient {
             .await;
     }
 
-    pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
-        let query = json!(GetMasterchainInfo {});
 
-        return self.execute_typed::<MasterchainInfo>(&query).await;
-    }
 
     pub async fn look_up_block_by_seqno(
         &self,
@@ -617,5 +613,32 @@ impl Service<Value> for AsyncClient {
         let mut this = self.clone();
 
         return Box::pin(async move { this.execute(req).await });
+    }
+}
+
+pub struct Ton<S> {
+    service: S
+}
+
+impl<S> Ton<S> where S : Service<Value, Response = Value, Error = Box<(dyn std::error::Error + Sync + std::marker::Send + 'static)>> {
+    pub fn new(service: S) -> Self {
+        Self {
+            service
+        }
+    }
+
+    async fn call(&mut self, request: Value) -> anyhow::Result<Value> {
+        let ready = self.service.ready().await.map_err(|e| anyhow!(e))?;
+        let call = self.service.call(request).await.map_err(|e| anyhow!(e))?;
+
+        return Ok(call)
+    }
+
+    pub async fn get_masterchain_info(&mut self) -> anyhow::Result<MasterchainInfo> {
+        let query = json!(GetMasterchainInfo {});
+
+        let response = self.call(query).await?;
+
+        return Ok(serde_json::from_value(response)?);
     }
 }

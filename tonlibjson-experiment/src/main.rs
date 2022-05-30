@@ -8,7 +8,7 @@ use std::iter::repeat;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use tonlibjson_tokio::{AsyncClient, ClientBuilder, GetMasterchainInfo, MasterchainInfo};
+use tonlibjson_tokio::{AsyncClient, ClientBuilder, GetMasterchainInfo, MasterchainInfo, Ton};
 use tower::discover::{Change, Discover, ServiceList};
 use tower::{Service, ServiceExt};
 use futures::TryStreamExt;
@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
         tower::load::CompleteOnResponse::default(),
     );
 
-    let mut ton = tower::balance::p2c::Balance::new(emwa);
+    let mut ton = Ton::new(tower::balance::p2c::Balance::new(emwa));
 
     let request = serde_json::to_value(GetMasterchainInfo {})?;
 
@@ -33,18 +33,22 @@ async fn main() -> anyhow::Result<()> {
 
     let now = Instant::now();
 
-    let mut responses = ton
-        .ready()
-        .await
-        .map_err(|e| anyhow!(e))?
-        .call_all(stream::iter(repeat(request).take(100000)))
-        .unordered();
+    let master = ton.get_masterchain_info().await?;
 
-    while let Ok(Some(rsp)) = responses.try_next().await {
-        println!("{:?}", rsp);
-    }
+    println!("{:?}", master);
 
-    println!("{:?}", (Instant::now() - now).as_secs());
+    // let mut resp = ton
+    //     .ready()
+    //     .await
+    //     .map_err(|e| anyhow!(e))?
+    //     .call_all(stream::iter(repeat(request).take(100000)))
+    //     .unordered();
+    //
+    // while let Ok(Some(rsp)) = responses.try_next().await {
+    //     println!("{:?}", rsp);
+    // }
+    //
+    // println!("{:?}", (Instant::now() - now).as_secs());
 
     Ok(())
 }
