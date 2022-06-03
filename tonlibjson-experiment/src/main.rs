@@ -1,16 +1,35 @@
 use futures::TryStreamExt;
 use futures::{stream, StreamExt};
+use serde_json::Value;
 use tokio::time::Instant;
-use tonlibjson_tokio::{ShortTxId, Ton};
+use tower::Service;
+use tonlibjson_tokio::{ServiceError, ShortTxId, Ton, TonBalanced};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let ton = Ton::from_config("./liteserver_config.json").await?;
-
-    println!("ton built");
+    let ton = Ton::balanced("./liteserver_config.json").await?;
 
     let now = Instant::now();
 
+    run(ton).await;
+
+    let balanced_timing = (Instant::now() - now).as_secs();
+
+    let ton = Ton::naive("./liteserver_config.json").await?;
+    let now = Instant::now();
+
+    run(ton).await;
+
+    let naive_timing = (Instant::now() - now).as_secs();
+
+
+    println!("Balanced: {:?}", balanced_timing);
+    println!("Naive: {:?}", naive_timing);
+
+    Ok(())
+}
+
+async fn run<S>(ton: Ton<S>) -> anyhow::Result<()> where S : Service<Value, Response = Value, Error = ServiceError> + Clone {
     let master = ton.get_masterchain_info().await?;
     let _stream = stream::iter((master.last.seqno - 10000..master.last.seqno).into_iter())
         .for_each_concurrent(500, |seqno| {
@@ -39,8 +58,6 @@ async fn main() -> anyhow::Result<()> {
                 }
             }
         }).await;
-
-    println!("{:?}", (Instant::now() - now).as_secs());
 
     Ok(())
 }

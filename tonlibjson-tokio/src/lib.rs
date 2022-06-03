@@ -355,7 +355,7 @@ impl AsyncClient {
 
 impl Service<Value> for AsyncClient {
     type Response = Value;
-    type Error = anyhow::Error;
+    type Error = ServiceError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -365,19 +365,21 @@ impl Service<Value> for AsyncClient {
     fn call(&mut self, req: Value) -> Self::Future {
         let this = self.clone();
 
-        return Box::pin(async move { this.execute(req).await });
+        return Box::pin(async move { this.execute(req).await.map_err(|x| ServiceError::from(x)) });
     }
 }
 
+pub type ServiceError = Box<(dyn Error + Sync + Send)>;
+pub type TonNaive = AsyncClient;
 pub type TonBalanced = Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<AsyncClient>>>, Value>, Value>;
 
 #[derive(Clone)]
-pub struct Ton {
-    service: TonBalanced,
+pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> {
+    service: S
 }
 
-impl Ton {
-    pub async fn from_config<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+impl Ton<TonBalanced> {
+    pub async fn balanced<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
         let clients = build_clients(path).await?;
 
         let discover = ServiceList::new(clients);
@@ -399,9 +401,22 @@ impl Ton {
     }
 }
 
-impl Ton
+impl Ton<AsyncClient> {
+    pub async fn naive<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let client = ClientBuilder::from_file(path)?
+            .disable_logging()
+            .build()
+            .await?;
+
+        Ok(Self {
+            service: client
+        })
+    }
+}
+
+impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> + Clone
 {
-    pub fn new(service: TonBalanced) -> Self {
+    pub fn new(service: S) -> Self {
         Self { service }
     }
 
@@ -604,11 +619,11 @@ impl Ton
         &self,
         block: BlockIdExt,
     ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ {
-        struct State<'a>{
+        struct State<'a, S : Service<Value, Response = Value, Error = ServiceError>> {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
             block: BlockIdExt,
-            this: &'a Ton
+            this: &'a Ton<S>
         }
 
         let this = self;
@@ -669,10 +684,10 @@ impl Ton
         address: String,
         last_tx: InternalTransactionId,
     ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
-        struct State<'a> {
+        struct State<'a, S : Service<Value, Response = Value, Error = ServiceError>> {
             address: String,
             last_tx: InternalTransactionId,
-            this: &'a Ton
+            this: &'a Ton<S>
         }
 
         let this = self;

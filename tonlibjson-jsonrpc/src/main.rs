@@ -1,13 +1,15 @@
+use std::fmt::Error;
 use std::future;
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::anyhow;
 use axum::{Json, Router, routing::post};
+use axum::response::Response;
 use futures::future::Either::{Left, Right};
 use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
-use tonlibjson_tokio::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, Ton};
+use tonlibjson_tokio::{AsyncClient, BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, Ton, TonBalanced};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -137,7 +139,7 @@ impl JsonResponse {
 }
 
 struct RpcServer {
-    client: Ton
+    client: Ton<TonBalanced>
 }
 
 type RpcResponse<T> = anyhow::Result<T>;
@@ -313,7 +315,7 @@ async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let ton = Ton::from_config("./liteserver_config.json").await?;
+    let ton = Ton::balanced("./liteserver_config.json").await?;
 
     let rpc = Arc::new(RpcServer {
         client: ton
