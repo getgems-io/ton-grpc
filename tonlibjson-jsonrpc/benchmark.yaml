@@ -1,0 +1,18 @@
+concurrency: 4
+base: http://localhost:3030
+iterations: 5
+rampup: 2
+
+plan:
+  - name: Get Masterchain Info
+    request:
+      url: "/"
+      method: POST
+      headers:
+        Content-Type: 'application/json'
+      body: |
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getMasterchainInfo"
+        }

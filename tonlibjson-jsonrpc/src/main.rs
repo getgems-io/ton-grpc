@@ -7,7 +7,7 @@ use futures::future::Either::{Left, Right};
 use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
-use tonlibjson_tokio::{AsyncClient, BlockIdExt, ClientBuilder, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId};
+use tonlibjson_tokio::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, Ton};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -137,7 +137,7 @@ impl JsonResponse {
 }
 
 struct RpcServer {
-    client: AsyncClient
+    client: Ton
 }
 
 type RpcResponse<T> = anyhow::Result<T>;
@@ -160,7 +160,9 @@ impl RpcServer {
     }
 
     async fn shards(&self, params: ShardsParams) -> RpcResponse<Value> {
-        self.client.get_shards(params.seqno).await
+        let response = self.client.get_shards(params.seqno).await?;
+
+        Ok(serde_json::to_value(response)?)
     }
 
     async fn get_block_header(&self, params: BlockHeaderParams) -> RpcResponse<Value> {
@@ -311,16 +313,10 @@ async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let client = ClientBuilder::from_file("./liteserver_config.json")
-        .unwrap()
-        .disable_logging()
-        .build()
-        .await?;
-
-    client.synchronize().await?;
+    let ton = Ton::from_config("./liteserver_config.json").await?;
 
     let rpc = Arc::new(RpcServer {
-        client
+        client: ton
     });
 
     let app = Router::new().route("/", post({

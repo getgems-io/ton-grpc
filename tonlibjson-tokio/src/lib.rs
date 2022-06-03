@@ -13,13 +13,19 @@ use std::future::Future;
 use std::io::BufReader;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::{Arc};
-use tokio::sync::Mutex;
+use std::sync::{Arc, mpsc, Mutex, RwLock};
 use std::task::{Context, Poll};
-use std::thread;
+use std::{future, thread};
+use std::sync::mpsc::TryRecvError;
+use std::thread::JoinHandle;
 use std::time::Duration;
+use tokio::select;
 use tonlibjson_rs::Client;
 use tower::{Service, ServiceExt};
+use tower::balance::p2c::Balance;
+use tower::buffer::Buffer;
+use tower::discover::ServiceList;
+use tower::load::PeakEwmaDiscover;
 use uuid::Uuid;
 
 pub struct ClientBuilder {
@@ -224,11 +230,29 @@ impl From<&ShortTxId> for AccountTransactionId {
     }
 }
 
-#[pin_project]
+struct Stop {
+    sender: mpsc::Sender<()>
+}
+
+impl Stop {
+    fn new(sender: mpsc::Sender<()>) -> Self {
+        Self {
+            sender
+        }
+    }
+}
+
+impl Drop for Stop {
+    fn drop(&mut self) {
+        let _ = self.sender.send(());
+    }
+}
+
 #[derive(Clone)]
 pub struct AsyncClient {
     client: Arc<Client>,
     responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>>,
+    stop_signal: Arc<Mutex<Stop>>
 }
 
 impl AsyncClient {
@@ -239,29 +263,34 @@ impl AsyncClient {
         let responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>> =
             Arc::new(DashMap::new());
         let responses_rcv = Arc::clone(&responses);
+        let (stop_signal, stop_receiver) = mpsc::channel();
 
-        let _ = thread::spawn(move || {
+        let _ = Arc::new(thread::spawn(move || {
             let timeout = Duration::from_secs(20);
             loop {
-                if let Ok(packet) = client_recv.receive(timeout) {
-                    if let Ok(json) = serde_json::from_str::<Value>(packet) {
-                        if let Some(Value::String(ref id)) = json.get("@extra") {
-                            if let Some((_, s)) = responses_rcv.remove(id) {
-                                let _ = s.send(json);
+                match stop_receiver.try_recv() {
+                    Ok(_) | Err(TryRecvError::Disconnected) => {
+                        println!("Stop thread");
+                        break
+                    },
+                    Err(TryRecvError::Empty) => {
+                        if let Ok(packet) = client_recv.receive(timeout) {
+                            if let Ok(json) = serde_json::from_str::<Value>(packet) {
+                                if let Some(Value::String(ref id)) = json.get("@extra") {
+                                    if let Some((_, s)) = responses_rcv.remove(id) {
+                                        let _ = s.send(json);
+                                    }
+                                } else {
+                                    println!("Unexpected response {:?}", json.to_string());
+                                }
                             }
-                        } else {
-                            println!("Unexpected response {:?}", json.to_string());
                         }
                     }
                 }
             }
-        });
+        }));
 
-        return AsyncClient { client, responses };
-    }
-
-    async fn send(&self, request: Value) -> () {
-        let _ = self.client.send(&request.to_string());
+        return AsyncClient { client, responses, stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal))) };
     }
 
     pub async fn execute(&self, request: Value) -> anyhow::Result<Value> {
@@ -295,6 +324,7 @@ impl AsyncClient {
                 let _ = obj.remove("@extra");
 
                 if value["@type"] == "error" {
+                    println!("Error occurred: {:?}", &value);
                     return match serde_json::from_value::<TonError>(value) {
                         Ok(e) => Err(anyhow::Error::from(e)),
                         Err(e) => Err(anyhow::Error::from(e)),
@@ -304,6 +334,7 @@ impl AsyncClient {
                 serde_json::from_value::<T>(value).map_err(anyhow::Error::from)
             }
             Err(e) => {
+                println!("timeout reached");
                 self.responses.remove(&id);
 
                 Err(anyhow::Error::from(e))
@@ -317,7 +348,7 @@ impl AsyncClient {
         });
 
         return self
-            .execute_typed_with_timeout::<Value>(&query, Duration::from_secs(120))
+            .execute_typed_with_timeout::<Value>(&query, Duration::from_secs(60 * 5))
             .await;
     }
 }
@@ -327,7 +358,7 @@ impl Service<Value> for AsyncClient {
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
@@ -338,24 +369,43 @@ impl Service<Value> for AsyncClient {
     }
 }
 
+pub type TonBalanced = Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<AsyncClient>>>, Value>, Value>;
+
 #[derive(Clone)]
-pub struct Ton<S> where S: Clone + Send + 'static {
-    service: S,
+pub struct Ton {
+    service: TonBalanced,
 }
 
-impl<S> Ton<S>
-where
-    S: Service<
-        Value,
-        Response = Value,
-        Error = Box<(dyn std::error::Error + Sync + Send + 'static)>,
-    > + Clone + Send,
+impl Ton {
+    pub async fn from_config<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+        let clients = build_clients(path).await?;
+
+        let discover = ServiceList::new(clients);
+
+        let emwa = PeakEwmaDiscover::new(
+            discover,
+            Duration::from_millis(300),
+            Duration::from_secs(10),
+            tower::load::CompleteOnResponse::default(),
+        );
+
+        let ton = Balance::new(emwa);
+        let ton = Buffer::new(ton, 200000);
+
+
+        Ok(Self {
+            service: ton
+        })
+    }
+}
+
+impl Ton
 {
-    pub fn new(service: S) -> Self {
+    pub fn new(service: TonBalanced) -> Self {
         Self { service }
     }
 
-    pub async fn get_masterchain_info(&mut self) -> anyhow::Result<MasterchainInfo> {
+    pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
         let query = json!(GetMasterchainInfo {});
 
         let response = self.call(query).await?;
@@ -364,7 +414,7 @@ where
     }
 
     pub async fn look_up_block_by_seqno(
-        &mut self,
+        &self,
         workchain: i64,
         shard: i64,
         seqno: u64,
@@ -373,7 +423,7 @@ where
     }
 
     pub async fn look_up_block_by_lt(
-        &mut self,
+        &self,
         workchain: i64,
         shard: i64,
         lt: i64,
@@ -381,7 +431,7 @@ where
         return self.look_up_block(workchain, shard, 0, lt).await;
     }
 
-    pub async fn get_shards(&mut self, master_seqno: u64) -> anyhow::Result<ShardsResponse> {
+    pub async fn get_shards(&self, master_seqno: u64) -> anyhow::Result<ShardsResponse> {
         let block = self
             .look_up_block(MAIN_WORKCHAIN, MAIN_SHARD, master_seqno, 0)
             .await?;
@@ -397,7 +447,7 @@ where
     }
 
     pub async fn get_block_header(
-        &mut self,
+        &self,
         workchain: i64,
         shard: i64,
         seqno: u64,
@@ -412,7 +462,7 @@ where
         return self.call(request).await;
     }
 
-    pub async fn raw_get_account_state(&mut self, address: &str) -> anyhow::Result<Value> {
+    pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
         let request = json!({
             "@type": "raw.getAccountState",
             "account_address": {
@@ -443,7 +493,7 @@ where
         Ok(response)
     }
 
-    pub async fn get_account_state(&mut self, address: &str) -> anyhow::Result<Value> {
+    pub async fn get_account_state(&self, address: &str) -> anyhow::Result<Value> {
         let request = json!({
             "@type": "getAccountState",
             "account_address": {
@@ -455,7 +505,7 @@ where
     }
 
     pub async fn raw_get_transactions(
-        &mut self,
+        &self,
         address: &str,
         from_lt: &str,
         from_hash: &str,
@@ -478,7 +528,7 @@ where
     }
 
     async fn blocks_get_transactions(
-        &mut self,
+        &self,
         block: &BlockIdExt,
         count: u32,
     ) -> anyhow::Result<TransactionsResponse> {
@@ -494,7 +544,7 @@ where
     }
 
     async fn blocks_get_transactions_after(
-        &mut self,
+        &self,
         block: &BlockIdExt,
         count: u32,
         tx: AccountTransactionId,
@@ -513,7 +563,7 @@ where
     }
 
     async fn look_up_block(
-        &mut self,
+        &self,
         workchain: i64,
         shard: i64,
         seqno: u64,
@@ -542,7 +592,7 @@ where
         return self.call(request).await;
     }
 
-    pub async fn send_message(&mut self, message: &str) -> anyhow::Result<Value> {
+    pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
         let request = json!(RawSendMessage {
             body: message.to_string()
         });
@@ -551,18 +601,14 @@ where
     }
 
     pub async fn get_tx_stream(
-        &mut self,
+        &self,
         block: BlockIdExt,
-    ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ where <S as Service<Value>>::Future: Send {
-        struct State<'a, Y> where Y: Service<
-            Value,
-            Response = Value,
-            Error = Box<(dyn std::error::Error + Sync + Send + 'static)>,
-        > + Clone + Send + 'static {
+    ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ {
+        struct State<'a>{
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
             block: BlockIdExt,
-            this: &'a mut Ton<Y>
+            this: &'a Ton
         }
 
         let this = self;
@@ -606,7 +652,7 @@ where
     }
 
     pub async fn get_account_tx_stream(
-        &mut self,
+        &self,
         address: String,
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
         let account_state = self.raw_get_account_state(&address).await?;
@@ -619,18 +665,14 @@ where
     }
 
     pub fn get_account_tx_stream_from(
-        &mut self,
+        &self,
         address: String,
         last_tx: InternalTransactionId,
     ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
-        struct State<'a, Y> where Y: Service<
-            Value,
-            Response = Value,
-            Error = Box<(dyn std::error::Error + Sync + Send + 'static)>,
-        > + Clone + Send + 'static {
+        struct State<'a> {
             address: String,
             last_tx: InternalTransactionId,
-            this: &'a mut Ton<Y>
+            this: &'a Ton
         }
 
         let this = self;
@@ -656,10 +698,58 @@ where
         .try_flatten();
     }
 
-    async fn call(&mut self, request: Value) -> anyhow::Result<Value> {
-        let ready = self.service.ready().await.map_err(|e| anyhow!(e))?;
+    async fn call(&self, request: Value) -> anyhow::Result<Value> {
+        let mut ton = self.clone();
+        let ready = ton.service.ready().await.map_err(|e| anyhow!(e))?;
         let call = ready.call(request).await.map_err(|e| anyhow!(e))?;
 
         return Ok(call);
     }
+}
+
+
+async fn build_clients<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<AsyncClient>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let config: Value = serde_json::from_reader(reader)?;
+
+    let liteservers = config["liteservers"]
+        .as_array()
+        .ok_or(anyhow!("No liteservers in config"))?;
+
+    let x: Vec<AsyncClient> = stream::iter(liteservers.to_owned())
+        .map(move |liteserver| {
+            let mut config = config.clone();
+            config["liteservers"] = Value::Array(vec![liteserver.to_owned()]);
+
+            config
+        })
+        .then(|config| async move {
+            let config = config.clone();
+
+            async move {
+                let client = ClientBuilder::from_json_config(&config)
+                    .disable_logging()
+                    .build()
+                    .await;
+                match client {
+                    Ok(client) => {
+                        let sync = client.synchronize().await;
+                        match sync {
+                            Ok(_) => Ok(client),
+                            Err(e) => Err(e),
+                        }
+                    }
+                    Err(e) => Err(e),
+                }
+            }
+        })
+        .buffer_unordered(100)
+        .filter(|client| {
+            future::ready(client.is_ok())
+        })
+        .try_collect()
+        .await?;
+
+    return Ok(x);
 }
