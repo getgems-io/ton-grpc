@@ -1,3 +1,5 @@
+mod retry;
+
 use anyhow::anyhow;
 use dashmap::DashMap;
 use futures::TryStreamExt;
@@ -26,7 +28,10 @@ use tower::balance::p2c::Balance;
 use tower::buffer::Buffer;
 use tower::discover::ServiceList;
 use tower::load::PeakEwmaDiscover;
+use tower::retry::{Policy, Retry};
+use tower::retry::budget::Budget;
 use uuid::Uuid;
+use crate::retry::RetryPolicy;
 
 pub struct ClientBuilder {
     config: Value,
@@ -371,7 +376,7 @@ impl Service<Value> for AsyncClient {
 
 pub type ServiceError = Box<(dyn Error + Sync + Send)>;
 pub type TonNaive = AsyncClient;
-pub type TonBalanced = Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<AsyncClient>>>, Value>, Value>;
+pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<AsyncClient>>>, Value>, Value>>;
 
 #[derive(Clone)]
 pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> {
@@ -393,7 +398,11 @@ impl Ton<TonBalanced> {
 
         let ton = Balance::new(emwa);
         let ton = Buffer::new(ton, 200000);
-
+        let ton = Retry::new(RetryPolicy::new(Budget::new(
+            Duration::from_secs(10),
+            10,
+            0.1
+        )), ton);
 
         Ok(Self {
             service: ton
