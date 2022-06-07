@@ -10,12 +10,7 @@ fn main() {
 
     if !is_static {
         let dst = cmake::Config::new("ton")
-            .uses_cxx11()
             .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", "clang")
-            .define("CMAKE_CXX_COMPILER", "clang++")
-            .cxxflag("-std=c++14")
-            .cxxflag("-stdlib=libc++")
             .build_target("tonlibjson")
             .build();
 
