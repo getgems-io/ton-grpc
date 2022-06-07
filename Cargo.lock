@@ -856,7 +856,6 @@ dependencies = [
  "hex",
  "serde_json",
  "tokio",
- "tonlibjson-rs",
  "tonlibjson-tokio",
  "tower",
 ]
