@@ -2,11 +2,8 @@ use std::env;
 use cmake;
 
 fn main() {
-    let is_static = env::var("CARGO_FEATURE_STATIC").unwrap_or_default() == "1";
-    // let is_lto = env::var("CARGO_PROFILE_RELEASE_LTO").unwrap_or_default() == "1";
-    let is_lto = false;
-
-    eprintln!("{}, {}", is_static, is_lto);
+    let is_static = env::var("PROFILE").unwrap_or_default() == "release";
+    let is_lto = is_static; // TODO
 
     if !is_static {
         let dst = cmake::Config::new("ton")
