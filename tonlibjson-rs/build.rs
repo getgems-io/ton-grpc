@@ -2,18 +2,12 @@ use std::env;
 use cmake;
 
 fn main() {
-    for (key, value) in env::vars() {
-        println!("{key}: {value}");
-    }
+    let is_static = env::var("CARGO_FEATURE_STATIC").unwrap_or_default() == "1";
+    let is_lto = env::var("CARGO_FEATURE_LTO").unwrap_or_default() == "1";
 
-    let target = env::var("TARGET").unwrap();
-    let profile = env::var("PROFILE").unwrap();
-    let openssl_dir =
-        env::var("OPENSSL_ROOT_DIR").ok().map(|x| format!("{}/lib", x)).or(
-            pkg_config::probe_library("openssl").ok()
-            .map(|lib| lib.link_paths.first().unwrap().display().to_string())).unwrap();
+    eprintln!("{}, {}", is_static, is_lto);
 
-    if target.contains("darwin") {
+    if !is_static {
         let dst = cmake::Config::new("ton")
             .uses_cxx11()
             .define("TON_ONLY_TONLIB", "ON")
@@ -30,25 +24,21 @@ fn main() {
         return;
     }
 
-    println!("cargo:rustc-link-arg=-fuse-ld=lld");
+    let openssl_dir = pkg_config::probe_library("openssl").ok()
+            .map(|lib| lib.link_paths.first().unwrap().display().to_string()).or_else(
+        || env::var("OPENSSL_ROOT_DIR").ok().map(|x| format!("{}/lib", x))
+    ).unwrap();
+
+    if is_lto {
+        println!("cargo:rustc-link-arg=-fuse-ld=lld");
+    }
 
     println!("cargo:rustc-link-search=native={}", openssl_dir);
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
 
-    let dst;
-    if profile == "debug" {
-        dst = cmake::Config::new("ton")
-            .uses_cxx11()
-            .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", "clang")
-            .define("CMAKE_CXX_COMPILER", "clang++")
-            .cxxflag("-std=c++14")
-            .cxxflag("-stdlib=libc++")
-            .build_target("tonlibjson_static")
-            .build();
-    } else {
-        dst = cmake::Config::new("ton")
+    let dst= if is_lto {
+        cmake::Config::new("ton")
             .uses_cxx11()
             .cxxflag("-flto")
             .define("TON_ONLY_TONLIB", "ON")
@@ -59,8 +49,18 @@ fn main() {
             .cxxflag("-fuse-ld=lld")
             .cxxflag("-Wno-error=unused-command-line-argument")
             .build_target("tonlibjson_static")
-            .build();
-    }
+            .build()
+    } else {
+        cmake::Config::new("ton")
+            .uses_cxx11()
+            .define("TON_ONLY_TONLIB", "ON")
+            .define("CMAKE_C_COMPILER", "clang")
+            .define("CMAKE_CXX_COMPILER", "clang++")
+            .cxxflag("-std=c++14")
+            .cxxflag("-stdlib=libc++")
+            .build_target("tonlibjson_static")
+            .build()
+    };
 
     println!("cargo:rustc-link-lib=static=c++");
 
