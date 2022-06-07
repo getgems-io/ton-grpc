@@ -31,6 +31,9 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Install libc++
+        run: sudo apt update && sudo apt install --yes libc++-dev
+
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af #@v1
         with:
