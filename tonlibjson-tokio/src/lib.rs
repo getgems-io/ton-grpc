@@ -732,6 +732,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
 }
 
 
+#[allow(clippy::async_yields_async)]
 async fn build_clients<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<AsyncClient>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);

@@ -1,0 +1,12 @@
+name: Check release build
+on:
+  pull_request:
+    branches: [ "master" ]
+jobs:
+  build-docker-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - run: docker build .
