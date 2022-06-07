@@ -1,5 +1,4 @@
 use std::env;
-use cmake;
 
 fn main() {
     let is_static = env::var("PROFILE").unwrap_or_default() == "release";
@@ -57,7 +56,7 @@ fn main() {
 
     println!("cargo:rustc-link-lib=static=c++");
 
-    for item in vec!("tdnet", "keys", "tdactor", "tl-utils", "tdutils") {
+    for item in ["tdnet", "keys", "tdactor", "tl-utils", "tdutils"] {
         println!("cargo:rustc-link-search=native={}/build/{}", dst.display(), item);
         println!("cargo:rustc-link-lib=static={}", item)
     }
