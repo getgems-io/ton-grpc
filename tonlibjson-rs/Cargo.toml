@@ -12,6 +12,6 @@ anyhow = "1.0.57"
 cmake = "0.1.48"
 pkg-config = "0.3.25"
 
-[features]
-static = []
-lto = ["static"]
+#[features]
+#static = []
+#lto = ["static"]
