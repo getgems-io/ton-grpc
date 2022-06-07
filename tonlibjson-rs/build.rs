@@ -2,32 +2,23 @@ use std::env;
 use cmake;
 
 fn main() {
+    for (key, value) in env::vars() {
+        println!("{key}: {value}");
+    }
+
     let target = env::var("TARGET").unwrap();
     let profile = env::var("PROFILE").unwrap();
+    let openssl_dir = pkg_config::probe_library("openssl").ok()
+        .map(|lib| lib.link_paths.first().unwrap().display().to_string());
     let openssl_dir =
-        env::var("OPENSSL_ROOT_DIR").ok().map(|x| format!("{}/lib", x)).or(
-            pkg_config::probe_library("openssl").ok()
-                .map(|lib| lib.link_paths.first().unwrap().display().to_string())
-        ).unwrap();
-
-    let clang;
-    let clangpp;
-    if let Ok(llvm_path) = env::var("LLVM_PATH") {
-        clang = format!("{}/bin/clang", llvm_path);
-        clangpp = format!("{}/bin/clang++", llvm_path);
-
-        println!("cargo:rustc-link-search=native={}/lib/x86_64-unknown-linux-gnu", llvm_path);
-    } else {
-        clang = "clang".to_string();
-        clangpp = "clang++".to_string();
-    }
+        env::var("OPENSSL_ROOT_DIR").ok().map(|x| format!("{}/lib", x)).or(open_ssl_dir).unwrap();
 
     if target.contains("darwin") {
         let dst = cmake::Config::new("ton")
             .uses_cxx11()
             .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", clang)
-            .define("CMAKE_CXX_COMPILER", clangpp)
+            .define("CMAKE_C_COMPILER", "clang")
+            .define("CMAKE_CXX_COMPILER", "clang++")
             .cxxflag("-std=c++14")
             .cxxflag("-stdlib=libc++")
             .build_target("tonlibjson")
@@ -50,8 +41,8 @@ fn main() {
         dst = cmake::Config::new("ton")
             .uses_cxx11()
             .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", clang)
-            .define("CMAKE_CXX_COMPILER", clangpp)
+            .define("CMAKE_C_COMPILER", "clang")
+            .define("CMAKE_CXX_COMPILER", "clang++")
             .cxxflag("-std=c++14")
             .cxxflag("-stdlib=libc++")
             .build_target("tonlibjson_static")
@@ -61,8 +52,8 @@ fn main() {
             .uses_cxx11()
             .cxxflag("-flto")
             .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", clang)
-            .define("CMAKE_CXX_COMPILER", clangpp)
+            .define("CMAKE_C_COMPILER", "clang")
+            .define("CMAKE_CXX_COMPILER", "clang++")
             .cxxflag("-std=c++14")
             .cxxflag("-stdlib=libc++")
             .cxxflag("-fuse-ld=lld")
