@@ -8,10 +8,10 @@ fn main() {
 
     let target = env::var("TARGET").unwrap();
     let profile = env::var("PROFILE").unwrap();
-    let openssl_dir = pkg_config::probe_library("openssl").ok()
-        .map(|lib| lib.link_paths.first().unwrap().display().to_string());
     let openssl_dir =
-        env::var("OPENSSL_ROOT_DIR").ok().map(|x| format!("{}/lib", x)).or(open_ssl_dir).unwrap();
+        env::var("OPENSSL_ROOT_DIR").ok().map(|x| format!("{}/lib", x)).or(
+            pkg_config::probe_library("openssl").ok()
+            .map(|lib| lib.link_paths.first().unwrap().display().to_string())).unwrap();
 
     if target.contains("darwin") {
         let dst = cmake::Config::new("ton")
@@ -31,6 +31,10 @@ fn main() {
     }
 
     println!("cargo:rustc-link-arg=-fuse-ld=lld");
+
+    println!("cargo:rustc-link-search=native={}", openssl_dir);
+    println!("cargo:rustc-link-lib=static=crypto");
+    println!("cargo:rustc-link-lib=static=ssl");
 
     let dst;
     if profile == "debug" {
