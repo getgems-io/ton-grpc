@@ -32,10 +32,6 @@ fn main() {
 
     println!("cargo:rustc-link-arg=-fuse-ld=lld");
 
-    println!("cargo:rustc-link-search=native={}", openssl_dir);
-    println!("cargo:rustc-link-lib=static=crypto");
-    println!("cargo:rustc-link-lib=static=ssl");
-
     let dst;
     if profile == "debug" {
         dst = cmake::Config::new("ton")
