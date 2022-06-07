@@ -1,15 +1,13 @@
-use std::fmt::Error;
 use std::future;
 use std::sync::Arc;
 use std::time::Duration;
 use anyhow::anyhow;
 use axum::{Json, Router, routing::post};
-use axum::response::Response;
 use futures::future::Either::{Left, Right};
 use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
-use tonlibjson_tokio::{AsyncClient, BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, Ton, TonBalanced};
+use tonlibjson_tokio::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, Ton, TonBalanced};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -118,17 +116,17 @@ struct JsonResponse {
 
 impl JsonResponse {
     fn new(id: JsonRequestId, result: Value) -> Self {
-        return Self {
+        Self {
             ok: true,
             result: Some(result),
             error: None,
             jsonrpc: "2.0".to_string(),
-            id: id
+            id
         }
     }
 
     fn error(id: JsonRequestId, e: anyhow::Error) -> Self {
-        return Self {
+        Self {
             ok: false,
             result: None,
             error: Some(JsonError { code: -32603, message: e.to_string() }),

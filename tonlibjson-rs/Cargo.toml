@@ -11,7 +11,3 @@ anyhow = "1.0.57"
 [build-dependencies]
 cmake = "0.1.48"
 pkg-config = "0.3.25"
-
-#[features]
-#static = []
-#lto = ["static"]

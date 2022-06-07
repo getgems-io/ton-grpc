@@ -3,7 +3,7 @@ use futures::{stream, StreamExt};
 use serde_json::Value;
 use tokio::time::Instant;
 use tower::Service;
-use tonlibjson_tokio::{ServiceError, ShortTxId, Ton, TonBalanced};
+use tonlibjson_tokio::{ServiceError, ShortTxId, Ton};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -11,14 +11,14 @@ async fn main() -> anyhow::Result<()> {
 
     let now = Instant::now();
 
-    run(ton).await;
+    let _ = run(ton).await;
 
     let balanced_timing = (Instant::now() - now).as_secs();
 
     let ton = Ton::naive("./liteserver_config.json").await?;
     let now = Instant::now();
 
-    run(ton).await;
+    let _ = run(ton).await;
 
     let naive_timing = (Instant::now() - now).as_secs();
 
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
 async fn run<S>(ton: Ton<S>) -> anyhow::Result<()> where S : Service<Value, Response = Value, Error = ServiceError> + Clone {
     let master = ton.get_masterchain_info().await?;
-    let _stream = stream::iter((master.last.seqno - 10000..master.last.seqno).into_iter())
+    let _stream = stream::iter(master.last.seqno - 10000..master.last.seqno)
         .for_each_concurrent(500, |seqno| {
             let ton = ton.clone();
             async move {
