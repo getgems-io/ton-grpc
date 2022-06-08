@@ -13,5 +13,6 @@ RUN cargo fetch --locked
 ENV RUSTFLAGS="-Clinker-plugin-lto -Clinker=clang -Clink-arg=-fuse-ld=lld"
 
 RUN cargo build -vv --release
+RUN cargo test -vv --release
 
 CMD ["./target/release/tonlibjson-jsonrpc"]

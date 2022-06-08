@@ -21,10 +21,7 @@ fn main() {
         || env::var("OPENSSL_ROOT_DIR").ok().map(|x| format!("{}/lib", x))
     ).unwrap();
 
-    if is_lto {
-        println!("cargo:rustc-link-arg=-fuse-ld=lld");
-    }
-
+    println!("cargo:rustc-link-arg=-fuse-ld=lld");
     println!("cargo:rustc-link-search=native={}", openssl_dir);
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
