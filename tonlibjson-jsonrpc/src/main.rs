@@ -18,12 +18,13 @@ struct LookupBlockParams {
     unixtime: Option<u64>
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 struct ShardsParams {
     seqno: u64
 }
 
-#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+#[derive(Deserialize)]
 struct BlockHeaderParams {
     workchain: i64,
     shard: String,
@@ -32,7 +33,8 @@ struct BlockHeaderParams {
     file_hash: Option<String>
 }
 
-#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+#[derive(Deserialize)]
 struct BlockTransactionsParams {
     workchain: i64,
     shard: String,
@@ -49,7 +51,8 @@ struct AddressParams {
     address: String
 }
 
-#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+#[derive(Deserialize)]
 struct TransactionsParams {
     address: String,
     limit: Option<u16>,
@@ -64,7 +67,7 @@ struct SendBocParams {
     boc: String
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(tag = "method")]
 enum Method {
     #[serde(rename = "lookupBlock")]
@@ -89,7 +92,8 @@ enum Method {
 
 type JsonRequestId = Option<Value>;
 
-#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+#[derive(Deserialize)]
 struct JsonRequest {
     jsonrpc: Option<String>,
     id: JsonRequestId,
