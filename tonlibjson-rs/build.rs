@@ -1,14 +1,10 @@
 use std::env;
-#[warn(clippy::single_component_path_imports)]
-use cmake;
+use cmake::Config;
 
 fn main() {
-    let is_static = env::var("PROFILE").unwrap() == "release";
+    let is_release = env::var("PROFILE").unwrap() == "release";
     let target = env::var("TARGET").unwrap();
-    let darwin = "x86_64-apple-darwin";
-    let is_lto = target != darwin;
-
-    eprintln!("TARGET: {}", target);
+    let is_darwin = target == "x86_64-apple-darwin";
 
     let openssl_dir = env::var("OPENSSL_ROOT_DIR")
         .ok()
@@ -20,30 +16,8 @@ fn main() {
                 )
         ).unwrap();
 
-    if !is_static {
-        let dst = cmake::Config::new("ton")
-            .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", "clang")
-            .define("CMAKE_CXX_COMPILER", "clang++")
-            .define("CMAKE_CXX_STANDARD", "14")
-            .cxxflag("-std=c++14")
-            .cxxflag("-stdlib=libc++")
-            .uses_cxx11()
-            .build_target("tonlibjson")
-            .build();
-
-        println!("cargo:rustc-link-search=native={}/build/tonlib", dst.display());
-        println!("cargo:rustc-link-lib=dylib=tonlibjson");
-
-        return;
-    }
-
-    println!("cargo:rustc-link-search=native={}", openssl_dir);
-    println!("cargo:rustc-link-lib=static=crypto");
-    println!("cargo:rustc-link-lib=static=ssl");
-
-    let dst= if is_lto {
-        cmake::Config::new("ton")
+    let dst= if !is_darwin && is_release {
+        Config::new("ton")
             .define("TON_ONLY_TONLIB", "ON")
             .define("CMAKE_C_COMPILER", "clang")
             .define("CMAKE_CXX_COMPILER", "clang++")
@@ -57,7 +31,7 @@ fn main() {
             .build_target("tonlibjson_static")
             .build()
     } else {
-        cmake::Config::new("ton")
+        Config::new("ton")
             .uses_cxx11()
             .define("TON_ONLY_TONLIB", "ON")
             .define("CMAKE_C_COMPILER", "clang")
@@ -69,11 +43,15 @@ fn main() {
             .build()
     };
 
-    if target == darwin {
+    if is_darwin {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else {
         println!("cargo:rustc-link-lib=static=c++");
     }
+
+    println!("cargo:rustc-link-search=native={}", openssl_dir);
+    println!("cargo:rustc-link-lib=static=crypto");
+    println!("cargo:rustc-link-lib=static=ssl");
 
     for item in ["tdnet", "keys", "tdactor", "tl-utils", "tdutils"] {
         println!("cargo:rustc-link-search=native={}/build/{}", dst.display(), item);
