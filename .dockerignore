@@ -1,3 +1,4 @@
-target/
 Dockerfile
-.git
+target/
+**/.git
+**/.github

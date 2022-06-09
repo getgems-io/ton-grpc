@@ -5,6 +5,3 @@ members = [
     "tonlibjson-jsonrpc",
     "tonlibjson-experiment"
 ]
-
-[profile.release]
-lto = "fat"
