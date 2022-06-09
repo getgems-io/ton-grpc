@@ -4,7 +4,6 @@ use anyhow::anyhow;
 use dashmap::DashMap;
 use futures::TryStreamExt;
 use futures::{stream, Stream, StreamExt};
-use pin_project::pin_project;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -15,20 +14,18 @@ use std::future::Future;
 use std::io::BufReader;
 use std::path::Path;
 use std::pin::Pin;
-use std::sync::{Arc, mpsc, Mutex, RwLock};
+use std::sync::{Arc, mpsc, Mutex};
 use std::task::{Context, Poll};
 use std::{future, thread};
 use std::sync::mpsc::TryRecvError;
-use std::thread::JoinHandle;
 use std::time::Duration;
-use tokio::select;
 use tonlibjson_rs::Client;
 use tower::{Service, ServiceExt};
 use tower::balance::p2c::Balance;
 use tower::buffer::Buffer;
 use tower::discover::ServiceList;
 use tower::load::PeakEwmaDiscover;
-use tower::retry::{Policy, Retry};
+use tower::retry::{Retry};
 use tower::retry::budget::Budget;
 use uuid::Uuid;
 use crate::retry::RetryPolicy;
@@ -68,7 +65,7 @@ impl ClientBuilder {
         let reader = BufReader::new(file);
         let config: Value = serde_json::from_reader(reader)?;
 
-        return Ok(ClientBuilder::from_json_config(&config));
+        Ok(ClientBuilder::from_json_config(&config))
     }
 
     pub fn disable_logging(&mut self) -> &mut Self {
@@ -253,6 +250,7 @@ impl Drop for Stop {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct AsyncClient {
     client: Arc<Client>,
@@ -295,7 +293,11 @@ impl AsyncClient {
             }
         }));
 
-        return AsyncClient { client, responses, stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal))) };
+        AsyncClient {
+            client,
+            responses,
+            stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
+        }
     }
 
     pub async fn execute(&self, request: Value) -> anyhow::Result<Value> {
@@ -325,7 +327,7 @@ impl AsyncClient {
         return match timeout {
             Ok(mut value) => {
                 // println!("{:#?}", value);
-                let obj = value.as_object_mut().ok_or(anyhow!("Not an object"))?;
+                let obj = value.as_object_mut().ok_or_else(||anyhow!("Not an object"))?;
                 let _ = obj.remove("@extra");
 
                 if value["@type"] == "error" {
@@ -358,6 +360,12 @@ impl AsyncClient {
     }
 }
 
+impl Default for AsyncClient {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Service<Value> for AsyncClient {
     type Response = Value;
     type Error = ServiceError;
@@ -370,7 +378,9 @@ impl Service<Value> for AsyncClient {
     fn call(&mut self, req: Value) -> Self::Future {
         let this = self.clone();
 
-        return Box::pin(async move { this.execute(req).await.map_err(|x| ServiceError::from(x)) });
+        Box::pin(async move {
+            this.execute(req).await.map_err(ServiceError::from)
+        })
     }
 }
 
@@ -434,7 +444,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
 
         let response = self.call(query).await?;
 
-        return Ok(serde_json::from_value(response)?);
+        Ok(serde_json::from_value(response)?)
     }
 
     pub async fn look_up_block_by_seqno(
@@ -497,8 +507,8 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         let mut response = self.call(request).await?;
 
         let code = response["code"].as_str().unwrap_or("");
-        let state: &str = if code.len() == 0 || code.parse::<i64>().is_ok() {
-            if response["frozen_hash"].as_str().unwrap_or("").len() == 0 {
+        let state: &str = if code.is_empty() || code.parse::<i64>().is_ok() {
+            if response["frozen_hash"].as_str().unwrap_or("").is_empty() {
                 "uninitialized"
             } else {
                 "frozen"
@@ -583,7 +593,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
 
         let response = self.call(request).await?;
 
-        return Ok(serde_json::from_value(response)?);
+        Ok(serde_json::from_value(response)?)
     }
 
     async fn look_up_block(
@@ -636,7 +646,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         }
 
         let this = self;
-        return stream::try_unfold(
+        stream::try_unfold(
             State {
                 last_tx: None,
                 incomplete: true,
@@ -645,22 +655,21 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
             },
             move |state| {
                 async move {
-                    if state.incomplete == false {
+                    if !state.incomplete {
                         return anyhow::Ok(None);
                     }
 
-                    let txs;
-                    if let Some(tx) = state.last_tx {
-                        txs = state.this.blocks_get_transactions_after(&state.block, 30, tx).await?
+                    let txs= if let Some(tx) = state.last_tx {
+                        state.this.blocks_get_transactions_after(&state.block, 30, tx).await?
                     } else {
-                        txs = state.this.blocks_get_transactions(&state.block, 30).await?
-                    }
+                        state.this.blocks_get_transactions(&state.block, 30).await?
+                    };
 
                     println!("got {} transactions", txs.transactions.len());
 
                     let last_tx = txs.transactions.last().map(AccountTransactionId::from);
 
-                    return anyhow::Ok(Some((
+                    anyhow::Ok(Some((
                         stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
                         State {
                             last_tx,
@@ -668,11 +677,11 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
                             block: state.block,
                             this: state.this
                         },
-                    )));
+                    )))
                 }
             },
         )
-        .try_flatten();
+        .try_flatten()
     }
 
     pub async fn get_account_tx_stream(
@@ -682,7 +691,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         let account_state = self.raw_get_account_state(&address).await?;
         let ltx = account_state
             .get("last_transaction_id")
-            .ok_or(anyhow!("Unexpected missed last_transaction_id"))?;
+            .ok_or_else(||anyhow!("Unexpected missed last_transaction_id"))?;
         let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned())?;
 
         return Ok(self.get_account_tx_stream_from(address, last_tx));
@@ -700,7 +709,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         }
 
         let this = self;
-        return stream::try_unfold(State { address, last_tx, this }, move |state| async move {
+        stream::try_unfold(State { address, last_tx, this }, move |state| async move {
             let txs = state.this
                 .raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash)
                 .await?;
@@ -719,7 +728,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
                 anyhow::Ok(None)
             }
         })
-        .try_flatten();
+        .try_flatten()
     }
 
     async fn call(&self, request: Value) -> anyhow::Result<Value> {
@@ -727,7 +736,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         let ready = ton.service.ready().await.map_err(|e| anyhow!(e))?;
         let call = ready.call(request).await.map_err(|e| anyhow!(e))?;
 
-        return Ok(call);
+        Ok(call)
     }
 }
 
@@ -740,12 +749,12 @@ async fn build_clients<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<AsyncClien
 
     let liteservers = config["liteservers"]
         .as_array()
-        .ok_or(anyhow!("No liteservers in config"))?;
+        .ok_or_else(||anyhow!("No liteservers in config"))?;
 
     let x: Vec<AsyncClient> = stream::iter(liteservers.to_owned())
         .map(move |liteserver| {
             let mut config = config.clone();
-            config["liteservers"] = Value::Array(vec![liteserver.to_owned()]);
+            config["liteservers"] = Value::Array(vec![liteserver]);
 
             config
         })
@@ -776,5 +785,5 @@ async fn build_clients<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<AsyncClien
         .try_collect()
         .await?;
 
-    return Ok(x);
+    Ok(x)
 }

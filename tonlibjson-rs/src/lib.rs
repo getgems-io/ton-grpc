@@ -37,9 +37,9 @@ mod tests {
 extern {
     fn tonlib_client_json_create() -> *mut c_void;
 
-    fn tonlib_client_json_destroy(p: *mut c_void) -> ();
+    fn tonlib_client_json_destroy(p: *mut c_void);
 
-    fn tonlib_client_json_send(p: *mut c_void, request: *const c_char) -> ();
+    fn tonlib_client_json_send(p: *mut c_void, request: *const c_char);
 
     fn tonlib_client_json_execute(p: *mut c_void, request: *const c_char) -> *const c_char;
 
@@ -52,9 +52,9 @@ pub struct Client {
 
 impl Client {
     pub fn new() -> Self {
-        return Client {
+        Self {
             pointer: unsafe { tonlib_client_json_create() }
-        };
+        }
     }
 
     pub fn send(&self, request: &str) -> Result<()> {
@@ -67,8 +67,7 @@ impl Client {
 
     pub fn receive(&self, timeout: Duration) -> Result<&str> {
         let response = unsafe {
-            let t = c_double::from(timeout.as_secs_f64());
-            let ptr = tonlib_client_json_receive(self.pointer, t);
+            let ptr = tonlib_client_json_receive(self.pointer, timeout.as_secs_f64());
             if ptr.is_null() {
                 return Err(anyhow!("timeout reached"));
             }
@@ -78,7 +77,7 @@ impl Client {
 
         let str = response.to_str()?;
 
-        return Ok(str)
+        Ok(str)
     }
 
     pub fn execute(&self, request: &str) -> Result<&str> {
@@ -95,7 +94,13 @@ impl Client {
 
         let str = response.to_str()?;
 
-        return Ok(str)
+        Ok(str)
+    }
+}
+
+impl Default for Client {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
