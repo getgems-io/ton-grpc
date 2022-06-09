@@ -1,4 +1,5 @@
 use std::env;
+#[warn(clippy::single_component_path_imports)]
 use cmake;
 
 fn main() {
