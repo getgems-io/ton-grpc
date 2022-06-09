@@ -33,7 +33,7 @@ COPY . .
 RUN cargo build -vv --release --target x86_64-unknown-linux-gnu
 RUN cargo test -vv --release --target x86_64-unknown-linux-gnu
 
-FROM rust:1.61-bullseye AS runner
+FROM debian:bullseye-slim AS runner
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/tonlibjson-jsonrpc /app/tonlibjson-jsonrpc
 
 CMD ["/app/tonlibjson-jsonrpc"]
