@@ -283,8 +283,13 @@ impl AsyncClient {
                                     if let Some((_, s)) = responses_rcv.remove(id) {
                                         let _ = s.send(json);
                                     }
+                                } else if let Some(Value::String(ref typ)) = json.get("@type") {
+                                    match typ.as_str() {
+                                        "updateSyncState" => (),
+                                        _ => println!("Unexpected response {:?} with type {}", json.to_string(), typ)
+                                    }
                                 } else {
-                                    println!("Unexpected response {:?}", json.to_string());
+                                    println!("Unexpected response {:?}", json.to_string())
                                 }
                             }
                         }
