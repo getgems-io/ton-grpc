@@ -6,7 +6,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
 tonlibjson-rs = { path = "../tonlibjson-rs" }
-anyhow = "1.0.57"
+anyhow = "1.0.58"
 serde = { version = "1.0.136", features = ["serde_derive"] }
 serde_json = "1.0.79"
 tokio = { version = "1.19.2", features = ["rt-multi-thread", "sync", "macros", "time", "rt"] }
