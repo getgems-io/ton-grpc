@@ -14,4 +14,4 @@ futures = "0.3.21"
 dashmap = "5.3.4"
 uuid = { version = "1.1.2", features = ["v4", "fast-rng"] }
 tower = { version = "0.4.13", features = ["full"] }
-pin-project = "1.0.10"
+pin-project = "1.0.11"
