@@ -71,7 +71,7 @@ impl ClientBuilder {
     pub fn disable_logging(&mut self) -> &mut Self {
         self.disable_logging = Some(json!({
             "@type": "setLogVerbosityLevel",
-            "new_verbosity_level": 1
+            "new_verbosity_level": 0
         }));
 
         self
@@ -273,7 +273,7 @@ impl AsyncClient {
             loop {
                 match stop_receiver.try_recv() {
                     Ok(_) | Err(TryRecvError::Disconnected) => {
-                        println!("Stop thread");
+                        tracing::warn!("Stop thread");
                         break
                     },
                     Err(TryRecvError::Empty) => {
@@ -286,10 +286,10 @@ impl AsyncClient {
                                 } else if let Some(Value::String(ref typ)) = json.get("@type") {
                                     match typ.as_str() {
                                         "updateSyncState" => (),
-                                        _ => println!("Unexpected response {:?} with type {}", json.to_string(), typ)
+                                        _ => tracing::warn!("Unexpected response {:?} with type {}", json.to_string(), typ)
                                     }
                                 } else {
-                                    println!("Unexpected response {:?}", json.to_string())
+                                    tracing::warn!("Unexpected response {:?}", json.to_string())
                                 }
                             }
                         }
@@ -324,19 +324,17 @@ impl AsyncClient {
         self.responses.insert(id.clone(), tx);
 
         let x = request.to_string();
-        // println!("{:#?}", x);
         let _ = self.client.send(&x);
 
         let timeout = tokio::time::timeout(timeout, rx).await?;
 
         return match timeout {
             Ok(mut value) => {
-                // println!("{:#?}", value);
                 let obj = value.as_object_mut().ok_or_else(||anyhow!("Not an object"))?;
                 let _ = obj.remove("@extra");
 
                 if value["@type"] == "error" {
-                    println!("Error occurred: {:?}", &value);
+                    tracing::warn!("Error occurred: {:?}", &value);
                     return match serde_json::from_value::<TonError>(value) {
                         Ok(e) => Err(anyhow::Error::from(e)),
                         Err(e) => Err(anyhow::Error::from(e)),
@@ -346,7 +344,7 @@ impl AsyncClient {
                 serde_json::from_value::<T>(value).map_err(anyhow::Error::from)
             }
             Err(e) => {
-                println!("timeout reached");
+                tracing::warn!("timeout reached");
                 self.responses.remove(&id);
 
                 Err(anyhow::Error::from(e))
@@ -670,7 +668,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
                         state.this.blocks_get_transactions(&state.block, 30).await?
                     };
 
-                    println!("got {} transactions", txs.transactions.len());
+                    tracing::debug!("got {} transactions", txs.transactions.len());
 
                     let last_tx = txs.transactions.last().map(AccountTransactionId::from);
 
@@ -775,8 +773,14 @@ async fn build_clients<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<AsyncClien
                     Ok(client) => {
                         let sync = client.synchronize().await;
                         match sync {
-                            Ok(_) => Ok(client),
-                            Err(e) => Err(e),
+                            Ok(_) => {
+                                tracing::info!("Client synced");
+                                Ok(client)
+                            },
+                            Err(e) => {
+                                tracing::error!("Client sync failed: {}", e);
+                                Err(e)
+                            },
                         }
                     }
                     Err(e) => Err(e),

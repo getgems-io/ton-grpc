@@ -18,4 +18,5 @@ serde = { version = "1.0.140", features = ["serde_derive"] }
 serde_json = "1.0.82"
 base64 = "0.13.0"
 hex = "0.4.3"
-
+tracing = "0.1"
+tracing-subscriber = "0.3"
