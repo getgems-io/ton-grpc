@@ -7,6 +7,8 @@ use tonlibjson_tokio::{ServiceError, ShortTxId, Ton};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
+
     let ton = Ton::balanced("./liteserver_config.json").await?;
 
     let now = Instant::now();
@@ -43,18 +45,18 @@ async fn run<S>(ton: Ton<S>) -> anyhow::Result<()> where S : Service<Value, Resp
                                     for tx in txs {
                                         let address = format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap());
                                         match ton.get_account_state(&address).await {
-                                            Ok(account) => println!("{}: {}", &address, account["balance"].as_str().unwrap()),
-                                            Err(e) => println!("{:?}", e)
+                                            Ok(account) => tracing::info!("{}: {}", &address, account["balance"].as_str().unwrap()),
+                                            Err(e) => tracing::error!("{:?}", e)
                                         }
                                     }
                                 },
-                                Err(e) => println!("{:?}", e)
+                                Err(e) => tracing::error!("{:?}", e)
                             }
                         } else {
-                            println!("no block")
+                            tracing::error!("no block")
                         }
                     },
-                    Err(e) => println!("{:?}", e)
+                    Err(e) => tracing::error!("{:?}", e)
                 }
             }
         }).await;

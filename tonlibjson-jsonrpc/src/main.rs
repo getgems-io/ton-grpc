@@ -192,7 +192,6 @@ impl RpcServer {
 
         let txs: Vec<ShortTxId> = txs.into_iter()
             .map(|tx: ShortTxId| {
-                println!("{}", &tx.account);
                 ShortTxId {
                     account: format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap()),
                     hash: tx.hash,
@@ -317,6 +316,8 @@ async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) 
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
+
     let ton = Ton::balanced("./liteserver_config.json").await?;
 
     let rpc = Arc::new(RpcServer {
