@@ -11,7 +11,7 @@ tokio = { version = "1.20.1", features = ["full"] }
 anyhow = "1.0.58"
 futures = "0.3.21"
 tonlibjson-tokio = { path = "../tonlibjson-tokio" }
-serde_json = "1.0.82"
+serde_json = "1.0.83"
 base64 = "0.13"
 hex = "0.4.3"
 tracing = "0.1"
