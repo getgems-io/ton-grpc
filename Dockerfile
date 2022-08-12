@@ -1,4 +1,4 @@
-FROM rust:1.62.1-bullseye AS builder
+FROM rust:1.63.0-bullseye AS builder
 
 RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common
 
