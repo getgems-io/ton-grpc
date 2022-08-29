@@ -1,5 +1,6 @@
 mod retry;
 mod liteserver;
+mod discover;
 
 use anyhow::anyhow;
 use dashmap::DashMap;
@@ -20,6 +21,7 @@ use std::task::{Context, Poll};
 use std::{future, thread};
 use std::sync::mpsc::TryRecvError;
 use std::time::Duration;
+use reqwest::Url;
 use tonlibjson_rs::Client;
 use tower::{Service, ServiceExt};
 use tower::balance::p2c::Balance;
@@ -28,7 +30,9 @@ use tower::discover::ServiceList;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::{Retry};
 use tower::retry::budget::Budget;
+use tracing::debug;
 use uuid::Uuid;
+use crate::discover::DynamicServiceStream;
 use crate::retry::RetryPolicy;
 
 pub struct ClientBuilder {
@@ -233,6 +237,7 @@ impl From<&ShortTxId> for AccountTransactionId {
     }
 }
 
+#[derive(Debug)]
 struct Stop {
     sender: mpsc::Sender<()>
 }
@@ -252,7 +257,7 @@ impl Drop for Stop {
 }
 
 #[allow(dead_code)]
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AsyncClient {
     client: Arc<Client>,
     responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>>,
@@ -390,7 +395,7 @@ impl Service<Value> for AsyncClient {
 
 pub type ServiceError = Box<(dyn Error + Sync + Send)>;
 pub type TonNaive = AsyncClient;
-pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<AsyncClient>>>, Value>, Value>>;
+pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<DynamicServiceStream>, Value>, Value>>;
 
 #[derive(Clone)]
 pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> {
@@ -399,9 +404,10 @@ pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceErro
 
 impl Ton<TonBalanced> {
     pub async fn balanced<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let clients = build_clients(path).await?;
-
-        let discover = ServiceList::new(clients);
+        let discover = DynamicServiceStream::new(
+            Url::parse("https://ton.org/global-config.json")?,
+            Duration::from_secs(60)
+        );
 
         let emwa = PeakEwmaDiscover::new(
             discover,
@@ -766,26 +772,7 @@ async fn build_clients<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<AsyncClien
             let config = config.clone();
 
             async move {
-                let client = ClientBuilder::from_json_config(&config)
-                    .disable_logging()
-                    .build()
-                    .await;
-                match client {
-                    Ok(client) => {
-                        let sync = client.synchronize().await;
-                        match sync {
-                            Ok(_) => {
-                                tracing::info!("Client synced");
-                                Ok(client)
-                            },
-                            Err(e) => {
-                                tracing::error!("Client sync failed: {}", e);
-                                Err(e)
-                            },
-                        }
-                    }
-                    Err(e) => Err(e),
-                }
+                build_client(&config).await
             }
         })
         .buffer_unordered(100)
@@ -796,4 +783,29 @@ async fn build_clients<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<AsyncClien
         .await?;
 
     Ok(x)
+}
+
+pub async fn build_client(config: &Value) -> anyhow::Result<AsyncClient> {
+    debug!("build_client");
+    let client = ClientBuilder::from_json_config(&config)
+        .disable_logging()
+        .build()
+        .await;
+
+    match client {
+        Ok(client) => {
+            let sync = client.synchronize().await;
+            match sync {
+                Ok(_) => {
+                    tracing::info!("Client synced");
+                    Ok(client)
+                },
+                Err(e) => {
+                    tracing::error!("Client sync failed: {}", e);
+                    Err(e)
+                },
+            }
+        }
+        Err(e) => Err(e),
+    }
 }

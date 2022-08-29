@@ -7,6 +7,7 @@ use futures::future::Either::{Left, Right};
 use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 use tonlibjson_tokio::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, Ton, TonBalanced};
 
 #[derive(Deserialize, Debug)]
@@ -318,7 +319,11 @@ async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) 
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
+    debug!("initialize ton client...");
+
     let ton = Ton::balanced("./liteserver_config.json").await?;
+
+    debug!("initialized");
 
     let rpc = Arc::new(RpcServer {
         client: ton

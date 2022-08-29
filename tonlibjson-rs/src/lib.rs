@@ -46,6 +46,7 @@ extern {
     fn tonlib_client_json_receive(p: *mut c_void, timeout: c_double) -> *const c_char;
 }
 
+#[derive(Debug)]
 pub struct Client {
     pointer: *mut c_void,
 }
