@@ -1,23 +1,44 @@
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use serde_json::Value;
+use std::future::Future;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use reqwest::{IntoUrl, Url};
+use serde_json::{json, Value};
+use tokio::sync::mpsc::{channel, Receiver};
+use tower::discover::{Change, Discover};
+use tower::MakeService;
+use crate::{ClientBuilder, ServiceError, TonNaive};
+use tower::service_fn;
+use tower::util::ServiceFn;
 
-#[derive(Deserialize, Serialize, Hash, Eq, PartialEq)]
+#[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct LiteserverId {
     #[serde(rename = "@type")]
     typ: String,
     key: String,
 }
 
-#[derive(Deserialize, Serialize, Hash, Eq, PartialEq)]
+#[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct Liteserver {
     id: LiteserverId,
     ip: i32,
     port: u16,
 }
 
-pub async fn load_ton_config(url: &str) -> anyhow::Result<String> {
+impl Liteserver {
+    pub fn identifier(&self) -> String {
+        format!("{}:{}", self.id.typ, self.id.key)
+    }
+}
+
+pub struct LiteserverConfig {
+    config: Value,
+    liteserver: Liteserver
+}
+
+pub async fn load_ton_config<U: IntoUrl>(url: U) -> anyhow::Result<String> {
     let config = reqwest::get(url).await?.text().await?;
 
     Ok(config)
