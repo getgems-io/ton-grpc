@@ -1,17 +1,8 @@
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use reqwest::{IntoUrl, Url};
-use serde_json::{json, Value};
-use tokio::sync::mpsc::{channel, Receiver};
-use tower::discover::{Change, Discover};
-use tower::MakeService;
-use crate::{ClientBuilder, ServiceError, TonNaive};
-use tower::service_fn;
-use tower::util::ServiceFn;
+use reqwest::IntoUrl;
+use serde_json::Value;
 
 #[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct LiteserverId {
@@ -31,11 +22,6 @@ impl Liteserver {
     pub fn identifier(&self) -> String {
         format!("{}:{}", self.id.typ, self.id.key)
     }
-}
-
-pub struct LiteserverConfig {
-    config: Value,
-    liteserver: Liteserver
 }
 
 pub async fn load_ton_config<U: IntoUrl>(url: U) -> anyhow::Result<String> {
