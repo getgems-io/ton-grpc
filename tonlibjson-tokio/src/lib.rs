@@ -311,9 +311,8 @@ impl AsyncClient {
     }
 
     pub async fn execute(&self, request: Value) -> anyhow::Result<Value> {
-        return self
-            .execute_typed_with_timeout(&request, Duration::from_secs(20))
-            .await;
+        self.execute_typed_with_timeout(&request, Duration::from_secs(20))
+            .await
     }
 
     async fn execute_typed_with_timeout<T: DeserializeOwned>(
@@ -333,7 +332,7 @@ impl AsyncClient {
 
         let timeout = tokio::time::timeout(timeout, rx).await?;
 
-        return match timeout {
+        match timeout {
             Ok(mut value) => {
                 let obj = value.as_object_mut().ok_or_else(||anyhow!("Not an object"))?;
                 let _ = obj.remove("@extra");
@@ -354,7 +353,7 @@ impl AsyncClient {
 
                 Err(anyhow::Error::from(e))
             }
-        };
+        }
     }
 
     pub async fn synchronize(&self) -> anyhow::Result<Value> {
@@ -362,9 +361,8 @@ impl AsyncClient {
             "@type": "sync"
         });
 
-        return self
-            .execute_typed_with_timeout::<Value>(&query, Duration::from_secs(60 * 5))
-            .await;
+        self.execute_typed_with_timeout::<Value>(&query, Duration::from_secs(60 * 5))
+            .await
     }
 }
 
@@ -462,7 +460,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         shard: i64,
         seqno: u64,
     ) -> anyhow::Result<Value> {
-        return self.look_up_block(workchain, shard, seqno, 0).await;
+        self.look_up_block(workchain, shard, seqno, 0).await
     }
 
     pub async fn look_up_block_by_lt(
@@ -471,7 +469,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         shard: i64,
         lt: i64,
     ) -> anyhow::Result<Value> {
-        return self.look_up_block(workchain, shard, 0, lt).await;
+        self.look_up_block(workchain, shard, 0, lt).await
     }
 
     pub async fn get_shards(&self, master_seqno: u64) -> anyhow::Result<ShardsResponse> {
@@ -502,7 +500,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
             "id": block
         });
 
-        return self.call(request).await;
+        self.call(request).await
     }
 
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
@@ -544,7 +542,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
             }
         });
 
-        return self.call(request).await;
+        self.call(request).await
     }
 
     pub async fn raw_get_transactions(
@@ -632,7 +630,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
             "lt": lt
         });
 
-        return self.call(request).await;
+        self.call(request).await
     }
 
     pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
@@ -640,7 +638,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
             body: message.to_string()
         });
 
-        return self.call(request).await;
+        self.call(request).await
     }
 
     pub async fn get_tx_stream(
