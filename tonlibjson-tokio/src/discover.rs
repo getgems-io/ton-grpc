@@ -114,7 +114,9 @@ async fn changes(
                 Ok(v) => Some(v)
             }
         })
-        .then(|(id, config)| async move {
+        .then(
+            #[allow(clippy::async_yields_async)]
+            |(id, config)| async move {
             async move {
                 (id, build_client(&config).await)
             }

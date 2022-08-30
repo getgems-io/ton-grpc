@@ -751,7 +751,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
 
 pub async fn build_client(config: &Value) -> anyhow::Result<AsyncClient> {
     debug!("build_client");
-    let client = ClientBuilder::from_json_config(&config)
+    let client = ClientBuilder::from_json_config(config)
         .disable_logging()
         .build()
         .await;
