@@ -321,7 +321,7 @@ async fn main() -> anyhow::Result<()> {
 
     debug!("initialize ton client...");
 
-    let ton = Ton::balanced("./liteserver_config.json").await?;
+    let ton = Ton::balanced().await?;
 
     debug!("initialized");
 

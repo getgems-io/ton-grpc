@@ -9,7 +9,7 @@ use tonlibjson_tokio::{ServiceError, ShortTxId, Ton};
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let ton = Ton::balanced("./liteserver_config.json").await?;
+    let ton = Ton::balanced().await?;
 
     let now = Instant::now();
 

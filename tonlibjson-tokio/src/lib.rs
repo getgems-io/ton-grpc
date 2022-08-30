@@ -5,7 +5,7 @@ mod discover;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use futures::TryStreamExt;
-use futures::{stream, Stream, StreamExt};
+use futures::{stream, Stream};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -18,7 +18,7 @@ use std::path::Path;
 use std::pin::Pin;
 use std::sync::{Arc, mpsc, Mutex};
 use std::task::{Context, Poll};
-use std::{future, thread};
+use std::thread;
 use std::sync::mpsc::TryRecvError;
 use std::time::Duration;
 use reqwest::Url;
@@ -26,7 +26,6 @@ use tonlibjson_rs::Client;
 use tower::{Service, ServiceExt};
 use tower::balance::p2c::Balance;
 use tower::buffer::Buffer;
-use tower::discover::ServiceList;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::{Retry};
 use tower::retry::budget::Budget;
@@ -403,7 +402,7 @@ pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceErro
 }
 
 impl Ton<TonBalanced> {
-    pub async fn balanced<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
+    pub async fn balanced() -> anyhow::Result<Self> {
         let discover = DynamicServiceStream::new(
             Url::parse("https://ton.org/global-config.json")?,
             Duration::from_secs(60)
@@ -748,41 +747,6 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
 
         Ok(call)
     }
-}
-
-
-#[allow(clippy::async_yields_async)]
-async fn build_clients<P: AsRef<Path>>(path: P) -> anyhow::Result<Vec<AsyncClient>> {
-    let file = File::open(path)?;
-    let reader = BufReader::new(file);
-    let config: Value = serde_json::from_reader(reader)?;
-
-    let liteservers = config["liteservers"]
-        .as_array()
-        .ok_or_else(||anyhow!("No liteservers in config"))?;
-
-    let x: Vec<AsyncClient> = stream::iter(liteservers.to_owned())
-        .map(move |liteserver| {
-            let mut config = config.clone();
-            config["liteservers"] = Value::Array(vec![liteserver]);
-
-            config
-        })
-        .then(|config| async move {
-            let config = config.clone();
-
-            async move {
-                build_client(&config).await
-            }
-        })
-        .buffer_unordered(100)
-        .filter(|client| {
-            future::ready(client.is_ok())
-        })
-        .try_collect()
-        .await?;
-
-    Ok(x)
 }
 
 pub async fn build_client(config: &Value) -> anyhow::Result<AsyncClient> {
