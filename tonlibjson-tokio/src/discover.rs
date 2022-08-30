@@ -1,10 +1,8 @@
-use futures::executor::block_on;
 use reqwest::Url;
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::collections::HashSet;
 use std::time::Duration;
 use std::{
-    hash::Hash,
     pin::Pin,
     task::{Context, Poll},
     thread,
@@ -14,12 +12,12 @@ use tokio::sync::mpsc::{channel, Receiver, Sender};
 use std::future;
 
 use crate::liteserver::{extract_liteserver_list, load_ton_config, Liteserver};
-use crate::{build_client, AsyncClient, ClientBuilder, ServiceError, TonNaive};
+use crate::{build_client, AsyncClient, ServiceError};
 use tokio_stream::Stream;
 use tower::discover::Change;
 use tracing::{debug, error};
 
-use futures::stream::{StreamExt, TryStreamExt};
+use futures::stream::{StreamExt};
 use tokio::time::MissedTickBehavior::Skip;
 
 type DiscoverResult<K, S, E> = Result<Change<K, S>, E>;
@@ -49,7 +47,7 @@ impl DynamicServiceStream {
                         Err(e) => {
                             error!("Error occured: {:?}", e);
                         }
-                        Ok((config, new_liteservers)) => {
+                        Ok(new_liteservers) => {
                             liteservers = new_liteservers;
                         }
                     }
@@ -84,7 +82,7 @@ async fn changes(
     url: Url,
     liteservers: &HashSet<Liteserver>,
     tx: Sender<Change<String, AsyncClient>>,
-) -> anyhow::Result<(String, HashSet<Liteserver>)> {
+) -> anyhow::Result<HashSet<Liteserver>> {
     let config = load_ton_config(url).await?;
     let liteserver_new = extract_liteserver_list(&config)?;
     let config_parsed: Value = serde_json::from_str(&config)?;
@@ -122,12 +120,12 @@ async fn changes(
             }
         })
         .buffer_unordered(12)
-        .filter(|(id, client)| {
+        .filter(|(_, client)| {
             future::ready(client.is_ok())
         })
         .for_each(|(id, client)| async {
-            tx.send(Change::Insert(id, client.unwrap())).await;
+            let _ = tx.send(Change::Insert(id, client.unwrap())).await;
         }).await;
 
-    Ok((config, liteserver_new))
+    Ok(liteserver_new)
 }
