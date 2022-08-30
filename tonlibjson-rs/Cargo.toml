@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
-libc = "0.2.125"
+libc = "0.2.132"
 anyhow = "1.0.62"
 
 [build-dependencies]
