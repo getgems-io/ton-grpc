@@ -3,6 +3,7 @@ mod liteserver;
 mod discover;
 mod make;
 mod client;
+mod config;
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
@@ -15,7 +16,6 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
 use std::time::Duration;
-use reqwest::Url;
 use tower::{Service, ServiceExt};
 use tower::balance::p2c::{Balance};
 use tower::buffer::Buffer;
@@ -23,6 +23,7 @@ use tower::load::PeakEwmaDiscover;
 use tower::retry::{Retry};
 use tower::retry::budget::Budget;
 use crate::client::AsyncClient;
+use crate::config::AppConfig;
 use crate::discover::DynamicServiceStream;
 use crate::make::ClientFactory;
 use crate::retry::RetryPolicy;
@@ -240,8 +241,10 @@ pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceErro
 
 impl Ton<TonBalanced> {
     pub async fn balanced() -> anyhow::Result<Self> {
+        let config = AppConfig::from_env();
+
         let discover = DynamicServiceStream::new(
-            Url::parse("https://ton.org/global-config.json")?,
+            config.config_url,
             Duration::from_secs(60)
         );
 
