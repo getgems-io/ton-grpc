@@ -9,21 +9,19 @@ use std::{
 };
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use std::future;
-
-use crate::liteserver::{extract_liteserver_list, load_ton_config, Liteserver};
-use crate::{build_client, AsyncClient, ServiceError};
+use crate::liteserver::{extract_liteserver_list, load_ton_config, Liteserver, LiteserverConfig};
+use crate::{ClientFactory, ServiceError};
 use tokio_stream::Stream;
 use tower::discover::Change;
 use tracing::{debug, error};
-
-use futures::stream::{StreamExt};
 use tokio::time::MissedTickBehavior::Skip;
+use tower::reconnect::Reconnect;
+use crate::client::AsyncClient;
 
 type DiscoverResult<K, S, E> = Result<Change<K, S>, E>;
 
 pub struct DynamicServiceStream {
-    changes: Receiver<Change<String, AsyncClient>>,
+    changes: Receiver<Change<String, LiteserverConfig>>,
 }
 
 impl DynamicServiceStream {
@@ -62,14 +60,14 @@ impl DynamicServiceStream {
 }
 
 impl Stream for DynamicServiceStream {
-    type Item = DiscoverResult<String, AsyncClient, ServiceError>;
+    type Item = DiscoverResult<String, Reconnect<ClientFactory, LiteserverConfig>, ServiceError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let c = &mut self.changes;
         match Pin::new(&mut *c).poll_recv(cx) {
             Poll::Pending | Poll::Ready(None) => Poll::Pending,
             Poll::Ready(Some(change)) => match change {
-                Change::Insert(k, client) => Poll::Ready(Some(Ok(Change::Insert(k, client)))),
+                Change::Insert(k, client) => Poll::Ready(Some(Ok(Change::Insert(k, Reconnect::new::<AsyncClient, Value>(ClientFactory::default(), client))))),
                 Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
             },
         }
@@ -81,53 +79,27 @@ impl Unpin for DynamicServiceStream {}
 async fn changes(
     url: Url,
     liteservers: &HashSet<Liteserver>,
-    tx: Sender<Change<String, AsyncClient>>,
+    tx: Sender<Change<String, LiteserverConfig>>,
 ) -> anyhow::Result<HashSet<Liteserver>> {
     let config = load_ton_config(url).await?;
+    let config: Value = serde_json::from_str(&config)?;
     let liteserver_new = extract_liteserver_list(&config)?;
-    let config_parsed: Value = serde_json::from_str(&config)?;
 
-    let lsn = liteserver_new.clone();
+    let liteservers_remove = liteservers.difference(&liteserver_new).collect::<Vec<&Liteserver>>();
+    let liteservers_insert = liteserver_new.difference(liteservers).collect::<Vec<&Liteserver>>();
 
-    for ls in liteservers.difference(&liteserver_new) {
+    debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), liteservers_remove.len(), liteservers_insert.len());
+
+    for ls in liteservers_remove {
         debug!("remove {:?}", ls.identifier());
         tx.send(Change::Remove(ls.identifier())).await?;
     }
 
-    tokio_stream::iter(lsn.difference(liteservers))
-        .then(|ls| {
-            let mut config = config_parsed.clone();
-            async move {
-                let id = ls.identifier();
-                debug!("found new liteserver {:?}", id);
-                let ls = serde_json::to_value(ls)?;
-                config["liteservers"] = Value::Array(vec![ls]);
+    for ls in liteservers_insert {
+        debug!("insert {:?}", ls.identifier());
 
-                anyhow::Ok((id, config))
-        }})
-        .filter_map(|f| async {
-            match f {
-                Err(e) => {
-                    error!("{:?}", e);
-                    None
-                },
-                Ok(v) => Some(v)
-            }
-        })
-        .then(
-            #[allow(clippy::async_yields_async)]
-            |(id, config)| async move {
-            async move {
-                (id, build_client(&config).await)
-            }
-        })
-        .buffer_unordered(12)
-        .filter(|(_, client)| {
-            future::ready(client.is_ok())
-        })
-        .for_each(|(id, client)| async {
-            let _ = tx.send(Change::Insert(id, client.unwrap())).await;
-        }).await;
+        tx.send(Change::Insert(ls.identifier(), LiteserverConfig::new(config.clone(), ls.clone()))).await?;
+    }
 
     Ok(liteserver_new)
 }
