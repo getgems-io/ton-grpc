@@ -241,7 +241,7 @@ pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceErro
 
 impl Ton<TonBalanced> {
     pub async fn balanced() -> anyhow::Result<Self> {
-        let config = AppConfig::from_env();
+        let config = AppConfig::from_env()?;
 
         let discover = DynamicServiceStream::new(
             config.config_url,
