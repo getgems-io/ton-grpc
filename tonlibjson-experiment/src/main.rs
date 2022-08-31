@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
 
     let balanced_timing = (Instant::now() - now).as_secs();
 
-    println!("Naive: {:?}", naive_timing);
+    println!("Naive: {:?}", balanced_timing);
 
     Ok(())
 }

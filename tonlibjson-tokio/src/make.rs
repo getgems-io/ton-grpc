@@ -7,13 +7,8 @@ use crate::client::AsyncClient;
 use crate::ClientBuilder;
 use crate::liteserver::LiteserverConfig;
 
+#[derive(Default)]
 pub struct ClientFactory;
-
-impl Default for ClientFactory {
-    fn default() -> Self {
-        ClientFactory { }
-    }
-}
 
 impl Service<LiteserverConfig> for ClientFactory {
     type Response = AsyncClient;
