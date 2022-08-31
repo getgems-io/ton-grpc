@@ -18,12 +18,20 @@ pub struct Liteserver {
     port: u16,
 }
 
+#[derive(Clone, Debug)]
 pub struct LiteserverConfig {
     pub config: Value,
     pub liteserver: Liteserver
 }
 
 impl LiteserverConfig {
+    pub fn new(config: Value, liteserver: Liteserver) -> Self {
+        Self {
+            config,
+            liteserver
+        }
+    }
+
     pub fn to_config(&self) -> anyhow::Result<Value> {
         let json = serde_json::to_value(self.liteserver.clone())?;
         let mut config = self.config.clone();
@@ -46,10 +54,8 @@ pub async fn load_ton_config<U: IntoUrl>(url: U) -> anyhow::Result<String> {
     Ok(config)
 }
 
-pub fn extract_liteserver_list(config: &str) -> anyhow::Result<HashSet<Liteserver>> {
-    let decoded_json = serde_json::from_str::<Value>(config)?;
-
-    let liteservers = decoded_json
+pub fn extract_liteserver_list(config: &Value) -> anyhow::Result<HashSet<Liteserver>> {
+    let liteservers = config
         .get("liteservers")
         .ok_or_else(|| anyhow!("liteservers not found"))?
         .as_array()
@@ -97,7 +103,7 @@ mod tests {
                 "key": "3XO67K/qi+gu3T9v8G2hx1yNmWZhccL3O7SoosFo8G0="
               }
             }
-        ]}).to_string();
+        ]});
 
         let liteservers = extract_liteserver_list(&config).unwrap();
 

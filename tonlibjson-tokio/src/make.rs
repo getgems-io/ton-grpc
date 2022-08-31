@@ -2,11 +2,18 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tower::Service;
-use tracing::debug;
-use crate::{AsyncClient, ClientBuilder};
+use tracing::{debug, error};
+use crate::client::AsyncClient;
+use crate::ClientBuilder;
 use crate::liteserver::LiteserverConfig;
 
 pub struct ClientFactory;
+
+impl Default for ClientFactory {
+    fn default() -> Self {
+        ClientFactory { }
+    }
+}
 
 impl Service<LiteserverConfig> for ClientFactory {
     type Response = AsyncClient;
@@ -26,7 +33,12 @@ impl Service<LiteserverConfig> for ClientFactory {
                 .build()
                 .await?;
 
-            client.synchronize().await?;
+            client.synchronize().await.map_err(|e| {
+                error!("cannot synchronize client {:?}", req.liteserver.identifier());
+                e
+            })?;
+
+            debug!("successfully made new client {:?}", req.liteserver.identifier());
 
             anyhow::Ok(client)
         })
