@@ -17,15 +17,6 @@ async fn main() -> anyhow::Result<()> {
 
     let balanced_timing = (Instant::now() - now).as_secs();
 
-    let ton = Ton::naive("./liteserver_config.json").await?;
-    let now = Instant::now();
-
-    let _ = run(ton).await;
-
-    let naive_timing = (Instant::now() - now).as_secs();
-
-
-    println!("Balanced: {:?}", balanced_timing);
     println!("Naive: {:?}", naive_timing);
 
     Ok(())

@@ -18,6 +18,22 @@ pub struct Liteserver {
     port: u16,
 }
 
+pub struct LiteserverConfig {
+    pub config: Value,
+    pub liteserver: Liteserver
+}
+
+impl LiteserverConfig {
+    pub fn to_config(&self) -> anyhow::Result<Value> {
+        let json = serde_json::to_value(self.liteserver.clone())?;
+        let mut config = self.config.clone();
+
+        config["liteservers"] = Value::Array(vec![json]);
+
+        Ok(config)
+    }
+}
+
 impl Liteserver {
     pub fn identifier(&self) -> String {
         format!("{}:{}", self.id.typ, self.id.key)

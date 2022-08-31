@@ -1,6 +1,7 @@
 mod retry;
 mod liteserver;
 mod discover;
+mod make;
 
 use anyhow::anyhow;
 use dashmap::DashMap;
@@ -423,19 +424,6 @@ impl Ton<TonBalanced> {
 
         Ok(Self {
             service: ton
-        })
-    }
-}
-
-impl Ton<AsyncClient> {
-    pub async fn naive<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let client = ClientBuilder::from_file(path)?
-            .disable_logging()
-            .build()
-            .await?;
-
-        Ok(Self {
-            service: client
         })
     }
 }
