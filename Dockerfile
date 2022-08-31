@@ -34,6 +34,9 @@ RUN cargo build -vv --release --target x86_64-unknown-linux-gnu
 RUN cargo test -vv --release --target x86_64-unknown-linux-gnu
 
 FROM debian:bullseye-slim AS runner
+
+RUN apt update && apt install --yes ca-certificates
+
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/tonlibjson-jsonrpc /app/tonlibjson-jsonrpc
 
 CMD ["/app/tonlibjson-jsonrpc"]
