@@ -15,11 +15,13 @@ COPY ./Cargo.toml ./Cargo.toml
 
 RUN USER=root cargo new --lib tonlibjson-rs
 RUN USER=root cargo new --lib tonlibjson-tokio
+RUN USER=root cargo new --lib tonlibjson-tvm
 RUN USER=root cargo new --bin tonlibjson-jsonrpc
 RUN USER=root cargo new --bin tonlibjson-experiment
 
 COPY ./tonlibjson-rs/Cargo.toml ./tonlibjson-rs/Cargo.toml
 COPY ./tonlibjson-tokio/Cargo.toml ./tonlibjson-tokio/Cargo.toml
+COPY ./tonlibjson-tvm/Cargo.toml ./tonlibjson-tvm/Cargo.toml
 COPY ./tonlibjson-jsonrpc/Cargo.toml ./tonlibjson-jsonrpc/Cargo.toml
 COPY ./tonlibjson-experiment/Cargo.toml ./tonlibjson-experiment/Cargo.toml
 
