@@ -49,7 +49,7 @@ impl AsyncClient {
                                     }
                                 } else if let Some(Value::String(ref typ)) = json.get("@type") {
                                     match typ.as_str() {
-                                        "updateSyncState" => (),
+                                        "updateSyncState" => tracing::debug!("Update sync state: {:?}", json),
                                         _ => tracing::warn!("Unexpected response {:?} with type {}", json.to_string(), typ)
                                     }
                                 } else {
