@@ -10,7 +10,7 @@ cmake = "0.1.48"
 [dependencies]
 axum = "0.5.15"
 anyhow = "1.0.63"
-tokio = { version = "1.20.1", features = ["rt-multi-thread", "sync", "macros", "time", "rt"] }
+tokio = { version = "1.21.0", features = ["rt-multi-thread", "sync", "macros", "time", "rt"] }
 tokio-stream = "0.1.9"
 futures = "0.3.24"
 tonlibjson-tokio = { path = "../tonlibjson-tokio" }
