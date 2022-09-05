@@ -6,7 +6,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
 libc = "0.2.132"
-anyhow = "1.0.63"
+anyhow = "1.0.64"
 
 [build-dependencies]
 cmake = "0.1.48"
