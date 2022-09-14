@@ -7,7 +7,7 @@ edition = "2021"
 
 [dependencies]
 tower = { version = "0.4.13", features = ["full"] }
-tokio = { version = "1.20.1", features = ["full"] }
+tokio = { version = "1.21.1", features = ["full"] }
 anyhow = "1.0.63"
 futures = "0.3.24"
 tonlibjson-tokio = { path = "../tonlibjson-tokio" }
