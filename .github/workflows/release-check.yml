@@ -2,6 +2,9 @@ name: Check release build
 on:
   pull_request:
     branches: [ "master" ]
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
 jobs:
   build-docker-image:
     runs-on: ubuntu-latest
