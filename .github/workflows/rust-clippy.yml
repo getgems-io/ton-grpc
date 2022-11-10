@@ -29,20 +29,6 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Restore llvm repos
-        run: |
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          sudo ./llvm.sh 14
-
-      - name: Install libc++-14
-        run: sudo apt-get install -y libc++-14-dev libc++abi-14-dev
-
-      - name: Switch clang version to 14
-        run: |
-          sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-14 101
-          sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 101
-
       - uses: actions/cache@v3
         with:
           path: |
