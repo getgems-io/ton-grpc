@@ -42,9 +42,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.head_ref }}
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.base_ref }}
-          cache-to: type=inline
+            type=gha,scope=${{ github.base_ref }}
+            type=gha,scope=${{ github.head_ref }}
+          cache-to: type=gha,mode=max,scope=${{ github.head_ref }}
           build-args: |
             sha=${{ github.sha }}
             sha_short=${{ env.GITHUB_SHA_SHORT }}
