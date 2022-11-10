@@ -2,10 +2,10 @@ FROM rust:1.65.0-bullseye AS builder
 
 RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common
 
-RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 14 all
-RUN ln -sf $(which clang-14) /usr/bin/clang
-RUN ln -sf $(which clang++-14) /usr/bin/clang++
-RUN ln -sf /usr/bin/ld.lld-14 /usr/bin/ld.lld
+RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 15 all
+RUN ln -sf $(which clang-15) /usr/bin/clang
+RUN ln -sf $(which clang++-15) /usr/bin/clang++
+RUN ln -sf /usr/bin/ld.lld-15 /usr/bin/ld.lld
 
 RUN USER=root cargo new --bin app
 WORKDIR /app
