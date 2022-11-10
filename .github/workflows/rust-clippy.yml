@@ -43,14 +43,6 @@ jobs:
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-14 101
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-14 101
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af #@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          components: clippy
-          override: true
-
       - uses: actions/cache@v3
         with:
           path: |
@@ -61,20 +53,15 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Install required cargo
-        run: cargo install --force clippy-sarif sarif-fmt
-
-      - name: Run rust-clippy
-        run:
-          cargo clippy
-          --all-features
-          --message-format=json
-          --target x86_64-unknown-linux-gnu
-          | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
-        continue-on-error: true
-
-      - name: Upload analysis results to GitHub
-        uses: github/codeql-action/upload-sarif@v2
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af #@v1
         with:
-          sarif_file: rust-clippy-results.sarif
-          wait-for-processing: true
+          profile: minimal
+          toolchain: stable
+          components: clippy
+          override: true
+
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features --target x86_64-unknown-linux-gnu
