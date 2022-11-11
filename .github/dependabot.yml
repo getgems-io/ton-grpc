@@ -9,6 +9,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    pull-request-branch-name:
+      separator: "_"
   - package-ecosystem: gitsubmodule
     directory: "/"
     schedule:
@@ -17,3 +19,5 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    pull-request-branch-name:
+      separator: "_"
