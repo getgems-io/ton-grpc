@@ -1,16 +1,18 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use serde_json::json;
 use tower::Service;
-use tracing::{debug, error};
+use tracing::{debug, error, warn};
 use crate::client::AsyncClient;
-use crate::ClientBuilder;
-use crate::liteserver::LiteserverConfig;
+use crate::{ClientBuilder, GetMasterchainInfo};
+use crate::ton_config::TonConfig;
 
-#[derive(Default)]
+
+#[derive(Default, Debug)]
 pub struct ClientFactory;
 
-impl Service<LiteserverConfig> for ClientFactory {
+impl Service<TonConfig> for ClientFactory {
     type Response = AsyncClient;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -19,21 +21,25 @@ impl Service<LiteserverConfig> for ClientFactory {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: LiteserverConfig) -> Self::Future {
-        debug!("make new liteserver {:?}", req.liteserver.identifier());
-
+    fn call(&mut self, req: TonConfig) -> Self::Future {
         Box::pin(async move {
-            let client = ClientBuilder::from_json_config(&req.to_config()?)
+            warn!("make new liteserver");
+
+            let client = ClientBuilder::from_config(&req)
                 .disable_logging()
                 .build()
                 .await?;
 
+            // Ping
+            let pong = client.execute(json!(GetMasterchainInfo {})).await?;
+            warn!("Pong: {}", pong);
+
             client.synchronize().await.map_err(|e| {
-                error!("cannot synchronize client {:?}", req.liteserver.identifier());
+                error!("cannot synchronize client, error is {:?}", e);
                 e
             })?;
 
-            debug!("successfully made new client {:?}", req.liteserver.identifier());
+            debug!("successfully made new client");
 
             anyhow::Ok(client)
         })

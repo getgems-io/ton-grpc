@@ -1,9 +1,8 @@
-use futures::TryStreamExt;
 use futures::{stream, StreamExt};
 use serde_json::Value;
 use tokio::time::Instant;
 use tower::Service;
-use tonlibjson_tokio::{ServiceError, ShortTxId, Ton};
+use tonlibjson_tokio::{ServiceError, Ton};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -17,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
 
     let balanced_timing = (Instant::now() - now).as_secs();
 
-    println!("Naive: {:?}", balanced_timing);
+    println!("Time: {:?}", balanced_timing);
 
     Ok(())
 }
@@ -32,18 +31,19 @@ async fn run<S>(ton: Ton<S>) -> anyhow::Result<()> where S : Service<Value, Resp
                 match ton.get_shards(seqno).await {
                     Ok(shards) => {
                         if let Some(block) = shards.shards.first() {
-                            match ton.get_tx_stream(block.clone()).await.try_collect::<Vec<ShortTxId>>().await {
-                                Ok(txs) => {
-                                    for tx in txs {
-                                        let address = format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap());
-                                        match ton.get_account_state(&address).await {
-                                            Ok(account) => tracing::info!("{}: {}", &address, account["balance"].as_str().unwrap()),
-                                            Err(e) => tracing::error!("{:?}", e)
-                                        }
+                            ton.get_tx_stream(block.clone()).await
+                                .for_each_concurrent(10, |tx| async {
+                                    let Ok(tx) = tx else {
+                                        tracing::error!("{:?}", tx.unwrap_err());
+
+                                        return
+                                    };
+                                    let address = format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap());
+                                    match ton.get_account_state(&address).await {
+                                        Ok(account) => tracing::info!("{}: {}", &address, account["balance"].as_str().unwrap()),
+                                        Err(e) => tracing::error!("{:?}", e)
                                     }
-                                },
-                                Err(e) => tracing::error!("{:?}", e)
-                            }
+                                }).await;
                         } else {
                             tracing::error!("no block")
                         }
