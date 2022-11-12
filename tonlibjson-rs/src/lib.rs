@@ -1,5 +1,5 @@
 use std::{ffi::{c_void, CStr, CString}, time::Duration};
-use libc::{c_char, c_double};
+use libc::{c_char, c_double, c_int};
 use anyhow::{anyhow, Result};
 
 #[cfg(test)]
@@ -31,6 +31,11 @@ mod tests {
 
         assert!(response.is_err())
     }
+
+    #[test]
+    fn set_verbosity_level() {
+        Client::set_verbosity_level(0)
+    }
 }
 
 #[link(name = "tonlib")]
@@ -44,6 +49,8 @@ extern {
     fn tonlib_client_json_execute(p: *mut c_void, request: *const c_char) -> *const c_char;
 
     fn tonlib_client_json_receive(p: *mut c_void, timeout: c_double) -> *const c_char;
+
+    fn tonlib_client_set_verbosity_level(level: c_int);
 }
 
 #[derive(Debug)]
@@ -56,6 +63,10 @@ impl Client {
         Self {
             pointer: unsafe { tonlib_client_json_create() }
         }
+    }
+
+    pub fn set_verbosity_level(level: i32) {
+        unsafe { tonlib_client_set_verbosity_level(level) }
     }
 
     pub fn send(&self, request: &str) -> Result<()> {
