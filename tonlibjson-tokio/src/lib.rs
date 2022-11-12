@@ -1,9 +1,9 @@
 mod retry;
-mod liteserver;
 mod discover;
 mod make;
 mod client;
 mod config;
+mod ton_config;
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
@@ -12,21 +12,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::fs::File;
-use std::io::BufReader;
 use std::path::Path;
 use std::time::Duration;
 use tower::{Service, ServiceExt};
 use tower::balance::p2c::{Balance};
 use tower::buffer::Buffer;
+use tower::discover::ServiceList;
 use tower::load::PeakEwmaDiscover;
+use tower::reconnect::Reconnect;
 use tower::retry::{Retry};
 use tower::retry::budget::Budget;
 use crate::client::AsyncClient;
 use crate::config::AppConfig;
-use crate::discover::DynamicServiceStream;
 use crate::make::ClientFactory;
 use crate::retry::RetryPolicy;
+use crate::ton_config::{load_ton_config, TonConfig};
 
 pub struct ClientBuilder {
     config: Value,
@@ -34,14 +34,14 @@ pub struct ClientBuilder {
 }
 
 impl ClientBuilder {
-    pub fn from_json_config(config: &Value) -> Self {
+    pub fn from_config(config: &str) -> Self {
         let full_config = json!({
             "@type": "init",
             "options": {
                 "@type": "options",
                 "config": {
                     "@type": "config",
-                    "config": config.to_string(),
+                    "config": config,
                     "use_callbacks_for_network": false,
                     "blockchain_name": "",
                     "ignore_cache": true
@@ -59,17 +59,15 @@ impl ClientBuilder {
     }
 
     pub fn from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Self> {
-        let file = File::open(path)?;
-        let reader = BufReader::new(file);
-        let config: Value = serde_json::from_reader(reader)?;
+        let config = std::fs::read_to_string(&path)?;
 
-        Ok(ClientBuilder::from_json_config(&config))
+        Ok(ClientBuilder::from_config(&config))
     }
 
     pub fn disable_logging(&mut self) -> &mut Self {
         self.disable_logging = Some(json!({
             "@type": "setLogVerbosityLevel",
-            "new_verbosity_level": 0
+            "new_verbosity_level": 1
         }));
 
         self
@@ -232,7 +230,7 @@ impl From<&ShortTxId> for AccountTransactionId {
 
 pub type ServiceError = Box<(dyn Error + Sync + Send)>;
 pub type TonNaive = AsyncClient;
-pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<DynamicServiceStream>, Value>, Value>>;
+pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<Reconnect<ClientFactory, TonConfig>>>>, Value>, Value>>;
 
 #[derive(Clone)]
 pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> {
@@ -243,10 +241,14 @@ impl Ton<TonBalanced> {
     pub async fn balanced() -> anyhow::Result<Self> {
         let config = AppConfig::from_env()?;
 
-        let discover = DynamicServiceStream::new(
-            config.config_url,
-            Duration::from_secs(60)
-        );
+        tracing::info!("Config url: {}, pool size: {}", config.config_url, config.pool_size);
+
+        let ton_config = load_ton_config(config.config_url).await?;
+        let clients = (0..config.pool_size)
+            .map(|_| Reconnect::new::<AsyncClient, Value>(ClientFactory::default(), ton_config.clone()))
+            .collect();
+
+        let discover = ServiceList::new(clients);
 
         let emwa = PeakEwmaDiscover::new(
             discover,
