@@ -5,6 +5,8 @@ fn test_mem() {
     let memory_before = procinfo::pid::statm_self().unwrap().resident;
 
     {
+        Client::set_verbosity_level(0);
+
         let mut clients = vec![];
         for _ in 1..10000 {
             let client = Client::new();
