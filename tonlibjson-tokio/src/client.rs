@@ -32,13 +32,14 @@ impl AsyncClient {
         let responses_rcv = Arc::clone(&responses);
         let (stop_signal, stop_receiver) = mpsc::channel();
 
-        let _ = Arc::new(thread::spawn(move || {
+        tokio::task::spawn_blocking(move || {
             let timeout = Duration::from_secs(20);
+
             loop {
                 match stop_receiver.try_recv() {
                     Ok(_) | Err(TryRecvError::Disconnected) => {
                         tracing::warn!("Stop thread");
-                        break
+                        return
                     },
                     Err(TryRecvError::Empty) => {
                         if let Ok(packet) = client_recv.receive(timeout) {
@@ -60,7 +61,7 @@ impl AsyncClient {
                     }
                 }
             }
-        }));
+        });
 
         AsyncClient {
             client,
