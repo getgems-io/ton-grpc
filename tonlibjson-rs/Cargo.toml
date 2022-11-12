@@ -11,3 +11,6 @@ anyhow = { workspace = true }
 [build-dependencies]
 cmake = "0.1.48"
 pkg-config = "0.3.25"
+
+[dev-dependencies]
+procinfo = "0.4.2"
