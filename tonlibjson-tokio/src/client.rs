@@ -42,21 +42,29 @@ impl AsyncClient {
                         return
                     },
                     Err(TryRecvError::Empty) => {
-                        if let Ok(packet) = client_recv.receive(timeout) {
-                            if let Ok(json) = serde_json::from_str::<Value>(packet) {
-                                if let Some(Value::String(ref id)) = json.get("@extra") {
-                                    if let Some((_, s)) = responses_rcv.remove(id) {
-                                        let _ = s.send(json);
-                                    }
-                                } else if let Some(Value::String(ref typ)) = json.get("@type") {
-                                    match typ.as_str() {
-                                        "updateSyncState" => tracing::debug!("Update sync state: {:?}", json),
-                                        _ => tracing::warn!("Unexpected response {:?} with type {}", json.to_string(), typ)
-                                    }
-                                } else {
-                                    tracing::warn!("Unexpected response {:?}", json.to_string())
-                                }
+                        let Ok(packet) = client_recv.receive(timeout) else {
+                            tracing::error!("receive timeout");
+
+                            return
+                        };
+
+                        let Ok(json) = serde_json::from_str::<Value>(packet) else {
+                            tracing::error!("receive bad json");
+
+                            return
+                        };
+
+                        if let Some(Value::String(ref id)) = json.get("@extra") {
+                            if let Some((_, s)) = responses_rcv.remove(id) {
+                                let _ = s.send(json);
                             }
+                        } else if let Some(Value::String(ref typ)) = json.get("@type") {
+                            match typ.as_str() {
+                                "updateSyncState" => tracing::debug!("Update sync state: {:?}", json),
+                                _ => tracing::warn!("Unexpected response {:?} with type {}", json.to_string(), typ)
+                            }
+                        } else {
+                            tracing::warn!("Unexpected response {:?}", json.to_string())
                         }
                     }
                 }
