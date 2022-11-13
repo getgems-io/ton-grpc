@@ -15,7 +15,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::path::Path;
 use std::time::Duration;
-use tower::{Service, ServiceExt};
+use tower::{BoxError, Service, ServiceExt};
 use tower::balance::p2c::{Balance};
 use tower::buffer::Buffer;
 use tower::discover::ServiceList;
@@ -230,12 +230,11 @@ impl From<&ShortTxId> for AccountTransactionId {
     }
 }
 
-pub type ServiceError = Box<(dyn Error + Sync + Send)>;
 pub type TonNaive = AsyncClient;
 pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<Reconnect<ClientFactory, TonConfig>>>>, Request>, Request>>;
 
 #[derive(Clone)]
-pub struct Ton<S> where S : Service<Request, Response = Value, Error = ServiceError> {
+pub struct Ton<S> where S : Service<Request, Response = Value, Error = BoxError> {
     service: S
 }
 
@@ -277,7 +276,7 @@ impl Ton<TonBalanced> {
     }
 }
 
-impl<S> Ton<S> where S : Service<Request, Response = Value, Error = ServiceError> + Clone
+impl<S> Ton<S> where S : Service<Request, Response = Value, Error = BoxError> + Clone
 {
     pub fn new(service: S) -> Self {
         Self { service }
@@ -482,7 +481,7 @@ impl<S> Ton<S> where S : Service<Request, Response = Value, Error = ServiceError
         &self,
         block: BlockIdExt,
     ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ {
-        struct State<'a, S : Service<Request, Response = Value, Error = ServiceError>> {
+        struct State<'a, S : Service<Request, Response = Value, Error = BoxError>> {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
             block: BlockIdExt,
@@ -546,7 +545,7 @@ impl<S> Ton<S> where S : Service<Request, Response = Value, Error = ServiceError
         address: String,
         last_tx: InternalTransactionId,
     ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
-        struct State<'a, S : Service<Request, Response = Value, Error = ServiceError>> {
+        struct State<'a, S : Service<Request, Response = Value, Error = BoxError>> {
             address: String,
             last_tx: InternalTransactionId,
             this: &'a Ton<S>
