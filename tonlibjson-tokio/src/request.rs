@@ -38,6 +38,14 @@ impl Request {
             data
         }
     }
+
+    pub fn with_new_id(&self) -> Self {
+        Self {
+            id: RequestId::new_v4(),
+            timeout: self.timeout,
+            data: self.data.clone()
+        }
+    }
 }
 
 #[cfg(test)]

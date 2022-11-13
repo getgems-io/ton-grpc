@@ -253,8 +253,8 @@ impl Ton<TonBalanced> {
 
         let emwa = PeakEwmaDiscover::new(
             discover,
-            Duration::from_millis(300),
-            Duration::from_secs(10),
+            Duration::from_secs(15),
+            Duration::from_secs(60),
             tower::load::CompleteOnResponse::default(),
         );
 

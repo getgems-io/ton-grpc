@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use futures::future;
+use crate::request::Request;
 use tower::retry::budget::Budget;
 use tower::retry::Policy;
 
@@ -16,10 +17,10 @@ impl RetryPolicy {
     }
 }
 
-impl<E, Req, Res> Policy<Req, Res, E> for RetryPolicy where Req : Clone {
+impl<E, Res> Policy<Request, Res, E> for RetryPolicy {
     type Future = future::Ready<Self>;
 
-    fn retry(&self, _: &Req, result: Result<&Res, &E>) -> Option<Self::Future> {
+    fn retry(&self, _: &Request, result: Result<&Res, &E>) -> Option<Self::Future> {
         match result {
             Ok(_) => {
                 self.budget.deposit();
@@ -35,7 +36,7 @@ impl<E, Req, Res> Policy<Req, Res, E> for RetryPolicy where Req : Clone {
         }
     }
 
-    fn clone_request(&self, req: &Req) -> Option<Req> {
-        Some(req.clone())
+    fn clone_request(&self, req: &Request) -> Option<Request> {
+        Some(req.with_new_id())
     }
 }
