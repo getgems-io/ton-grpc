@@ -18,17 +18,14 @@ use std::time::Duration;
 use tower::{BoxError, Service, ServiceExt};
 use tower::balance::p2c::{Balance};
 use tower::buffer::Buffer;
-use tower::discover::ServiceList;
 use tower::load::PeakEwmaDiscover;
-use tower::reconnect::Reconnect;
 use tower::retry::{Retry};
 use tower::retry::budget::Budget;
 use crate::client::AsyncClient;
 use crate::config::AppConfig;
-use crate::make::ClientFactory;
+use crate::discover::DynamicServiceStream;
 use crate::request::Request;
 use crate::retry::RetryPolicy;
-use crate::ton_config::{load_ton_config, TonConfig};
 
 pub struct ClientBuilder {
     config: Value,
@@ -231,7 +228,7 @@ impl From<&ShortTxId> for AccountTransactionId {
 }
 
 pub type TonNaive = AsyncClient;
-pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<Reconnect<ClientFactory, TonConfig>>>>, Request>, Request>>;
+pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<DynamicServiceStream>, Request>, Request>>;
 
 #[derive(Clone)]
 pub struct Ton<S> where S : Service<Request, Response = Value, Error = BoxError> {
@@ -244,21 +241,20 @@ impl Ton<TonBalanced> {
 
         tracing::info!("Config url: {}, pool size: {}", config.config_url, config.pool_size);
 
-        let ton_config = load_ton_config(config.config_url).await?;
-        let clients = (0..config.pool_size)
-            .map(|_| Reconnect::new::<AsyncClient, Value>(ClientFactory::default(), ton_config.clone()))
-            .collect();
+        let discover = DynamicServiceStream::new(
+            config.config_url.clone(),
+            Duration::from_secs(5),
+            config.pool_size
+        )?;
 
-        let discover = ServiceList::new(clients);
-
-        let emwa = PeakEwmaDiscover::new(
+        let ewma = PeakEwmaDiscover::new(
             discover,
             Duration::from_secs(15),
             Duration::from_secs(60),
             tower::load::CompleteOnResponse::default(),
         );
 
-        let ton = Balance::new(emwa);
+        let ton = Balance::new(ewma);
         let ton = Buffer::new(ton, 200000);
         let ton = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
