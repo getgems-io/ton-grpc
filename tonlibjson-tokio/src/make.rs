@@ -1,11 +1,12 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use serde_json::json;
 use tower::Service;
-use tracing::{debug, error, warn};
+use tracing::{debug, warn};
 use crate::client::AsyncClient;
-use crate::{ClientBuilder, GetMasterchainInfo};
+use crate::{ClientBuilder, GetMasterchainInfo, Request};
 use crate::ton_config::TonConfig;
 
 
@@ -31,13 +32,18 @@ impl Service<TonConfig> for ClientFactory {
                 .await?;
 
             // Ping
-            let pong = client.execute(json!(GetMasterchainInfo {})).await?;
+            let pong = client.execute(
+                &Request::with_timeout(
+                    json!(GetMasterchainInfo {}),
+                    Duration::from_secs(1)
+                )).await?;
             warn!("Pong: {}", pong);
 
-            client.synchronize().await.map_err(|e| {
-                error!("cannot synchronize client, error is {:?}", e);
-                e
-            })?;
+            let sync = Request::with_timeout(json!({
+                "@type": "sync"
+            }), Duration::from_secs(60 * 5));
+
+            client.execute(&sync).await?;
 
             debug!("successfully made new client");
 

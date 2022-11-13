@@ -1,25 +1,22 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::thread;
 use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::TryRecvError;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use serde_json::{json, Value};
 use anyhow::anyhow;
+use serde_json::Value;
 use dashmap::DashMap;
-use serde::de::DeserializeOwned;
 use tower::Service;
-use uuid::Uuid;
 use tonlibjson_rs::Client;
 use crate::{ServiceError, TonError};
+use crate::request::{Request, RequestId, Response};
 
-#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct AsyncClient {
     client: Arc<Client>,
-    responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>>,
-    stop_signal: Arc<Mutex<Stop>>
+    responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
+    _stop_signal: Arc<Mutex<Stop>>
 }
 
 impl AsyncClient {
@@ -27,12 +24,12 @@ impl AsyncClient {
         let client = Arc::new(Client::new());
         let client_recv = client.clone();
 
-        let responses: Arc<DashMap<String, tokio::sync::oneshot::Sender<Value>>> =
+        let responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>> =
             Arc::new(DashMap::new());
         let responses_rcv = Arc::clone(&responses);
         let (stop_signal, stop_receiver) = mpsc::channel();
 
-        tokio::task::spawn_blocking(move || {
+        let _ = tokio::task::spawn_blocking(move || {
             let timeout = Duration::from_secs(20);
 
             loop {
@@ -43,19 +40,12 @@ impl AsyncClient {
                     },
                     Err(TryRecvError::Empty) => {
                         if let Ok(packet) = client_recv.receive(timeout) {
-                            if let Ok(json) = serde_json::from_str::<Value>(packet) {
-                                if let Some(Value::String(ref id)) = json.get("@extra") {
-                                    if let Some((_, s)) = responses_rcv.remove(id) {
-                                        let _ = s.send(json);
-                                    }
-                                } else if let Some(Value::String(ref typ)) = json.get("@type") {
-                                    match typ.as_str() {
-                                        "updateSyncState" => tracing::debug!("Update sync state: {:?}", json),
-                                        _ => tracing::warn!("Unexpected response {:?} with type {}", json.to_string(), typ)
-                                    }
-                                } else {
-                                    tracing::warn!("Unexpected response {:?}", json.to_string())
+                            if let Ok(response) = serde_json::from_str::<Response>(packet) {
+                                if let Some((_, sender)) = responses_rcv.remove(&response.id) {
+                                    let _ = sender.send(response);
                                 }
+                            } else {
+                                tracing::warn!("Unexpected response {:?}", packet.to_string())
                             }
                         }
                     }
@@ -66,63 +56,31 @@ impl AsyncClient {
         AsyncClient {
             client,
             responses,
-            stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
+            _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
         }
     }
 
-    pub async fn execute(&self, request: Value) -> anyhow::Result<Value> {
-        self.execute_typed_with_timeout(&request, Duration::from_secs(20))
-            .await
-    }
+    // TODO[akostylev0] internal
+    pub async fn execute(&self, request: &Request) -> anyhow::Result<Value> {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Response>();
+        self.responses.insert(request.id, tx);
 
-    async fn execute_typed_with_timeout<T: DeserializeOwned>(
-        &self,
-        request: &Value,
-        timeout: Duration,
-    ) -> anyhow::Result<T> {
-        let mut request = request.clone();
+        let _ = self.client.send(&serde_json::to_string(request)?);
 
-        let id = Uuid::new_v4().to_string();
-        request["@extra"] = json!(id);
-        let (tx, rx) = tokio::sync::oneshot::channel::<Value>();
-        self.responses.insert(id.clone(), tx);
+        let result = tokio::time::timeout(request.timeout, rx).await;
+        self.responses.remove(&request.id);
 
-        let x = request.to_string();
-        let _ = self.client.send(&x);
+        let response = result??;
 
-        let timeout = tokio::time::timeout(timeout, rx).await?;
+        // TODO[akostylev0] refac
+        if response.data["@type"] == "error" {
+            tracing::warn!("Error occurred: {:?}", &response.data);
+            let error = serde_json::from_value::<TonError>(response.data)?;
 
-        match timeout {
-            Ok(mut value) => {
-                let obj = value.as_object_mut().ok_or_else(||anyhow!("Not an object"))?;
-                let _ = obj.remove("@extra");
-
-                if value["@type"] == "error" {
-                    tracing::warn!("Error occurred: {:?}", &value);
-                    return match serde_json::from_value::<TonError>(value) {
-                        Ok(e) => Err(anyhow::Error::from(e)),
-                        Err(e) => Err(anyhow::Error::from(e)),
-                    };
-                }
-
-                serde_json::from_value::<T>(value).map_err(anyhow::Error::from)
-            }
-            Err(e) => {
-                tracing::warn!("timeout reached");
-                self.responses.remove(&id);
-
-                Err(anyhow::Error::from(e))
-            }
+            return Err(anyhow!(error))
         }
-    }
 
-    pub async fn synchronize(&self) -> anyhow::Result<Value> {
-        let query = json!({
-            "@type": "sync"
-        });
-
-        self.execute_typed_with_timeout::<Value>(&query, Duration::from_secs(60 * 5))
-            .await
+        Ok(response.data)
     }
 }
 
@@ -142,10 +100,11 @@ impl Service<Value> for AsyncClient {
     }
 
     fn call(&mut self, req: Value) -> Self::Future {
+        let req = Request::new(req);
         let this = self.clone();
 
         Box::pin(async move {
-            this.execute(req).await.map_err(ServiceError::from)
+            this.execute(&req).await.map_err(ServiceError::from)
         })
     }
 }

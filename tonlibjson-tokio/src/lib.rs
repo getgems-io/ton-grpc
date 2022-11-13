@@ -4,6 +4,7 @@ mod make;
 mod client;
 mod config;
 mod ton_config;
+mod request;
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
@@ -25,6 +26,7 @@ use tower::retry::budget::Budget;
 use crate::client::AsyncClient;
 use crate::config::AppConfig;
 use crate::make::ClientFactory;
+use crate::request::Request;
 use crate::retry::RetryPolicy;
 use crate::ton_config::{load_ton_config, TonConfig};
 
@@ -79,10 +81,10 @@ impl ClientBuilder {
 
         let client = AsyncClient::new();
         if let Some(ref disable_logging) = self.disable_logging {
-            client.execute(disable_logging.clone()).await?;
+            client.execute(&Request::new(disable_logging.clone())).await?;
         }
 
-        client.execute(self.config.clone()).await?;
+        client.execute(&Request::new(self.config.clone())).await?;
 
         Ok(client)
     }
