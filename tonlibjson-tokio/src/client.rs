@@ -9,7 +9,7 @@ use serde_json::Value;
 use dashmap::DashMap;
 use tower::Service;
 use tonlibjson_rs::Client;
-use crate::{ServiceError, TonError};
+use crate::TonError;
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Clone, Debug)]
@@ -60,8 +60,7 @@ impl AsyncClient {
         }
     }
 
-    // TODO[akostylev0] internal
-    pub async fn execute(&self, request: &Request) -> anyhow::Result<Value> {
+    async fn execute(&self, request: &Request) -> anyhow::Result<Value> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Response>();
         self.responses.insert(request.id, tx);
 
@@ -90,21 +89,20 @@ impl Default for AsyncClient {
     }
 }
 
-impl Service<Value> for AsyncClient {
+impl Service<Request> for AsyncClient {
     type Response = Value;
-    type Error = ServiceError;
+    type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Value) -> Self::Future {
-        let req = Request::new(req);
+    fn call(&mut self, req: Request) -> Self::Future {
         let this = self.clone();
 
         Box::pin(async move {
-            this.execute(&req).await.map_err(ServiceError::from)
+            this.execute(&req).await
         })
     }
 }

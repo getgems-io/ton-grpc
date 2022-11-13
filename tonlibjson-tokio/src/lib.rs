@@ -4,7 +4,7 @@ mod make;
 mod client;
 mod config;
 mod ton_config;
-mod request;
+pub mod request;
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
@@ -79,12 +79,12 @@ impl ClientBuilder {
         #[derive(Deserialize)]
         struct Void {}
 
-        let client = AsyncClient::new();
+        let mut client = AsyncClient::new();
         if let Some(ref disable_logging) = self.disable_logging {
-            client.execute(&Request::new(disable_logging.clone())).await?;
+            client.call(Request::new(disable_logging.clone())).await?;
         }
 
-        client.execute(&Request::new(self.config.clone())).await?;
+        client.call(Request::new(self.config.clone())).await?;
 
         Ok(client)
     }
@@ -232,10 +232,10 @@ impl From<&ShortTxId> for AccountTransactionId {
 
 pub type ServiceError = Box<(dyn Error + Sync + Send)>;
 pub type TonNaive = AsyncClient;
-pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<Reconnect<ClientFactory, TonConfig>>>>, Value>, Value>>;
+pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<ServiceList<Vec<Reconnect<ClientFactory, TonConfig>>>>, Request>, Request>>;
 
 #[derive(Clone)]
-pub struct Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> {
+pub struct Ton<S> where S : Service<Request, Response = Value, Error = ServiceError> {
     service: S
 }
 
@@ -277,7 +277,7 @@ impl Ton<TonBalanced> {
     }
 }
 
-impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> + Clone
+impl<S> Ton<S> where S : Service<Request, Response = Value, Error = ServiceError> + Clone
 {
     pub fn new(service: S) -> Self {
         Self { service }
@@ -482,7 +482,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         &self,
         block: BlockIdExt,
     ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ {
-        struct State<'a, S : Service<Value, Response = Value, Error = ServiceError>> {
+        struct State<'a, S : Service<Request, Response = Value, Error = ServiceError>> {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
             block: BlockIdExt,
@@ -546,7 +546,7 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         address: String,
         last_tx: InternalTransactionId,
     ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
-        struct State<'a, S : Service<Value, Response = Value, Error = ServiceError>> {
+        struct State<'a, S : Service<Request, Response = Value, Error = ServiceError>> {
             address: String,
             last_tx: InternalTransactionId,
             this: &'a Ton<S>
@@ -575,7 +575,9 @@ impl<S> Ton<S> where S : Service<Value, Response = Value, Error = ServiceError> 
         .try_flatten()
     }
 
-    async fn call(&self, request: Value) -> anyhow::Result<Value> {
+    async fn call(&self, data: Value) -> anyhow::Result<Value> {
+        let request = Request::new(data);
+
         let mut ton = self.clone();
         let ready = ton.service.ready().await.map_err(|e| anyhow!(e))?;
         let call = ready.call(request).await.map_err(|e| anyhow!(e))?;

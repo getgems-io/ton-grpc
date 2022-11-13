@@ -26,14 +26,14 @@ impl Service<TonConfig> for ClientFactory {
         Box::pin(async move {
             warn!("make new liteserver");
 
-            let client = ClientBuilder::from_config(&req)
+            let mut client = ClientBuilder::from_config(&req)
                 .disable_logging()
                 .build()
                 .await?;
 
             // Ping
-            let pong = client.execute(
-                &Request::with_timeout(
+            let pong = client.call(
+                Request::with_timeout(
                     json!(GetMasterchainInfo {}),
                     Duration::from_secs(1)
                 )).await?;
@@ -43,7 +43,7 @@ impl Service<TonConfig> for ClientFactory {
                 "@type": "sync"
             }), Duration::from_secs(60 * 5));
 
-            client.execute(&sync).await?;
+            client.call(sync).await?;
 
             debug!("successfully made new client");
 
