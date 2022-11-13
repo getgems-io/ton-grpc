@@ -243,7 +243,7 @@ impl Ton<TonBalanced> {
 
         let discover = DynamicServiceStream::new(
             config.config_url.clone(),
-            Duration::from_secs(5),
+            Duration::from_secs(60),
             config.pool_size
         )?;
 
