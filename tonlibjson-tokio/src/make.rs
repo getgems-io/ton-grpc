@@ -3,7 +3,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use serde_json::json;
-use tower::Service;
+use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
+use tower::{Layer, Service};
 use tracing::{debug, warn};
 use crate::client::AsyncClient;
 use crate::{ClientBuilder, GetMasterchainInfo, Request};
@@ -14,7 +15,7 @@ use crate::ton_config::TonConfig;
 pub struct ClientFactory;
 
 impl Service<TonConfig> for ClientFactory {
-    type Response = AsyncClient;
+    type Response = ConcurrencyLimit<AsyncClient>;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -46,6 +47,8 @@ impl Service<TonConfig> for ClientFactory {
             client.call(sync).await?;
 
             debug!("successfully made new client");
+
+            let client = ConcurrencyLimitLayer::new(100).layer(client);
 
             anyhow::Ok(client)
         })
