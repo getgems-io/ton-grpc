@@ -44,7 +44,7 @@ impl AsyncClient {
                                 if let Some((_, sender)) = responses_rcv.remove(&response.id) {
                                     let _ = sender.send(response);
                                 }
-                            } else {
+                            } else if !packet.contains("syncState") {
                                 tracing::warn!("Unexpected response {:?}", packet.to_string())
                             }
                         }
