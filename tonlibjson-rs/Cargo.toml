@@ -5,12 +5,12 @@ edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
-libc = "0.2.137"
+libc = "0.2"
 anyhow = { workspace = true }
 
 [build-dependencies]
-cmake = "0.1.49"
-pkg-config = "0.3.26"
+cmake = "0.1"
+pkg-config = "0.3"
 
 [dev-dependencies]
-procinfo = "0.4.2"
+procinfo = "0.4"

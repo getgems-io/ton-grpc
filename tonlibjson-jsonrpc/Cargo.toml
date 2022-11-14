@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [build-dependencies]
-cmake = "0.1.48"
+cmake = "0.1"
 
 [dependencies]
 tonlibjson-tokio = { path = "../tonlibjson-tokio" }
@@ -19,4 +19,4 @@ serde_json = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
 tokio-stream = { workspace = true }
-axum = "0.5.17"
+axum = "0.5"
