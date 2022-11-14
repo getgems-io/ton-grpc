@@ -9,7 +9,7 @@ libc = "0.2.137"
 anyhow = { workspace = true }
 
 [build-dependencies]
-cmake = "0.1.48"
+cmake = "0.1.49"
 pkg-config = "0.3.25"
 
 [dev-dependencies]
