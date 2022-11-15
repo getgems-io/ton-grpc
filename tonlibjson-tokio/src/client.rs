@@ -12,7 +12,7 @@ use tonlibjson_rs::Client;
 use crate::TonError;
 use crate::request::{Request, RequestId, Response};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct AsyncClient {
     client: Arc<Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
@@ -59,28 +59,6 @@ impl AsyncClient {
             _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
         }
     }
-
-    async fn execute(&self, request: &Request) -> anyhow::Result<Value> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Response>();
-        self.responses.insert(request.id, tx);
-
-        let _ = self.client.send(&serde_json::to_string(request)?);
-
-        let result = tokio::time::timeout(request.timeout, rx).await;
-        self.responses.remove(&request.id);
-
-        let response = result??;
-
-        // TODO[akostylev0] refac
-        if response.data["@type"] == "error" {
-            tracing::warn!("Error occurred: {:?}", &response.data);
-            let error = serde_json::from_value::<TonError>(response.data)?;
-
-            return Err(anyhow!(error))
-        }
-
-        Ok(response.data)
-    }
 }
 
 impl Default for AsyncClient {
@@ -99,10 +77,32 @@ impl Service<Request> for AsyncClient {
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
-        let this = self.clone();
+        let to_string = serde_json::to_string(&req);
+        let Ok(query) = to_string else {
+            return Box::pin(futures::future::ready(Err(anyhow!(to_string.unwrap_err()))));
+        };
+
+        let requests = Arc::clone(&self.responses);
+        let (tx, rx) = tokio::sync::oneshot::channel::<Response>();
+        requests.insert(req.id, tx);
+
+        let _ = self.client.send(&query);
 
         Box::pin(async move {
-            this.execute(&req).await
+            let result = tokio::time::timeout(req.timeout, rx).await;
+            requests.remove(&req.id);
+
+            let response = result??;
+
+            // TODO[akostylev0] refac
+            if response.data["@type"] == "error" {
+                tracing::warn!("Error occurred: {:?}", &response.data);
+                let error = serde_json::from_value::<TonError>(response.data)?;
+
+                return Err(anyhow!(error))
+            }
+
+            Ok(response.data)
         })
     }
 }
