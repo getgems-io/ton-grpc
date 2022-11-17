@@ -21,7 +21,7 @@ use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::{Retry};
 use tower::retry::budget::Budget;
-use crate::client::AsyncClient;
+use crate::client::Client;
 use crate::config::AppConfig;
 use crate::discover::DynamicServiceStream;
 use crate::request::Request;
@@ -72,11 +72,11 @@ impl ClientBuilder {
         self
     }
 
-    pub async fn build(&self) -> anyhow::Result<AsyncClient> {
+    pub async fn build(&self) -> anyhow::Result<Client> {
         #[derive(Deserialize)]
         struct Void {}
 
-        let mut client = AsyncClient::new();
+        let mut client = Client::new();
         if let Some(ref disable_logging) = self.disable_logging {
             client.call(Request::new(disable_logging.clone())).await?;
         }
@@ -227,7 +227,7 @@ impl From<&ShortTxId> for AccountTransactionId {
     }
 }
 
-pub type TonNaive = AsyncClient;
+pub type TonNaive = Client;
 pub type TonBalanced = Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<DynamicServiceStream>, Request>, Request>>;
 
 #[derive(Clone)]

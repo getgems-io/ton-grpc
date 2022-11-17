@@ -12,7 +12,7 @@ use tokio_stream::Stream;
 use tower::discover::Change;
 use tracing::{error, info};
 use tower::reconnect::Reconnect;
-use crate::client::AsyncClient;
+use crate::client::Client;
 use crate::make::ClientFactory;
 use crate::ton_config::{TonConfig, load_ton_config};
 
@@ -66,7 +66,7 @@ impl Stream for DynamicServiceStream {
         match Pin::new(&mut *c).poll_next(cx) {
             Poll::Pending | Poll::Ready(None) => Poll::Pending,
             Poll::Ready(Some(change)) => match change {
-                Change::Insert(k, client) => Poll::Ready(Some(Ok(Change::Insert(k, Reconnect::new::<AsyncClient, Value>(ClientFactory::default(), client))))),
+                Change::Insert(k, client) => Poll::Ready(Some(Ok(Change::Insert(k, Reconnect::new::<Client, Value>(ClientFactory::default(), client))))),
                 Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
             },
         }

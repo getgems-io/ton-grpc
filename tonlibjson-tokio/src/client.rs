@@ -8,20 +8,19 @@ use anyhow::anyhow;
 use serde_json::Value;
 use dashmap::DashMap;
 use tower::Service;
-use tonlibjson_rs::Client;
 use crate::TonError;
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Debug)]
-pub struct AsyncClient {
-    client: Arc<Client>,
+pub struct Client {
+    client: Arc<tonlibjson_rs::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
     _stop_signal: Arc<Mutex<Stop>>
 }
 
-impl AsyncClient {
+impl Client {
     pub fn new() -> Self {
-        let client = Arc::new(Client::new());
+        let client = Arc::new(tonlibjson_rs::Client::new());
         let client_recv = client.clone();
 
         let responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>> =
@@ -53,7 +52,7 @@ impl AsyncClient {
             }
         });
 
-        AsyncClient {
+        Client {
             client,
             responses,
             _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
@@ -61,13 +60,13 @@ impl AsyncClient {
     }
 }
 
-impl Default for AsyncClient {
+impl Default for Client {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl Service<Request> for AsyncClient {
+impl Service<Request> for Client {
     type Response = Value;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;

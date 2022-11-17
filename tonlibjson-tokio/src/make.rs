@@ -6,7 +6,7 @@ use serde_json::json;
 use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
 use tower::{Layer, Service};
 use tracing::{debug, warn};
-use crate::client::AsyncClient;
+use crate::client::Client;
 use crate::{ClientBuilder, GetMasterchainInfo, Request};
 use crate::ton_config::TonConfig;
 
@@ -15,7 +15,7 @@ use crate::ton_config::TonConfig;
 pub struct ClientFactory;
 
 impl Service<TonConfig> for ClientFactory {
-    type Response = ConcurrencyLimit<AsyncClient>;
+    type Response = ConcurrencyLimit<Client>;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
