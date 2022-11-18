@@ -1,76 +1,87 @@
+use crate::client::Client;
+use crate::make::ClientFactory;
+use crate::ton_config::load_ton_config;
+use async_stream::try_stream;
 use reqwest::Url;
-use serde_json::Value;
 use std::time::Duration;
 use std::{
     pin::Pin,
-    task::{Context, Poll}
+    task::{Context, Poll},
 };
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
-use async_stream::stream;
+use std::collections::HashSet;
 use tokio_stream::Stream;
 use tower::discover::Change;
-use tracing::{error, info};
-use tower::reconnect::Reconnect;
-use crate::client::Client;
-use crate::make::ClientFactory;
-use crate::ton_config::{TonConfig, load_ton_config};
+use tower::limit::ConcurrencyLimit;
+use tracing::{debug, info};
+use crate::liteserver::{extract_liteserver_list, Liteserver, LiteserverConfig};
+use tower::ServiceExt;
+use tower::Service;
 
 type DiscoverResult<K, S, E> = Result<Change<K, S>, E>;
 
 pub struct DynamicServiceStream {
-    changes: Pin<Box<dyn Stream<Item=Change<u64, TonConfig>> + Send>>
+    changes: Pin<Box<dyn Stream<Item = Result<Change<String, ConcurrencyLimit<Client>>, anyhow::Error>> + Send>>,
 }
 
 impl DynamicServiceStream {
-    pub(crate) fn new(url: Url, period: Duration, size: u8) -> anyhow::Result<Self> {
+    pub(crate) fn new(url: Url, period: Duration) -> anyhow::Result<Self> {
         let mut interval = tokio::time::interval(period);
-        let mut hash = 0;
+        let mut liteservers = HashSet::new();
+        let mut factory = ClientFactory::default();
 
-        let stream = stream! {
+        // TODO[akostylev0] refac
+        let stream = try_stream! {
             loop {
                 interval.tick().await;
 
                 info!("tick service discovery");
-                let Ok(config) = load_ton_config(url.clone()).await else {
-                    error!("cannot load config");
-                    continue;
-                };
+                let config = load_ton_config(url.clone()).await?;
+                let config = serde_json::from_str(&config)?;
+                let liteserver_new = extract_liteserver_list(&config)?;
 
-                let mut hasher = DefaultHasher::new();
-                config.hash(&mut hasher);
-                let new_hash = hasher.finish();
+                let liteservers_remove = liteservers.difference(&liteserver_new).collect::<Vec<&Liteserver>>();
+                let liteservers_insert = liteserver_new.difference(&liteservers).collect::<Vec<&Liteserver>>();
 
-                if new_hash != hash {
-                    for i in 0..size {
-                        info!("insert {}", new_hash + i as u64);
-                        yield Change::Insert(new_hash + i as u64, config.clone());
-                        info!("remove {}", hash + i as u64);
-                        yield Change::Remove(hash + i as u64);
-                    }
+                debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), liteservers_remove.len(), liteservers_insert.len());
 
-                    hash = new_hash
+                for ls in liteservers_remove {
+                    debug!("remove {:?}", ls.identifier());
+                    yield Change::Remove(ls.identifier());
                 }
+
+                for ls in liteservers_insert {
+                    debug!("insert {:?}", ls.identifier());
+
+                    let config = LiteserverConfig::new(config.clone(), ls.clone());
+                    let client = factory.ready().await?.call(serde_json::to_string(&config.to_config()?)?).await?;
+
+                    yield Change::Insert(ls.identifier(), client);
+                }
+
+                liteservers = liteserver_new.clone();
             }
         };
 
-        Ok(Self { changes: Box::pin(stream) })
+        Ok(Self {
+            changes: Box::pin(stream),
+        })
     }
 }
 
 impl Stream for DynamicServiceStream {
-    type Item = DiscoverResult<u64, Reconnect<ClientFactory, TonConfig>, anyhow::Error>;
+    type Item = DiscoverResult<String, ConcurrencyLimit<Client>, anyhow::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let c = &mut self.changes;
         match Pin::new(&mut *c).poll_next(cx) {
-            Poll::Pending | Poll::Ready(None) => Poll::Pending,
-            Poll::Ready(Some(change)) => match change {
-                Change::Insert(k, client) => Poll::Ready(Some(Ok(Change::Insert(k, Reconnect::new::<Client, Value>(ClientFactory::default(), client))))),
+            Poll::Ready(Some(Ok(change))) => match change {
+                Change::Insert(k, client) => Poll::Ready(Some(Ok(Change::Insert(
+                    k,
+                    client,
+                )))),
                 Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
             },
+            _ => Poll::Pending
         }
     }
 }
-
-impl Unpin for DynamicServiceStream {}

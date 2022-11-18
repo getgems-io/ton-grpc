@@ -5,6 +5,7 @@ mod client;
 mod config;
 mod ton_config;
 pub mod request;
+mod liteserver;
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
@@ -243,8 +244,7 @@ impl Ton<TonBalanced> {
 
         let discover = DynamicServiceStream::new(
             config.config_url.clone(),
-            Duration::from_secs(60),
-            config.pool_size
+            Duration::from_secs(60)
         )?;
 
         let ewma = PeakEwmaDiscover::new(
