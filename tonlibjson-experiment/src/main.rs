@@ -25,7 +25,7 @@ async fn main() -> anyhow::Result<()> {
 async fn run<S>(ton: Ton<S>) -> anyhow::Result<()> where S : Service<Request, Response = Value, Error = BoxError> + Clone {
     let master = ton.get_masterchain_info().await?;
 
-    stream::iter(master.last.seqno - 1000..master.last.seqno)
+    stream::iter(master.last.seqno - 10000..master.last.seqno)
         .for_each_concurrent(500, |seqno| {
             let ton = ton.clone();
             async move {

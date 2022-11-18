@@ -1,21 +1,30 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, mpsc, Mutex};
+use std::sync::{Arc, mpsc, Mutex, RwLock};
 use std::sync::mpsc::TryRecvError;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use anyhow::anyhow;
-use serde_json::Value;
+use serde_json::{json, Value};
 use dashmap::DashMap;
 use tower::Service;
+use tracing::error;
 use crate::TonError;
 use crate::request::{Request, RequestId, Response};
+
+#[derive(Debug, Clone)]
+enum State {
+    Init,
+    Sync,
+    Ready
+}
 
 #[derive(Debug)]
 pub struct Client {
     client: Arc<tonlibjson_rs::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
-    _stop_signal: Arc<Mutex<Stop>>
+    _stop_signal: Arc<Mutex<Stop>>,
+    state: Arc<RwLock<State>>
 }
 
 impl Client {
@@ -27,6 +36,9 @@ impl Client {
             Arc::new(DashMap::new());
         let responses_rcv = Arc::clone(&responses);
         let (stop_signal, stop_receiver) = mpsc::channel();
+
+        let state = Arc::new(RwLock::new(State::Init));
+        let state_rcv = state.clone();
 
         let _ = tokio::task::spawn_blocking(move || {
             let timeout = Duration::from_secs(20);
@@ -43,7 +55,14 @@ impl Client {
                                 if let Some((_, sender)) = responses_rcv.remove(&response.id) {
                                     let _ = sender.send(response);
                                 }
-                            } else if !packet.contains("syncState") {
+                            } else if packet.contains("syncState") {
+                                // tracing::error!("Sync state: {}", packet.to_string());
+                                if packet.contains("syncStateDone") {
+                                    let mut state = state_rcv.write().unwrap();
+
+                                    *state = State::Ready;
+                                }
+                            } else {
                                 tracing::warn!("Unexpected response {:?}", packet.to_string())
                             }
                         }
@@ -55,7 +74,8 @@ impl Client {
         Client {
             client,
             responses,
-            _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
+            _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal))),
+            state: state
         }
     }
 }
@@ -71,8 +91,29 @@ impl Service<Request> for Client {
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let state = self.state.read().unwrap().clone();
+        match state {
+            State::Init => {
+                let sync = serde_json::to_string(&json!({
+                    "@type": "sync"
+                })).unwrap();
+
+                let _ = self.client.send(&sync);
+
+                cx.waker().wake_by_ref();
+
+                *self.state.write().unwrap() = State::Sync;
+
+                Poll::Pending
+            },
+            State::Sync => {
+                cx.waker().wake_by_ref();
+
+                Poll::Pending
+            },
+            State::Ready => Poll::Ready(Ok(()))
+        }
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
