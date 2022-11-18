@@ -1,18 +1,16 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
-use serde_json::json;
 use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
 use tower::{Layer, Service};
 use tracing::{debug, warn};
 use crate::client::Client;
-use crate::{ClientBuilder, GetMasterchainInfo, Request};
+use crate::ClientBuilder;
 use crate::ton_config::TonConfig;
 
 
 #[derive(Default, Debug)]
-pub struct ClientFactory;
+pub struct  ClientFactory;
 
 impl Service<TonConfig> for ClientFactory {
     type Response = ConcurrencyLimit<Client>;
@@ -27,28 +25,15 @@ impl Service<TonConfig> for ClientFactory {
         Box::pin(async move {
             warn!("make new liteserver");
 
-            let mut client = ClientBuilder::from_config(&req)
+            let client = ClientBuilder::from_config(&req)
                 .disable_logging()
                 .build()
                 .await?;
 
-            // Ping
-            let pong = client.call(
-                Request::with_timeout(
-                    json!(GetMasterchainInfo {}),
-                    Duration::from_secs(1)
-                )).await?;
-            warn!("Pong: {}", pong);
-
-            let sync = Request::with_timeout(json!({
-                "@type": "sync"
-            }), Duration::from_secs(60 * 5));
-
-            client.call(sync).await?;
+            let client = ConcurrencyLimitLayer::new(100)
+                .layer(client);
 
             debug!("successfully made new client");
-
-            let client = ConcurrencyLimitLayer::new(100).layer(client);
 
             anyhow::Ok(client)
         })
