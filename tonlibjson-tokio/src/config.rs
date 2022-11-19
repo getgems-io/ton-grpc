@@ -6,15 +6,12 @@ use config::Config;
 #[derive(Debug, Deserialize)]
 pub struct AppConfig {
     #[serde(default = "default_ton_config_url")]
-    pub config_url: Url,
-    #[serde(default = "default_pool_size")]
-    pub pool_size: u8
+    pub config_url: Url
 }
 
 fn default_ton_config_url() -> Url {
     Url::from_str("https://ton.org/global-config.json").unwrap()
 }
-fn default_pool_size() -> u8 { 6 }
 
 impl AppConfig {
     pub fn from_env() -> anyhow::Result<Self> {
