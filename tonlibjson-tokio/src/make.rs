@@ -5,7 +5,8 @@ use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
 use tower::{Layer, Service};
 use tracing::{debug, warn};
 use crate::client::Client;
-use crate::ClientBuilder;
+use crate::request::Request;
+use crate::{ClientBuilder, GetMasterchainInfo};
 use crate::ton_config::TonConfig;
 
 
@@ -25,10 +26,12 @@ impl Service<TonConfig> for ClientFactory {
         Box::pin(async move {
             warn!("make new liteserver");
 
-            let client = ClientBuilder::from_config(&req)
+            let mut client = ClientBuilder::from_config(&req.to_string())
                 .disable_logging()
                 .build()
                 .await?;
+
+            let _ = client.call(Request::new(serde_json::to_value(GetMasterchainInfo {})?)).await?;
 
             let client = ConcurrencyLimitLayer::new(100)
                 .layer(client);

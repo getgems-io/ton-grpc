@@ -5,7 +5,6 @@ mod client;
 mod config;
 mod ton_config;
 pub mod request;
-mod liteserver;
 
 use anyhow::anyhow;
 use futures::TryStreamExt;
@@ -240,7 +239,7 @@ impl Ton<TonBalanced> {
     pub async fn balanced() -> anyhow::Result<Self> {
         let config = AppConfig::from_env()?;
 
-        tracing::info!("Config url: {}, pool size: {}", config.config_url, config.pool_size);
+        tracing::warn!("Ton config url: {}", config.config_url);
 
         let discover = DynamicServiceStream::new(
             config.config_url.clone(),

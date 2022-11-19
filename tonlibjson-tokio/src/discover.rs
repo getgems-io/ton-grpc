@@ -13,7 +13,7 @@ use tokio_stream::Stream;
 use tower::discover::Change;
 use tower::limit::ConcurrencyLimit;
 use tracing::{debug, info};
-use crate::liteserver::{extract_liteserver_list, Liteserver, LiteserverConfig};
+use crate::ton_config::Liteserver;
 use tower::ServiceExt;
 use tower::Service;
 
@@ -36,8 +36,7 @@ impl DynamicServiceStream {
 
                 info!("tick service discovery");
                 let config = load_ton_config(url.clone()).await?;
-                let config = serde_json::from_str(&config)?;
-                let liteserver_new = extract_liteserver_list(&config)?;
+                let liteserver_new: HashSet<Liteserver> = HashSet::from_iter(config.liteservers.iter().cloned());
 
                 let liteservers_remove = liteservers.difference(&liteserver_new).collect::<Vec<&Liteserver>>();
                 let liteservers_insert = liteserver_new.difference(&liteservers).collect::<Vec<&Liteserver>>();
@@ -45,17 +44,16 @@ impl DynamicServiceStream {
                 debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), liteservers_remove.len(), liteservers_insert.len());
 
                 for ls in liteservers_remove {
-                    debug!("remove {:?}", ls.identifier());
-                    yield Change::Remove(ls.identifier());
+                    debug!("remove {:?}", ls.id());
+                    yield Change::Remove(ls.id());
                 }
 
                 for ls in liteservers_insert {
-                    debug!("insert {:?}", ls.identifier());
+                    debug!("insert {:?}", ls.id());
 
-                    let config = LiteserverConfig::new(config.clone(), ls.clone());
-                    let client = factory.ready().await?.call(serde_json::to_string(&config.to_config()?)?).await?;
-
-                    yield Change::Insert(ls.identifier(), client);
+                    if let Ok(client) = factory.ready().await?.call(config.with_liteserver(ls)).await {
+                        yield Change::Insert(ls.id(), client);
+                    }
                 }
 
                 liteservers = liteserver_new.clone();

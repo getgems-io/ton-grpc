@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use serde_json::{json, Value};
 use dashmap::DashMap;
 use tower::Service;
-use tracing::error;
+use tracing::warn;
 use crate::TonError;
 use crate::request::{Request, RequestId, Response};
 
@@ -96,6 +96,7 @@ impl Service<Request> for Client {
         match state {
             State::Init => {
                 let sync = serde_json::to_string(&json!({
+                    "@extra": uuid::Uuid::new_v4(),
                     "@type": "sync"
                 })).unwrap();
 
@@ -144,6 +145,12 @@ impl Service<Request> for Client {
 
             Ok(response.data)
         })
+    }
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        warn!("Drop client");
     }
 }
 
