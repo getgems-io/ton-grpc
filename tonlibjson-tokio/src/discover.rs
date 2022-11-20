@@ -1,6 +1,6 @@
 use crate::client::Client;
 use crate::make::ClientFactory;
-use crate::ton_config::{load_ton_config, read_ton_config};
+use crate::ton_config::{load_ton_config, read_ton_config, TonConfig};
 use async_stream::try_stream;
 use reqwest::Url;
 use std::time::Duration;
@@ -10,6 +10,7 @@ use std::{
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
+use futures::TryFutureExt;
 use tokio_stream::Stream;
 use tower::discover::Change;
 use tower::limit::ConcurrencyLimit;
@@ -28,16 +29,7 @@ impl DynamicServiceStream {
     pub(crate) async fn new(url: Url, period: Duration, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
         let mut factory = ClientFactory::default();
         let mut interval = tokio::time::interval(period);
-        let mut config = match load_ton_config(url.clone()).await {
-            Ok(c) => Ok(c),
-            Err(e) => {
-                if let Some(path) = fallback_path {
-                    Ok(read_ton_config(path).await?)
-                } else {
-                    Err(e)
-                }
-            }
-        }?;
+        let mut config = config(url.clone(), fallback_path).await?;
 
         let stream = try_stream! {
             interval.tick().await;
@@ -117,4 +109,14 @@ impl Stream for DynamicServiceStream {
             _ => Poll::Pending
         }
     }
+}
+
+async fn config(url: Url, fallback_path: Option<PathBuf>) -> anyhow::Result<TonConfig> {
+    load_ton_config(url).or_else(|e| async {
+        if let Some(path) = fallback_path {
+            return read_ton_config(path).await
+        }
+
+        Err(e)
+    }).await
 }
