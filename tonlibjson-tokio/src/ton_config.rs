@@ -2,7 +2,7 @@ use reqwest::IntoUrl;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 pub struct TonConfig {
     pub liteservers: Vec<Liteserver>,
     #[serde(flatten)]
@@ -51,7 +51,8 @@ pub async fn load_ton_config<U: IntoUrl>(url: U) -> anyhow::Result<TonConfig> {
 
 #[cfg(test)]
 mod tests {
-    use crate::ton_config::load_ton_config;
+    use serde_json::json;
+    use crate::ton_config::{load_ton_config, TonConfig};
 
     #[tokio::test]
     async fn load_config_mainnet() {
@@ -60,5 +61,29 @@ mod tests {
         let config = load_ton_config(url).await.unwrap();
 
         assert_eq!(config.data.get("@type").unwrap(), "config.global");
+    }
+
+    #[test]
+    fn config_equals() {
+        let config_lhs = serde_json::from_value::<TonConfig>(json!({
+            "@type": "config.global",
+            "liteservers": [],
+            "dht": {
+                "a": 3,
+                "k": 3,
+            }
+        })).unwrap();
+        let config_rhs = TonConfig {
+            liteservers: vec![],
+            data: json!({
+                "@type": "config.global",
+                "dht": {
+                    "a": 3,
+                    "k": 3,
+                }
+            })
+        };
+
+        assert_eq!(config_lhs, config_rhs);
     }
 }

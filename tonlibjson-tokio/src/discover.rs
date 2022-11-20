@@ -1,6 +1,6 @@
 use crate::client::Client;
 use crate::make::ClientFactory;
-use crate::ton_config::load_ton_config;
+use crate::ton_config::{load_ton_config, TonConfig};
 use async_stream::try_stream;
 use reqwest::Url;
 use std::time::Duration;
@@ -28,37 +28,56 @@ impl DynamicServiceStream {
         let mut interval = tokio::time::interval(period);
         let mut liteservers = HashSet::new();
         let mut factory = ClientFactory::default();
+        // TODO[akostylev0] use local config on failure
+        let mut config: Option<TonConfig> = None;
 
-        // TODO[akostylev0] refac
         let stream = try_stream! {
             loop {
                 interval.tick().await;
 
                 info!("tick service discovery");
-                let config = load_ton_config(url.clone()).await?;
+                let new_config = load_ton_config(url.clone()).await?;
+                let liteserver_new: HashSet<Liteserver> = HashSet::from_iter(new_config.liteservers.iter().cloned());
 
-                let liteserver_new: HashSet<Liteserver> = HashSet::from_iter(config.liteservers.iter().cloned());
+                let (mut remove, mut insert) = if config.is_none() {
+                    (vec![], liteserver_new.iter().collect::<Vec<&Liteserver>>())
+                } else {
+                    let config = config.unwrap();
+                    if config == new_config {
+                        (vec![], vec![])
+                    } else {
+                        if config.data == new_config.data {
+                            (
+                                liteservers.difference(&liteserver_new).collect::<Vec<&Liteserver>>(),
+                                liteserver_new.difference(&liteservers).collect::<Vec<&Liteserver>>()
+                            )
+                        } else {
+                            (
+                                liteservers.iter().collect::<Vec<&Liteserver>>(),
+                                liteserver_new.iter().collect::<Vec<&Liteserver>>()
+                            )
+                        }
+                    }
+                };
 
-                let mut liteservers_remove = liteservers.difference(&liteserver_new).collect::<Vec<&Liteserver>>();
-                let mut liteservers_insert = liteserver_new.difference(&liteservers).collect::<Vec<&Liteserver>>();
-
-                debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), liteservers_remove.len(), liteservers_insert.len());
-                while !liteservers_remove.is_empty() && !liteservers_insert.is_empty() {
-                    if let Some(ls) = liteservers_remove.pop() {
+                debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), remove.len(), insert.len());
+                while !remove.is_empty() || !insert.is_empty() {
+                    if let Some(ls) = remove.pop() {
                         debug!("remove {:?}", ls.id());
                         yield Change::Remove(ls.id());
                     }
 
-                    if let Some(ls) = liteservers_insert.pop() {
+                    if let Some(ls) = insert.pop() {
                         debug!("insert {:?}", ls.id());
 
-                        if let Ok(client) = factory.ready().await?.call(config.with_liteserver(ls)).await {
+                        if let Ok(client) = factory.ready().await?.call(new_config.with_liteserver(ls)).await {
                             yield Change::Insert(ls.id(), client);
                         }
                     }
                 }
 
                 liteservers = liteserver_new.clone();
+                config = Some(new_config);
             }
         };
 
