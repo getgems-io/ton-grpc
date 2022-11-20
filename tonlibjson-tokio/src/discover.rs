@@ -36,23 +36,25 @@ impl DynamicServiceStream {
 
                 info!("tick service discovery");
                 let config = load_ton_config(url.clone()).await?;
+
                 let liteserver_new: HashSet<Liteserver> = HashSet::from_iter(config.liteservers.iter().cloned());
 
-                let liteservers_remove = liteservers.difference(&liteserver_new).collect::<Vec<&Liteserver>>();
-                let liteservers_insert = liteserver_new.difference(&liteservers).collect::<Vec<&Liteserver>>();
+                let mut liteservers_remove = liteservers.difference(&liteserver_new).collect::<Vec<&Liteserver>>();
+                let mut liteservers_insert = liteserver_new.difference(&liteservers).collect::<Vec<&Liteserver>>();
 
                 debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), liteservers_remove.len(), liteservers_insert.len());
+                while !liteservers_remove.is_empty() && !liteservers_insert.is_empty() {
+                    if let Some(ls) = liteservers_remove.pop() {
+                        debug!("remove {:?}", ls.id());
+                        yield Change::Remove(ls.id());
+                    }
 
-                for ls in liteservers_remove {
-                    debug!("remove {:?}", ls.id());
-                    yield Change::Remove(ls.id());
-                }
+                    if let Some(ls) = liteservers_insert.pop() {
+                        debug!("insert {:?}", ls.id());
 
-                for ls in liteservers_insert {
-                    debug!("insert {:?}", ls.id());
-
-                    if let Ok(client) = factory.ready().await?.call(config.with_liteserver(ls)).await {
-                        yield Change::Insert(ls.id(), client);
+                        if let Ok(client) = factory.ready().await?.call(config.with_liteserver(ls)).await {
+                            yield Change::Insert(ls.id(), client);
+                        }
                     }
                 }
 
