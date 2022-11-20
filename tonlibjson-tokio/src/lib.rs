@@ -243,8 +243,9 @@ impl Ton<TonBalanced> {
 
         let discover = DynamicServiceStream::new(
             config.config_url.clone(),
-            Duration::from_secs(60)
-        )?;
+            Duration::from_secs(60),
+            config.config_path
+        ).await?;
 
         let ewma = PeakEwmaDiscover::new(
             discover,

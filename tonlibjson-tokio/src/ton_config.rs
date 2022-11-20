@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use reqwest::IntoUrl;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
@@ -45,6 +46,13 @@ pub async fn load_ton_config<U: IntoUrl>(url: U) -> anyhow::Result<TonConfig> {
     let config = reqwest::get(url).await?.text().await?;
 
     let config = serde_json::from_str(config.as_ref())?;
+
+    Ok(config)
+}
+
+pub async fn read_ton_config(path: PathBuf) -> anyhow::Result<TonConfig> {
+    let config = tokio::fs::read_to_string(path).await?;
+    let config= serde_json::from_str(config.as_ref())?;
 
     Ok(config)
 }
