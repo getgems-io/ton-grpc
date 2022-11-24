@@ -31,7 +31,6 @@ RUN cargo build --release --target x86_64-unknown-linux-gnu
 COPY . .
 
 RUN cargo build -vv --release --target x86_64-unknown-linux-gnu
-RUN cargo test -vv --release --target x86_64-unknown-linux-gnu
 
 FROM debian:bullseye-slim AS runner
 
