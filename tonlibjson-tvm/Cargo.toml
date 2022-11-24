@@ -1,9 +1,0 @@
-[package]
-name = "tonlibjson-tvm"
-version = "0.1.0"
-edition = "2021"
-authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
-
-[dependencies]
-serde = { version = "1.0.144", features = ["serde_derive"] }
-serde_json = "1.0.85"

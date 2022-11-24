@@ -2,7 +2,6 @@
 members = [
     "tonlibjson-rs",
     "tonlibjson-tokio",
-    "tonlibjson-tvm",
     "tonlibjson-jsonrpc",
     "tonlibjson-experiment"
 ]
