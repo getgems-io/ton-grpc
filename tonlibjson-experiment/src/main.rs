@@ -1,28 +1,25 @@
 use futures::{stream, StreamExt};
-use serde_json::Value;
 use tokio::time::Instant;
-use tower::{BoxError, Service};
-use tonlibjson_tokio::Ton;
-use tonlibjson_tokio::request::Request;
+use tonlibjson_tokio::ton::TonClient;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let ton = Ton::balanced().await?;
+    let ton = TonClient::new().await?;
 
     let now = Instant::now();
 
     let _ = run(ton).await;
 
-    let balanced_timing = (Instant::now() - now).as_secs();
+    let timing = (Instant::now() - now).as_secs();
 
-    println!("Time: {:?}", balanced_timing);
+    println!("Time: {:?}", timing);
 
     Ok(())
 }
 
-async fn run<S>(ton: Ton<S>) -> anyhow::Result<()> where S : Service<Request, Response = Value, Error = BoxError> + Clone {
+async fn run(ton: TonClient) -> anyhow::Result<()> {
     let master = ton.get_masterchain_info().await?;
 
     stream::iter(master.last.seqno - 10000..master.last.seqno)

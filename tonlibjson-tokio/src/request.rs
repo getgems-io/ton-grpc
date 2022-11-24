@@ -27,16 +27,16 @@ pub struct Response {
 }
 
 impl Request {
-    pub fn new(data: Value) -> Self {
-        Self::with_timeout(data, Duration::from_secs(3))
+    pub fn new<T: Serialize>(data: T) -> anyhow::Result<Self> {
+        Ok(Self::with_timeout(data, Duration::from_secs(3))?)
     }
 
-    pub fn with_timeout(data: Value, timeout: Duration) -> Self {
-        Self {
+    pub fn with_timeout<T: Serialize>(data: T, timeout: Duration) -> anyhow::Result<Self> {
+        Ok(Self {
             id: RequestId::new_v4(),
             timeout,
-            data
-        }
+            data: serde_json::to_value(data)?
+        })
     }
 
     pub fn with_new_id(&self) -> Self {

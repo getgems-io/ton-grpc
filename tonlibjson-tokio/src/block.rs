@@ -41,6 +41,14 @@ pub struct AccountAddress {
     account_address: String,
 }
 
+impl AccountAddress {
+    pub fn new(account_address: String) -> Self {
+        Self {
+            account_address
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "@type", rename = "raw.message")]
 pub struct RawMessage {
@@ -132,13 +140,33 @@ pub struct SmcLoad {
     pub account_address: AccountAddress
 }
 
+impl SmcLoad {
+    pub fn new(address: String) -> Self {
+        Self {
+            account_address: AccountAddress::new(address)
+        }
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "@type", rename = "smc.runGetMethod")]
 pub struct SmcRunGetMethod {
     id: i64,
     method: SmcMethodId,
-    stack: Vec<StackEntry>
+    stack: SmcStack
 }
+
+impl SmcRunGetMethod {
+    pub fn new(contract_id: i64, method: SmcMethodId, stack: SmcStack) -> Self {
+        Self {
+            id: contract_id,
+            method,
+            stack
+        }
+    }
+}
+
+pub type SmcStack = Vec<StackEntry>;
 
 #[derive(Debug, Serialize)]
 #[serde(tag = "@type")]
@@ -200,6 +228,12 @@ pub enum StackEntry {
 
     #[serde(rename = "tvm.stackEntryUnsupported")]
     Unsupported
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "smc.info")]
+pub struct SmcInfo {
+    pub id: i64
 }
 
 #[cfg(test)]
