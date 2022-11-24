@@ -393,7 +393,7 @@ impl<S> Ton<S> where S : Service<Request, Response = Value, Error = BoxError> + 
 
                     tracing::debug!("got {} transactions", txs.transactions.len());
 
-                    let last_tx = txs.transactions.last().map(AccountTransactionId::from);
+                    let last_tx = txs.transactions.last().map(Into::into);
 
                     anyhow::Ok(Some((
                         stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
