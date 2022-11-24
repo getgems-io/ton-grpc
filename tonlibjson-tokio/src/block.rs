@@ -101,6 +101,15 @@ pub struct AccountTransactionId {
     pub lt: String,
 }
 
+impl Default for AccountTransactionId {
+    fn default() -> Self {
+        Self {
+            account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
+            lt: "".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "raw.sendMessage")]
 pub struct RawSendMessage {

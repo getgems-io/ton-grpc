@@ -291,30 +291,14 @@ impl<S> Ton<S> where S : Service<Request, Response = Value, Error = BoxError> + 
         &self,
         block: &BlockIdExt,
         count: u32,
-    ) -> anyhow::Result<TransactionsResponse> {
-        self.blocks_get_transactions_after(
-            block,
-            count,
-            AccountTransactionId {
-                account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
-                lt: "".to_string(),
-            },
-        )
-        .await
-    }
-
-    async fn blocks_get_transactions_after(
-        &self,
-        block: &BlockIdExt,
-        count: u32,
-        tx: AccountTransactionId,
+        tx: Option<AccountTransactionId>
     ) -> anyhow::Result<TransactionsResponse> {
         let request = json!({
             "@type": "blocks.getTransactions",
             "id": block,
             "mode": 7 + 128,
             "count": count,
-            "after": tx,
+            "after": tx.unwrap_or_default(),
         });
 
         let response = self.call(request).await?;
@@ -385,11 +369,7 @@ impl<S> Ton<S> where S : Service<Request, Response = Value, Error = BoxError> + 
                         return anyhow::Ok(None);
                     }
 
-                    let txs= if let Some(tx) = state.last_tx {
-                        state.this.blocks_get_transactions_after(&state.block, 30, tx).await?
-                    } else {
-                        state.this.blocks_get_transactions(&state.block, 30).await?
-                    };
+                    let txs= state.this.blocks_get_transactions(&state.block, 30, state.last_tx).await?;
 
                     tracing::debug!("got {} transactions", txs.transactions.len());
 
