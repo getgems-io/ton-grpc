@@ -8,8 +8,8 @@ use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use tonlibjson_tokio::{Ton, TonBalanced};
-use tonlibjson_tokio::block::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId};
+use tonlibjson_tokio::ton::TonClient;
+use tonlibjson_tokio::block::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, SmcStack};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -69,6 +69,13 @@ struct SendBocParams {
     boc: String
 }
 
+#[derive(Deserialize, Debug)]
+struct RunGetMethodParams {
+    address: String,
+    method: String,
+    stack: SmcStack
+}
+
 #[derive(Deserialize)]
 #[serde(tag = "method")]
 enum Method {
@@ -88,8 +95,10 @@ enum Method {
     Transactions { params: TransactionsParams },
     #[serde(rename = "sendBoc")]
     SendBoc { params: SendBocParams },
+    #[serde(rename = "runGetMethod")]
+    RunGetMethod { params: RunGetMethodParams },
     #[serde(rename = "getMasterchainInfo")]
-    MasterchainInfo
+    MasterchainInfo,
 }
 
 type JsonRequestId = Option<Value>;
@@ -143,7 +152,7 @@ impl JsonResponse {
 }
 
 struct RpcServer {
-    client: Ton<TonBalanced>
+    client: TonClient
 }
 
 type RpcResponse<T> = anyhow::Result<T>;
@@ -293,6 +302,14 @@ impl RpcServer {
 
         self.client.send_message(&b64).await
     }
+
+    async fn run_get_method(&self, params : RunGetMethodParams) -> RpcResponse<Value> {
+        let address = params.address;
+        let method = params.method;
+        let stack = params.stack;
+
+        self.client.run_get_method(address, method, stack).await
+    }
 }
 
 async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) -> Json<JsonResponse> {
@@ -305,7 +322,8 @@ async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) 
         Method::AddressInformation { params } => rpc.get_address_information(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
         Method::ExtendedAddressInformation { params } => rpc.get_extended_address_information(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
         Method::Transactions { params } => rpc.get_transactions(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::SendBoc { params } => rpc.send_boc(params).await.and_then(|x| Ok(serde_json::to_value(x)?))
+        Method::SendBoc { params } => rpc.send_boc(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
+        Method::RunGetMethod { params} => rpc.run_get_method(params).await.and_then(|x| Ok(serde_json::to_value(x)?))
     };
 
     Json(
@@ -322,7 +340,7 @@ async fn main() -> anyhow::Result<()> {
 
     debug!("initialize ton client...");
 
-    let ton = Ton::balanced().await?;
+    let ton = TonClient::new().await?;
 
     debug!("initialized");
 

@@ -4,9 +4,10 @@ use std::task::{Context, Poll};
 use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
 use tower::{Layer, Service};
 use tracing::{debug, warn};
-use crate::client::Client;
+use crate::block::GetMasterchainInfo;
 use crate::request::Request;
-use crate::{ClientBuilder, GetMasterchainInfo};
+use crate::ClientBuilder;
+use crate::session::SessionClient;
 use crate::ton_config::TonConfig;
 
 
@@ -14,7 +15,7 @@ use crate::ton_config::TonConfig;
 pub struct  ClientFactory;
 
 impl Service<TonConfig> for ClientFactory {
-    type Response = ConcurrencyLimit<Client>;
+    type Response = ConcurrencyLimit<SessionClient>;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -31,7 +32,9 @@ impl Service<TonConfig> for ClientFactory {
                 .build()
                 .await?;
 
-            let _ = client.call(Request::new(serde_json::to_value(GetMasterchainInfo {})?)).await?;
+            let _ = client.call(Request::new(serde_json::to_value(GetMasterchainInfo {})?)?).await?;
+
+            let client = SessionClient::new(client);
 
             let client = ConcurrencyLimitLayer::new(100)
                 .layer(client);
