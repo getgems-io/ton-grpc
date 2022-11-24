@@ -1,11 +1,8 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use anyhow::anyhow;
-use futures::TryFutureExt;
 use serde_json::Value;
-use tower::{BoxError, Service, ServiceExt};
-use tower::buffer::Buffer;
+use tower::{Service, ServiceExt};
 use crate::session::SessionRequest::{Atomic, RunGetMethod};
 use crate::{Client, Request};
 use crate::block::{SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
@@ -23,13 +20,13 @@ impl From<Request> for SessionRequest {
 }
 
 pub struct SessionClient {
-    client: Buffer<Client, Request>
+    client: Client
 }
 
 impl SessionClient {
     pub fn new(client: Client) -> Self {
         Self {
-            client: Buffer::new(client, 10000)
+            client
         }
     }
 }
@@ -40,12 +37,12 @@ impl Service<SessionRequest> for SessionClient {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.client.poll_ready(cx).map_err(|e| anyhow!(e))
+        self.client.poll_ready(cx)
     }
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
         match req {
-            Atomic(req) => Box::pin(self.client.call(req).map_err(|e| anyhow!(e))),
+            Atomic(req) => Box::pin(self.client.call(req)),
             RunGetMethod { address, method, stack} => {
                 let mut this = self.client.clone();
                 Box::pin(async move {
@@ -65,7 +62,7 @@ impl Service<SessionRequest> for SessionClient {
                         .call(Request::new(&req)?).await?;
 
                     Ok(resp)
-                }.map_err(|e: BoxError| anyhow!(e)))
+                })
             }
         }
     }
