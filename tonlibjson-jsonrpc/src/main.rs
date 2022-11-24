@@ -8,7 +8,8 @@ use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use tonlibjson_tokio::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, Ton, TonBalanced};
+use tonlibjson_tokio::{Ton, TonBalanced};
+use tonlibjson_tokio::block::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
