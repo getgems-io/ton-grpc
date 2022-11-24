@@ -19,7 +19,7 @@ enum State {
     Ready
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Client {
     client: Arc<tonlibjson_rs::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
