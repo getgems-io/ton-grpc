@@ -19,10 +19,10 @@ use tower::Service;
 use crate::ton_config::Liteserver;
 use crate::session::SessionClient;
 
-type DiscoverResult<K, S, E> = Result<Change<K, S>, E>;
+type DiscoverResult = Result<Change<String, ConcurrencyLimit<SessionClient>>, anyhow::Error>;
 
 pub struct DynamicServiceStream {
-    changes: Pin<Box<dyn Stream<Item = Result<Change<String, ConcurrencyLimit<SessionClient>>, anyhow::Error>> + Send>>,
+    changes: Pin<Box<dyn Stream<Item = DiscoverResult> + Send>>,
 }
 
 impl DynamicServiceStream {
@@ -94,7 +94,7 @@ impl DynamicServiceStream {
 }
 
 impl Stream for DynamicServiceStream {
-    type Item = DiscoverResult<String, ConcurrencyLimit<SessionClient>, anyhow::Error>;
+    type Item = DiscoverResult;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let c = &mut self.changes;
