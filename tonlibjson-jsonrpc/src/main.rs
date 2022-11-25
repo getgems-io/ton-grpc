@@ -1,3 +1,5 @@
+mod params;
+
 use std::future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -10,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use tracing::debug;
 use tonlibjson_tokio::ton::TonClient;
 use tonlibjson_tokio::block::{BlockIdExt, InternalTransactionId, MasterchainInfo, RawTransaction, ShortTxId, SmcStack};
+use crate::params::{RunGetMethodParams, Stack};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -67,13 +70,6 @@ struct TransactionsParams {
 #[derive(Deserialize, Debug)]
 struct SendBocParams {
     boc: String
-}
-
-#[derive(Deserialize, Debug)]
-struct RunGetMethodParams {
-    address: String,
-    method: String,
-    stack: SmcStack
 }
 
 #[derive(Deserialize)]
@@ -158,8 +154,8 @@ struct RpcServer {
 type RpcResponse<T> = anyhow::Result<T>;
 
 impl RpcServer {
-    async fn master_chain_info(&self) -> RpcResponse<MasterchainInfo> {
-        self.client.get_masterchain_info().await
+    async fn master_chain_info(&self) -> RpcResponse<Value> {
+        Ok(serde_json::to_value(self.client.get_masterchain_info().await?)?)
     }
 
     async fn lookup_block(&self, params: LookupBlockParams) -> RpcResponse<Value> {
@@ -308,22 +304,29 @@ impl RpcServer {
         let method = params.method;
         let stack = params.stack;
 
-        self.client.run_get_method(address, method, stack).await
+        let mut resp = self.client.run_get_method(address, method, stack.try_into()?).await?;
+
+        let stack: SmcStack = serde_json::from_value(resp["stack"].clone())?;
+        let stack: Stack = stack.try_into()?;
+
+        resp["stack"] = serde_json::to_value(&stack)?;
+
+        Ok(resp)
     }
 }
 
 async fn dispatch_method(Json(payload): Json<JsonRequest>, rpc: Arc<RpcServer>) -> Json<JsonResponse> {
     let result = match payload.method {
-        Method::MasterchainInfo => rpc.master_chain_info().await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::LookupBlock { params } => rpc.lookup_block(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::Shards { params } => rpc.shards(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::BlockHeader { params } => rpc.get_block_header(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::BlockTransactions { params } => rpc.get_block_transactions(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::AddressInformation { params } => rpc.get_address_information(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::ExtendedAddressInformation { params } => rpc.get_extended_address_information(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::Transactions { params } => rpc.get_transactions(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::SendBoc { params } => rpc.send_boc(params).await.and_then(|x| Ok(serde_json::to_value(x)?)),
-        Method::RunGetMethod { params} => rpc.run_get_method(params).await.and_then(|x| Ok(serde_json::to_value(x)?))
+        Method::MasterchainInfo => rpc.master_chain_info().await,
+        Method::LookupBlock { params } => rpc.lookup_block(params).await,
+        Method::Shards { params } => rpc.shards(params).await,
+        Method::BlockHeader { params } => rpc.get_block_header(params).await,
+        Method::BlockTransactions { params } => rpc.get_block_transactions(params).await,
+        Method::AddressInformation { params } => rpc.get_address_information(params).await,
+        Method::ExtendedAddressInformation { params } => rpc.get_extended_address_information(params).await,
+        Method::Transactions { params } => rpc.get_transactions(params).await,
+        Method::SendBoc { params } => rpc.send_boc(params).await,
+        Method::RunGetMethod { params} => rpc.run_get_method(params).await
     };
 
     Json(

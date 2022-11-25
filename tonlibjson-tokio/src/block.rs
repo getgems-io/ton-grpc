@@ -179,14 +179,14 @@ pub enum SmcMethodId {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
-#[serde(rename = "tvm.slice")]
+#[serde(rename = "tvm.Slice")]
 pub struct Slice {
     pub bytes: String
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
-#[serde(rename = "tvm.cell")]
+#[serde(rename = "tvm.Cell")]
 pub struct Cell {
     pub bytes: String
 }
@@ -200,16 +200,16 @@ pub struct Number {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
-#[serde(rename = "tvm.tuple")]
+#[serde(rename = "tvm.Tuple")]
 pub struct Tuple {
-    pub elements: Vec<StackEntry>
+    pub tuple: Vec<StackEntry>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
-#[serde(rename = "tvm.list")]
+#[serde(rename = "tvm.List")]
 pub struct List {
-    pub elements: Vec<StackEntry>
+    pub list: Vec<StackEntry>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
