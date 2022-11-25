@@ -28,7 +28,7 @@ pub struct Response {
 
 impl Request {
     pub fn new<T: Serialize>(data: T) -> anyhow::Result<Self> {
-        Ok(Self::with_timeout(data, Duration::from_secs(3))?)
+        Self::with_timeout(data, Duration::from_secs(3))
     }
 
     pub fn with_timeout<T: Serialize>(data: T, timeout: Duration) -> anyhow::Result<Self> {

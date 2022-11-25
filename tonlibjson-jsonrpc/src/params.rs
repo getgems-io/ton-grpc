@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use tonlibjson_tokio::block::{Cell, Number, Slice, SmcStack, StackEntry, Tuple};
+use tonlibjson_tokio::block::{Cell, Number, Slice, SmcStack, StackEntry};
 
 #[derive(Deserialize, Debug)]
 pub struct RunGetMethodParams {
@@ -64,7 +64,7 @@ impl TryFrom<SmcStack> for Stack {
             }
         }).collect();
 
-        Ok(Self { 0: elements? })
+        Ok(Self(elements?))
     }
 }
 

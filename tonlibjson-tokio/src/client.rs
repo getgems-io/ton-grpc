@@ -75,7 +75,7 @@ impl Client {
             client,
             responses,
             _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal))),
-            state: state
+            state
         }
     }
 }
