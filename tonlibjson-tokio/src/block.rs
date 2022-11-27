@@ -267,8 +267,8 @@ mod tests {
         let slice = StackEntry::Slice { slice: Slice { bytes: "test".to_string() }};
         let cell = StackEntry::Cell { cell: Cell { bytes: "test".to_string() }};
         let number = StackEntry::Number { number: Number { number: "123".to_string() }};
-        let tuple = StackEntry::Tuple { tuple: Tuple { elements: vec![slice.clone(), cell.clone()]  }};
-        let list = StackEntry::List { list: List { elements: vec![slice.clone(), tuple.clone()]  }};
+        let tuple = StackEntry::Tuple { tuple: Tuple { tuple: vec![slice.clone(), cell.clone()]  }};
+        let list = StackEntry::List { list: List { list: vec![slice.clone(), tuple.clone()]  }};
 
         assert_eq!(serde_json::to_string(&slice).unwrap(), "{\"@type\":\"tvm.stackEntrySlice\",\"slice\":{\"@type\":\"tvm.slice\",\"bytes\":\"test\"}}");
         assert_eq!(serde_json::to_string(&cell).unwrap(), "{\"@type\":\"tvm.stackEntryCell\",\"cell\":{\"@type\":\"tvm.cell\",\"bytes\":\"test\"}}");
