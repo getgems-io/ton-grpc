@@ -19,4 +19,4 @@ serde_json = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
 tokio-stream = { workspace = true }
-axum = "0.5"
+axum = "0.6"
