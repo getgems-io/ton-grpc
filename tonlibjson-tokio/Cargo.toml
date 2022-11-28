@@ -21,3 +21,5 @@ pin-project = "1.0"
 reqwest = { version = "0.11", features = ["rustls-tls", "trust-dns"], default-features = false }
 config = { version = "0.13", default-features = false }
 url = { version = "2.3", features = ["serde"] }
+tempfile = "3.3"
+linemux = "0.2"

@@ -57,7 +57,7 @@ impl ClientBuilder {
     pub fn disable_logging(&mut self) -> &mut Self {
         self.disable_logging = Some(json!({
             "@type": "setLogVerbosityLevel",
-            "new_verbosity_level": 1
+            "new_verbosity_level": 3
         }));
 
         self
