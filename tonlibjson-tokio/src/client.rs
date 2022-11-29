@@ -1,4 +1,5 @@
 use std::future::Future;
+use std::io::{BufRead, BufReader, Read};
 use std::pin::Pin;
 use std::sync::{Arc, mpsc, Mutex, RwLock};
 use std::sync::mpsc::TryRecvError;
@@ -7,10 +8,13 @@ use std::time::Duration;
 use anyhow::anyhow;
 use serde_json::{json, Value};
 use dashmap::DashMap;
+use futures::StreamExt;
+use linemux::MuxedLines;
 use tower::Service;
-use tracing::warn;
+use tracing::{error, info, info_span, warn};
 use crate::TonError;
 use crate::request::{Request, RequestId, Response};
+use tempfile::NamedTempFile;
 
 #[derive(Debug, Clone)]
 enum State {
@@ -46,7 +50,7 @@ impl Client {
             loop {
                 match stop_receiver.try_recv() {
                     Ok(_) | Err(TryRecvError::Disconnected) => {
-                        tracing::warn!("Stop thread");
+                        warn!("Stop thread");
                         return
                     },
                     Err(TryRecvError::Empty) => {
@@ -63,7 +67,7 @@ impl Client {
                                     *state = State::Ready;
                                 }
                             } else {
-                                tracing::warn!("Unexpected response {:?}", packet.to_string())
+                                warn!("Unexpected response {:?}", packet.to_string())
                             }
                         }
                     }
@@ -71,12 +75,48 @@ impl Client {
             }
         });
 
-        Client {
+        let client = Client {
             client,
             responses,
             _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal))),
             state
-        }
+        };
+
+        let (logs_file, logs_file_path) = NamedTempFile::new().unwrap().keep().unwrap();
+
+        error!("logs temp file path is: {}", logs_file_path.to_str().unwrap());
+
+        let logs = client.client.execute(&json!({"@type": "setLogStream", "log_stream": {"@type": "logStreamFile", "path": logs_file_path, "max_file_size": 1024 * 1024}}).to_string());
+        let logs = client.client.execute(&json!({"@type": "getLogStream"}).to_string());
+
+        let _ = tokio::task::spawn(async {
+            let id = uuid::Uuid::new_v4().to_string();
+            let mut lines = MuxedLines::new()?;
+            let mut buffer = "".to_string();
+            lines.add_file(logs_file_path).await?;
+            while let Ok(Some(line)) = lines.next_line().await {
+                if buffer.is_empty() && line.line().ends_with("{") {
+                    buffer = line.line().to_string();
+                } else if buffer.is_empty() {
+                    info!(id = id, "{}", line.line())
+                } else if line.line() == "}" {
+                    buffer += "\n";
+                    buffer += line.line();
+                    info!(id = id, "{}", buffer);
+                    buffer = "".to_string();
+                } else {
+                    buffer += "\n";
+                    buffer += line.line();
+                }
+
+                // warn!(id = id, "{}", line.line())
+            }
+            anyhow::Ok(())
+        });
+
+        error!("logs: {}", logs.unwrap());
+
+        client
     }
 }
 
@@ -137,7 +177,7 @@ impl Service<Request> for Client {
 
             // TODO[akostylev0] refac
             if response.data["@type"] == "error" {
-                tracing::warn!("Error occurred: {:?}", &response.data);
+                warn!("Error occurred: {:?}", &response.data);
                 let error = serde_json::from_value::<TonError>(response.data)?;
 
                 return Err(anyhow!(error))
