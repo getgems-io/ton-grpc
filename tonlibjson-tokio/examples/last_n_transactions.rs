@@ -1,25 +1,15 @@
 use futures::{stream, StreamExt};
 use tokio::time::Instant;
+use tracing_test::traced_test;
 use tonlibjson_tokio::ton::TonClient;
 
 #[tokio::main]
+#[traced_test]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
-
     let ton = TonClient::new().await?;
 
     let now = Instant::now();
 
-    let _ = run(ton).await;
-
-    let timing = (Instant::now() - now).as_secs();
-
-    println!("Time: {:?}", timing);
-
-    Ok(())
-}
-
-async fn run(ton: TonClient) -> anyhow::Result<()> {
     let master = ton.get_masterchain_info().await?;
 
     stream::iter(master.last.seqno - 10000..master.last.seqno)
@@ -51,8 +41,13 @@ async fn run(ton: TonClient) -> anyhow::Result<()> {
             }
         }).await;
 
+    let timing = (Instant::now() - now).as_secs();
+
+    println!("Time: {:?}", timing);
+
     Ok(())
 }
+
 
 fn base64_to_hex(b: &str) -> anyhow::Result<String> {
     let bytes = base64::decode(b)?;

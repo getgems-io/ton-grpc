@@ -2,8 +2,7 @@
 members = [
     "tonlibjson-rs",
     "tonlibjson-tokio",
-    "tonlibjson-jsonrpc",
-    "tonlibjson-experiment"
+    "tonlibjson-jsonrpc"
 ]
 
 [workspace.dependencies]
@@ -18,3 +17,4 @@ serde = { version = "1.0", features = ["serde_derive"] }
 base64 = "0.13"
 hex = "0.4"
 tokio-stream = "0.1"
+tracing-test = "0.2.3"
