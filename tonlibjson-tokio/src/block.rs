@@ -179,14 +179,14 @@ pub enum SmcMethodId {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
-#[serde(rename = "tvm.Slice")]
+#[serde(rename = "tvm.slice")]
 pub struct Slice {
     pub bytes: String
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
-#[serde(rename = "tvm.Cell")]
+#[serde(rename = "tvm.cell")]
 pub struct Cell {
     pub bytes: String
 }
@@ -200,16 +200,16 @@ pub struct Number {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
-#[serde(rename = "tvm.Tuple")]
+#[serde(rename = "tvm.tuple")]
 pub struct Tuple {
-    pub tuple: Vec<StackEntry>
+    pub elements: Vec<StackEntry>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
-#[serde(rename = "tvm.List")]
+#[serde(rename = "tvm.list")]
 pub struct List {
-    pub list: Vec<StackEntry>
+    pub elements: Vec<StackEntry>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -267,8 +267,8 @@ mod tests {
         let slice = StackEntry::Slice { slice: Slice { bytes: "test".to_string() }};
         let cell = StackEntry::Cell { cell: Cell { bytes: "test".to_string() }};
         let number = StackEntry::Number { number: Number { number: "123".to_string() }};
-        let tuple = StackEntry::Tuple { tuple: Tuple { tuple: vec![slice.clone(), cell.clone()]  }};
-        let list = StackEntry::List { list: List { list: vec![slice.clone(), tuple.clone()]  }};
+        let tuple = StackEntry::Tuple { tuple: Tuple { elements: vec![slice.clone(), cell.clone()]  }};
+        let list = StackEntry::List { list: List { elements: vec![slice.clone(), tuple.clone()]  }};
 
         assert_eq!(serde_json::to_string(&slice).unwrap(), "{\"@type\":\"tvm.stackEntrySlice\",\"slice\":{\"@type\":\"tvm.slice\",\"bytes\":\"test\"}}");
         assert_eq!(serde_json::to_string(&cell).unwrap(), "{\"@type\":\"tvm.stackEntryCell\",\"cell\":{\"@type\":\"tvm.cell\",\"bytes\":\"test\"}}");
