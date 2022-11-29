@@ -1,7 +1,7 @@
 [workspace]
 members = [
     "tonlibjson-rs",
-    "tonlibjson-tokio",
+    "tonlibjson-client",
     "tonlibjson-jsonrpc"
 ]
 

@@ -1229,37 +1229,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tonlibjson-jsonrpc"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "base64",
- "cmake",
- "futures",
- "hex",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tonlibjson-tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "tonlibjson-rs"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "cmake",
- "libc",
- "pkg-config",
- "procinfo",
-]
-
-[[package]]
-name = "tonlibjson-tokio"
+name = "tonlibjson-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -1281,6 +1251,36 @@ dependencies = [
  "tracing-test",
  "url",
  "uuid",
+]
+
+[[package]]
+name = "tonlibjson-jsonrpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64",
+ "cmake",
+ "futures",
+ "hex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tonlibjson-client",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "tonlibjson-rs"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "cmake",
+ "libc",
+ "pkg-config",
+ "procinfo",
 ]
 
 [[package]]

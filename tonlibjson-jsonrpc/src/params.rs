@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 use serde::{Serialize, Deserialize};
 use serde_json::{json, Value};
-use tonlibjson_tokio::block::{Cell, Number, Slice, SmcStack, StackEntry};
+use tonlibjson_client::block::{Cell, Number, Slice, SmcStack, StackEntry};
 
 #[derive(Deserialize, Debug)]
 pub struct RunGetMethodParams {

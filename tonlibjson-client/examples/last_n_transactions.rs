@@ -1,7 +1,7 @@
 use futures::{stream, StreamExt};
 use tokio::time::Instant;
 use tracing_test::traced_test;
-use tonlibjson_tokio::ton::TonClient;
+use tonlibjson_client::ton::TonClient;
 
 #[tokio::main]
 #[traced_test]

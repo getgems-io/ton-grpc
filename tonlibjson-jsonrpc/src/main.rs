@@ -10,8 +10,8 @@ use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
-use tonlibjson_tokio::ton::TonClient;
-use tonlibjson_tokio::block::{BlockIdExt, InternalTransactionId, RawTransaction, ShortTxId, SmcStack};
+use tonlibjson_client::ton::TonClient;
+use tonlibjson_client::block::{BlockIdExt, InternalTransactionId, RawTransaction, ShortTxId, SmcStack};
 use crate::params::{RunGetMethodParams, Stack};
 
 #[derive(Deserialize, Debug)]

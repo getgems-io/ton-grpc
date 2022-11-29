@@ -8,7 +8,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 cmake = "0.1"
 
 [dependencies]
-tonlibjson-tokio = { path = "../tonlibjson-tokio" }
+tonlibjson-client = { path = "../tonlibjson-client" }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 futures = { workspace = true }
