@@ -343,7 +343,7 @@ async fn main() -> anyhow::Result<()> {
 
     debug!("initialize ton client...");
 
-    let ton = TonClient::new().await?;
+    let ton = TonClient::from_env().await?;
 
     debug!("initialized");
 

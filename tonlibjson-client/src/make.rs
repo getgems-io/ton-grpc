@@ -1,12 +1,13 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use serde_json::{json, Value};
 use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
 use tower::{Layer, Service};
 use tracing::{debug, warn};
 use crate::block::GetMasterchainInfo;
+use crate::client::Client;
 use crate::request::Request;
-use crate::ClientBuilder;
 use crate::session::SessionClient;
 use crate::ton_config::TonConfig;
 
@@ -32,7 +33,7 @@ impl Service<TonConfig> for ClientFactory {
                 .build()
                 .await?;
 
-            let _ = client.call(Request::new(serde_json::to_value(GetMasterchainInfo {})?)?).await?;
+            let _ = client.call(Request::new(GetMasterchainInfo {})?).await?;
 
             let client = SessionClient::new(client);
 
@@ -43,5 +44,57 @@ impl Service<TonConfig> for ClientFactory {
 
             anyhow::Ok(client)
         })
+    }
+}
+
+
+struct ClientBuilder {
+    config: Value,
+    disable_logging: Option<Value>,
+}
+
+impl ClientBuilder {
+    fn from_config(config: &str) -> Self {
+        let full_config = json!({
+            "@type": "init",
+            "options": {
+                "@type": "options",
+                "config": {
+                    "@type": "config",
+                    "config": config,
+                    "use_callbacks_for_network": false,
+                    "blockchain_name": "",
+                    "ignore_cache": true
+                },
+                "keystore_type": {
+                    "@type": "keyStoreTypeInMemory"
+                }
+            }
+        });
+
+        Self {
+            config: full_config,
+            disable_logging: None,
+        }
+    }
+
+    fn disable_logging(&mut self) -> &mut Self {
+        self.disable_logging = Some(json!({
+            "@type": "setLogVerbosityLevel",
+            "new_verbosity_level": 1
+        }));
+
+        self
+    }
+
+    async fn build(&self) -> anyhow::Result<Client> {
+        let mut client = Client::new();
+        if let Some(ref disable_logging) = self.disable_logging {
+            client.call(Request::new(disable_logging.clone())?).await?;
+        }
+
+        client.call(Request::new(self.config.clone())?).await?;
+
+        Ok(client)
     }
 }

@@ -1,3 +1,5 @@
+use std::error::Error;
+use std::fmt::{Display, Formatter};
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 
@@ -234,6 +236,28 @@ pub enum StackEntry {
 #[serde(tag = "smc.info")]
 pub struct SmcInfo {
     pub id: i64
+}
+
+#[derive(Debug, Deserialize)]
+pub struct TonError {
+    code: i32,
+    message: String,
+}
+
+impl Display for TonError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Ton error occurred with code {}, message {}",
+            self.code, self.message
+        )
+    }
+}
+
+impl Error for TonError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        None
+    }
 }
 
 #[cfg(test)]

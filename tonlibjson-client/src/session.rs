@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 use serde_json::Value;
 use tower::{Service, ServiceExt};
 use crate::session::SessionRequest::{Atomic, RunGetMethod};
-use crate::{Client, Request};
+use crate::{client::Client, request::Request};
 use crate::block::{SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
 
 #[derive(Clone)]

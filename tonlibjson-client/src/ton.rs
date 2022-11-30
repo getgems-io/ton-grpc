@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt};
 use anyhow::anyhow;
@@ -9,10 +10,11 @@ use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tower::Service;
+use url::Url;
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, GetMasterchainInfo, SmcStack};
 use crate::config::AppConfig;
 use crate::discover::DynamicServiceStream;
-use crate::Request;
+use crate::request::Request;
 use crate::retry::RetryPolicy;
 use crate::session::SessionRequest;
 
@@ -25,15 +27,35 @@ const MAIN_WORKCHAIN: i64 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
-    pub async fn new() -> anyhow::Result<Self> {
-        let config = AppConfig::from_env()?;
+    pub async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
+        let discover = DynamicServiceStream::from_path(path).await?;
 
-        tracing::warn!("Ton config url: {}", config.config_url);
-
-        let discover = DynamicServiceStream::new(
-            config.config_url.clone(),
+        let ewma = PeakEwmaDiscover::new(
+            discover,
+            Duration::from_secs(15),
             Duration::from_secs(60),
-            config.config_path
+            tower::load::CompleteOnResponse::default(),
+        );
+
+        let client = Balance::new(ewma);
+        let client = Buffer::new(client, 200000);
+        let client = Retry::new(RetryPolicy::new(Budget::new(
+            Duration::from_secs(10),
+            10,
+            0.1
+        )), client);
+
+
+        Ok(Self {
+            client
+        })
+    }
+
+    pub async fn from_url(url: Url, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
+        let discover = DynamicServiceStream::new(
+            url,
+            Duration::from_secs(60),
+            fallback_path
         ).await?;
 
         let ewma = PeakEwmaDiscover::new(
@@ -55,6 +77,15 @@ impl TonClient {
         Ok(Self {
             client
         })
+    }
+
+    pub async fn from_env() -> anyhow::Result<Self> {
+        let config = AppConfig::from_env()?;
+
+        tracing::warn!("Ton config url: {}", config.config_url);
+        tracing::warn!("Ton config fallback path: {:?}", config.config_path);
+
+        Self::from_url(config.config_url, config.config_path).await
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {

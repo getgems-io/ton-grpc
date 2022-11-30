@@ -6,7 +6,7 @@ use tonlibjson_client::ton::TonClient;
 #[tokio::main]
 #[traced_test]
 async fn main() -> anyhow::Result<()> {
-    let ton = TonClient::new().await?;
+    let ton = TonClient::from_env().await?;
 
     let now = Instant::now();
 

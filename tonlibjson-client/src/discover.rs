@@ -26,10 +26,27 @@ pub struct DynamicServiceStream {
 }
 
 impl DynamicServiceStream {
+    pub(crate) async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
+        let config = read_ton_config(path).await?;
+        let mut factory = ClientFactory::default();
+
+        let stream = try_stream! {
+            for ls in config.liteservers.iter() {
+                if let Ok(client) = factory.ready().await?.call(config.with_liteserver(ls)).await {
+                    yield Change::Insert(ls.id(), client);
+                }
+            }
+        };
+
+        Ok(Self {
+            changes: Box::pin(stream),
+        })
+    }
+
     pub(crate) async fn new(url: Url, period: Duration, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
+        let mut config = config(url.clone(), fallback_path).await?;
         let mut factory = ClientFactory::default();
         let mut interval = tokio::time::interval(period);
-        let mut config = config(url.clone(), fallback_path).await?;
 
         let stream = try_stream! {
             interval.tick().await;
@@ -100,10 +117,9 @@ impl Stream for DynamicServiceStream {
         let c = &mut self.changes;
         match Pin::new(&mut *c).poll_next(cx) {
             Poll::Ready(Some(Ok(change))) => match change {
-                Change::Insert(k, client) => Poll::Ready(Some(Ok(Change::Insert(
-                    k,
-                    client,
-                )))),
+                Change::Insert(k, client) => Poll::Ready(Some(Ok(
+                    Change::Insert(k, client)
+                ))),
                 Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
             },
             _ => Poll::Pending

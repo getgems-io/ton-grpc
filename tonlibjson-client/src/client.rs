@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use dashmap::DashMap;
 use tower::Service;
 use tracing::warn;
-use crate::TonError;
+use crate::block::TonError;
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Debug, Clone)]
@@ -137,7 +137,7 @@ impl Service<Request> for Client {
 
             // TODO[akostylev0] refac
             if response.data["@type"] == "error" {
-                tracing::warn!("Error occurred: {:?}", &response.data);
+                warn!("Error occurred: {:?}", &response.data);
                 let error = serde_json::from_value::<TonError>(response.data)?;
 
                 return Err(anyhow!(error))
