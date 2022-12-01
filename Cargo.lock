@@ -1245,7 +1245,7 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
- "tonlibjson-rs",
+ "tonlibjson-sys",
  "tower",
  "tracing",
  "tracing-test",
@@ -1273,7 +1273,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tonlibjson-rs"
+name = "tonlibjson-sys"
 version = "0.1.0"
 dependencies = [
  "anyhow",

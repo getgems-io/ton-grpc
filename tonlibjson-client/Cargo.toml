@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
-tonlibjson-rs = { path = "../tonlibjson-rs" }
+tonlibjson-sys = { path = "../tonlibjson-sys" }
 tower = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }

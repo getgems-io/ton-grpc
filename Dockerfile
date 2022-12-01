@@ -13,11 +13,11 @@ WORKDIR /app
 COPY ./Cargo.lock ./Cargo.lock
 COPY ./Cargo.toml ./Cargo.toml
 
-RUN USER=root cargo new --lib tonlibjson-rs
+RUN USER=root cargo new --lib tonlibjson-sys
 RUN USER=root cargo new --lib tonlibjson-client
 RUN USER=root cargo new --bin tonlibjson-jsonrpc
 
-COPY ./tonlibjson-rs/Cargo.toml ./tonlibjson-rs/Cargo.toml
+COPY ./tonlibjson-sys/Cargo.toml ./tonlibjson-sys/Cargo.toml
 COPY ./tonlibjson-client/Cargo.toml ./tonlibjson-client/Cargo.toml
 COPY ./tonlibjson-jsonrpc/Cargo.toml ./tonlibjson-jsonrpc/Cargo.toml
 
