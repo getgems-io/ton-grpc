@@ -1,3 +1,0 @@
-[submodule "tonlibjson-rs/ton"]
-	path = tonlibjson-rs/ton
-	url = https://github.com/ton-blockchain/ton
