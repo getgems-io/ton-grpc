@@ -21,7 +21,7 @@ enum State {
 
 #[derive(Debug, Clone)]
 pub struct Client {
-    client: Arc<tonlibjson_rs::Client>,
+    client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
     _stop_signal: Arc<Mutex<Stop>>,
     state: Arc<RwLock<State>>
@@ -29,7 +29,7 @@ pub struct Client {
 
 impl Client {
     pub fn new() -> Self {
-        let client = Arc::new(tonlibjson_rs::Client::new());
+        let client = Arc::new(tonlibjson_sys::Client::new());
         let client_recv = client.clone();
 
         let responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>> =
