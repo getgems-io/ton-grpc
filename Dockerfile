@@ -26,11 +26,11 @@ COPY ./tonlibjson-jsonrpc/Cargo.toml ./tonlibjson-jsonrpc/Cargo.toml
 ADD .cargo .cargo
 
 RUN cargo fetch --locked
-RUN cargo build --release --target x86_64-unknown-linux-gnu --features '$FEATURES'
+RUN cargo build --release --target x86_64-unknown-linux-gnu --features $FEATURES
 
 COPY . .
 
-RUN cargo build -vv --release --target x86_64-unknown-linux-gnu --features '$FEATURES'
+RUN cargo build -vv --release --target x86_64-unknown-linux-gnu --features $FEATURES
 
 FROM debian:bullseye-slim AS runner
 
