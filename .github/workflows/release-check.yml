@@ -58,4 +58,4 @@ jobs:
           build-args: |
             sha=${{ github.sha }}
             sha_short=${{ env.GITHUB_SHA_SHORT }}
-            features=${{ matrix.features }}
+            FEATURES=${{ matrix.features }}
