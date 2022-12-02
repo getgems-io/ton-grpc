@@ -16,8 +16,12 @@ fn main() {
                 )
         ).unwrap();
 
+    let ton_dir = if cfg!(feature = "testnet") { "ton-testnet" } else { "ton" };
+
+    eprintln!("ton dir is {}", ton_dir);
+
     let dst= if !is_darwin && is_release {
-        Config::new("ton")
+        Config::new(ton_dir)
             .define("TON_ONLY_TONLIB", "ON")
             .define("CMAKE_C_COMPILER", "clang")
             .define("CMAKE_CXX_COMPILER", "clang++")
@@ -31,7 +35,7 @@ fn main() {
             .build_target("tonlibjson_static")
             .build()
     } else {
-        Config::new("ton")
+        Config::new(ton_dir)
             .uses_cxx11()
             .define("TON_ONLY_TONLIB", "ON")
             .define("CMAKE_C_COMPILER", "clang")
