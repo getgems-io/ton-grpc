@@ -20,3 +20,6 @@ base64 = { workspace = true }
 hex = { workspace = true }
 tokio-stream = { workspace = true }
 axum = "0.6"
+
+[features]
+testnet = ["tonlibjson-client/testnet"]
