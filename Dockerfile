@@ -1,5 +1,7 @@
 FROM rust:1.65.0-bullseye AS builder
 
+ARG FEATURES
+
 RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common
 
 RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 15 all
@@ -24,11 +26,11 @@ COPY ./tonlibjson-jsonrpc/Cargo.toml ./tonlibjson-jsonrpc/Cargo.toml
 ADD .cargo .cargo
 
 RUN cargo fetch --locked
-RUN cargo build --release --target x86_64-unknown-linux-gnu
+RUN cargo build --release --target x86_64-unknown-linux-gnu --features '$FEATURES'
 
 COPY . .
 
-RUN cargo build -vv --release --target x86_64-unknown-linux-gnu
+RUN cargo build -vv --release --target x86_64-unknown-linux-gnu --features '$FEATURES'
 
 FROM debian:bullseye-slim AS runner
 
