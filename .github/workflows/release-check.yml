@@ -9,7 +9,7 @@ jobs:
   build-docker-image:
     strategy:
       matrix:
-        version:
+        include:
           - suffix: ''
             features: ''
           - suffix: '-testnet'
