@@ -1,0 +1,21 @@
+[package]
+name = "tonlibjson-grpc"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+
+[dependencies]
+tonlibjson-client = { path = "../tonlibjson-client" }
+tokio = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tonic = "0.8"
+tonic-web = "0.4"
+prost = "0.11"
+
+[build-dependencies]
+tonic-build = "0.8"
+
+[features]
+testnet = ["tonlibjson-client/testnet"]

@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package ton;
+
+service Ton {
+  rpc GetMasterchainInfo (GetMasterchainInfoRequest) returns (GetMasterchainInfoResponse) {}
+}
+
+message GetMasterchainInfoRequest {}
+
+message GetMasterchainInfoResponse {
+  BlockIdExt init = 1;
+  BlockIdExt last = 2;
+  string state_root_hash = 3;
+}
+
+message BlockIdExt {
+  int32 workchain = 1;
+  int64 shard = 2;
+  int32 seqno = 3;
+  string root_hash = 4;
+  string file_hash = 5;
+}

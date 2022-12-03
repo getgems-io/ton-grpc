@@ -2,13 +2,17 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
+use serde_aux::prelude::deserialize_number_from_string;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {
-    pub workchain: i64,
-    pub shard: String,
-    pub seqno: u64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub workchain: i32,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub shard: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub seqno: i32,
     pub root_hash: String,
     pub file_hash: String,
 }

@@ -2,7 +2,8 @@
 members = [
     "tonlibjson-sys",
     "tonlibjson-client",
-    "tonlibjson-jsonrpc"
+    "tonlibjson-jsonrpc",
+    "tonlibjson-grpc"
 ]
 
 [workspace.dependencies]
