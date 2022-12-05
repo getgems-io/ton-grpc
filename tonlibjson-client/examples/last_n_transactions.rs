@@ -1,11 +1,11 @@
 use futures::{stream, StreamExt};
 use tokio::time::Instant;
-use tracing_test::traced_test;
 use tonlibjson_client::ton::TonClient;
 
 #[tokio::main]
-#[traced_test]
 async fn main() -> anyhow::Result<()> {
+    tracing_subscriber::fmt::init();
+
     let ton = TonClient::from_env().await?;
 
     let now = Instant::now();

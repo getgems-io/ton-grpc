@@ -1248,6 +1248,7 @@ dependencies = [
  "tonlibjson-sys",
  "tower",
  "tracing",
+ "tracing-subscriber",
  "tracing-test",
  "url",
  "uuid",
