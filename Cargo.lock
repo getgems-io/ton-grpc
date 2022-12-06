@@ -1240,6 +1240,7 @@ dependencies = [
  "futures",
  "hex",
  "pin-project",
+ "rand",
  "reqwest",
  "serde",
  "serde_json",
