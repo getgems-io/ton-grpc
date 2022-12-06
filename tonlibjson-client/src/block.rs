@@ -14,6 +14,14 @@ pub struct BlockIdExt {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "@type", rename = "ton.blockId")]
+pub struct BlockId {
+    pub workchain: i64,
+    pub shard: String,
+    pub seqno: u64
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.shortTxId")]
 pub struct ShortTxId {
     pub account: String,
@@ -89,6 +97,34 @@ pub struct RawTransactions {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]
 pub struct GetMasterchainInfo {}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "@type", rename = "blocks.lookupBlock")]
+pub struct BlocksLookupBlock {
+    pub mode: i32,
+    pub id: BlockId,
+    pub lt: i64,
+    pub utime: i32
+}
+
+impl BlocksLookupBlock {
+    pub fn new(id: &BlockId, lt: i64, utime: i32) -> Self {
+        let mut mode: i32 = 0;
+        if id.seqno > 0 {
+            mode += 1
+        }
+        if lt > 0 {
+            mode += 2
+        }
+
+        Self {
+            mode,
+            id: id.clone(),
+            lt,
+            utime
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ShardsResponse {

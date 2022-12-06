@@ -7,9 +7,9 @@ use std::time::Duration;
 use anyhow::anyhow;
 use serde_json::{json, Value};
 use dashmap::DashMap;
-use tower::Service;
-use tracing::warn;
-use crate::block::TonError;
+use tower::{Service, ServiceExt};
+use tracing::{info, warn};
+use crate::block::{BlockId, BlockIdExt, BlocksLookupBlock, GetMasterchainInfo, MasterchainInfo, TonError};
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Debug, Clone)]
@@ -24,7 +24,8 @@ pub struct Client {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
     _stop_signal: Arc<Mutex<Stop>>,
-    state: Arc<RwLock<State>>
+    state: Arc<RwLock<State>>,
+    pub min_block: Option<BlockIdExt>
 }
 
 impl Client {
@@ -58,6 +59,8 @@ impl Client {
                             } else if packet.contains("syncState") {
                                 // tracing::error!("Sync state: {}", packet.to_string());
                                 if packet.contains("syncStateDone") {
+                                    tracing::info!("syncState: {:#?}", packet);
+
                                     let mut state = state_rcv.write().unwrap();
 
                                     *state = State::Ready;
@@ -75,14 +78,57 @@ impl Client {
             client,
             responses,
             _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal))),
-            state
+            state,
+            min_block: None
         }
     }
-}
 
-impl Default for Client {
-    fn default() -> Self {
-        Self::new()
+    pub async fn setup_first_available_block(&mut self) -> anyhow::Result<()> {
+        let masterchain_info: MasterchainInfo = serde_json::from_value(self.ready().await?
+            .call(Request::new(GetMasterchainInfo {})?).await?)?;
+
+        let length = masterchain_info.last.seqno;
+        let mut cur = length / 2;
+        let mut rhs = length;
+        let mut lhs = masterchain_info.init.seqno;
+
+        let workchain = masterchain_info.last.workchain;
+        let shard = masterchain_info.last.shard;
+
+        let mut iter = 0;
+
+        let request = BlocksLookupBlock::new(&BlockId {
+            workchain,
+            shard: shard.clone(),
+            seqno: cur
+        }, 0, 0);
+        let mut block = self.ready().await?.call(Request::new(request)?).await;
+
+        while lhs < rhs {
+            iter += 1;
+            if block.is_err() {
+                lhs = cur + 1;
+            } else {
+                rhs = cur;
+            }
+
+            cur = (lhs + rhs) / 2;
+
+            info!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
+
+            let request = BlocksLookupBlock::new(&BlockId {
+                workchain,
+                shard: shard.clone(),
+                seqno: cur
+            }, 0, 0);
+            block = self.ready().await?.call(Request::new(request)?).await;
+        }
+
+        let block: BlockIdExt = serde_json::from_value(block?)?;
+
+        self.min_block = Some(block);
+
+        Ok(())
     }
 }
 

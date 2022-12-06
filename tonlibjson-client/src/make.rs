@@ -3,12 +3,12 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use serde_json::{json, Value};
 use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
-use tower::{Layer, Service};
+use tower::{Layer, Service, ServiceExt};
 use tracing::{debug, warn};
 use crate::block::GetMasterchainInfo;
 use crate::client::Client;
 use crate::request::Request;
-use crate::session::SessionClient;
+use crate::session::{SessionClient, SessionRequest};
 use crate::ton_config::TonConfig;
 
 
@@ -35,9 +35,11 @@ impl Service<TonConfig> for ClientFactory {
 
             let _ = client.call(Request::new(GetMasterchainInfo {})?).await?;
 
+            client.setup_first_available_block().await?;
+
             let client = SessionClient::new(client);
 
-            let client = ConcurrencyLimitLayer::new(100)
+            let mut client = ConcurrencyLimitLayer::new(100)
                 .layer(client);
 
             debug!("successfully made new client");
@@ -81,7 +83,7 @@ impl ClientBuilder {
     fn disable_logging(&mut self) -> &mut Self {
         self.disable_logging = Some(json!({
             "@type": "setLogVerbosityLevel",
-            "new_verbosity_level": 1
+            "new_verbosity_level": 0
         }));
 
         self
