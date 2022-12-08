@@ -33,6 +33,10 @@ impl SessionClient {
     pub fn get_ref(&self) -> &Client {
         &self.client
     }
+
+    pub fn get_mut(&mut self) -> &mut Client {
+        &mut self.client
+    }
 }
 
 impl Service<SessionRequest> for SessionClient {
