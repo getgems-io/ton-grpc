@@ -1,21 +1,20 @@
 use tower::Service;
 use tower::discover::{Change, Discover};
-use tower::load::Load;
+use tower::load::{CompleteOnResponse, Load};
 use tower::ready_cache::{error::Failed, ReadyCache};
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::hash::Hash;
 use std::marker::PhantomData;
-use std::{
-    fmt,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use std::{fmt, mem, pin::Pin, task::{Context, Poll}};
+use std::sync::{Arc, Mutex};
 use futures::{future, ready};
-use tracing::{debug, trace};
+use tracing::{debug, trace, warn};
 use tower::BoxError;
 use futures::TryFutureExt;
 use crate::block::BlockIdExt;
+use crate::cursor_client::CursorClient;
 use crate::session::SessionRequest;
+use rand::seq::IteratorRandom;
 
 pub struct BalanceRequest {
     pub request: SessionRequest,
@@ -145,19 +144,32 @@ impl<D> Balance<D>
 
     /// Performs P2C on inner services to find a suitable endpoint.
     fn p2c_ready_index(&mut self, min_seqno: Option<i32>) -> Option<usize> {
-
-
         match self.services.ready_len() {
             0 => None,
             1 => Some(0),
             len => {
-                // Get two distinct random indexes (in a random order) and
-                // compare the loads of the service at each index.
-                let idxs = rand::seq::index::sample(&mut self.rng, len, 2);
+                let mut idxs = (0 .. len)
+                    .map(|index| (index, self.services.get_ready_index(index).expect("invalid index")))
+                    .filter(|(index, (_, svc))| {
+                        if let Some(min_seqno) = min_seqno {
+                            // TODO[a.kostylev] well
+                            let svc: &&PeakEwma<CursorClient> = unsafe { mem::transmute(svc) };
 
-                let aidx = idxs.index(0);
-                let bidx = idxs.index(1);
-                debug_assert_ne!(aidx, bidx, "random indices must be distinct");
+                            if svc.service.first_block().as_ref().unwrap().seqno <= min_seqno {
+                                warn!(min_seqno = min_seqno, "first_seqno: {}", svc.service.first_block().as_ref().unwrap().seqno);
+
+                                true
+                            } else {
+                                false
+                            }
+                        } else {
+                            true
+                        }
+                    })
+                    .choose_multiple(&mut self.rng, 2);
+
+                let aidx = idxs.pop().unwrap().0;
+                let bidx = idxs.pop().unwrap().0;
 
                 let aload = self.ready_index_load(aidx);
                 let bload = self.ready_index_load(bidx);
@@ -217,7 +229,14 @@ impl<D> Service<BalanceRequest> for Balance<D>
     }
 
     fn call(&mut self, request: BalanceRequest) -> Self::Future {
-        let index = self.p2c_ready_index(None).expect("called before ready");
+        let index = if let Some(block) = request.block {
+            warn!(seqno = block.seqno, "request with block seqno");
+            // todo fix
+            self.p2c_ready_index(Some(block.seqno)).expect("called before ready")
+        } else {
+            self.p2c_ready_index(None).expect("called before ready")
+        };
+
         self.services
             .call_ready_index(index, request.request)
             .map_err(Into::into)
@@ -238,4 +257,19 @@ impl std::error::Error for DiscoverError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&*self.0)
     }
+}
+
+
+#[derive(Debug)]
+pub struct PeakEwma<S, C = CompleteOnResponse> {
+    pub service: S,
+    decay_ns: f64,
+    rtt_estimate: Arc<Mutex<RttEstimate>>,
+    completion: C,
+}
+
+#[derive(Debug)]
+struct RttEstimate {
+    update_at: tokio::time::Instant,
+    rtt_ns: f64,
 }

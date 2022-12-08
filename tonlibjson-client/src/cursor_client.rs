@@ -8,6 +8,7 @@ use anyhow::{anyhow, Result};
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt};
 use tower::limit::ConcurrencyLimit;
+use tower::load::{CompleteOnResponse, PeakEwma};
 use tracing::error;
 use tracing::log::{log, warn};
 use crate::block::{BlockId, BlockIdExt};
@@ -23,8 +24,8 @@ enum State {
 pub struct CursorClient {
     client: Option<ConcurrencyLimit<SessionClient>>,
 
-    pub first_block: Option<BlockIdExt>,
-    pub last_block: Option<BlockIdExt>,
+    first_block: Option<BlockIdExt>,
+    last_block: Option<BlockIdExt>,
 
     state: State,
 }
@@ -39,12 +40,12 @@ impl CursorClient {
         }
     }
 
-    fn first_block(&self) -> Result<&BlockIdExt> {
+    pub fn first_block(&self) -> Result<&BlockIdExt> {
         self.first_block.as_ref()
             .ok_or(anyhow!("first block is unknown"))
     }
 
-    fn last_block(&self) -> Result<&BlockIdExt> {
+    pub fn last_block(&self) -> Result<&BlockIdExt> {
         self.last_block.as_ref()
             .ok_or(anyhow!("last block is unknown"))
     }
@@ -106,5 +107,23 @@ impl Service<SessionRequest> for CursorClient {
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
         Box::pin(self.client.as_mut().expect("ready must be called").call(req))
+    }
+}
+
+
+trait CursorRequest {
+    fn can_accept(&self, block: &BlockIdExt) -> bool;
+}
+
+impl CursorRequest for CursorClient {
+    fn can_accept(&self, block: &BlockIdExt) -> bool {
+        self.first_block.as_ref().expect("ready must be called").seqno <= block.seqno
+        && block.seqno <= self.last_block.as_ref().expect("ready must be called").seqno
+    }
+}
+
+impl CursorRequest for PeakEwma<CursorClient> {
+    fn can_accept(&self, block: &BlockIdExt) -> bool {
+        false
     }
 }

@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use dashmap::DashMap;
 use tower::{Service, ServiceExt};
 use tracing::{debug, info, warn};
-use crate::block::{BlockId, BlockIdExt, BlocksLookupBlock, GetMasterchainInfo, MasterchainInfo, Sync, TonError};
+use crate::block::{AccountTransactionId, BlockId, BlockIdExt, BlocksLookupBlock, GetMasterchainInfo, MasterchainInfo, Sync, TonError};
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Debug, Clone)]
@@ -89,7 +89,29 @@ impl Client {
             if block.is_err() {
                 lhs = cur + 1;
             } else {
-                rhs = cur;
+                let b = serde_json::from_value::<BlockIdExt>(block.unwrap()).unwrap();
+
+                let request = json!({
+                    "@type": "blocks.getTransactions",
+                    "id": b,
+                    "mode": 7 + 128,
+                    "count": 1,
+                    "after": AccountTransactionId::default(),
+                });
+
+                let header = self
+                    .ready()
+                    .await?
+                    .call(Request::new(request)?)
+                    .await;
+
+                info!("header: {:?}", header);
+
+                if header.is_err() {
+                    lhs = cur + 1;
+                } else {
+                    rhs = cur;
+                }
             }
 
             cur = (lhs + rhs) / 2;

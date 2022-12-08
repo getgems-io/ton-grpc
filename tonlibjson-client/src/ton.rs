@@ -196,6 +196,7 @@ impl TonClient {
         let block = self.look_up_block_by_lt(MAIN_WORKCHAIN, MAIN_SHARD, from_lt.parse()?).await?;
         let block = serde_json::from_value::<BlockIdExt>(block)?;
 
+
         let request = json!({
             "@type": "raw.getTransactions",
             "account_address": {
@@ -208,7 +209,7 @@ impl TonClient {
             }
         });
 
-        let response = self.call(request).await?;
+        let response = self.call_with_block(block, request).await?;
 
         Ok(serde_json::from_value(response)?)
     }
@@ -376,6 +377,16 @@ impl TonClient {
 
     async fn call(&self, data: Value) -> anyhow::Result<Value> {
         let request = SessionRequest::Atomic(Request::new(data)?);
+
+        let mut ton = self.clone();
+        let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
+        let call = ready.call(request.into()).await.map_err(|e| anyhow!(e))?;
+
+        Ok(call)
+    }
+
+    async fn call_with_block(&self, block: BlockIdExt, data: Value) -> anyhow::Result<Value> {
+        let request = BalanceRequest::new(Some(block), SessionRequest::Atomic(Request::new(data)?));
 
         let mut ton = self.clone();
         let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
