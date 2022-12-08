@@ -70,7 +70,7 @@ impl<E, Res> Policy<BalanceRequest, Res, E> for RetryPolicy {
     fn clone_request(&self, req: &BalanceRequest) -> Option<BalanceRequest> {
         <Self as tower::retry::Policy<SessionRequest, Res, E>>::clone_request(self, &req.request)
             .map(|inner|
-                BalanceRequest::new(req.block.clone(), inner)
+                BalanceRequest::new(req.lt, inner)
             )
     }
 }

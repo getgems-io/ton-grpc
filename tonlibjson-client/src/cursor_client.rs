@@ -6,26 +6,26 @@ use std::task::{Context, Poll, ready};
 use tower::Service;
 use anyhow::{anyhow, Result};
 use futures::future::BoxFuture;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use tower::limit::ConcurrencyLimit;
 use tower::load::{CompleteOnResponse, PeakEwma};
 use tracing::error;
 use tracing::log::{log, warn};
-use crate::block::{BlockId, BlockIdExt};
+use crate::block::{BlockHeader, BlockId, BlockIdExt};
 use crate::client::Client;
 use crate::session::{SessionClient, SessionRequest};
 
 enum State {
     Init,
-    Future(Pin<Box<dyn Future<Output=(Result<BlockIdExt>, Result<BlockIdExt>, ConcurrencyLimit<SessionClient>)> + Send>>),
+    Future(Pin<Box<dyn Future<Output=(Result<BlockHeader>, Result<BlockHeader>, ConcurrencyLimit<SessionClient>)> + Send>>),
     Ready
 }
 
 pub struct CursorClient {
     client: Option<ConcurrencyLimit<SessionClient>>,
 
-    first_block: Option<BlockIdExt>,
-    last_block: Option<BlockIdExt>,
+    first_block: Option<BlockHeader>,
+    last_block: Option<BlockHeader>,
 
     state: State,
 }
@@ -40,18 +40,14 @@ impl CursorClient {
         }
     }
 
-    pub fn first_block(&self) -> Result<&BlockIdExt> {
+    pub fn first_block(&self) -> Result<&BlockHeader> {
         self.first_block.as_ref()
             .ok_or(anyhow!("first block is unknown"))
     }
 
-    pub fn last_block(&self) -> Result<&BlockIdExt> {
+    pub fn last_block(&self) -> Result<&BlockHeader> {
         self.last_block.as_ref()
             .ok_or(anyhow!("last block is unknown"))
-    }
-
-    fn get_range(&self) -> Result<Range<&BlockIdExt>> {
-        Ok(self.first_block()? .. self.last_block()?)
     }
 }
 
@@ -71,10 +67,12 @@ impl Service<SessionRequest> for CursorClient {
                     let low = client.get_mut().get_mut();
 
                     warn!("start sync");
-                    let rhs = low.synchronize().await;
+                    let rhs = low.synchronize()
+                        .await;
 
                     warn!("start searching");
-                    let lhs = low.find_first_block().await;
+                    let lhs = low.find_first_block()
+                        .await;
 
                     (lhs, rhs, client)
                 }.boxed())
@@ -90,11 +88,11 @@ impl Service<SessionRequest> for CursorClient {
 
                         State::Ready
                     },
-                    _ => {
-                        error!("error occured during client initialization, retry...");
+                    (Err(e), _) | (_, Err(e)) => {
+                        error!("error occurred during client initialization: {}", e);
 
                         State::Init
-                    }
+                    },
                 }
             },
             State::Ready => return self.client.as_mut().unwrap().poll_ready(cx)
@@ -107,23 +105,5 @@ impl Service<SessionRequest> for CursorClient {
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
         Box::pin(self.client.as_mut().expect("ready must be called").call(req))
-    }
-}
-
-
-trait CursorRequest {
-    fn can_accept(&self, block: &BlockIdExt) -> bool;
-}
-
-impl CursorRequest for CursorClient {
-    fn can_accept(&self, block: &BlockIdExt) -> bool {
-        self.first_block.as_ref().expect("ready must be called").seqno <= block.seqno
-        && block.seqno <= self.last_block.as_ref().expect("ready must be called").seqno
-    }
-}
-
-impl CursorRequest for PeakEwma<CursorClient> {
-    fn can_accept(&self, block: &BlockIdExt) -> bool {
-        false
     }
 }

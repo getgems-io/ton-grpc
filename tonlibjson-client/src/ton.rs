@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt};
@@ -9,6 +10,7 @@ use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tower::Service;
+use tracing::info;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, GetMasterchainInfo, SmcStack};
@@ -193,12 +195,8 @@ impl TonClient {
         from_lt: &str,
         from_hash: &str,
     ) -> anyhow::Result<RawTransactions> {
-        let block = self.look_up_block_by_lt(MAIN_WORKCHAIN, MAIN_SHARD, from_lt.parse()?).await?;
-        let block = serde_json::from_value::<BlockIdExt>(block)?;
-
-
         let request = json!({
-            "@type": "raw.getTransactions",
+            "@type": "raw.getTransactionsV2",
             "account_address": {
                 "account_address": address
             },
@@ -206,10 +204,12 @@ impl TonClient {
                 "@type": "internal.transactionId",
                 "lt": from_lt,
                 "hash": from_hash
-            }
+            },
+            "try_decode_messages": false,
+            "count": 16
         });
 
-        let response = self.call_with_block(block, request).await?;
+        let response = self.call_with_block(from_lt.parse()?, request).await?;
 
         Ok(serde_json::from_value(response)?)
     }
@@ -341,14 +341,19 @@ impl TonClient {
         }
 
         stream::try_unfold(State { address, last_tx, this: self }, move |state| async move {
-            let txs = state.this
+            let mut txs = state.this
                 .raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash)
                 .await?;
 
-            if let Some(last_tx) = txs.transactions.last() {
+            let mut txs = txs.transactions;
+
+            let first = txs.swap_remove(0);
+            debug_assert_eq!(first.transaction_id.hash, state.last_tx.hash);
+
+            if let Some(last_tx) = txs.last() {
                 let tx_id = last_tx.transaction_id.clone();
                 anyhow::Ok(Some((
-                    stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
+                    stream::iter(txs.into_iter().map(anyhow::Ok)),
                     State {
                         address: state.address,
                         last_tx: tx_id,
@@ -385,8 +390,8 @@ impl TonClient {
         Ok(call)
     }
 
-    async fn call_with_block(&self, block: BlockIdExt, data: Value) -> anyhow::Result<Value> {
-        let request = BalanceRequest::new(Some(block), SessionRequest::Atomic(Request::new(data)?));
+    async fn call_with_block(&self, lt: i64, data: Value) -> anyhow::Result<Value> {
+        let request = BalanceRequest::new(Some(lt), SessionRequest::Atomic(Request::new(data)?));
 
         let mut ton = self.clone();
         let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
