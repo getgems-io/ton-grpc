@@ -3,12 +3,12 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use serde_json::{json, Value};
 use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
-use tower::{Layer, Service, ServiceExt};
+use tower::{Layer, Service};
 use tracing::{debug, warn};
 use crate::block::GetMasterchainInfo;
 use crate::client::Client;
 use crate::request::Request;
-use crate::session::{SessionClient, SessionRequest};
+use crate::session::SessionClient;
 use crate::ton_config::TonConfig;
 
 
@@ -35,11 +35,9 @@ impl Service<TonConfig> for ClientFactory {
 
             let _ = client.call(Request::new(GetMasterchainInfo {})?).await?;
 
-            client.setup_first_available_block().await?;
-
             let client = SessionClient::new(client);
 
-            let mut client = ConcurrencyLimitLayer::new(100)
+            let client = ConcurrencyLimitLayer::new(100)
                 .layer(client);
 
             debug!("successfully made new client");

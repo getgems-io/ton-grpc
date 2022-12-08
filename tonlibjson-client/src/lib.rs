@@ -9,3 +9,4 @@ mod retry;
 mod discover;
 mod client;
 mod balance;
+mod cursor_client;

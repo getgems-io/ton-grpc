@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use dashmap::DashMap;
 use tower::{Service, ServiceExt};
 use tracing::{info, warn};
-use crate::block::{BlockId, BlockIdExt, BlocksLookupBlock, GetMasterchainInfo, MasterchainInfo, TonError};
+use crate::block::{BlockId, BlockIdExt, BlocksLookupBlock, GetMasterchainInfo, MasterchainInfo, Sync, TonError};
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Debug, Clone)]
@@ -24,8 +24,7 @@ pub struct Client {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
     _stop_signal: Arc<Mutex<Stop>>,
-    state: Arc<RwLock<State>>,
-    pub min_block: Option<BlockIdExt>
+    state: Arc<RwLock<State>>
 }
 
 impl Client {
@@ -78,12 +77,11 @@ impl Client {
             client,
             responses,
             _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal))),
-            state,
-            min_block: None
+            state
         }
     }
 
-    pub async fn setup_first_available_block(&mut self) -> anyhow::Result<()> {
+    pub async fn find_first_block(&mut self) -> anyhow::Result<BlockIdExt> {
         let masterchain_info: MasterchainInfo = serde_json::from_value(self.ready().await?
             .call(Request::new(GetMasterchainInfo {})?).await?)?;
 
@@ -95,8 +93,6 @@ impl Client {
         let workchain = masterchain_info.last.workchain;
         let shard = masterchain_info.last.shard;
 
-        let mut iter = 0;
-
         let request = BlocksLookupBlock::new(&BlockId {
             workchain,
             shard: shard.clone(),
@@ -105,7 +101,7 @@ impl Client {
         let mut block = self.ready().await?.call(Request::new(request)?).await;
 
         while lhs < rhs {
-            iter += 1;
+            // TODO[akostylev0] specify error
             if block.is_err() {
                 lhs = cur + 1;
             } else {
@@ -121,14 +117,29 @@ impl Client {
                 shard: shard.clone(),
                 seqno: cur
             }, 0, 0);
-            block = self.ready().await?.call(Request::new(request)?).await;
+            block = self
+                .ready()
+                .await?
+                .call(Request::new(request)?)
+                .await;
         }
 
         let block: BlockIdExt = serde_json::from_value(block?)?;
 
-        self.min_block = Some(block);
+        Ok(block)
+    }
 
-        Ok(())
+    pub async fn synchronize(&mut self) -> anyhow::Result<BlockIdExt> {
+        let request = Request::new(Sync::default())?;
+
+        let response = self.ready()
+            .await?
+            .call(request)
+            .await?;
+
+        let block = serde_json::from_value::<BlockIdExt>(response)?;
+
+        Ok(block)
     }
 }
 

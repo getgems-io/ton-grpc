@@ -3,6 +3,10 @@ use std::fmt::{Display, Formatter};
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 
+#[derive(Debug, Serialize, Default)]
+#[serde(tag = "@type", rename = "sync")]
+pub struct Sync {}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {

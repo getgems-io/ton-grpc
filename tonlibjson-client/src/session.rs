@@ -1,12 +1,11 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use serde_json::{json, Value};
+use serde_json::Value;
 use tower::{Service, ServiceExt};
-use tracing::{error, info};
 use crate::session::SessionRequest::{Atomic, RunGetMethod};
 use crate::{client::Client, request::Request};
-use crate::block::{BlockId, BlocksLookupBlock, GetMasterchainInfo, MasterchainInfo, SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
+use crate::block::{SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
 
 #[derive(Clone)]
 pub enum SessionRequest {
