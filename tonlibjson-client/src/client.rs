@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use serde_json::{json, Value};
 use dashmap::DashMap;
 use tower::{Service, ServiceExt};
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use crate::block::{BlockId, BlockIdExt, BlocksLookupBlock, GetMasterchainInfo, MasterchainInfo, Sync, TonError};
 use crate::request::{Request, RequestId, Response};
 
@@ -94,13 +94,14 @@ impl Client {
 
             cur = (lhs + rhs) / 2;
 
-            info!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
+            debug!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
 
             let request = BlocksLookupBlock::new(&BlockId {
                 workchain,
                 shard: shard.clone(),
                 seqno: cur
             }, 0, 0);
+
             block = self
                 .ready()
                 .await?
