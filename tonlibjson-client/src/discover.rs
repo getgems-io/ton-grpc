@@ -16,10 +16,11 @@ use tower::limit::ConcurrencyLimit;
 use tracing::{debug, info};
 use tower::ServiceExt;
 use tower::Service;
+use crate::cursor_client::CursorClient;
 use crate::ton_config::Liteserver;
 use crate::session::SessionClient;
 
-type DiscoverResult = Result<Change<String, ConcurrencyLimit<SessionClient>>, anyhow::Error>;
+type DiscoverResult = Result<Change<String, CursorClient>, anyhow::Error>;
 
 pub struct DynamicServiceStream {
     changes: Pin<Box<dyn Stream<Item = DiscoverResult> + Send>>,
