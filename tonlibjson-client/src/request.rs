@@ -5,7 +5,7 @@ use serde_json::Value;
 
 pub type RequestId = Uuid;
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize)]
 pub struct Request {
     #[serde(rename="@extra")]
     pub id: RequestId,

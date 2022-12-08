@@ -7,7 +7,6 @@ use crate::session::SessionRequest::{Atomic, RunGetMethod};
 use crate::{client::Client, request::Request};
 use crate::block::{SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
 
-#[derive(Clone)]
 pub enum SessionRequest {
     RunGetMethod { address: String, method: String, stack: SmcStack },
     Atomic(Request)
