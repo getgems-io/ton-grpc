@@ -12,7 +12,7 @@ pub struct Sync {}
 pub struct BlockIdExt {
     pub workchain: i64,
     pub shard: String,
-    pub seqno: u64,
+    pub seqno: i32,
     pub root_hash: String,
     pub file_hash: String,
 }

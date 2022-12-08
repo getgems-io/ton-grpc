@@ -1,3 +1,5 @@
+extern crate core;
+
 pub mod request;
 pub mod block;
 pub mod session;
