@@ -13,18 +13,10 @@ use crate::block::{BlockId, BlockIdExt, BlocksLookupBlock, GetMasterchainInfo, M
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Debug, Clone)]
-enum State {
-    Init,
-    Sync,
-    Ready
-}
-
-#[derive(Debug, Clone)]
 pub struct Client {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
-    _stop_signal: Arc<Mutex<Stop>>,
-    state: Arc<RwLock<State>>
+    _stop_signal: Arc<Mutex<Stop>>
 }
 
 impl Client {
@@ -36,9 +28,6 @@ impl Client {
             Arc::new(DashMap::new());
         let responses_rcv = Arc::clone(&responses);
         let (stop_signal, stop_receiver) = mpsc::channel();
-
-        let state = Arc::new(RwLock::new(State::Init));
-        let state_rcv = state.clone();
 
         let _ = tokio::task::spawn_blocking(move || {
             let timeout = Duration::from_secs(20);
@@ -56,13 +45,9 @@ impl Client {
                                     let _ = sender.send(response);
                                 }
                             } else if packet.contains("syncState") {
-                                // tracing::error!("Sync state: {}", packet.to_string());
+                                tracing::error!("Sync state: {}", packet.to_string());
                                 if packet.contains("syncStateDone") {
                                     tracing::info!("syncState: {:#?}", packet);
-
-                                    let mut state = state_rcv.write().unwrap();
-
-                                    *state = State::Ready;
                                 }
                             } else {
                                 tracing::warn!("Unexpected response {:?}", packet.to_string())
@@ -76,8 +61,7 @@ impl Client {
         Client {
             client,
             responses,
-            _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal))),
-            state
+            _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
         }
     }
 
@@ -130,7 +114,7 @@ impl Client {
     }
 
     pub async fn synchronize(&mut self) -> anyhow::Result<BlockIdExt> {
-        let request = Request::new(Sync::default())?;
+        let request = Request::with_timeout(Sync::default(), Duration::from_secs(60))?;
 
         let response = self.ready()
             .await?
@@ -149,29 +133,7 @@ impl Service<Request> for Client {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let state = self.state.read().unwrap().clone();
-        match state {
-            State::Init => {
-                let sync = serde_json::to_string(&json!({
-                    "@extra": uuid::Uuid::new_v4(),
-                    "@type": "sync"
-                })).unwrap();
-
-                let _ = self.client.send(&sync);
-
-                cx.waker().wake_by_ref();
-
-                *self.state.write().unwrap() = State::Sync;
-
-                Poll::Pending
-            },
-            State::Sync => {
-                cx.waker().wake_by_ref();
-
-                Poll::Pending
-            },
-            State::Ready => Poll::Ready(Ok(()))
-        }
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
