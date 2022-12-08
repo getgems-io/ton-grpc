@@ -1,3 +1,4 @@
+use std::mem;
 use std::ops::Range;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
@@ -9,17 +10,17 @@ use tower::limit::ConcurrencyLimit;
 use tracing::error;
 use tracing::log::{log, warn};
 use crate::block::{BlockId, BlockIdExt};
-use crate::cursor_client::State::Init;
+use crate::client::Client;
 use crate::session::{SessionClient, SessionRequest};
 
 enum State<'a> {
     Init,
-    Future(BoxFuture<'a, Result<(BlockIdExt, BlockIdExt)>>),
+    Future(BoxFuture<'a, (Result<BlockIdExt>, Result<BlockIdExt>, ConcurrencyLimit<SessionClient>)>),
     Ready
 }
 
 pub struct CursorClient<'a> {
-    client: ConcurrencyLimit<SessionClient>,
+    client: Option<ConcurrencyLimit<SessionClient>>,
 
     pub first_block: Option<BlockIdExt>,
     pub last_block: Option<BlockIdExt>,
@@ -30,10 +31,10 @@ pub struct CursorClient<'a> {
 impl CursorClient<'_> {
     pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
         Self {
-            client,
+            client: Some(client),
             first_block: None,
             last_block: None,
-            state: Init
+            state: State::Init
         }
     }
 
@@ -52,7 +53,7 @@ impl CursorClient<'_> {
     }
 }
 
-impl Service<SessionRequest> for CursorClient<'_> {
+impl<'a> Service<SessionRequest> for CursorClient<'a> {
     type Response = <SessionClient as Service<SessionRequest>>::Response;
     type Error = <SessionClient as Service<SessionRequest>>::Error;
     type Future = <SessionClient as Service<SessionRequest>>::Future;
@@ -60,33 +61,41 @@ impl Service<SessionRequest> for CursorClient<'_> {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.state = match &mut self.state {
             State::Init => {
-                let mut client = self.client.get_mut().get_mut().clone();
+                let mut client = self.client
+                    .take()
+                    .expect("client must be provided");
 
                 State::Future(async move {
-                    warn!("start sync");
-                    let rhs = client.synchronize().await?;
-                    warn!("start searching");
-                    let lhs = client.find_first_block().await?;
+                    let low = client.get_mut().get_mut();
 
-                    Ok((lhs, rhs))
+                    warn!("start sync");
+                    let rhs = low.synchronize().await;
+
+                    warn!("start searching");
+                    let lhs = low.find_first_block().await;
+
+                    (lhs, rhs, client)
                 }.boxed())
             },
             State::Future(fut) => {
-                match ready!(fut.poll_unpin(cx)) {
-                    Err(e) => {
-                        error!("initialization error: {:?}", e);
+                let (first_block, last_block, client) = ready!(fut.poll_unpin(cx));
+                self.client.replace(client);
+
+                match (first_block, last_block) {
+                    (Ok(f), Ok(l)) => {
+                        self.first_block.replace(f);
+                        self.last_block.replace(l);
+
+                        State::Ready
+                    },
+                    _ => {
+                        error!("error occured during client initialization, retry...");
 
                         State::Init
                     }
-                    Ok((first_block, last_block)) => {
-                        self.first_block = Some(first_block);
-                        self.last_block = Some(last_block);
-
-                        State::Ready
-                    }
                 }
             },
-            State::Ready => return self.client.poll_ready(cx)
+            State::Ready => return self.client.as_mut().unwrap().poll_ready(cx)
         };
 
         cx.waker().wake_by_ref();
@@ -95,6 +104,6 @@ impl Service<SessionRequest> for CursorClient<'_> {
     }
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
-        Box::pin(self.client.call(req))
+        Box::pin(self.client.as_mut().expect("ready must be called").call(req))
     }
 }
