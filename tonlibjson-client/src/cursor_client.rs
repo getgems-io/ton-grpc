@@ -1,3 +1,4 @@
+use std::future::Future;
 use std::mem;
 use std::ops::Range;
 use std::pin::Pin;
@@ -13,22 +14,22 @@ use crate::block::{BlockId, BlockIdExt};
 use crate::client::Client;
 use crate::session::{SessionClient, SessionRequest};
 
-enum State<'a> {
+enum State {
     Init,
-    Future(BoxFuture<'a, (Result<BlockIdExt>, Result<BlockIdExt>, ConcurrencyLimit<SessionClient>)>),
+    Future(Pin<Box<dyn Future<Output=(Result<BlockIdExt>, Result<BlockIdExt>, ConcurrencyLimit<SessionClient>)>>>),
     Ready
 }
 
-pub struct CursorClient<'a> {
+pub struct CursorClient {
     client: Option<ConcurrencyLimit<SessionClient>>,
 
     pub first_block: Option<BlockIdExt>,
     pub last_block: Option<BlockIdExt>,
 
-    state: State<'a>,
+    state: State,
 }
 
-impl CursorClient<'_> {
+impl CursorClient {
     pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
         Self {
             client: Some(client),
@@ -53,7 +54,7 @@ impl CursorClient<'_> {
     }
 }
 
-impl<'a> Service<SessionRequest> for CursorClient<'a> {
+impl Service<SessionRequest> for CursorClient {
     type Response = <SessionClient as Service<SessionRequest>>::Response;
     type Error = <SessionClient as Service<SessionRequest>>::Error;
     type Future = <SessionClient as Service<SessionRequest>>::Future;
