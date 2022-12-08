@@ -6,6 +6,7 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::hash::Hash;
 use std::marker::PhantomData;
 use std::{fmt, mem, pin::Pin, task::{Context, Poll}};
+use std::cmp::min;
 use std::sync::{Arc, Mutex};
 use futures::{future, ready};
 use tracing::{debug, trace, warn};
@@ -18,14 +19,14 @@ use rand::seq::IteratorRandom;
 
 pub struct BalanceRequest {
     pub request: SessionRequest,
-    pub block: Option<BlockIdExt>
+    pub lt: Option<i64>
 }
 
 impl BalanceRequest {
-    pub fn new(block: Option<BlockIdExt>, request: SessionRequest) -> Self {
+    pub fn new(lt: Option<i64>, request: SessionRequest) -> Self {
         Self {
             request,
-            block
+            lt
         }
     }
 }
@@ -34,7 +35,7 @@ impl From<SessionRequest> for BalanceRequest {
     fn from(request: SessionRequest) -> Self {
         Self {
             request,
-            block: None
+            lt: None
         }
     }
 }
@@ -143,7 +144,7 @@ impl<D> Balance<D>
     }
 
     /// Performs P2C on inner services to find a suitable endpoint.
-    fn p2c_ready_index(&mut self, min_seqno: Option<i32>) -> Option<usize> {
+    fn p2c_ready_index(&mut self, min_lt: Option<i64>) -> Option<usize> {
         match self.services.ready_len() {
             0 => None,
             1 => Some(0),
@@ -151,12 +152,12 @@ impl<D> Balance<D>
                 let mut idxs = (0 .. len)
                     .map(|index| (index, self.services.get_ready_index(index).expect("invalid index")))
                     .filter(|(index, (_, svc))| {
-                        if let Some(min_seqno) = min_seqno {
+                        if let Some(min_lt) = min_lt {
                             // TODO[a.kostylev] well
                             let svc: &&PeakEwma<CursorClient> = unsafe { mem::transmute(svc) };
 
-                            if svc.service.first_block().as_ref().unwrap().seqno <= min_seqno {
-                                warn!(min_seqno = min_seqno, "first_seqno: {}", svc.service.first_block().as_ref().unwrap().seqno);
+                            if svc.service.first_block().as_ref().unwrap().start_lt <= (min_lt - 10000000) {
+                                // debug!(min_tl = min_lt, "start_tl: {}", svc.service.first_block().as_ref().unwrap().start_lt);
 
                                 true
                             } else {
@@ -229,10 +230,10 @@ impl<D> Service<BalanceRequest> for Balance<D>
     }
 
     fn call(&mut self, request: BalanceRequest) -> Self::Future {
-        let index = if let Some(block) = request.block {
-            warn!(seqno = block.seqno, "request with block seqno");
+        let index = if let Some(lt) = request.lt {
+            // debug!(lt = lt, "request with lt");
             // todo fix
-            self.p2c_ready_index(Some(block.seqno)).expect("called before ready")
+            self.p2c_ready_index(Some(lt)).expect("called before ready")
         } else {
             self.p2c_ready_index(None).expect("called before ready")
         };

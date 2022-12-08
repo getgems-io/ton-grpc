@@ -1,17 +1,35 @@
+use std::collections::VecDeque;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
+use serde_aux::prelude::*;
 
 #[derive(Debug, Serialize, Default)]
 #[serde(tag = "@type", rename = "sync")]
 pub struct Sync {}
 
+#[derive(Debug, Serialize)]
+#[serde(tag = "@type", rename = "blocks.getBlockHeader")]
+pub struct GetBlockHeader {
+    id: BlockIdExt
+}
+
+impl GetBlockHeader {
+    pub fn new(id: BlockIdExt) -> Self {
+        Self {
+            id
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub workchain: i64,
     pub shard: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub seqno: i32,
     pub root_hash: String,
     pub file_hash: String,
@@ -20,9 +38,34 @@ pub struct BlockIdExt {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "ton.blockId")]
 pub struct BlockId {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub workchain: i64,
     pub shard: String,
-    pub seqno: u64
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub seqno: i32
+}
+
+#[derive(Debug, Deserialize)]
+pub struct BlockHeader {
+    pub id: BlockIdExt,
+    pub global_id: i32,
+    pub version: i32,
+    pub after_merge: bool,
+    pub after_split: bool,
+    pub before_split: bool,
+    pub want_merge: bool,
+    pub validator_list_hash_short: i32,
+    pub catchain_seqno: i32,
+    pub min_ref_mc_seqno: i32,
+    pub is_key_block: bool,
+    pub prev_key_block_seqno: i32,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub start_lt: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub end_lt: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub gen_utime: i64,
+    pub prev_blocks: Vec<BlockIdExt>
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -68,7 +111,8 @@ impl AccountAddress {
 pub struct RawMessage {
     source: AccountAddress,
     destination: AccountAddress,
-    value: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub value: i64,
     fwd_fee: String,
     ihr_fee: String,
     created_lt: String,

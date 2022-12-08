@@ -9,7 +9,7 @@ use serde_json::{json, Value};
 use dashmap::DashMap;
 use tower::{Service, ServiceExt};
 use tracing::{debug, info, warn};
-use crate::block::{AccountTransactionId, BlockId, BlockIdExt, BlocksLookupBlock, GetMasterchainInfo, MasterchainInfo, Sync, TonError};
+use crate::block::{AccountTransactionId, BlockHeader, BlockId, BlockIdExt, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo, Sync, TonError};
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Debug, Clone)]
@@ -65,7 +65,7 @@ impl Client {
         }
     }
 
-    pub async fn find_first_block(&mut self) -> anyhow::Result<BlockIdExt> {
+    pub async fn find_first_block(&mut self) -> anyhow::Result<BlockHeader> {
         let masterchain_info: MasterchainInfo = serde_json::from_value(self.ready().await?
             .call(Request::new(GetMasterchainInfo {})?).await?)?;
 
@@ -105,8 +105,6 @@ impl Client {
                     .call(Request::new(request)?)
                     .await;
 
-                info!("header: {:?}", header);
-
                 if header.is_err() {
                     lhs = cur + 1;
                 } else {
@@ -133,10 +131,10 @@ impl Client {
 
         let block: BlockIdExt = serde_json::from_value(block?)?;
 
-        Ok(block)
+        self.block_header(block).await
     }
 
-    pub async fn synchronize(&mut self) -> anyhow::Result<BlockIdExt> {
+    pub async fn synchronize(&mut self) -> anyhow::Result<BlockHeader> {
         let request = Request::with_timeout(Sync::default(), Duration::from_secs(60))?;
 
         let response = self.ready()
@@ -146,7 +144,20 @@ impl Client {
 
         let block = serde_json::from_value::<BlockIdExt>(response)?;
 
-        Ok(block)
+        self.block_header(block).await
+    }
+
+    pub async fn block_header(&mut self, block: BlockIdExt) -> anyhow::Result<BlockHeader> {
+        let request = Request::new(GetBlockHeader::new(block.clone()))?;
+
+        let response = self.ready()
+            .await?
+            .call(request)
+            .await?;
+
+        let header = serde_json::from_value::<BlockHeader>(response)?;
+
+        Ok(header)
     }
 }
 
