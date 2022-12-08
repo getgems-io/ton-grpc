@@ -16,7 +16,7 @@ use crate::session::{SessionClient, SessionRequest};
 
 enum State {
     Init,
-    Future(Pin<Box<dyn Future<Output=(Result<BlockIdExt>, Result<BlockIdExt>, ConcurrencyLimit<SessionClient>)>>>),
+    Future(Pin<Box<dyn Future<Output=(Result<BlockIdExt>, Result<BlockIdExt>, ConcurrencyLimit<SessionClient>)> + Send>>),
     Ready
 }
 

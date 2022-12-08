@@ -7,16 +7,17 @@ use tower::{Layer, Service};
 use tracing::{debug, warn};
 use crate::block::GetMasterchainInfo;
 use crate::client::Client;
+use crate::cursor_client::CursorClient;
 use crate::request::Request;
 use crate::session::SessionClient;
 use crate::ton_config::TonConfig;
 
 
 #[derive(Default, Debug)]
-pub struct  ClientFactory;
+pub struct ClientFactory;
 
 impl Service<TonConfig> for ClientFactory {
-    type Response = ConcurrencyLimit<SessionClient>;
+    type Response = CursorClient;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -39,6 +40,8 @@ impl Service<TonConfig> for ClientFactory {
 
             let client = ConcurrencyLimitLayer::new(100)
                 .layer(client);
+
+            let client = CursorClient::new(client);
 
             debug!("successfully made new client");
 
