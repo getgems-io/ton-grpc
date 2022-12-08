@@ -10,7 +10,7 @@ use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tower::Service;
 use url::Url;
-use crate::balance::Balance;
+use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, GetMasterchainInfo, SmcStack};
 use crate::config::AppConfig;
 use crate::discover::DynamicServiceStream;
@@ -20,7 +20,7 @@ use crate::session::SessionRequest;
 
 #[derive(Clone)]
 pub struct TonClient {
-    client: Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<DynamicServiceStream>, SessionRequest>, SessionRequest>>
+    client: Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<DynamicServiceStream>>, BalanceRequest>>
 }
 
 const MAIN_WORKCHAIN: i64 = -1;
@@ -193,6 +193,9 @@ impl TonClient {
         from_lt: &str,
         from_hash: &str,
     ) -> anyhow::Result<RawTransactions> {
+        let block = self.look_up_block_by_lt(MAIN_WORKCHAIN, MAIN_SHARD, from_lt.parse()?).await?;
+        let block = serde_json::from_value::<BlockIdExt>(block)?;
+
         let request = json!({
             "@type": "raw.getTransactions",
             "account_address": {
@@ -366,7 +369,7 @@ impl TonClient {
                 address,
                 method,
                 stack
-            }).await.map_err(|e| anyhow!(e))?;
+            }.into()).await.map_err(|e| anyhow!(e))?;
 
         Ok(resp)
     }
@@ -376,7 +379,7 @@ impl TonClient {
 
         let mut ton = self.clone();
         let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
-        let call = ready.call(request).await.map_err(|e| anyhow!(e))?;
+        let call = ready.call(request.into()).await.map_err(|e| anyhow!(e))?;
 
         Ok(call)
     }

@@ -14,27 +14,52 @@ use futures::{future, ready};
 use tracing::{debug, trace};
 use tower::BoxError;
 use futures::TryFutureExt;
+use crate::block::BlockIdExt;
+use crate::session::SessionRequest;
 
-pub struct Balance<D, Req>
+pub struct BalanceRequest {
+    pub request: SessionRequest,
+    pub block: Option<BlockIdExt>
+}
+
+impl BalanceRequest {
+    pub fn new(block: Option<BlockIdExt>, request: SessionRequest) -> Self {
+        Self {
+            request,
+            block
+        }
+    }
+}
+
+impl From<SessionRequest> for BalanceRequest {
+    fn from(request: SessionRequest) -> Self {
+        Self {
+            request,
+            block: None
+        }
+    }
+}
+
+pub struct Balance<D>
     where
         D: Discover,
         D::Key: Hash,
 {
     discover: D,
 
-    services: ReadyCache<D::Key, D::Service, Req>,
+    services: ReadyCache<D::Key, D::Service, SessionRequest>,
 
     rng: SmallRng,
 
-    _req: PhantomData<Req>,
+    _req: PhantomData<SessionRequest>,
 }
 
-impl<D, Req> Balance<D, Req>
+impl<D> Balance<D>
     where
         D: Discover,
         D::Key: Hash,
-        D::Service: Service<Req>,
-        <D::Service as Service<Req>>::Error: Into<BoxError>,
+        D::Service: Service<SessionRequest>,
+        <D::Service as Service<SessionRequest>>::Error: Into<BoxError>,
 {
     /// Constructs a load balancer that uses operating system entropy.
     pub fn new(discover: D) -> Self {
@@ -54,14 +79,14 @@ impl<D, Req> Balance<D, Req>
     }
 }
 
-impl<D, Req> Balance<D, Req>
+impl<D> Balance<D>
     where
         D: Discover + Unpin,
         D::Key: Hash + Clone,
         D::Error: Into<BoxError>,
-        D::Service: Service<Req> + Load,
+        D::Service: Service<SessionRequest> + Load,
         <D::Service as Load>::Metric: std::fmt::Debug,
-        <D::Service as Service<Req>>::Error: Into<BoxError>,
+        <D::Service as Service<SessionRequest>>::Error: Into<BoxError>,
 {
     /// Polls `discover` for updates, adding new items to `not_ready`.
     ///
@@ -162,20 +187,20 @@ impl<D, Req> Balance<D, Req>
     }
 }
 
-impl<D, Req> Service<Req> for Balance<D, Req>
+impl<D> Service<BalanceRequest> for Balance<D>
     where
         D: Discover + Unpin,
         D::Key: Hash + Clone,
         D::Error: Into<BoxError>,
-        D::Service: Service<Req> + Load,
+        D::Service: Service<SessionRequest> + Load,
         <D::Service as Load>::Metric: std::fmt::Debug,
-        <D::Service as Service<Req>>::Error: Into<BoxError>,
+        <D::Service as Service<SessionRequest>>::Error: Into<BoxError>,
 {
-    type Response = <D::Service as Service<Req>>::Response;
+    type Response = <D::Service as Service<SessionRequest>>::Response;
     type Error = BoxError;
     type Future = future::MapErr<
-        <D::Service as Service<Req>>::Future,
-        fn(<D::Service as Service<Req>>::Error) -> BoxError,
+        <D::Service as Service<SessionRequest>>::Future,
+        fn(<D::Service as Service<SessionRequest>>::Error) -> BoxError,
     >;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -191,10 +216,10 @@ impl<D, Req> Service<Req> for Balance<D, Req>
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, request: Req) -> Self::Future {
+    fn call(&mut self, request: BalanceRequest) -> Self::Future {
         let index = self.p2c_ready_index(None).expect("called before ready");
         self.services
-            .call_ready_index(index, request)
+            .call_ready_index(index, request.request)
             .map_err(Into::into)
     }
 }
