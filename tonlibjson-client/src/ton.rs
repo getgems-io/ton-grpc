@@ -209,9 +209,17 @@ impl TonClient {
             "count": 16
         });
 
-        let response = self.call_with_block(from_lt.parse()?, request).await?;
+        let response = self.call_with_block(from_lt.parse()?, request.clone()).await?;
+        let response: RawTransactions = serde_json::from_value(response)?;
 
-        Ok(serde_json::from_value(response)?)
+        if response.transactions.len() == 1 {
+            let response = self.call_with_block(1000000, request).await?;
+            let response: RawTransactions = serde_json::from_value(response)?;
+
+            return Ok(response);
+        }
+
+        Ok(response)
     }
 
     async fn blocks_get_transactions(

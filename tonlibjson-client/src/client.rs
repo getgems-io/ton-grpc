@@ -89,27 +89,7 @@ impl Client {
             if block.is_err() {
                 lhs = cur + 1;
             } else {
-                let b = serde_json::from_value::<BlockIdExt>(block.unwrap()).unwrap();
-
-                let request = json!({
-                    "@type": "blocks.getTransactions",
-                    "id": b,
-                    "mode": 7 + 128,
-                    "count": 1,
-                    "after": AccountTransactionId::default(),
-                });
-
-                let header = self
-                    .ready()
-                    .await?
-                    .call(Request::new(request)?)
-                    .await;
-
-                if header.is_err() {
-                    lhs = cur + 1;
-                } else {
-                    rhs = cur;
-                }
+                rhs = cur;
             }
 
             cur = (lhs + rhs) / 2;
