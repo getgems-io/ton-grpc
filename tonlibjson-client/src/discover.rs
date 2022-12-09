@@ -1,4 +1,4 @@
-use crate::make::ClientFactory;
+use crate::make::{CursorClientFactory, SessionClientFactory};
 use crate::ton_config::{load_ton_config, read_ton_config, TonConfig};
 use async_stream::try_stream;
 use reqwest::Url;
@@ -9,27 +9,29 @@ use std::{
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
-use futures::TryFutureExt;
+use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use tokio_stream::Stream;
 use tower::discover::Change;
 use tower::limit::ConcurrencyLimit;
+use tower::load::PeakEwmaDiscover;
 use tracing::{debug, info};
 use tower::ServiceExt;
 use tower::Service;
+use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::ton_config::Liteserver;
 use crate::session::SessionClient;
 
-type DiscoverResult = Result<Change<String, CursorClient>, anyhow::Error>;
+type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 
-pub struct DynamicServiceStream {
-    changes: Pin<Box<dyn Stream<Item = DiscoverResult> + Send>>,
+pub struct ClientDiscover {
+    changes: Pin<Box<dyn Stream<Item = DiscoverResult<SessionClient>> + Send>>,
 }
 
-impl DynamicServiceStream {
+impl ClientDiscover {
     pub(crate) async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
         let config = read_ton_config(path).await?;
-        let mut factory = ClientFactory::default();
+        let mut factory = SessionClientFactory::default();
 
         let stream = try_stream! {
             for ls in config.liteservers.iter() {
@@ -46,7 +48,7 @@ impl DynamicServiceStream {
 
     pub(crate) async fn new(url: Url, period: Duration, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
         let mut config = config(url.clone(), fallback_path).await?;
-        let mut factory = ClientFactory::default();
+        let mut factory = SessionClientFactory::default();
         let mut interval = tokio::time::interval(period);
 
         let stream = try_stream! {
@@ -111,8 +113,8 @@ impl DynamicServiceStream {
     }
 }
 
-impl Stream for DynamicServiceStream {
-    type Item = DiscoverResult;
+impl Stream for ClientDiscover {
+    type Item = DiscoverResult<SessionClient>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let c = &mut self.changes;
@@ -120,6 +122,33 @@ impl Stream for DynamicServiceStream {
             Poll::Ready(Some(Ok(change))) => match change {
                 Change::Insert(k, client) => Poll::Ready(Some(Ok(
                     Change::Insert(k, client)
+                ))),
+                Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
+            },
+            _ => Poll::Pending
+        }
+    }
+}
+
+pub struct CursorClientDiscover {
+    discover: PeakEwmaDiscover<ClientDiscover>
+}
+
+impl CursorClientDiscover {
+    pub fn new(discover: PeakEwmaDiscover<ClientDiscover>) -> Self {
+        Self { discover }
+    }
+}
+
+impl Stream for CursorClientDiscover {
+    type Item = DiscoverResult<CursorClient>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let c = &mut self.discover;
+        match Pin::new(&mut *c).poll_next(cx) {
+            Poll::Ready(Some(Ok(change))) => match change {
+                Change::Insert(k, client) => Poll::Ready(Some(Ok(
+                    Change::Insert(k, CursorClientFactory::create(client))
                 ))),
                 Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
             },

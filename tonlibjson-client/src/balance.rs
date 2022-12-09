@@ -16,6 +16,7 @@ use crate::block::BlockIdExt;
 use crate::cursor_client::CursorClient;
 use crate::session::SessionRequest;
 use rand::seq::IteratorRandom;
+use crate::discover::CursorClientDiscover;
 
 pub struct BalanceRequest {
     pub request: SessionRequest,
@@ -40,34 +41,25 @@ impl From<SessionRequest> for BalanceRequest {
     }
 }
 
-pub struct Balance<D>
-    where
-        D: Discover,
-        D::Key: Hash,
+pub struct Balance
 {
-    discover: D,
+    discover: CursorClientDiscover,
 
-    services: ReadyCache<D::Key, D::Service, SessionRequest>,
+    services: ReadyCache<<CursorClientDiscover as Discover>::Key, <CursorClientDiscover as Discover>::Service, SessionRequest>,
 
     rng: SmallRng,
 
     _req: PhantomData<SessionRequest>,
 }
 
-impl<D> Balance<D>
-    where
-        D: Discover,
-        D::Key: Hash,
-        D::Service: Service<SessionRequest>,
-        <D::Service as Service<SessionRequest>>::Error: Into<BoxError>,
-{
+impl Balance {
     /// Constructs a load balancer that uses operating system entropy.
-    pub fn new(discover: D) -> Self {
+    pub fn new(discover: CursorClientDiscover) -> Self {
         Self::from_rng(discover, &mut rand::thread_rng()).expect("ThreadRNG must be valid")
     }
 
     /// Constructs a load balancer seeded with the provided random number generator.
-    pub fn from_rng<R: Rng>(discover: D, rng: R) -> Result<Self, rand::Error> {
+    pub fn from_rng<R: Rng>(discover: CursorClientDiscover, rng: R) -> Result<Self, rand::Error> {
         let rng = SmallRng::from_rng(rng)?;
         Ok(Self {
             rng,
@@ -79,15 +71,7 @@ impl<D> Balance<D>
     }
 }
 
-impl<D> Balance<D>
-    where
-        D: Discover + Unpin,
-        D::Key: Hash + Clone,
-        D::Error: Into<BoxError>,
-        D::Service: Service<SessionRequest> + Load,
-        <D::Service as Load>::Metric: std::fmt::Debug,
-        <D::Service as Service<SessionRequest>>::Error: Into<BoxError>,
-{
+impl Balance {
     /// Polls `discover` for updates, adding new items to `not_ready`.
     ///
     /// Removals may alter the order of either `ready` or `not_ready`.
@@ -153,11 +137,8 @@ impl<D> Balance<D>
                     .map(|index| (index, self.services.get_ready_index(index).expect("invalid index")))
                     .filter(|(index, (_, svc))| {
                         if let Some(min_lt) = min_lt {
-                            // TODO[a.kostylev] well
-                            let svc: &&PeakEwma<CursorClient> = unsafe { mem::transmute(svc) };
-
-                            if svc.service.first_block().as_ref().unwrap().start_lt <= (min_lt - 10000000) {
-                                // debug!(min_tl = min_lt, "start_tl: {}", svc.service.first_block().as_ref().unwrap().start_lt);
+                            if svc.load().first_block.as_ref().unwrap().start_lt <= min_lt {
+                                debug!(min_tl = min_lt, "start_tl: {}", svc.load().first_block.as_ref().unwrap().start_lt);
 
                                 true
                             } else {
@@ -190,30 +171,18 @@ impl<D> Balance<D>
     }
 
     /// Accesses a ready endpoint by index and returns its current load.
-    fn ready_index_load(&self, index: usize) -> <D::Service as Load>::Metric {
+    fn ready_index_load(&self, index: usize) -> <<CursorClientDiscover as Discover>::Service as Load>::Metric {
         let (_, svc) = self.services.get_ready_index(index).expect("invalid index");
         svc.load()
     }
-
-    pub(crate) fn discover_mut(&mut self) -> &mut D {
-        &mut self.discover
-    }
 }
 
-impl<D> Service<BalanceRequest> for Balance<D>
-    where
-        D: Discover + Unpin,
-        D::Key: Hash + Clone,
-        D::Error: Into<BoxError>,
-        D::Service: Service<SessionRequest> + Load,
-        <D::Service as Load>::Metric: std::fmt::Debug,
-        <D::Service as Service<SessionRequest>>::Error: Into<BoxError>,
-{
-    type Response = <D::Service as Service<SessionRequest>>::Response;
+impl Service<BalanceRequest> for Balance {
+    type Response = <<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Response;
     type Error = BoxError;
     type Future = future::MapErr<
-        <D::Service as Service<SessionRequest>>::Future,
-        fn(<D::Service as Service<SessionRequest>>::Error) -> BoxError,
+        <<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Future,
+        fn(<<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Error) -> BoxError,
     >;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -231,7 +200,7 @@ impl<D> Service<BalanceRequest> for Balance<D>
 
     fn call(&mut self, request: BalanceRequest) -> Self::Future {
         let index = if let Some(lt) = request.lt {
-            // debug!(lt = lt, "request with lt");
+            debug!(lt = lt, "request with lt");
             // todo fix
             self.p2c_ready_index(Some(lt)).expect("called before ready")
         } else {
@@ -258,19 +227,4 @@ impl std::error::Error for DiscoverError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&*self.0)
     }
-}
-
-
-#[derive(Debug)]
-pub struct PeakEwma<S, C = CompleteOnResponse> {
-    pub service: S,
-    decay_ns: f64,
-    rtt_estimate: Arc<Mutex<RttEstimate>>,
-    completion: C,
-}
-
-#[derive(Debug)]
-struct RttEstimate {
-    update_at: tokio::time::Instant,
-    rtt_ns: f64,
 }

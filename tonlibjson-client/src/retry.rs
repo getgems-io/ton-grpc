@@ -3,7 +3,7 @@ use futures::future;
 use tower::retry::budget::Budget;
 use tower::retry::Policy;
 use crate::balance::BalanceRequest;
-use crate::session::SessionRequest;
+use crate::session::{SessionClient, SessionRequest};
 use crate::session::SessionRequest::RunGetMethod;
 
 #[derive(Clone)]
@@ -43,7 +43,9 @@ impl<E, Res> Policy<SessionRequest, Res, E> for RetryPolicy {
             SessionRequest::Atomic(req) => Some(SessionRequest::Atomic(req.with_new_id())),
             RunGetMethod { address, method, stack } => Some(
                 RunGetMethod {address: address.clone(), method: method.clone(), stack: stack.clone()}
-            )
+            ),
+            SessionRequest::FindFirsBlock {} => Some(SessionRequest::FindFirsBlock {}),
+            SessionRequest::Synchronize {} => Some(SessionRequest::Synchronize {})
         }
     }
 }

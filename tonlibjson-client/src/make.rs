@@ -1,9 +1,11 @@
-use std::future::Future;
+use std::future::{Future, ready, Ready};
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use serde_json::{json, Value};
 use tower::limit::{ConcurrencyLimit, ConcurrencyLimitLayer};
 use tower::{Layer, Service};
+use tower::load::{CompleteOnResponse, PeakEwma};
 use tracing::{debug, warn};
 use crate::block::GetMasterchainInfo;
 use crate::client::Client;
@@ -14,10 +16,10 @@ use crate::ton_config::TonConfig;
 
 
 #[derive(Default, Debug)]
-pub struct ClientFactory;
+pub struct SessionClientFactory;
 
-impl Service<TonConfig> for ClientFactory {
-    type Response = CursorClient;
+impl Service<TonConfig> for SessionClientFactory {
+    type Response = SessionClient;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -27,7 +29,7 @@ impl Service<TonConfig> for ClientFactory {
 
     fn call(&mut self, req: TonConfig) -> Self::Future {
         Box::pin(async move {
-            warn!("make new liteserver");
+            debug!("make new client");
 
             let mut client = ClientBuilder::from_config(&req.to_string())
                 .disable_logging()
@@ -38,18 +40,43 @@ impl Service<TonConfig> for ClientFactory {
 
             let client = SessionClient::new(client);
 
-            let client = ConcurrencyLimitLayer::new(100)
-                .layer(client);
-
-            let client = CursorClient::new(client);
-
             debug!("successfully made new client");
 
-            anyhow::Ok(client)
+            Ok(client)
         })
     }
 }
 
+#[derive(Default, Debug, Copy, Clone)]
+pub struct CursorClientFactory;
+
+impl CursorClientFactory {
+    pub fn create(client: PeakEwma<SessionClient>) -> CursorClient {
+        debug!("make new cursor client");
+        let client = ConcurrencyLimitLayer::new(100)
+            .layer(client);
+
+        let client = CursorClient::new(client);
+
+        debug!("successfully made new cursor client");
+
+        client
+    }
+}
+
+impl Service<PeakEwma<SessionClient>> for CursorClientFactory {
+    type Response = CursorClient;
+    type Error = anyhow::Error;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn call(&mut self, client: PeakEwma<SessionClient>) -> Self::Future {
+        ready(Ok(Self::create(client)))
+    }
+}
 
 struct ClientBuilder {
     config: Value,

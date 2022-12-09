@@ -45,7 +45,7 @@ pub struct BlockId {
     pub seqno: i32
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct BlockHeader {
     pub id: BlockIdExt,
     pub global_id: i32,
@@ -156,7 +156,7 @@ pub struct BlocksLookupBlock {
 }
 
 impl BlocksLookupBlock {
-    pub fn new(id: &BlockId, lt: i64, utime: i32) -> Self {
+    pub fn new(id: BlockId, lt: i64, utime: i32) -> Self {
         let mut mode: i32 = 0;
         if id.seqno > 0 {
             mode += 1
@@ -167,7 +167,7 @@ impl BlocksLookupBlock {
 
         Self {
             mode,
-            id: id.clone(),
+            id,
             lt,
             utime
         }
