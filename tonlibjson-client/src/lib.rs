@@ -12,3 +12,4 @@ mod retry;
 mod discover;
 mod client;
 mod balance;
+mod error;

@@ -15,14 +15,15 @@ use url::Url;
 use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, GetMasterchainInfo, SmcStack};
 use crate::config::AppConfig;
-use crate::discover::DynamicServiceStream;
+use crate::discover::{ClientDiscover, CursorClientDiscover};
+use crate::make::CursorClientFactory;
 use crate::request::Request;
 use crate::retry::RetryPolicy;
 use crate::session::SessionRequest;
 
 #[derive(Clone)]
 pub struct TonClient {
-    client: Retry<RetryPolicy, Buffer<Balance<PeakEwmaDiscover<DynamicServiceStream>>, BalanceRequest>>
+    client: Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>
 }
 
 const MAIN_WORKCHAIN: i64 = -1;
@@ -30,16 +31,16 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
     pub async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
-        let discover = DynamicServiceStream::from_path(path).await?;
-
-        let ewma = PeakEwmaDiscover::new(
-            discover,
+        let client_discover = ClientDiscover::from_path(path).await?;
+        let ewma_discover = PeakEwmaDiscover::new(
+            client_discover,
             Duration::from_secs(15),
             Duration::from_secs(60),
             tower::load::CompleteOnResponse::default(),
         );
+        let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
-        let client = Balance::new(ewma);
+        let client = Balance::new(cursor_client_discover);
         let client = Buffer::new(client, 200000);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
@@ -54,20 +55,20 @@ impl TonClient {
     }
 
     pub async fn from_url(url: Url, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
-        let discover = DynamicServiceStream::new(
+        let client_discover = ClientDiscover::new(
             url,
             Duration::from_secs(60),
             fallback_path
         ).await?;
-
-        let ewma = PeakEwmaDiscover::new(
-            discover,
+        let ewma_discover = PeakEwmaDiscover::new(
+            client_discover,
             Duration::from_secs(15),
             Duration::from_secs(60),
             tower::load::CompleteOnResponse::default(),
         );
+        let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
-        let client = Balance::new(ewma);
+        let client = Balance::new(cursor_client_discover);
         let client = Buffer::new(client, 200000);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),

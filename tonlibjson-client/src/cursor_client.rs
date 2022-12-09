@@ -1,14 +1,18 @@
+use std::cmp::Ordering;
 use std::future::Future;
 use std::mem;
 use std::ops::Range;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
-use tower::Service;
+use tower::{Service, ServiceExt};
 use anyhow::{anyhow, Result};
+use async_stream::stream;
 use futures::future::BoxFuture;
-use futures::{FutureExt, StreamExt, TryFutureExt};
+use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use serde_json::Value;
 use tower::limit::ConcurrencyLimit;
 use tower::load::{CompleteOnResponse, PeakEwma};
+use tower::load::peak_ewma::Cost;
 use tracing::error;
 use tracing::log::{log, warn};
 use crate::block::{BlockHeader, BlockId, BlockIdExt};
@@ -17,12 +21,12 @@ use crate::session::{SessionClient, SessionRequest};
 
 enum State {
     Init,
-    Future(Pin<Box<dyn Future<Output=(Result<BlockHeader>, Result<BlockHeader>, ConcurrencyLimit<SessionClient>)> + Send>>),
+    Future(Pin<Box<dyn Future<Output=(Result<Value>, Result<Value>, ConcurrencyLimit<PeakEwma<SessionClient>>)> + Send>>),
     Ready
 }
 
 pub struct CursorClient {
-    client: Option<ConcurrencyLimit<SessionClient>>,
+    client: Option<ConcurrencyLimit<PeakEwma<SessionClient>>>,
 
     first_block: Option<BlockHeader>,
     last_block: Option<BlockHeader>,
@@ -31,23 +35,13 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
-    pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
+    pub fn new(client: ConcurrencyLimit<PeakEwma<SessionClient>>) -> Self {
         Self {
             client: Some(client),
             first_block: None,
             last_block: None,
             state: State::Init
         }
-    }
-
-    pub fn first_block(&self) -> Result<&BlockHeader> {
-        self.first_block.as_ref()
-            .ok_or(anyhow!("first block is unknown"))
-    }
-
-    pub fn last_block(&self) -> Result<&BlockHeader> {
-        self.last_block.as_ref()
-            .ok_or(anyhow!("last block is unknown"))
     }
 }
 
@@ -64,15 +58,14 @@ impl Service<SessionRequest> for CursorClient {
                     .expect("client must be provided");
 
                 State::Future(async move {
-                    let low = client.get_mut().get_mut();
+                    let mut low = client.get_mut();
 
-                    warn!("start sync");
-                    let rhs = low.synchronize()
-                        .await;
+                    let req = futures::stream::iter(vec![SessionRequest::FindFirsBlock {}, SessionRequest::Synchronize {}]);
+                    let mut resp = low.call_all(req)
+                        .map_err(|e| anyhow!(e));
 
-                    warn!("start searching");
-                    let lhs = low.find_first_block()
-                        .await;
+                    let lhs = resp.next().await.unwrap();
+                    let rhs = resp.next().await.unwrap();
 
                     (lhs, rhs, client)
                 }.boxed())
@@ -83,6 +76,8 @@ impl Service<SessionRequest> for CursorClient {
 
                 match (first_block, last_block) {
                     (Ok(f), Ok(l)) => {
+                        let f = serde_json::from_value::<BlockHeader>(f).unwrap();
+                        let l = serde_json::from_value::<BlockHeader>(l).unwrap();
                         self.first_block.replace(f);
                         self.last_block.replace(l);
 
@@ -105,5 +100,37 @@ impl Service<SessionRequest> for CursorClient {
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
         Box::pin(self.client.as_mut().expect("ready must be called").call(req))
+    }
+}
+
+
+impl tower::load::Load for CursorClient {
+    type Metric = Metrics;
+
+    fn load(&self) -> Self::Metric {
+        Metrics {
+            first_block: self.first_block.clone(),
+            last_block: self.last_block.clone(),
+            ewma: self.client.as_ref().map(|c| c.get_ref().load())
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Metrics {
+    pub first_block: Option<BlockHeader>,
+    pub last_block: Option<BlockHeader>,
+    pub ewma: Option<Cost>
+}
+
+impl PartialEq<Self> for Metrics {
+    fn eq(&self, other: &Self) -> bool {
+        self.ewma.eq(&other.ewma)
+    }
+}
+
+impl PartialOrd<Self> for Metrics {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.ewma.partial_cmp(&other.ewma)
     }
 }
