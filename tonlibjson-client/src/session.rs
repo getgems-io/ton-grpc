@@ -4,8 +4,8 @@ use std::marker::PhantomData;
 use std::pin::Pin;
 use std::process::Output;
 use std::sync::{Arc};
-use tokio::sync::Mutex;
-use std::task::{Context, Poll};
+use tokio::sync::{Mutex, MutexGuard, TryLockError};
+use std::task::{Context, Poll, ready};
 use std::time::Duration;
 use anyhow::anyhow;
 use futures::future::BoxFuture;
@@ -15,11 +15,12 @@ use pin_project::pin_project;
 use serde_json::Value;
 use tower::{BoxError, Layer, Service, ServiceExt};
 use tower::buffer::Buffer;
-use tower::load::PeakEwma;
+use tower::load::{Load, PeakEwma};
+use tower::load::peak_ewma::Cost;
 use tracing::debug;
 use crate::{client::Client, request::Request};
 use crate::block::{Sync, BlockHeader, BlockId, BlockIdExt, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo, SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
-use crate::error::{ErrorLayer, ErrorService};
+use crate::shared::{SharedLayer, SharedService};
 
 pub enum SessionRequest {
     RunGetMethod { address: String, method: String, stack: SmcStack },
@@ -36,12 +37,12 @@ impl From<Request> for SessionRequest {
 
 #[derive(Clone)]
 pub struct SessionClient {
-    client: Client
+    inner: SharedService<PeakEwma<Client>>
 }
 
 impl SessionClient {
-    pub fn new(client: Client) -> Self {
-        Self { client }
+    pub fn new(client: PeakEwma<Client>) -> Self {
+        Self { inner: SharedLayer::default().layer(client) }
     }
 }
 
@@ -51,36 +52,34 @@ impl Service<SessionRequest> for SessionClient {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.client.poll_ready(cx)
+        self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
         match req {
             SessionRequest::Atomic(req) => {
-                self.client.call(req)
+                self.inner.call(req).boxed()
             },
             SessionRequest::RunGetMethod { address, method, stack} => {
-                let mut this = self.clone();
-                async move { this.run_get_method(address, method, stack).await }.boxed()
+                self.run_get_method(address, method, stack).boxed()
             },
             SessionRequest::Synchronize {} => {
-                let mut this = self.clone();
-                async move { this.synchronize().await }.boxed()
+                self.synchronize().boxed()
             },
             SessionRequest::FindFirsBlock {} => {
-                let mut this = self.clone();
-                async move { this.find_first_block().await }.boxed()
+                self.find_first_block().boxed()
             }
         }
     }
 }
 
 impl SessionClient {
-    fn run_get_method(&mut self, address: String, method: String, stack: SmcStack) -> BoxFuture<anyhow::Result<Value>> {
+    fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> impl Future<Output=anyhow::Result<Value>> {
+        let mut client = self.inner.clone();
         let req = SmcLoad::new(address);
 
         async move {
-            let resp = self.client
+            let resp = client
                 .ready()
                 .await?
                 .call(Request::new(&req)?)
@@ -94,19 +93,21 @@ impl SessionClient {
                 stack
             );
 
-            self.client
+            client
                 .ready()
                 .await?
                 .call(Request::new(&req)?)
                 .await
-        }.boxed()
+        }
     }
 
-    pub fn synchronize(&mut self) -> BoxFuture<anyhow::Result<Value>> {
+    pub fn synchronize(&self) -> impl Future<Output=anyhow::Result<Value>> {
+        let mut client = self.inner.clone();
+
         async move {
             let request = Request::with_timeout(Sync::default(), Duration::from_secs(60))?;
 
-            let response = self.client
+            let response = client
                 .ready()
                 .await?
                 .call(request)
@@ -114,13 +115,22 @@ impl SessionClient {
 
             let block = serde_json::from_value::<BlockIdExt>(response)?;
 
-            self.block_header(block).await
-        }.boxed()
+            let request = Request::new(GetBlockHeader::new(block))?;
+            let response = client
+                .ready()
+                .await?
+                .call(request)
+                .await?;
+
+            Ok(response)
+        }
     }
 
-    pub fn find_first_block(&mut self) -> BoxFuture<anyhow::Result<Value>> {
+    pub fn find_first_block(&self) -> impl Future<Output=anyhow::Result<Value>> {
+        let mut client = self.inner.clone();
+
         async move {
-            let masterchain_info = self.client
+            let masterchain_info = client
                 .ready()
                 .await?
                 .call(Request::new(GetMasterchainInfo {})?)
@@ -140,7 +150,7 @@ impl SessionClient {
                 shard: shard.clone(),
                 seqno: cur
             }, 0, 0);
-            let mut block = self.client
+            let mut block = client
                 .ready()
                 .await?
                 .call(Request::new(request)?)
@@ -164,7 +174,7 @@ impl SessionClient {
                     seqno: cur
                 }, 0, 0);
 
-                block = self.client
+                block = client
                     .ready()
                     .await?
                     .call(Request::new(request)?)
@@ -173,21 +183,23 @@ impl SessionClient {
 
             let block: BlockIdExt = serde_json::from_value(block?)?;
 
-            self.block_header(block).await
-        }.boxed()
+            let request = Request::new(GetBlockHeader::new(block))?;
+            let response = client
+                .ready()
+                .await?
+                .call(request)
+                .await?;
+
+            Ok(response)
+        }
     }
+}
 
-    pub async fn block_header(&mut self, block: BlockIdExt) -> anyhow::Result<Value> {
-        let request = Request::new(GetBlockHeader::new(block.clone()))?;
 
-        let response = self.client
-            .ready()
-            .await?
-            .call(request)
-            .await?;
+impl Load for SessionClient {
+    type Metric = Cost;
 
-        // let header = serde_json::from_value::<BlockHeader>(response)?;
-
-        Ok(response)
+    fn load(&self) -> Self::Metric {
+        self.inner.load()
     }
 }

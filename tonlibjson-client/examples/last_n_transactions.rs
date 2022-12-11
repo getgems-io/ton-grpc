@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
         .for_each_concurrent(500, |seqno| {
             let ton = ton.clone();
             async move {
-                match ton.get_shards(seqno).await {
+                match ton.get_shards(seqno as u64).await {
                     Ok(shards) => {
                         if let Some(block) = shards.shards.first() {
                             ton.get_tx_stream(block.clone()).await

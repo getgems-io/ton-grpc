@@ -4,12 +4,14 @@ use std::mem;
 use std::ops::Range;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
+use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::{anyhow, Result};
 use async_stream::stream;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use serde_json::Value;
+use tokio::time::{Interval, interval};
 use tower::limit::ConcurrencyLimit;
 use tower::load::{CompleteOnResponse, PeakEwma};
 use tower::load::peak_ewma::Cost;
@@ -21,26 +23,28 @@ use crate::session::{SessionClient, SessionRequest};
 
 enum State {
     Init,
-    Future(Pin<Box<dyn Future<Output=(Result<Value>, Result<Value>, ConcurrencyLimit<PeakEwma<SessionClient>>)> + Send>>),
+    Future(Pin<Box<dyn Future<Output=(Result<Value>, Result<Value>)> + Send>>),
     Ready
 }
 
 pub struct CursorClient {
-    client: Option<ConcurrencyLimit<PeakEwma<SessionClient>>>,
+    client: ConcurrencyLimit<SessionClient>,
 
     first_block: Option<BlockHeader>,
     last_block: Option<BlockHeader>,
 
     state: State,
+    timer: Interval
 }
 
 impl CursorClient {
-    pub fn new(client: ConcurrencyLimit<PeakEwma<SessionClient>>) -> Self {
+    pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
         Self {
-            client: Some(client),
+            client: client,
             first_block: None,
             last_block: None,
-            state: State::Init
+            state: State::Init,
+            timer: interval(Duration::from_secs(3))
         }
     }
 }
@@ -53,26 +57,21 @@ impl Service<SessionRequest> for CursorClient {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.state = match &mut self.state {
             State::Init => {
-                let mut client = self.client
-                    .take()
-                    .expect("client must be provided");
+                let mut client = self.client.clone();
 
                 State::Future(async move {
-                    let mut low = client.get_mut();
-
                     let req = futures::stream::iter(vec![SessionRequest::FindFirsBlock {}, SessionRequest::Synchronize {}]);
-                    let mut resp = low.call_all(req)
+                    let mut resp = client.call_all(req)
                         .map_err(|e| anyhow!(e));
 
                     let lhs = resp.next().await.unwrap();
                     let rhs = resp.next().await.unwrap();
 
-                    (lhs, rhs, client)
+                    (lhs, rhs)
                 }.boxed())
             },
             State::Future(fut) => {
-                let (first_block, last_block, client) = ready!(fut.poll_unpin(cx));
-                self.client.replace(client);
+                let (first_block, last_block) = ready!(fut.poll_unpin(cx));
 
                 match (first_block, last_block) {
                     (Ok(f), Ok(l)) => {
@@ -81,6 +80,7 @@ impl Service<SessionRequest> for CursorClient {
                         self.first_block.replace(f);
                         self.last_block.replace(l);
 
+                        self.timer.reset();
                         State::Ready
                     },
                     (Err(e), _) | (_, Err(e)) => {
@@ -90,7 +90,7 @@ impl Service<SessionRequest> for CursorClient {
                     },
                 }
             },
-            State::Ready => return self.client.as_mut().unwrap().poll_ready(cx)
+            State::Ready => return self.client.poll_ready(cx)
         };
 
         cx.waker().wake_by_ref();
@@ -99,7 +99,7 @@ impl Service<SessionRequest> for CursorClient {
     }
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
-        Box::pin(self.client.as_mut().expect("ready must be called").call(req))
+        self.client.call(req).boxed()
     }
 }
 
@@ -111,7 +111,7 @@ impl tower::load::Load for CursorClient {
         Metrics {
             first_block: self.first_block.clone(),
             last_block: self.last_block.clone(),
-            ewma: self.client.as_ref().map(|c| c.get_ref().load())
+            ewma: Some(self.client.load())
         }
     }
 }
