@@ -12,7 +12,7 @@ use tracing::{debug, info, warn};
 use crate::block::{AccountTransactionId, BlockHeader, BlockId, BlockIdExt, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo, Sync, TonError};
 use crate::request::{Request, RequestId, Response};
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Client {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,

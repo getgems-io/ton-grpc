@@ -25,7 +25,7 @@ use crate::session::SessionClient;
 type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 
 pub struct ClientDiscover {
-    changes: Pin<Box<dyn Stream<Item = DiscoverResult<SessionClient>> + Send>>,
+    changes: Pin<Box<dyn Stream<Item = DiscoverResult<Client>> + Send>>,
 }
 
 impl ClientDiscover {
@@ -114,7 +114,7 @@ impl ClientDiscover {
 }
 
 impl Stream for ClientDiscover {
-    type Item = DiscoverResult<SessionClient>;
+    type Item = DiscoverResult<Client>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let c = &mut self.changes;

@@ -19,7 +19,7 @@ use crate::ton_config::TonConfig;
 pub struct SessionClientFactory;
 
 impl Service<TonConfig> for SessionClientFactory {
-    type Response = SessionClient;
+    type Response = Client;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -38,8 +38,6 @@ impl Service<TonConfig> for SessionClientFactory {
 
             let _ = client.call(Request::new(GetMasterchainInfo {})?).await?;
 
-            let client = SessionClient::new(client);
-
             debug!("successfully made new client");
 
             Ok(client)
@@ -51,8 +49,10 @@ impl Service<TonConfig> for SessionClientFactory {
 pub struct CursorClientFactory;
 
 impl CursorClientFactory {
-    pub fn create(client: PeakEwma<SessionClient>) -> CursorClient {
+    pub fn create(client: PeakEwma<Client>) -> CursorClient {
         debug!("make new cursor client");
+        let client = SessionClient::new(client);
+
         let client = ConcurrencyLimitLayer::new(100)
             .layer(client);
 
@@ -64,7 +64,7 @@ impl CursorClientFactory {
     }
 }
 
-impl Service<PeakEwma<SessionClient>> for CursorClientFactory {
+impl Service<PeakEwma<Client>> for CursorClientFactory {
     type Response = CursorClient;
     type Error = anyhow::Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
@@ -73,7 +73,7 @@ impl Service<PeakEwma<SessionClient>> for CursorClientFactory {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, client: PeakEwma<SessionClient>) -> Self::Future {
+    fn call(&mut self, client: PeakEwma<Client>) -> Self::Future {
         ready(Ok(Self::create(client)))
     }
 }
