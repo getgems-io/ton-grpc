@@ -1,6 +1,5 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use std::task::{Context, Poll};
-use std::sync::Mutex;
 use tower::{Layer, Service};
 use tower::load::Load;
 
@@ -16,7 +15,7 @@ impl<S> Layer<S> for SharedLayer {
 }
 
 pub struct SharedService<S> {
-    inner: Arc<Mutex<S>>
+    inner: Arc<RwLock<S>>
 }
 
 impl<S> Clone for SharedService<S> {
@@ -29,7 +28,7 @@ impl<S> Clone for SharedService<S> {
 
 impl<S> SharedService<S> {
     pub fn new(inner: S) -> Self {
-        Self { inner: Arc::new(Mutex::new(inner)) }
+        Self { inner: Arc::new(RwLock::new(inner)) }
     }
 }
 
@@ -40,7 +39,7 @@ impl<S, Req> Service<Req> for SharedService<S>
     type Future = S::Future;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match self.inner.try_lock() {
+        match self.inner.try_write() {
             Ok(mut lock) => {
                 lock.poll_ready(cx)
             }
@@ -51,7 +50,7 @@ impl<S, Req> Service<Req> for SharedService<S>
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
-        self.inner.lock().expect("call ready first").call(req)
+        self.inner.write().expect("call ready first").call(req)
     }
 }
 
@@ -59,6 +58,6 @@ impl<S> Load for SharedService<S> where S : Load {
     type Metric = S::Metric;
 
     fn load(&self) -> Self::Metric {
-        self.inner.lock().unwrap().load()
+        self.inner.read().unwrap().load()
     }
 }

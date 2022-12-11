@@ -11,19 +11,21 @@ use async_stream::stream;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use serde_json::Value;
-use tokio::time::{Interval, interval};
+use tokio::sync::watch::Receiver;
+use tokio::time::{Interval, interval, MissedTickBehavior};
 use tower::limit::ConcurrencyLimit;
 use tower::load::{CompleteOnResponse, PeakEwma};
 use tower::load::peak_ewma::Cost;
-use tracing::error;
+use tracing::{error, info};
 use tracing::log::{log, warn};
+use tracing_subscriber::fmt::time;
 use crate::block::{BlockHeader, BlockId, BlockIdExt};
 use crate::client::Client;
 use crate::session::{SessionClient, SessionRequest};
 
 enum State {
     Init,
-    Future(Pin<Box<dyn Future<Output=(Result<Value>, Result<Value>)> + Send>>),
+    Future(Pin<Box<dyn Future<Output=(Result<Value>)> + Send>>),
     Ready
 }
 
@@ -31,20 +33,47 @@ pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
 
     first_block: Option<BlockHeader>,
-    last_block: Option<BlockHeader>,
 
     state: State,
-    timer: Interval
+
+    last_block_rx: Receiver<Option<BlockHeader>>
 }
 
 impl CursorClient {
     pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
+        let (tx, rx) = tokio::sync::watch::channel(None);
+
+        tokio::spawn({
+            let mut client = client.clone();
+            async move {
+                let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
+                timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                loop {
+                    timer.tick().await;
+
+                    let last_block = client
+                        .ready()
+                        .await
+                        .map_err(|e| anyhow!(e))
+                        .unwrap()
+                        .call(SessionRequest::Synchronize {})
+                        .await
+                        .map(|val| serde_json::from_value::<BlockHeader>(val).unwrap());
+
+                    if let Ok(last_block) = last_block {
+                        info!("new block seqno: {}", last_block.id.seqno);
+                        tx.send(Some(last_block)).unwrap();
+                    }
+                }
+            }
+        });
+
         Self {
-            client: client,
+            client,
             first_block: None,
-            last_block: None,
             state: State::Init,
-            timer: interval(Duration::from_secs(3))
+
+            last_block_rx: rx
         }
     }
 }
@@ -60,37 +89,39 @@ impl Service<SessionRequest> for CursorClient {
                 let mut client = self.client.clone();
 
                 State::Future(async move {
-                    let req = futures::stream::iter(vec![SessionRequest::FindFirsBlock {}, SessionRequest::Synchronize {}]);
+                    let req = futures::stream::iter(vec![SessionRequest::FindFirsBlock {}]);
                     let mut resp = client.call_all(req)
                         .map_err(|e| anyhow!(e));
 
                     let lhs = resp.next().await.unwrap();
-                    let rhs = resp.next().await.unwrap();
 
-                    (lhs, rhs)
+                    (lhs)
                 }.boxed())
             },
             State::Future(fut) => {
-                let (first_block, last_block) = ready!(fut.poll_unpin(cx));
+                let first_block = ready!(fut.poll_unpin(cx));
 
-                match (first_block, last_block) {
-                    (Ok(f), Ok(l)) => {
+                match first_block {
+                    Ok(f) => {
                         let f = serde_json::from_value::<BlockHeader>(f).unwrap();
-                        let l = serde_json::from_value::<BlockHeader>(l).unwrap();
                         self.first_block.replace(f);
-                        self.last_block.replace(l);
 
-                        self.timer.reset();
                         State::Ready
                     },
-                    (Err(e), _) | (_, Err(e)) => {
+                    Err(e) => {
                         error!("error occurred during client initialization: {}", e);
 
                         State::Init
                     },
                 }
             },
-            State::Ready => return self.client.poll_ready(cx)
+            State::Ready => {
+                if self.last_block_rx.borrow().is_some() {
+                    return self.client.poll_ready(cx)
+                }
+
+                State::Ready
+            }
         };
 
         cx.waker().wake_by_ref();
@@ -108,9 +139,11 @@ impl tower::load::Load for CursorClient {
     type Metric = Metrics;
 
     fn load(&self) -> Self::Metric {
+        let last_block = self.last_block_rx.borrow().clone();
+
         Metrics {
             first_block: self.first_block.clone(),
-            last_block: self.last_block.clone(),
+            last_block,
             ewma: Some(self.client.load())
         }
     }
