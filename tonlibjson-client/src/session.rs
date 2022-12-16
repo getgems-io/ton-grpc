@@ -1,32 +1,24 @@
 use std::future::Future;
-use std::io::Read;
-use std::marker::PhantomData;
 use std::pin::Pin;
-use std::process::Output;
-use std::sync::{Arc};
-use tokio::sync::{Mutex, MutexGuard, TryLockError};
-use std::task::{Context, Poll, ready};
+use std::task::{Context, Poll};
 use std::time::Duration;
-use anyhow::anyhow;
-use futures::future::BoxFuture;
-use futures::{FutureExt, StreamExt};
-use futures::TryFutureExt;
-use pin_project::pin_project;
+use futures::FutureExt;
 use serde_json::Value;
-use tower::{BoxError, Layer, Service, ServiceExt};
-use tower::buffer::Buffer;
+use tower::{Layer, Service, ServiceExt};
 use tower::load::{Load, PeakEwma};
 use tower::load::peak_ewma::Cost;
 use tracing::debug;
 use crate::{client::Client, request::Request};
-use crate::block::{Sync, BlockHeader, BlockId, BlockIdExt, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo, SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
+use crate::block::{Sync, BlockId, BlockIdExt, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo, SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
 use crate::shared::{SharedLayer, SharedService};
 
+#[derive(Clone)]
 pub enum SessionRequest {
     RunGetMethod { address: String, method: String, stack: SmcStack },
     Atomic(Request),
     Synchronize {},
-    FindFirsBlock {}
+    FindFirstBlock {},
+    CurrentBlock {}
 }
 
 impl From<Request> for SessionRequest {
@@ -66,14 +58,40 @@ impl Service<SessionRequest> for SessionClient {
             SessionRequest::Synchronize {} => {
                 self.synchronize().boxed()
             },
-            SessionRequest::FindFirsBlock {} => {
+            SessionRequest::FindFirstBlock {} => {
                 self.find_first_block().boxed()
+            },
+            SessionRequest::CurrentBlock {} => {
+                self.current_block().boxed()
             }
         }
     }
 }
 
 impl SessionClient {
+    fn current_block(&self) -> impl Future<Output=anyhow::Result<Value>> {
+        let mut client = self.inner.clone();
+
+        async move {
+            let response = client.
+                ready()
+                .await?
+                .call(Request::new(GetMasterchainInfo::default())?)
+                .await?;
+
+            let block = serde_json::from_value::<MasterchainInfo>(response)?;
+
+            let request = Request::new(GetBlockHeader::new(block.last))?;
+            let response = client
+                .ready()
+                .await?
+                .call(request)
+                .await?;
+
+            Ok(response)
+        }
+    }
+
     fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> impl Future<Output=anyhow::Result<Value>> {
         let mut client = self.inner.clone();
         let req = SmcLoad::new(address);

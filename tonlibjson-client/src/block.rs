@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use serde::{Serialize, Deserialize};
@@ -45,6 +44,16 @@ pub struct BlockId {
     pub seqno: i32
 }
 
+impl From<BlockIdExt> for BlockId {
+    fn from(block: BlockIdExt) -> Self {
+        BlockId {
+            workchain: block.workchain,
+            shard: block.shard,
+            seqno: block.seqno
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Clone)]
 pub struct BlockHeader {
     pub id: BlockIdExt,
@@ -66,6 +75,16 @@ pub struct BlockHeader {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub gen_utime: i64,
     pub prev_blocks: Vec<BlockIdExt>
+}
+
+impl From<BlockHeader> for BlockId {
+    fn from(header: BlockHeader) -> Self {
+        BlockId {
+            workchain: header.id.workchain,
+            shard: header.id.shard,
+            seqno: header.id.seqno
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -142,7 +161,7 @@ pub struct RawTransactions {
     pub previous_transaction_id: InternalTransactionId,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]
 pub struct GetMasterchainInfo {}
 

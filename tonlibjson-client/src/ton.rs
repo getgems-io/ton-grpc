@@ -1,4 +1,3 @@
-use std::collections::VecDeque;
 use std::path::PathBuf;
 use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt};
@@ -10,13 +9,11 @@ use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tower::Service;
-use tracing::info;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, GetMasterchainInfo, SmcStack};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
-use crate::make::CursorClientFactory;
 use crate::request::Request;
 use crate::retry::RetryPolicy;
 use crate::session::SessionRequest;
@@ -350,7 +347,7 @@ impl TonClient {
         }
 
         stream::try_unfold(State { address, last_tx, this: self }, move |state| async move {
-            let mut txs = state.this
+            let txs = state.this
                 .raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash)
                 .await?;
 
@@ -400,7 +397,7 @@ impl TonClient {
     }
 
     async fn call_with_block(&self, lt: i64, data: Value) -> anyhow::Result<Value> {
-        let request = BalanceRequest::new(Some(lt), SessionRequest::Atomic(Request::new(data)?));
+        let request = BalanceRequest::with_logical_time(lt, SessionRequest::Atomic(Request::new(data)?));
 
         let mut ton = self.clone();
         let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
