@@ -1,43 +1,197 @@
 use tower::Service;
 use tower::discover::{Change, Discover};
-use tower::load::{CompleteOnResponse, Load};
-use tower::ready_cache::{error::Failed, ReadyCache};
+use tower::load::Load;
+use tower::ready_cache::ReadyCache;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
-use std::hash::Hash;
 use std::marker::PhantomData;
-use std::{fmt, mem, pin::Pin, task::{Context, Poll}};
-use std::cmp::min;
-use std::sync::{Arc, Mutex};
+use std::{fmt, pin::Pin, task::{Context, Poll}};
 use futures::{future, ready};
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace};
 use tower::BoxError;
 use futures::TryFutureExt;
-use crate::block::BlockIdExt;
-use crate::cursor_client::CursorClient;
 use crate::session::SessionRequest;
-use rand::seq::IteratorRandom;
+use rand::prelude::IteratorRandom;
 use crate::discover::CursorClientDiscover;
+use itertools::Itertools;
+use rand::seq::index::sample;
+use crate::cursor_client::Metrics;
+
+#[derive(Clone, Debug)]
+pub enum Route {
+    Any,
+    WithLogicalTime { lt: i64 },
+    Latest
+}
+
+impl Route {
+    pub fn pick(&self,
+            cache: &ReadyCache<<CursorClientDiscover as Discover>::Key, <CursorClientDiscover as Discover>::Service, SessionRequest>,
+            rng: &mut SmallRng
+    ) -> Option<usize> {
+        return match self {
+            Route::Any => {
+                match cache.ready_len() {
+                    0 => None,
+                    1 => Some(0),
+                    len => {
+                        let idxs = sample(rng, len, 2);
+                        let aidx = idxs.index(0);
+                        let bidx = idxs.index(1);
+
+                        let aload = cache.get_ready_index(aidx).expect("invalid index").1.load().expect("service must be ready");
+                        let bload = cache.get_ready_index(bidx).expect("invalid index").1.load().expect("service must be ready");
+
+                        let chosen = if aload <= bload { aidx } else { bidx };
+
+                        trace!(
+                            a.index = aidx,
+                            a.load = ?aload,
+                            b.index = bidx,
+                            b.load = ?bload,
+                            chosen = if chosen == aidx { "a" } else { "b" },
+                            "any p2c"
+                        );
+
+                        return Some(chosen);
+                    }
+                }
+
+
+            },
+            Route::WithLogicalTime { lt } => {
+                let mut idxs = (0..cache.ready_len())
+                    .map(|i| cache
+                        .get_ready_index(i)
+                        .and_then(|(_, svc)| svc.load())
+                        .map(|m| (i, m))
+                    )
+                    .flatten()
+                    .filter(|(_, metrics)| {
+                        metrics.first_block.start_lt <= *lt
+                            && *lt < metrics.last_block.end_lt
+                    })
+                    .choose_multiple(rng, 2);
+
+                match idxs.len() {
+                    0 => {
+                        return None;
+                    },
+                    1 => {
+                        let (aidx, _aload) = idxs.pop().unwrap();
+
+                        return Some(aidx);
+                    },
+                    _ => {
+                        let (aidx, aload) = idxs.pop().unwrap();
+                        let (bidx, bload) = idxs.pop().unwrap();
+
+                        let chosen = if aload <= bload { aidx } else { bidx };
+
+                        trace!(
+                            a.index = aidx,
+                            a.load = ?aload,
+                            b.index = bidx,
+                            b.load = ?bload,
+                            chosen = if chosen == aidx { "a" } else { "b" },
+                            "any p2c"
+                        );
+
+                        return Some(chosen);
+                    }
+                }
+            },
+            Route::Latest => {
+                let groups = (0..cache.ready_len())
+                    .map(|i| cache
+                        .get_ready_index(i)
+                        .and_then(|(_, svc)| svc.load())
+                        .map(|m| (i, m))
+                    )
+                    .flatten()
+                    .sorted_by_key(|(_, metrics)| -metrics.last_block.id.seqno)
+                    .group_by(|(_, metrics)| metrics.last_block.id.seqno);
+
+
+                let mut idxs: Vec<(usize, Metrics)> = vec![];
+                for (_, group) in &groups {
+                    idxs = group.collect();
+                    if idxs.len() > 1 {
+                        break;
+                    }
+                }
+
+                match idxs.len() {
+                    0 => {
+                        return None;
+                    },
+                    1 => {
+                        let (aidx, _aload) = idxs.pop().unwrap();
+
+                        return Some(aidx);
+                    },
+                    _ => {
+                        let (aidx, aload) = idxs.pop().unwrap();
+                        let (bidx, bload) = idxs.pop().unwrap();
+
+                        let chosen = if aload <= bload { aidx } else { bidx };
+
+                        trace!(
+                            a.index = aidx,
+                            a.load = ?aload,
+                            b.index = bidx,
+                            b.load = ?bload,
+                            chosen = if chosen == aidx { "a" } else { "b" },
+                            "any p2c"
+                        );
+
+                        return Some(chosen);
+                    }
+                }
+
+            }
+        }
+    }
+}
+
 
 pub struct BalanceRequest {
     pub request: SessionRequest,
-    pub lt: Option<i64>
+    pub route: Route
 }
 
 impl BalanceRequest {
-    pub fn new(lt: Option<i64>, request: SessionRequest) -> Self {
+    pub fn any(request: SessionRequest) -> Self {
         Self {
             request,
-            lt
+            route: Route::Any
+        }
+    }
+
+    pub fn with_logical_time(lt: i64, request: SessionRequest) -> Self {
+        Self {
+            request,
+            route: Route::WithLogicalTime { lt }
+        }
+    }
+
+    pub fn latest(request: SessionRequest) -> Self {
+        Self {
+            request,
+            route: Route::Latest
+        }
+    }
+
+    pub fn new(route: Route, request: SessionRequest) -> Self {
+        Self {
+            request,
+            route
         }
     }
 }
 
 impl From<SessionRequest> for BalanceRequest {
     fn from(request: SessionRequest) -> Self {
-        Self {
-            request,
-            lt: None
-        }
+        BalanceRequest::latest(request)
     }
 }
 
@@ -72,14 +226,10 @@ impl Balance {
 }
 
 impl Balance {
-    /// Polls `discover` for updates, adding new items to `not_ready`.
-    ///
-    /// Removals may alter the order of either `ready` or `not_ready`.
     fn update_pending_from_discover(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<(), DiscoverError>>> {
-        debug!("updating from discover");
         loop {
             match ready!(Pin::new(&mut self.discover).poll_discover(cx))
                 .transpose()
@@ -92,8 +242,6 @@ impl Balance {
                 }
                 Some(Change::Insert(key, svc)) => {
                     trace!("insert");
-                    // If this service already existed in the set, it will be
-                    // replaced as the new one becomes ready.
                     self.services.push(key, svc);
                 }
             }
@@ -126,55 +274,6 @@ impl Balance {
             "poll_unready"
         );
     }
-
-    /// Performs P2C on inner services to find a suitable endpoint.
-    fn p2c_ready_index(&mut self, min_lt: Option<i64>) -> Option<usize> {
-        match self.services.ready_len() {
-            0 => None,
-            1 => Some(0),
-            len => {
-                let mut idxs = (0 .. len)
-                    .map(|index| (index, self.services.get_ready_index(index).expect("invalid index")))
-                    .filter(|(index, (_, svc))| {
-                        if let Some(min_lt) = min_lt {
-                            if svc.load().first_block.as_ref().unwrap().start_lt <= min_lt {
-                                debug!(min_tl = min_lt, "start_tl: {}", svc.load().first_block.as_ref().unwrap().start_lt);
-
-                                true
-                            } else {
-                                false
-                            }
-                        } else {
-                            true
-                        }
-                    })
-                    .choose_multiple(&mut self.rng, 2);
-
-                let aidx = idxs.pop().unwrap().0;
-                let bidx = idxs.pop().unwrap().0;
-
-                let aload = self.ready_index_load(aidx);
-                let bload = self.ready_index_load(bidx);
-                let chosen = if aload <= bload { aidx } else { bidx };
-
-                trace!(
-                    a.index = aidx,
-                    a.load = ?aload,
-                    b.index = bidx,
-                    b.load = ?bload,
-                    chosen = if chosen == aidx { "a" } else { "b" },
-                    "p2c",
-                );
-                Some(chosen)
-            }
-        }
-    }
-
-    /// Accesses a ready endpoint by index and returns its current load.
-    fn ready_index_load(&self, index: usize) -> <<CursorClientDiscover as Discover>::Service as Load>::Metric {
-        let (_, svc) = self.services.get_ready_index(index).expect("invalid index");
-        svc.load()
-    }
 }
 
 impl Service<BalanceRequest> for Balance {
@@ -189,22 +288,22 @@ impl Service<BalanceRequest> for Balance {
         let _ = self.update_pending_from_discover(cx)?;
         self.promote_pending_to_ready(cx);
 
-        let ready_index = self.p2c_ready_index(None);
-        if ready_index.is_none() {
-
-            return Poll::Pending;
+        return if self.services.ready_len() > 0 {
+            Poll::Ready(Ok(()))
+        } else {
+            Poll::Pending
         }
-
-        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: BalanceRequest) -> Self::Future {
-        let index = if let Some(lt) = request.lt {
-            debug!(lt = lt, "request with lt");
-            // todo fix
-            self.p2c_ready_index(Some(lt)).expect("called before ready")
-        } else {
-            self.p2c_ready_index(None).expect("called before ready")
+        let index = match request.route.pick(&self.services, &mut self.rng) {
+            Some(index) => index,
+            None => {
+                // fallback
+
+                let request = BalanceRequest::any(request.request.clone());
+                request.route.pick(&self.services, &mut self.rng).expect("called before ready")
+            }
         };
 
         self.services
