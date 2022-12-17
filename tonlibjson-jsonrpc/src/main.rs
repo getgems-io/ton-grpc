@@ -309,7 +309,7 @@ impl RpcServer {
         let stack: SmcStack = serde_json::from_value(resp["stack"].clone())?;
         let stack: Stack = stack.try_into()?;
 
-        resp["stack"] = serde_json::to_value(&stack)?;
+        resp["stack"] = serde_json::to_value(stack)?;
 
         Ok(resp)
     }

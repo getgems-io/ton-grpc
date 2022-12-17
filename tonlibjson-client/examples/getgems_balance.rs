@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use tokio::time::Instant;
 use tracing::info;
-use tonlibjson_client::block::RawTransaction;
+
 use tonlibjson_client::ton::TonClient;
 
 #[tokio::main]
@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
                 return Some(msg.value)
             }
 
-            return None
+            None
         })
         .collect::<Vec<i64>>()
         .await
