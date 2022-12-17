@@ -9,10 +9,9 @@ use std::{
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
-use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use futures::{StreamExt, TryFutureExt};
 use tokio_stream::Stream;
 use tower::discover::Change;
-use tower::limit::ConcurrencyLimit;
 use tower::load::PeakEwmaDiscover;
 use tracing::{debug, info};
 use tower::ServiceExt;
@@ -20,7 +19,6 @@ use tower::Service;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::ton_config::Liteserver;
-use crate::session::SessionClient;
 
 type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 

@@ -1,10 +1,7 @@
-use std::marker::PhantomData;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 use anyhow::anyhow;
-use futures::future::{BoxFuture, MapErr};
+use futures::future::MapErr;
 use futures::TryFutureExt;
-use tokio::sync::Mutex;
 use tower::{Layer, Service};
 
 #[derive(Default)]

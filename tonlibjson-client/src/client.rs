@@ -1,15 +1,15 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, mpsc, Mutex, RwLock};
+use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::TryRecvError;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use anyhow::anyhow;
-use serde_json::{json, Value};
+use serde_json::Value;
 use dashmap::DashMap;
 use tower::{Service, ServiceExt};
-use tracing::{debug, info, warn};
-use crate::block::{AccountTransactionId, BlockHeader, BlockId, BlockIdExt, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo, Sync, TonError};
+use tracing::warn;
+use crate::block::TonError;
 use crate::request::{Request, RequestId, Response};
 
 #[derive(Debug)]
@@ -71,7 +71,7 @@ impl Service<Request> for Client {
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
