@@ -60,12 +60,10 @@ impl Route {
             },
             Route::WithLogicalTime { lt } => {
                 let mut idxs = (0..cache.ready_len())
-                    .map(|i| cache
+                    .filter_map(|i| cache
                         .get_ready_index(i)
                         .and_then(|(_, svc)| svc.load())
-                        .map(|m| (i, m))
-                    )
-                    .flatten()
+                        .map(|m| (i, m)))
                     .filter(|(_, metrics)| {
                         metrics.first_block.start_lt <= *lt
                             && *lt < metrics.last_block.end_lt
@@ -102,12 +100,10 @@ impl Route {
             },
             Route::Latest => {
                 let groups = (0..cache.ready_len())
-                    .map(|i| cache
+                    .filter_map(|i| cache
                         .get_ready_index(i)
                         .and_then(|(_, svc)| svc.load())
-                        .map(|m| (i, m))
-                    )
-                    .flatten()
+                        .map(|m| (i, m)))
                     .sorted_by_key(|(_, metrics)| -metrics.last_block.id.seqno)
                     .group_by(|(_, metrics)| metrics.last_block.id.seqno);
 
@@ -288,7 +284,7 @@ impl Service<BalanceRequest> for Balance {
         let _ = self.update_pending_from_discover(cx)?;
         self.promote_pending_to_ready(cx);
 
-        return if self.services.ready_len() > 0 {
+        if self.services.ready_len() > 0 {
             Poll::Ready(Ok(()))
         } else {
             Poll::Pending

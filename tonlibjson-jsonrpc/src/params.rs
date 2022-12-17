@@ -89,7 +89,7 @@ impl TryInto<SmcStack> for StackWrapped {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
-    use crate::params::{CellType, Stack, StackElement};
+    use crate::params::{CellType, Stack};
 
     #[test]
     pub fn serialize_cell_type() {

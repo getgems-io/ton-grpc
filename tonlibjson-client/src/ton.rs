@@ -401,7 +401,7 @@ impl TonClient {
 
         let mut ton = self.clone();
         let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
-        let call = ready.call(request.into()).await.map_err(|e| anyhow!(e))?;
+        let call = ready.call(request).await.map_err(|e| anyhow!(e))?;
 
         Ok(call)
     }

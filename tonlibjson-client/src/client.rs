@@ -7,7 +7,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use serde_json::Value;
 use dashmap::DashMap;
-use tower::{Service, ServiceExt};
+use tower::{Service};
 use tracing::warn;
 use crate::block::TonError;
 use crate::request::{Request, RequestId, Response};
@@ -63,6 +63,12 @@ impl Client {
             responses,
             _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
         }
+    }
+}
+
+impl Default for Client {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
