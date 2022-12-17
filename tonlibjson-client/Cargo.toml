@@ -24,6 +24,7 @@ reqwest = { version = "0.11", features = ["rustls-tls", "trust-dns"], default-fe
 config = { version = "0.13", default-features = false }
 url = { version = "2.3", features = ["serde"] }
 rand = "0.8"
+itertools = "0.10"
 
 [dev-dependencies]
 hex = { workspace = true }
