@@ -190,7 +190,7 @@ impl TonClient {
     pub async fn raw_get_transactions(
         &self,
         address: &str,
-        from_lt: &str,
+        from_lt: i64,
         from_hash: &str,
     ) -> anyhow::Result<RawTransactions> {
         let request = json!({
@@ -207,10 +207,10 @@ impl TonClient {
             "count": 16
         });
 
-        let response = self.call_with_block(from_lt.parse()?, request.clone()).await?;
+        let response = self.call_with_block(from_lt - 1000000, request.clone()).await?;
         let response: RawTransactions = serde_json::from_value(response)?;
 
-        if response.transactions.len() == 1 {
+        if response.transactions.len() <= 1 {
             let response = self.call_with_block(1000000, request).await?;
             let response: RawTransactions = serde_json::from_value(response)?;
 
@@ -326,6 +326,7 @@ impl TonClient {
         &self,
         address: String,
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
+        // TODO[akostylev0] typed
         let account_state = self.raw_get_account_state(&address).await?;
         let ltx = account_state
             .get("last_transaction_id")
@@ -348,24 +349,24 @@ impl TonClient {
 
         stream::try_unfold(State { address, last_tx, this: self }, move |state| async move {
             let txs = state.this
-                .raw_get_transactions(&state.address, &state.last_tx.lt, &state.last_tx.hash)
+                .raw_get_transactions(&state.address, state.last_tx.lt, &state.last_tx.hash)
                 .await?;
 
             let mut txs = txs.transactions;
 
-            let first = txs.swap_remove(0);
-            debug_assert_eq!(first.transaction_id.hash, state.last_tx.hash);
-
-            if let Some(last_tx) = txs.last() {
-                let tx_id = last_tx.transaction_id.clone();
-                anyhow::Ok(Some((
-                    stream::iter(txs.into_iter().map(anyhow::Ok)),
-                    State {
-                        address: state.address,
-                        last_tx: tx_id,
-                        this: state.this
-                    },
-                )))
+            if let Some(next_last_tx) = txs.pop() {
+                if state.last_tx == next_last_tx.transaction_id {
+                    anyhow::Ok(None)
+                } else {
+                    anyhow::Ok(Some((
+                        stream::iter(txs.into_iter().map(anyhow::Ok)),
+                        State {
+                            address: state.address,
+                            last_tx: next_last_tx.transaction_id,
+                            this: state.this
+                        },
+                    )))
+                }
             } else {
                 anyhow::Ok(None)
             }
