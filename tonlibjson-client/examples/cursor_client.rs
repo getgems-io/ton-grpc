@@ -5,7 +5,7 @@ use tower::load::{Load, PeakEwma};
 use tracing::info;
 use tonlibjson_client::config::AppConfig;
 use tonlibjson_client::cursor_client::CursorClient;
-use tonlibjson_client::make::{CursorClientFactory, SessionClientFactory};
+use tonlibjson_client::make::{CursorClientFactory, ClientFactory};
 
 use tonlibjson_client::ton_config::load_ton_config;
 
@@ -16,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let app_config = AppConfig::from_env()?;
     let ton_config = load_ton_config(app_config.config_url).await?;
 
-    let client = SessionClientFactory::default()
+    let client = ClientFactory::default()
         .ready()
         .await?
         .call(ton_config)

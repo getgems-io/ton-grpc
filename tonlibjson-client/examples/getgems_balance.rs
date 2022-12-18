@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use tokio::time::Instant;
 use tracing::info;
+use tonlibjson_client::block::RawTransaction;
 
 use tonlibjson_client::ton::TonClient;
 
@@ -20,13 +21,13 @@ async fn main() -> anyhow::Result<()> {
 
     let total_value: i64 = ton.get_account_tx_stream(address.to_owned()).await?
         .filter_map(|tx| async {
-            let tx = tx.unwrap();
+            let tx: RawTransaction = tx.unwrap();
             if let Some(msg) = tx.out_msgs.first() {
                 // info!("{:?}", msg);
 
-                return Some(-msg.value)
+                return Some(-msg.value - tx.fee)
             } else if let Some(msg) = tx.in_msg {
-                return Some(msg.value)
+                return Some(msg.value - tx.fee)
             }
 
             None

@@ -104,11 +104,12 @@ pub struct MasterchainInfo {
     pub state_root_hash: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(tag = "@type", rename = "internal.transactionId")]
 pub struct InternalTransactionId {
     pub hash: String,
-    pub lt: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub lt: i64,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -143,12 +144,17 @@ pub struct RawMessage {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "@type", rename = "raw.transaction")]
 pub struct RawTransaction {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
     pub utime: i64,
     pub data: String,
     pub transaction_id: InternalTransactionId,
-    pub fee: String,
-    pub storage_fee: String,
-    pub other_fee: String,
+
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub fee: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub storage_fee: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub other_fee: i64,
 
     #[serde(skip_serializing_if = "Option::is_none")]
     pub in_msg: Option<RawMessage>,

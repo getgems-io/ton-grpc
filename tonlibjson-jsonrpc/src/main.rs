@@ -240,7 +240,7 @@ impl RpcServer {
 
         let stream = match (lt, hash) {
             (Some(lt), Some(hash)) => Left(
-                self.client.get_account_tx_stream_from(address, InternalTransactionId {hash, lt})
+                self.client.get_account_tx_stream_from(address, InternalTransactionId {hash, lt: lt.parse()?})
             ),
             _ => Right(
                 self.client.get_account_tx_stream(address).await?
@@ -248,7 +248,7 @@ impl RpcServer {
         };
         let stream = match max_lt {
             Some(to_lt) => Left(stream.try_take_while(move |tx: &RawTransaction|
-                future::ready(Ok(tx.transaction_id.lt.parse::<i64>().unwrap() > to_lt))
+                future::ready(Ok(tx.transaction_id.lt > to_lt))
             )),
             _ => Right(stream)
         };

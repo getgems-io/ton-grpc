@@ -1,7 +1,6 @@
 use std::future::{Future, ready, Ready};
 use std::pin::Pin;
 use std::task::{Context, Poll};
-
 use serde_json::{json, Value};
 use tower::limit::{ConcurrencyLimitLayer};
 use tower::{Layer, Service};
@@ -14,11 +13,10 @@ use crate::request::Request;
 use crate::session::SessionClient;
 use crate::ton_config::TonConfig;
 
-
 #[derive(Default, Debug)]
-pub struct SessionClientFactory;
+pub struct ClientFactory;
 
-impl Service<TonConfig> for SessionClientFactory {
+impl Service<TonConfig> for ClientFactory {
     type Response = Client;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
