@@ -264,7 +264,7 @@ impl RpcServer {
 
         let response = serde_json::to_value(views)?;
 
-        Ok(response)
+        Ok(serde_json::to_value(response)?)
     }
 
     async fn send_boc(&self, params: SendBocParams) -> RpcResponse<Value> {
