@@ -115,7 +115,7 @@ pub struct InternalTransactionId {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "@type", rename = "accountAddress")]
 pub struct AccountAddress {
-    account_address: String,
+    pub account_address: String,
 }
 
 impl AccountAddress {
@@ -129,15 +129,15 @@ impl AccountAddress {
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(tag = "@type", rename = "raw.message")]
 pub struct RawMessage {
-    source: AccountAddress,
-    destination: AccountAddress,
+    pub source: AccountAddress,
+    pub destination: AccountAddress,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub value: i64,
-    fwd_fee: String,
-    ihr_fee: String,
-    created_lt: String,
-    body_hash: String,
-    msg_data: Value, // @todo maybe only msg.dataRaw
+    pub fwd_fee: String,
+    pub ihr_fee: String,
+    pub created_lt: String,
+    pub body_hash: String,
+    pub msg_data: Value, // @todo maybe only msg.dataRaw
     // @todo deserialize boc
 }
 

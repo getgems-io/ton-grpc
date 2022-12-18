@@ -1,4 +1,5 @@
 mod params;
+mod view;
 
 use std::future;
 use std::sync::Arc;
@@ -13,6 +14,7 @@ use tracing::debug;
 use tonlibjson_client::ton::TonClient;
 use tonlibjson_client::block::{BlockIdExt, InternalTransactionId, RawTransaction, ShortTxId, SmcStack};
 use crate::params::{RunGetMethodParams, Stack};
+use crate::view::TransactionView;
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -258,38 +260,11 @@ impl RpcServer {
             .try_collect()
             .await?;
 
+        let views: Vec<TransactionView> = txs.iter().map(Into::into).collect();
 
-        let mut response = serde_json::to_value(txs)?;
+        let response = serde_json::to_value(views)?;
 
-        // TODO meh
-        let mapped: Vec<&mut Value> = response.as_array_mut().unwrap().iter_mut().map(|x| {
-            if let Some(in_msg) = x.get_mut("in_msg") {
-                if let Some(source) = in_msg.get_mut("source") {
-                    *source = source.get("account_address").unwrap().clone()
-                }
-
-                if let Some(destination) = in_msg.get_mut("destination") {
-                    *destination = destination.get("account_address").unwrap().clone()
-                }
-            }
-
-            if let Some(out_msgs) = x.get_mut("out_msgs") {
-                *out_msgs = Value::Array(out_msgs.as_array_mut().unwrap().iter_mut().map(|out_msg| {
-                    if let Some(source) = out_msg.get_mut("source") {
-                        *source = source.get("account_address").unwrap().clone()
-                    }
-
-                    if let Some(destination) = out_msg.get_mut("destination") {
-                        *destination = destination.get("account_address").unwrap().clone()
-                    }
-                    out_msg.clone()
-                }).collect())
-            }
-
-            x
-        }).collect();
-
-        Ok(serde_json::to_value(mapped)?)
+        Ok(serde_json::to_value(response)?)
     }
 
     async fn send_boc(&self, params: SendBocParams) -> RpcResponse<Value> {
