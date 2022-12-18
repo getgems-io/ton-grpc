@@ -100,7 +100,7 @@ impl TonClient {
         &self,
         workchain: i64,
         shard: i64,
-        seqno: u64,
+        seqno: i32,
     ) -> anyhow::Result<Value> {
         self.look_up_block(workchain, shard, seqno, 0).await
     }
@@ -114,7 +114,7 @@ impl TonClient {
         self.look_up_block(workchain, shard, 0, lt).await
     }
 
-    pub async fn get_shards(&self, master_seqno: u64) -> anyhow::Result<ShardsResponse> {
+    pub async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<ShardsResponse> {
         let block = self
             .look_up_block(MAIN_WORKCHAIN, MAIN_SHARD, master_seqno, 0)
             .await?;
@@ -133,7 +133,7 @@ impl TonClient {
         &self,
         workchain: i64,
         shard: i64,
-        seqno: u64,
+        seqno: i32,
     ) -> anyhow::Result<Value> {
         let block = self.look_up_block(workchain, shard, seqno, 0).await?;
 
@@ -243,7 +243,7 @@ impl TonClient {
         &self,
         workchain: i64,
         shard: i64,
-        seqno: u64,
+        seqno: i32,
         lt: i64,
     ) -> anyhow::Result<Value> {
         let mut mode: i32 = 0;

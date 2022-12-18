@@ -18,14 +18,14 @@ use crate::params::{RunGetMethodParams, Stack};
 struct LookupBlockParams {
     workchain: i64,
     shard: String,
-    seqno: Option<u64>,
+    seqno: Option<i32>,
     lt: Option<i64>,
     unixtime: Option<u64>
 }
 
 #[derive(Deserialize)]
 struct ShardsParams {
-    seqno: u64
+    seqno: i32
 }
 
 #[allow(dead_code)]
@@ -33,7 +33,7 @@ struct ShardsParams {
 struct BlockHeaderParams {
     workchain: i64,
     shard: String,
-    seqno: u64,
+    seqno: i32,
     root_hash: Option<String>,
     file_hash: Option<String>
 }
@@ -43,7 +43,7 @@ struct BlockHeaderParams {
 struct BlockTransactionsParams {
     workchain: i64,
     shard: String,
-    seqno: u64,
+    seqno: i32,
     root_hash: Option<String>,
     file_hash: Option<String>,
     after_lt: Option<i64>,
