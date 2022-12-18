@@ -44,6 +44,8 @@ impl<S, Req> Service<Req> for SharedService<S>
                 lock.poll_ready(cx)
             }
             Err(_) => {
+                cx.waker().wake_by_ref();
+
                 Poll::Pending
             }
         }

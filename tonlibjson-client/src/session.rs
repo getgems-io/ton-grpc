@@ -18,7 +18,7 @@ pub enum SessionRequest {
     Atomic(Request),
     Synchronize {},
     FindFirstBlock {},
-    CurrentBlock {}
+    GetMasterchainInfo {},
 }
 
 impl From<Request> for SessionRequest {
@@ -61,20 +61,33 @@ impl Service<SessionRequest> for SessionClient {
             SessionRequest::FindFirstBlock {} => {
                 self.find_first_block().boxed()
             },
-            SessionRequest::CurrentBlock {} => {
-                self.current_block().boxed()
-            }
+            SessionRequest::GetMasterchainInfo {} => self.get_masterchain_info().boxed()
         }
     }
 }
 
 impl SessionClient {
+    fn get_masterchain_info(&self) -> impl Future<Output=anyhow::Result<Value>> {
+        let mut client = self.inner.clone();
+
+        async move {
+            let response = client
+                .ready()
+                .await?
+                .call(Request::new(GetMasterchainInfo::default())?)
+                .await?;
+
+            Ok(response)
+        }
+    }
+
+    #[allow(dead_code)]
     fn current_block(&self) -> impl Future<Output=anyhow::Result<Value>> {
         let mut client = self.inner.clone();
 
         async move {
-            let response = client.
-                ready()
+            let response = client
+                .ready()
                 .await?
                 .call(Request::new(GetMasterchainInfo::default())?)
                 .await?;

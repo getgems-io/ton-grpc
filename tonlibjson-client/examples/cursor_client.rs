@@ -6,6 +6,7 @@ use tracing::info;
 use tonlibjson_client::config::AppConfig;
 use tonlibjson_client::cursor_client::CursorClient;
 use tonlibjson_client::make::{CursorClientFactory, ClientFactory};
+use tonlibjson_client::session::SessionRequest;
 
 use tonlibjson_client::ton_config::load_ton_config;
 
@@ -23,21 +24,23 @@ async fn main() -> anyhow::Result<()> {
         .await?;
 
 
-    let client: CursorClient = CursorClientFactory::create(PeakEwma::new(client, Duration::from_secs(5), 500000.0, tower::load::CompleteOnResponse::default()));
-
-    // info!("start seqno: {:?}, end seqno: {:?}",
-    //     p.first_block().expect("must be synced").id.seqno,
-    //     p.last_block().expect("must be synced").id.seqno
-    // );
-
+    let mut client: CursorClient = CursorClientFactory::create(PeakEwma::new(client, Duration::from_secs(5), 500000.0, tower::load::CompleteOnResponse::default()));
     let mut timer = interval(Duration::from_secs(5));
+
+    client.ready().await?;
+
+    info!("client ready");
 
     for _ in 0.. 20 * 5 {
         timer.tick().await;
 
         let current_block = client.load().unwrap().last_block.id.seqno;
 
-        info!("current seqno: {:?}", current_block)
+        info!("current seqno: {:?}", current_block);
+
+        let info = client.ready().await?.call(SessionRequest::GetMasterchainInfo {}).await?;
+
+        info!("{:?}", info);
     }
 
     Ok(())

@@ -2,14 +2,14 @@ use std::cmp::Ordering;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
-use anyhow::{anyhow, Result};
-use futures::{FutureExt};
+use anyhow::Result;
+use futures::{FutureExt, TryFutureExt};
 use tokio::sync::watch::Receiver;
 use tokio::time::{interval, MissedTickBehavior};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
-use tracing::{info};
-use crate::block::{BlockHeader, BlocksLookupBlock};
+use tracing::{error, trace};
+use crate::block::{BlockHeader, BlocksLookupBlock, GetBlockHeader, MasterchainInfo};
 use crate::request::Request;
 use crate::session::{SessionClient, SessionRequest};
 
@@ -18,12 +18,15 @@ pub struct CursorClient {
 
     synced_block_rx: Receiver<Option<BlockHeader>>,
     first_block_rx: Receiver<Option<BlockHeader>>,
-    last_block_rx: Receiver<Option<BlockHeader>>
+    last_block_rx: Receiver<Option<BlockHeader>>,
+
+    masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
 
 impl CursorClient {
     pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
         let (ctx, crx) = tokio::sync::watch::channel(None);
+        let (mtx, mrx) = tokio::sync::watch::channel(None);
         tokio::spawn({
             let mut client = client.clone();
             async move {
@@ -32,18 +35,30 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    let last_block = client
+                    let masterchain_info = client
                         .ready()
-                        .await
-                        .map_err(|e| anyhow!(e))
-                        .unwrap()
-                        .call(SessionRequest::CurrentBlock {})
-                        .await
-                        .map(|val| serde_json::from_value::<BlockHeader>(val).unwrap());
+                        .and_then(|c| c.call(SessionRequest::GetMasterchainInfo {}))
+                        .map_ok(|val| serde_json::from_value::<MasterchainInfo>(val).unwrap())
+                        .await;
 
-                    if let Ok(last_block) = last_block {
-                        info!("new block seqno: {}", last_block.id.seqno);
-                        ctx.send(Some(last_block)).unwrap();
+                    match masterchain_info {
+                        Ok(masterchain_info) => {
+                            let last_block = client.ready()
+                                .and_then(|c|
+                                    c.call(SessionRequest::Atomic(Request::new(GetBlockHeader::new(masterchain_info.last.clone())).unwrap())))
+                                .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
+                                .await;
+
+                            match last_block {
+                                Ok(last_block) => {
+                                    trace!("new block seqno: {}", last_block.id.seqno);
+                                    mtx.send(Some(masterchain_info)).unwrap();
+                                    ctx.send(Some(last_block)).unwrap();
+                                },
+                                Err(e) => error!("{}", e)
+                            }
+                        },
+                        Err(e) => error!("{}", e)
                     }
                 }
             }
@@ -60,16 +75,18 @@ impl CursorClient {
 
                     let last_block = client
                         .ready()
-                        .await
-                        .map_err(|e| anyhow!(e))
-                        .unwrap()
-                        .call(SessionRequest::Synchronize {})
-                        .await
-                        .map(|val| serde_json::from_value::<BlockHeader>(val).unwrap());
+                        .and_then(|c| {
+                            c.call(SessionRequest::Synchronize {})
+                        })
+                        .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
+                        .await;
 
-                    if let Ok(last_block) = last_block {
-                        info!("new block seqno: {}", last_block.id.seqno);
-                        stx.send(Some(last_block)).unwrap();
+                    match last_block {
+                        Ok(last_block) => {
+                            trace!("new block seqno: {}", last_block.id.seqno);
+                            stx.send(Some(last_block)).unwrap();
+                        },
+                        Err(e) => error!("{}", e)
                     }
                 }
             }
@@ -90,35 +107,33 @@ impl CursorClient {
                         let request = BlocksLookupBlock::new(fb.into(), 0, 0);
                         let fb = client
                             .ready()
-                            .await
-                            .map_err(|e| anyhow!(e))
-                            .unwrap()
-                            .call(SessionRequest::Atomic(Request::new(request).unwrap()))
+                            .and_then(|c| c.call(SessionRequest::Atomic(Request::new(request).unwrap())))
                             .await;
 
-                        if fb.is_err() {
+                        if let Err(e) = fb {
+                            error!("{}", e);
                             first_block = None;
                         } else {
-                            info!("first block still available")
+                            trace!("first block still available")
                         }
                     }
 
                     if first_block.is_none() {
                         let fb = client
                             .ready()
-                            .await
-                            .map_err(|e| anyhow!(e))
-                            .unwrap()
-                            .call(SessionRequest::FindFirstBlock {})
-                            .await
-                            .map(|val| serde_json::from_value::<BlockHeader>(val).unwrap());
+                            .and_then(|c| c.call(SessionRequest::FindFirstBlock {}))
+                            .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
+                            .await;
 
-                        if let Ok(fb) = fb {
-                            info!("new first block seqno: {}", fb.id.seqno);
+                        match fb {
+                            Ok(fb) => {
+                                trace!("new first block seqno: {}", fb.id.seqno);
 
-                            first_block = Some(fb.clone());
+                                first_block = Some(fb.clone());
 
-                            ftx.send(Some(fb)).unwrap();
+                                ftx.send(Some(fb)).unwrap();
+                            },
+                            Err(e) => error!("{}", e)
                         }
                     }
                 }
@@ -130,7 +145,8 @@ impl CursorClient {
 
             first_block_rx: frx,
             last_block_rx: crx,
-            synced_block_rx: srx
+            synced_block_rx: srx,
+            masterchain_info_rx: mrx
         }
     }
 }
@@ -143,7 +159,8 @@ impl Service<SessionRequest> for CursorClient {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.last_block_rx.borrow().is_some()
             && self.first_block_rx.borrow().is_some()
-            && self.synced_block_rx.borrow().is_some() {
+            && self.synced_block_rx.borrow().is_some()
+            && self.masterchain_info_rx.borrow().is_some() {
             return self.client.poll_ready(cx)
         }
 
@@ -153,7 +170,15 @@ impl Service<SessionRequest> for CursorClient {
     }
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
-        self.client.call(req).boxed()
+        match req {
+            SessionRequest::GetMasterchainInfo {} => {
+                let masterchain_info = self.masterchain_info_rx.borrow().as_ref().unwrap().clone();
+                async {
+                    Ok(serde_json::to_value(masterchain_info)?)
+                }.boxed()
+            },
+            _ => self.client.call(req).boxed()
+        }
     }
 }
 

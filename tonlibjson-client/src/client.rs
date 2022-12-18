@@ -45,9 +45,9 @@ impl Client {
                                     let _ = sender.send(response);
                                 }
                             } else if packet.contains("syncState") {
-                                tracing::info!("Sync state: {}", packet.to_string());
+                                tracing::trace!("Sync state: {}", packet.to_string());
                                 if packet.contains("syncStateDone") {
-                                    tracing::info!("syncState: {:#?}", packet);
+                                    tracing::trace!("syncState: {:#?}", packet);
                                 }
                             } else {
                                 tracing::warn!("Unexpected response {:?}", packet.to_string())

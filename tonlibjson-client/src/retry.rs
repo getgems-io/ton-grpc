@@ -45,7 +45,7 @@ impl<E, Res> Policy<SessionRequest, Res, E> for RetryPolicy {
             ),
             SessionRequest::FindFirstBlock {} => Some(SessionRequest::FindFirstBlock {}),
             SessionRequest::Synchronize {} => Some(SessionRequest::Synchronize {}),
-            SessionRequest::CurrentBlock {} => {Some(SessionRequest::CurrentBlock {})}
+            SessionRequest::GetMasterchainInfo {} => Some(SessionRequest::GetMasterchainInfo {})
         }
     }
 }

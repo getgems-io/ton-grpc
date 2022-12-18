@@ -11,7 +11,7 @@ use tower::retry::Retry;
 use tower::Service;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, GetMasterchainInfo, SmcStack};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, SmcStack};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::request::Request;
@@ -89,9 +89,7 @@ impl TonClient {
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
-        let query = json!(GetMasterchainInfo {});
-
-        let response = self.call(query).await?;
+        let response = self.call_session_request(SessionRequest::GetMasterchainInfo {}).await?;
 
         Ok(serde_json::from_value(response)?)
     }
@@ -377,14 +375,27 @@ impl TonClient {
     pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {
         let mut ton = self.clone();
 
-        let resp = ton.client.ready().await.map_err(|e| anyhow!(e))?
+        let resp = ton.client
+            .ready()
+            .await
+            .map_err(|e| anyhow!(e))?
             .call(SessionRequest::RunGetMethod {
                 address,
                 method,
                 stack
-            }.into()).await.map_err(|e| anyhow!(e))?;
+            }.into())
+            .await
+            .map_err(|e| anyhow!(e))?;
 
         Ok(resp)
+    }
+
+    async fn call_session_request(&self, req: SessionRequest) -> anyhow::Result<Value> {
+        let mut ton = self.clone();
+        let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
+        let call = ready.call(req.into()).await.map_err(|e| anyhow!(e))?;
+
+        Ok(call)
     }
 
     async fn call(&self, data: Value) -> anyhow::Result<Value> {
