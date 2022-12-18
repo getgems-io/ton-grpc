@@ -16,7 +16,7 @@ use itertools::Itertools;
 use rand::seq::index::sample;
 use crate::cursor_client::Metrics;
 
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Route {
     Any,
     WithLogicalTime { lt: i64 },
@@ -24,9 +24,10 @@ pub enum Route {
 }
 
 impl Route {
-    pub fn pick(&self,
-            cache: &ReadyCache<<CursorClientDiscover as Discover>::Key, <CursorClientDiscover as Discover>::Service, SessionRequest>,
-            rng: &mut SmallRng
+    pub fn choose(
+        &self,
+        cache: &ReadyCache<<CursorClientDiscover as Discover>::Key, <CursorClientDiscover as Discover>::Service, SessionRequest>,
+        rng: &mut SmallRng
     ) -> Option<usize> {
         return match self {
             Route::Any => {
@@ -55,8 +56,6 @@ impl Route {
                         return Some(chosen);
                     }
                 }
-
-
             },
             Route::WithLogicalTime { lt } => {
                 let mut idxs = (0..cache.ready_len())
@@ -70,33 +69,7 @@ impl Route {
                     })
                     .choose_multiple(rng, 2);
 
-                match idxs.len() {
-                    0 => {
-                        return None;
-                    },
-                    1 => {
-                        let (aidx, _aload) = idxs.pop().unwrap();
-
-                        return Some(aidx);
-                    },
-                    _ => {
-                        let (aidx, aload) = idxs.pop().unwrap();
-                        let (bidx, bload) = idxs.pop().unwrap();
-
-                        let chosen = if aload <= bload { aidx } else { bidx };
-
-                        trace!(
-                            a.index = aidx,
-                            a.load = ?aload,
-                            b.index = bidx,
-                            b.load = ?bload,
-                            chosen = if chosen == aidx { "a" } else { "b" },
-                            "any p2c"
-                        );
-
-                        return Some(chosen);
-                    }
-                }
+                Self::choose_from_vec(&mut idxs)
             },
             Route::Latest => {
                 let groups = (0..cache.ready_len())
@@ -111,39 +84,42 @@ impl Route {
                 let mut idxs: Vec<(usize, Metrics)> = vec![];
                 for (_, group) in &groups {
                     idxs = group.collect();
-                    if idxs.len() > 1 {
+
+                    // we need at least 3 nodes in group
+                    if idxs.len() > 2 {
                         break;
                     }
                 }
 
-                match idxs.len() {
-                    0 => {
-                        return None;
-                    },
-                    1 => {
-                        let (aidx, _aload) = idxs.pop().unwrap();
+                Self::choose_from_vec(&mut idxs)
+            }
+        }
+    }
 
-                        return Some(aidx);
-                    },
-                    _ => {
-                        let (aidx, aload) = idxs.pop().unwrap();
-                        let (bidx, bload) = idxs.pop().unwrap();
+    fn choose_from_vec(idxs: &mut Vec<(usize, Metrics)>) -> Option<usize> {
+        return match idxs.len() {
+            0 => None,
+            1 => {
+                let (aidx, _) = idxs.pop().unwrap();
 
-                        let chosen = if aload <= bload { aidx } else { bidx };
+                Some(aidx)
+            },
+            _ => {
+                let (aidx, aload) = idxs.pop().unwrap();
+                let (bidx, bload) = idxs.pop().unwrap();
 
-                        trace!(
-                            a.index = aidx,
-                            a.load = ?aload,
-                            b.index = bidx,
-                            b.load = ?bload,
-                            chosen = if chosen == aidx { "a" } else { "b" },
-                            "any p2c"
-                        );
+                let chosen = if aload <= bload { aidx } else { bidx };
 
-                        return Some(chosen);
-                    }
-                }
+                trace!(
+                    a.index = aidx,
+                    a.load = ?aload,
+                    b.index = bidx,
+                    b.load = ?bload,
+                    chosen = if chosen == aidx { "a" } else { "b" },
+                    "any p2c"
+                );
 
+                Some(chosen)
             }
         }
     }
@@ -156,6 +132,7 @@ pub struct BalanceRequest {
 }
 
 impl BalanceRequest {
+    #[allow(dead_code)]
     pub fn any(request: SessionRequest) -> Self {
         Self {
             request,
@@ -292,18 +269,17 @@ impl Service<BalanceRequest> for Balance {
     }
 
     fn call(&mut self, request: BalanceRequest) -> Self::Future {
-        let index = match request.route.pick(&self.services, &mut self.rng) {
-            Some(index) => index,
-            None => {
-                // fallback
+        let (route, request) = (request.route, request.request);
 
-                let request = BalanceRequest::any(request.request.clone());
-                request.route.pick(&self.services, &mut self.rng).expect("called before ready")
-            }
-        };
+        let index = route
+            .choose(&self.services, &mut self.rng)
+            .or_else(|| {
+                Route::Any.choose(&self.services, &mut self.rng)
+            })
+            .expect("called before ready");
 
         self.services
-            .call_ready_index(index, request.request)
+            .call_ready_index(index, request)
             .map_err(Into::into)
     }
 }
