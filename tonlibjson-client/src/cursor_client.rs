@@ -16,44 +16,17 @@ use crate::session::{SessionClient, SessionRequest};
 pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
 
-    synced_block_rx: Receiver<Option<BlockHeader>>,
     first_block_rx: Receiver<Option<BlockHeader>>,
     last_block_rx: Receiver<Option<BlockHeader>>
 }
 
 impl CursorClient {
     pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
-        let (ctx, crx) = tokio::sync::watch::channel(None);
-        tokio::spawn({
-            let mut client = client.clone();
-            async move {
-                let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
-                timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
-                loop {
-                    timer.tick().await;
-
-                    let last_block = client
-                        .ready()
-                        .await
-                        .map_err(|e| anyhow!(e))
-                        .unwrap()
-                        .call(SessionRequest::CurrentBlock {})
-                        .await
-                        .map(|val| serde_json::from_value::<BlockHeader>(val).unwrap());
-
-                    if let Ok(last_block) = last_block {
-                        info!("new block seqno: {}", last_block.id.seqno);
-                        ctx.send(Some(last_block)).unwrap();
-                    }
-                }
-            }
-        });
-
         let (stx, srx) = tokio::sync::watch::channel(None);
         tokio::spawn({
             let mut client = client.clone();
             async move {
-                let mut timer = interval(Duration::from_secs(60));
+                let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
                 timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
                 loop {
                     timer.tick().await;
@@ -129,8 +102,7 @@ impl CursorClient {
             client,
 
             first_block_rx: frx,
-            last_block_rx: crx,
-            synced_block_rx: srx
+            last_block_rx: srx
         }
     }
 }
@@ -142,8 +114,7 @@ impl Service<SessionRequest> for CursorClient {
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.last_block_rx.borrow().is_some()
-            && self.first_block_rx.borrow().is_some()
-            && self.synced_block_rx.borrow().is_some() {
+            && self.first_block_rx.borrow().is_some() {
             return self.client.poll_ready(cx)
         }
 
