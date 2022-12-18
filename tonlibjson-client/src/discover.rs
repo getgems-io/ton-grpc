@@ -9,7 +9,7 @@ use std::{
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
-use futures::{StreamExt, TryFutureExt};
+use futures::TryFutureExt;
 use tokio_stream::Stream;
 use tower::discover::Change;
 use tower::load::PeakEwmaDiscover;
