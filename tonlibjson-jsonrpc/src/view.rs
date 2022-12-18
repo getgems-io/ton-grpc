@@ -30,10 +30,25 @@ impl From<&RawMessage> for MessageView {
 }
 
 #[derive(Serialize)]
+pub struct TransactionIdView {
+    pub hash: String,
+    pub lt: String
+}
+
+impl From<&InternalTransactionId> for TransactionIdView {
+    fn from(id: &InternalTransactionId) -> Self {
+        Self {
+            hash: id.hash.clone(),
+            lt: id.lt.to_string()
+        }
+    }
+}
+
+#[derive(Serialize)]
 pub struct TransactionView {
     pub utime: i64,
     pub data: String,
-    pub transaction_id: InternalTransactionId,
+    pub transaction_id: TransactionIdView,
     pub fee: String,
     pub storage_fee: String,
     pub other_fee: String,
@@ -48,7 +63,7 @@ impl From<&RawTransaction> for TransactionView {
         Self {
             utime: tx.utime,
             data: tx.data.clone(),
-            transaction_id: tx.transaction_id.clone(),
+            transaction_id: (&tx.transaction_id).into(),
             fee: tx.fee.to_string(),
             storage_fee: tx.storage_fee.to_string(),
             other_fee: tx.other_fee.to_string(),
