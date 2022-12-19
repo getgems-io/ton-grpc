@@ -22,7 +22,7 @@ impl GetBlockHeader {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -96,7 +96,7 @@ pub struct ShortTxId {
     pub mode: u8,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
 #[serde(tag = "@type", rename = "blocks.masterchainInfo")]
 pub struct MasterchainInfo {
     pub init: BlockIdExt,

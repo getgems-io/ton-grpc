@@ -6,7 +6,7 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::marker::PhantomData;
 use std::{fmt, pin::Pin, task::{Context, Poll}};
 use futures::{future, ready};
-use tracing::{debug, trace};
+use tracing::{debug, info, trace};
 use tower::BoxError;
 use futures::TryFutureExt;
 use crate::session::SessionRequest;
@@ -97,6 +97,8 @@ impl Route {
     }
 
     fn choose_from_vec(idxs: &mut Vec<(usize, Metrics)>) -> Option<usize> {
+        info!(len = idxs.len(), "choose from");
+
         return match idxs.len() {
             0 => None,
             1 => {

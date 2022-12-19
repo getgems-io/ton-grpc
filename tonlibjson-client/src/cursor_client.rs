@@ -9,14 +9,13 @@ use tokio::time::{interval, MissedTickBehavior};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tracing::{error, trace};
-use crate::block::{BlockHeader, BlocksLookupBlock, GetBlockHeader, MasterchainInfo};
+use crate::block::{BlockHeader, BlocksLookupBlock, MasterchainInfo};
 use crate::request::Request;
 use crate::session::{SessionClient, SessionRequest};
 
 pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
 
-    synced_block_rx: Receiver<Option<BlockHeader>>,
     first_block_rx: Receiver<Option<BlockHeader>>,
     last_block_rx: Receiver<Option<BlockHeader>>,
 
@@ -32,59 +31,47 @@ impl CursorClient {
             async move {
                 let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
                 timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+                let mut current: Option<MasterchainInfo> = None;
                 loop {
                     timer.tick().await;
 
-                    let masterchain_info = client
+                    let masterchain_info: Result<MasterchainInfo> = client
                         .ready()
                         .and_then(|c| c.call(SessionRequest::GetMasterchainInfo {}))
                         .map_ok(|val| serde_json::from_value::<MasterchainInfo>(val).unwrap())
                         .await;
 
                     match masterchain_info {
-                        Ok(masterchain_info) => {
-                            let last_block = client.ready()
-                                .and_then(|c|
-                                    c.call(SessionRequest::Atomic(Request::new(GetBlockHeader::new(masterchain_info.last.clone())).unwrap())))
+                        Ok(mut masterchain_info) => {
+                            if let Some(cur) = current.clone() {
+                                if cur == masterchain_info {
+                                    trace!(cursor = cur.last.seqno, "block actual");
+
+                                    continue;
+                                } else {
+                                    trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered")
+                                }
+                            }
+
+                            let last_block: Result<BlockHeader> = client
+                                .ready()
+                                .and_then(|c| c.call(SessionRequest::Synchronize {}))
                                 .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
                                 .await;
 
                             match last_block {
                                 Ok(last_block) => {
-                                    trace!("new block seqno: {}", last_block.id.seqno);
+                                    masterchain_info.last = last_block.id.clone();
+                                    trace!(seqno = last_block.id.seqno, "block reached");
+
+                                    current.replace(masterchain_info.clone());
+
                                     mtx.send(Some(masterchain_info)).unwrap();
                                     ctx.send(Some(last_block)).unwrap();
                                 },
                                 Err(e) => error!("{}", e)
                             }
-                        },
-                        Err(e) => error!("{}", e)
-                    }
-                }
-            }
-        });
-
-        let (stx, srx) = tokio::sync::watch::channel(None);
-        tokio::spawn({
-            let mut client = client.clone();
-            async move {
-                let mut timer = interval(Duration::from_secs(60));
-                timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
-                loop {
-                    timer.tick().await;
-
-                    let last_block = client
-                        .ready()
-                        .and_then(|c| {
-                            c.call(SessionRequest::Synchronize {})
-                        })
-                        .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
-                        .await;
-
-                    match last_block {
-                        Ok(last_block) => {
-                            trace!("new block seqno: {}", last_block.id.seqno);
-                            stx.send(Some(last_block)).unwrap();
                         },
                         Err(e) => error!("{}", e)
                     }
@@ -145,7 +132,6 @@ impl CursorClient {
 
             first_block_rx: frx,
             last_block_rx: crx,
-            synced_block_rx: srx,
             masterchain_info_rx: mrx
         }
     }
@@ -159,7 +145,6 @@ impl Service<SessionRequest> for CursorClient {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.last_block_rx.borrow().is_some()
             && self.first_block_rx.borrow().is_some()
-            && self.synced_block_rx.borrow().is_some()
             && self.masterchain_info_rx.borrow().is_some() {
             return self.client.poll_ready(cx)
         }
