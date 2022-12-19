@@ -10,7 +10,6 @@ use tracing::{debug, info, trace};
 use tower::BoxError;
 use futures::TryFutureExt;
 use crate::session::SessionRequest;
-use rand::prelude::IteratorRandom;
 use crate::discover::CursorClientDiscover;
 use itertools::Itertools;
 use rand::seq::index::sample;
@@ -63,13 +62,11 @@ impl Route {
                         .get_ready_index(i)
                         .and_then(|(_, svc)| svc.load())
                         .map(|m| (i, m)))
-                    .filter(|(_, metrics)| {
-                        metrics.first_block.start_lt <= *lt
-                            && *lt < metrics.last_block.end_lt
-                    })
-                    .choose_multiple(rng, 2);
+                    .filter(|(_, metrics)|
+                        metrics.first_block.start_lt <= *lt && *lt < metrics.last_block.end_lt )
+                    .collect();
 
-                Self::choose_from_vec(&mut idxs)
+                self.choose_from_vec(&mut idxs)
             },
             Route::Latest => {
                 let groups = (0..cache.ready_len())
@@ -91,13 +88,13 @@ impl Route {
                     }
                 }
 
-                Self::choose_from_vec(&mut idxs)
+                self.choose_from_vec(&mut idxs)
             }
         }
     }
 
-    fn choose_from_vec(idxs: &mut Vec<(usize, Metrics)>) -> Option<usize> {
-        info!(len = idxs.len(), "choose from");
+    fn choose_from_vec(&self, idxs: &mut Vec<(usize, Metrics)>) -> Option<usize> {
+        info!(route = ?self, len = idxs.len(), "choose from");
 
         return match idxs.len() {
             0 => None,
