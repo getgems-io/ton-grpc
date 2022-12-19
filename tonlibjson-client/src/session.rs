@@ -136,7 +136,7 @@ impl SessionClient {
         let mut client = self.inner.clone();
 
         async move {
-            let request = Request::with_timeout(Sync::default(), Duration::from_secs(60))?;
+            let request = Request::with_timeout(Sync::default(), Duration::from_secs(5 * 60))?;
 
             let response = client
                 .ready()
