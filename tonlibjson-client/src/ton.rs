@@ -209,10 +209,14 @@ impl TonClient {
         let response: RawTransactions = serde_json::from_value(response)?;
 
         if response.transactions.len() <= 1 {
-            let response = self.call_with_block(1000000, request).await?;
-            let response: RawTransactions = serde_json::from_value(response)?;
+            let archive_response = self.call_with_block(1000000, request).await?;
+            let archive_response: RawTransactions = serde_json::from_value(archive_response)?;
 
-            return Ok(response);
+            return if archive_response.transactions.len() <= 1 {
+                Ok(response)
+            } else {
+                Ok(archive_response)
+            }
         }
 
         Ok(response)
@@ -342,29 +346,40 @@ impl TonClient {
         struct State<'a> {
             address: String,
             last_tx: InternalTransactionId,
-            this: &'a TonClient
+            this: &'a TonClient,
+            next: bool
         }
 
-        stream::try_unfold(State { address, last_tx, this: self }, move |state| async move {
+        stream::try_unfold(State { address, last_tx, this: self, next: true }, move |state| async move {
+            if !state.next {
+                return anyhow::Ok(None);
+            }
+
             let txs = state.this
                 .raw_get_transactions(&state.address, state.last_tx.lt, &state.last_tx.hash)
                 .await?;
 
             let mut txs = txs.transactions;
-
-            if let Some(next_last_tx) = txs.pop() {
-                if state.last_tx == next_last_tx.transaction_id {
-                    anyhow::Ok(None)
-                } else {
-                    anyhow::Ok(Some((
-                        stream::iter(txs.into_iter().map(anyhow::Ok)),
-                        State {
-                            address: state.address,
-                            last_tx: next_last_tx.transaction_id,
-                            this: state.this
-                        },
-                    )))
-                }
+            if txs.len() == 1 {
+                anyhow::Ok(Some((
+                    stream::iter(txs.into_iter().map(anyhow::Ok)),
+                    State {
+                        address: state.address,
+                        last_tx: state.last_tx,
+                        this: state.this,
+                        next: false
+                    }
+                )))
+            } else if let Some(next_last_tx) = txs.pop() {
+                anyhow::Ok(Some((
+                    stream::iter(txs.into_iter().map(anyhow::Ok)),
+                    State {
+                        address: state.address,
+                        last_tx: next_last_tx.transaction_id,
+                        this: state.this,
+                        next: true
+                    }
+                )))
             } else {
                 anyhow::Ok(None)
             }

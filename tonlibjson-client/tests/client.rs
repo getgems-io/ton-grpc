@@ -30,3 +30,25 @@ async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+
+#[tokio::test]
+#[traced_test]
+async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result<()> {
+    let client = TonClient::from_env().await?;
+
+    let address = "EQBO_mAVkaHxt6Ibz7wqIJ_UIDmxZBFcgkk7fvIzkh7l42wO".to_owned();
+
+    let transaction_list: Vec<anyhow::Result<RawTransaction>> = client
+        .get_account_tx_stream(address)
+        .await?
+        .take(1)
+        .collect()
+        .await;
+
+    debug!("{:#?}", transaction_list);
+
+    assert_eq!(transaction_list.len(), 1);
+
+    Ok(())
+}
