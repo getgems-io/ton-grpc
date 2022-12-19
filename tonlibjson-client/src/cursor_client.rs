@@ -91,7 +91,7 @@ impl CursorClient {
                     timer.tick().await;
 
                     if let Some(fb) = first_block.clone() {
-                        let request = BlocksLookupBlock::new(fb.into(), 0, 0);
+                        let request = BlocksLookupBlock::seqno(fb.into());
                         let fb = client
                             .ready()
                             .and_then(|c| c.call(SessionRequest::Atomic(Request::new(request).unwrap())))

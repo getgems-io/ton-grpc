@@ -181,20 +181,25 @@ pub struct BlocksLookupBlock {
 }
 
 impl BlocksLookupBlock {
-    pub fn new(id: BlockId, lt: i64, utime: i32) -> Self {
-        let mut mode: i32 = 0;
-        if id.seqno > 0 {
-            mode += 1
+    pub fn seqno(id: BlockId) -> Self {
+        let mode = 1;
+
+        Self {
+            mode,
+            id,
+            lt: 0,
+            utime: 0
         }
-        if lt > 0 {
-            mode += 2
-        }
+    }
+
+    pub fn logical_time(id: BlockId, lt: i64) -> Self {
+        let mode = 2;
 
         Self {
             mode,
             id,
             lt,
-            utime
+            utime: 0
         }
     }
 }

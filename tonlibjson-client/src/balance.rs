@@ -18,8 +18,14 @@ use crate::cursor_client::Metrics;
 #[derive(Debug, Clone, Copy)]
 pub enum Route {
     Any,
-    WithLogicalTime { lt: i64 },
+    Block(BlockCriteria),
     Latest
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum BlockCriteria {
+    Seqno(i32),
+    LogicalTime(i64)
 }
 
 impl Route {
@@ -56,14 +62,16 @@ impl Route {
                     }
                 }
             },
-            Route::WithLogicalTime { lt } => {
+            Route::Block(criteria) => {
                 let mut idxs = (0..cache.ready_len())
                     .filter_map(|i| cache
                         .get_ready_index(i)
                         .and_then(|(_, svc)| svc.load())
                         .map(|m| (i, m)))
-                    .filter(|(_, metrics)|
-                        metrics.first_block.start_lt <= *lt && *lt < metrics.last_block.end_lt )
+                    .filter(|(_, metrics)| match criteria {
+                            BlockCriteria::LogicalTime(lt) => metrics.first_block.start_lt <= *lt && *lt < metrics.last_block.end_lt,
+                            BlockCriteria::Seqno(seqno) => metrics.first_block.id.seqno <= *seqno && *seqno < metrics.last_block.id.seqno
+                        })
                     .collect();
 
                 self.choose_from_vec(&mut idxs)
@@ -139,10 +147,10 @@ impl BalanceRequest {
         }
     }
 
-    pub fn with_logical_time(lt: i64, request: SessionRequest) -> Self {
+    pub fn block(criteria: BlockCriteria, request: SessionRequest) -> Self {
         Self {
             request,
-            route: Route::WithLogicalTime { lt }
+            route: Route::Block(criteria)
         }
     }
 
@@ -273,6 +281,8 @@ impl Service<BalanceRequest> for Balance {
         let index = route
             .choose(&self.services, &mut self.rng)
             .or_else(|| {
+                info!(route = ?route, "fallback to any");
+
                 Route::Any.choose(&self.services, &mut self.rng)
             })
             .expect("called before ready");

@@ -176,11 +176,11 @@ impl SessionClient {
             let workchain = masterchain_info.last.workchain;
             let shard = masterchain_info.last.shard;
 
-            let request = BlocksLookupBlock::new(BlockId {
+            let request = BlocksLookupBlock::seqno(BlockId {
                 workchain,
                 shard: shard.clone(),
                 seqno: cur
-            }, 0, 0);
+            });
             let mut block = client
                 .ready()
                 .await?
@@ -199,11 +199,11 @@ impl SessionClient {
 
                 debug!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
 
-                let request = BlocksLookupBlock::new(BlockId {
+                let request = BlocksLookupBlock::seqno(BlockId {
                     workchain,
                     shard: shard.clone(),
                     seqno: cur
-                }, 0, 0);
+                });
 
                 block = client
                     .ready()

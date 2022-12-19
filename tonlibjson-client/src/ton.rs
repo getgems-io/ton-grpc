@@ -10,7 +10,7 @@ use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tower::Service;
 use url::Url;
-use crate::balance::{Balance, BalanceRequest};
+use crate::balance::{Balance, BalanceRequest, BlockCriteria};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, SmcStack};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
@@ -100,7 +100,25 @@ impl TonClient {
         shard: i64,
         seqno: i32,
     ) -> anyhow::Result<Value> {
-        self.look_up_block(workchain, shard, seqno, 0).await
+        if seqno <= 0 {
+            return Err(anyhow!("seqno must be greater than 0"));
+        }
+
+        let mode: i32 = 1;
+        let criteria = BlockCriteria::Seqno(seqno);
+
+        let request = json!({
+            "@type": "blocks.lookupBlock",
+            "mode": mode,
+            "id": {
+                "@type": "ton.blockId",
+                "workchain": workchain,
+                "shard": shard,
+                "seqno": seqno
+            }
+        });
+
+        self.call_with_block(criteria, request).await
     }
 
     pub async fn look_up_block_by_lt(
@@ -109,12 +127,30 @@ impl TonClient {
         shard: i64,
         lt: i64,
     ) -> anyhow::Result<Value> {
-        self.look_up_block(workchain, shard, 0, lt).await
+        if lt <= 0 {
+            return Err(anyhow!("lt must be greater than 0"));
+        }
+
+        let mode: i32 = 2;
+        let criteria = BlockCriteria::LogicalTime(lt);
+
+        let request = json!({
+            "@type": "blocks.lookupBlock",
+            "mode": mode,
+            "id": {
+                "@type": "ton.blockId",
+                "workchain": workchain,
+                "shard": shard
+            },
+            "lt": lt
+        });
+
+        self.call_with_block(criteria, request).await
     }
 
     pub async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<ShardsResponse> {
         let block = self
-            .look_up_block(MAIN_WORKCHAIN, MAIN_SHARD, master_seqno, 0)
+            .look_up_block_by_seqno(MAIN_WORKCHAIN, MAIN_SHARD, master_seqno)
             .await?;
 
         let request = json!({
@@ -122,7 +158,7 @@ impl TonClient {
             "id": block
         });
 
-        let response = self.call(request).await?;
+        let response = self.call_with_block(BlockCriteria::Seqno(master_seqno), request).await?;
 
         Ok(serde_json::from_value(response)?)
     }
@@ -133,14 +169,14 @@ impl TonClient {
         shard: i64,
         seqno: i32,
     ) -> anyhow::Result<Value> {
-        let block = self.look_up_block(workchain, shard, seqno, 0).await?;
+        let block = self.look_up_block_by_seqno(workchain, shard, seqno).await?;
 
         let request = json!({
             "@type": "blocks.getBlockHeader",
             "id": block
         });
 
-        self.call(request).await
+        self.call_with_block(BlockCriteria::Seqno(seqno), request).await
     }
 
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
@@ -205,11 +241,11 @@ impl TonClient {
             "count": 16
         });
 
-        let response = self.call_with_block(from_lt - 1000000, request.clone()).await?;
+        let response = self.call_with_block(BlockCriteria::LogicalTime(from_lt), request.clone()).await?;
         let response: RawTransactions = serde_json::from_value(response)?;
 
         if response.transactions.len() <= 1 {
-            let archive_response = self.call_with_block(1000000, request).await?;
+            let archive_response = self.call_with_block(BlockCriteria::LogicalTime(1000000), request).await?;
             let archive_response: RawTransactions = serde_json::from_value(archive_response)?;
 
             return if archive_response.transactions.len() <= 1 {
@@ -236,39 +272,9 @@ impl TonClient {
             "after": tx.unwrap_or_default(),
         });
 
-        let response = self.call(request).await?;
+        let response = self.call_with_block(BlockCriteria::Seqno(block.seqno), request).await?;
 
         Ok(serde_json::from_value(response)?)
-    }
-
-    async fn look_up_block(
-        &self,
-        workchain: i64,
-        shard: i64,
-        seqno: i32,
-        lt: i64,
-    ) -> anyhow::Result<Value> {
-        let mut mode: i32 = 0;
-        if seqno > 0 {
-            mode += 1
-        }
-        if lt > 0 {
-            mode += 2
-        }
-
-        let request = json!({
-            "@type": "blocks.lookupBlock",
-            "mode": mode,
-            "id": {
-                "@type": "ton.blockId",
-                "workchain": workchain,
-                "shard": shard,
-                "seqno": seqno
-            },
-            "lt": lt
-        });
-
-        self.call(request).await
     }
 
     pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
@@ -388,21 +394,9 @@ impl TonClient {
     }
 
     pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {
-        let mut ton = self.clone();
-
-        let resp = ton.client
-            .ready()
+        self
+            .call_session_request(SessionRequest::RunGetMethod { address, method, stack })
             .await
-            .map_err(|e| anyhow!(e))?
-            .call(SessionRequest::RunGetMethod {
-                address,
-                method,
-                stack
-            }.into())
-            .await
-            .map_err(|e| anyhow!(e))?;
-
-        Ok(resp)
     }
 
     async fn call_session_request(&self, req: SessionRequest) -> anyhow::Result<Value> {
@@ -423,8 +417,8 @@ impl TonClient {
         Ok(call)
     }
 
-    async fn call_with_block(&self, lt: i64, data: Value) -> anyhow::Result<Value> {
-        let request = BalanceRequest::with_logical_time(lt, SessionRequest::Atomic(Request::new(data)?));
+    async fn call_with_block(&self, criteria: BlockCriteria, data: Value) -> anyhow::Result<Value> {
+        let request = BalanceRequest::block(criteria, SessionRequest::Atomic(Request::new(data)?));
 
         let mut ton = self.clone();
         let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;

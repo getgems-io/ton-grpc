@@ -165,8 +165,8 @@ impl RpcServer {
         let shard = params.shard.parse::<i64>()?;
 
         match (params.seqno, params.lt, params.unixtime) {
-            (Some(seqno), None, None) if seqno > 0 => self.client.look_up_block_by_seqno(workchain, shard, seqno).await,
-            (None, Some(lt), None) if lt > 0 => self.client.look_up_block_by_lt(workchain, shard, lt).await,
+            (Some(seqno), None, None) => self.client.look_up_block_by_seqno(workchain, shard, seqno).await,
+            (None, Some(lt), None) => self.client.look_up_block_by_lt(workchain, shard, lt).await,
             (None, None, Some(_)) => Err(anyhow!("unixtime is not supported")),
             _ => Err(anyhow!("seqno or lt or unixtime must be provided"))
         }
