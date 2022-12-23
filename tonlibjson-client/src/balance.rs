@@ -75,8 +75,8 @@ impl Route {
                         };
 
                         match criteria {
-                            BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt < last_block.end_lt,
-                            BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno < last_block.id.seqno
+                            BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
+                            BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
                         }
                     })
                     .collect();
