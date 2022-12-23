@@ -1,5 +1,6 @@
 use std::time::Duration;
 use async_trait::async_trait;
+use derive_new::new;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
@@ -20,7 +21,25 @@ pub trait Requestable where Self : Serialize + Sized {
         Request::with_timeout(self, timeout)
     }
 
-    async fn call<S : Service<Request, Response = Value, Error = anyhow::Error>>(self, client: &mut S) -> Result<Self::Response, anyhow::Error>
+    async fn call<Req, S : Service<Req, Response = Value, Error = anyhow::Error>>(self, client: &mut S) -> Result<Self::Response, anyhow::Error>
+        where Req: Send,
+              S : Send,
+              S::Future : Send,
+              RequestableWrapper<Self> : TryInto<Req, Error = S::Error>
+    {
+        let json = client
+            .ready()
+            .await?
+            .call(RequestableWrapper::new(self).try_into()?)
+            .await?;
+
+        let response = serde_json::from_value::<Self::Response>(json)?;
+
+        Ok(response)
+    }
+
+    // TODO[akostylev0] typed response
+    async fn call_value<S : Service<Request, Response = Value, Error = anyhow::Error>>(self, client: &mut S) -> Result<Value, anyhow::Error>
         where S : Send, S::Future : Send
     {
         let request = self.into_request();
@@ -31,11 +50,29 @@ pub trait Requestable where Self : Serialize + Sized {
             .call(request?)
             .await?;
 
-        let response = serde_json::from_value::<Self::Response>(json)?;
-
-        Ok(response)
+        Ok(json)
     }
 }
+
+
+#[derive(new)]
+pub struct RequestableWrapper<T> {
+    pub inner: T
+}
+
+impl<T> TryFrom<RequestableWrapper<T>> for Request where T : Requestable {
+    type Error = anyhow::Error;
+
+    fn try_from(req: RequestableWrapper<T>) -> Result<Self, Self::Error> {
+        req.inner.into_request()
+    }
+}
+
+// TODO[akostylev0]
+impl Requestable for Value {
+    type Response = Value;
+}
+
 
 pub type RequestId = Uuid;
 

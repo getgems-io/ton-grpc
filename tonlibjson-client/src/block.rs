@@ -1,17 +1,32 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::time::Duration;
+use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use serde_aux::prelude::*;
+use crate::request::Requestable;
 
 #[derive(Debug, Serialize, Default)]
 #[serde(tag = "@type", rename = "sync")]
 pub struct Sync {}
 
+impl Requestable for Sync {
+    type Response = BlockIdExt;
+
+    fn timeout(&self) -> Duration {
+        Duration::from_secs(5 * 60)
+    }
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "@type", rename = "blocks.getBlockHeader")]
 pub struct GetBlockHeader {
     id: BlockIdExt
+}
+
+impl Requestable for GetBlockHeader {
+    type Response = BlockHeader;
 }
 
 impl GetBlockHeader {
@@ -34,7 +49,7 @@ pub struct BlockIdExt {
     pub file_hash: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(new, Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "ton.blockId")]
 pub struct BlockId {
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -171,6 +186,10 @@ pub struct RawTransactions {
 #[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]
 pub struct GetMasterchainInfo {}
 
+impl Requestable for GetMasterchainInfo {
+    type Response = MasterchainInfo;
+}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "@type", rename = "blocks.lookupBlock")]
 pub struct BlocksLookupBlock {
@@ -178,6 +197,10 @@ pub struct BlocksLookupBlock {
     pub id: BlockId,
     pub lt: i64,
     pub utime: i32
+}
+
+impl Requestable for BlocksLookupBlock {
+    type Response = BlockIdExt;
 }
 
 impl BlocksLookupBlock {
@@ -256,6 +279,10 @@ pub struct SmcLoad {
     pub account_address: AccountAddress
 }
 
+impl Requestable for SmcLoad {
+    type Response = SmcInfo;
+}
+
 impl SmcLoad {
     pub fn new(address: String) -> Self {
         Self {
@@ -272,6 +299,10 @@ pub struct SmcRunGetMethod {
     stack: SmcStack
 }
 
+impl Requestable for SmcRunGetMethod {
+    type Response = Value;
+}
+
 impl SmcRunGetMethod {
     pub fn new(contract_id: i64, method: SmcMethodId, stack: SmcStack) -> Self {
         Self {
@@ -284,7 +315,7 @@ impl SmcRunGetMethod {
 
 pub type SmcStack = Vec<StackEntry>;
 
-#[derive(Debug, Serialize)]
+#[derive(new, Debug, Serialize)]
 #[serde(tag = "@type")]
 pub enum SmcMethodId {
     #[serde(rename = "smc.methodIdNumber")]

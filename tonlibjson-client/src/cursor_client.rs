@@ -1,16 +1,17 @@
 use std::cmp::Ordering;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tower::{Service, ServiceExt};
+use tower::Service;
 use anyhow::Result;
-use futures::{FutureExt, TryFutureExt};
+use futures::FutureExt;
 use tokio::sync::watch::Receiver;
 use tokio::time::{interval, MissedTickBehavior};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
-use tracing::{error, trace};
-use crate::block::{BlockHeader, BlocksLookupBlock, MasterchainInfo};
-use crate::request::Request;
+use tracing::{debug, error, trace};
+use crate::block::Sync;
+use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo};
+use crate::request::Requestable;
 use crate::session::{SessionClient, SessionRequest};
 
 pub struct CursorClient {
@@ -36,10 +37,8 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    let masterchain_info: Result<MasterchainInfo> = client
-                        .ready()
-                        .and_then(|c| c.call(SessionRequest::GetMasterchainInfo {}))
-                        .map_ok(|val| serde_json::from_value::<MasterchainInfo>(val).unwrap())
+                    let masterchain_info = GetMasterchainInfo::default()
+                        .call(&mut client)
                         .await;
 
                     match masterchain_info {
@@ -53,12 +52,7 @@ impl CursorClient {
                                     trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered")
                                 }
                             }
-
-                            let last_block: Result<BlockHeader> = client
-                                .ready()
-                                .and_then(|c| c.call(SessionRequest::Synchronize {}))
-                                .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
-                                .await;
+                            let last_block = sync(&mut client).await;
 
                             match last_block {
                                 Ok(last_block) => {
@@ -91,10 +85,8 @@ impl CursorClient {
                     timer.tick().await;
 
                     if let Some(fb) = first_block.clone() {
-                        let request = BlocksLookupBlock::seqno(fb.into());
-                        let fb = client
-                            .ready()
-                            .and_then(|c| c.call(SessionRequest::Atomic(Request::new(request).unwrap())))
+                        let fb = BlocksLookupBlock::seqno(fb.into())
+                            .call(&mut client)
                             .await;
 
                         if let Err(e) = fb {
@@ -106,11 +98,7 @@ impl CursorClient {
                     }
 
                     if first_block.is_none() {
-                        let fb = client
-                            .ready()
-                            .and_then(|c| c.call(SessionRequest::FindFirstBlock {}))
-                            .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
-                            .await;
+                        let fb = find_first_block(&mut client).await;
 
                         match fb {
                             Ok(fb) => {
@@ -204,4 +192,49 @@ impl PartialOrd<Self> for Metrics {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.ewma.partial_cmp(&other.ewma)
     }
+}
+
+async fn sync(client: &mut ConcurrencyLimit<SessionClient>) -> Result<BlockHeader> {
+    let id = Sync::default()
+        .call(client)
+        .await?;
+
+    GetBlockHeader::new(id).call(client).await
+}
+
+async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>) -> Result<BlockHeader> {
+    let masterchain_info = GetMasterchainInfo::default()
+        .call(client)
+        .await?;
+
+    let length = masterchain_info.last.seqno;
+    let mut cur = length / 2;
+    let mut rhs = length;
+    let mut lhs = 1;
+
+    let workchain = masterchain_info.last.workchain;
+    let shard = masterchain_info.last.shard;
+
+    let mut block = BlocksLookupBlock::seqno(
+        BlockId::new(workchain, shard.clone(), cur)
+    ).call(client).await;
+
+    while lhs < rhs {
+        // TODO[akostylev0] specify error
+        if block.is_err() {
+            lhs = cur + 1;
+        } else {
+            rhs = cur;
+        }
+
+        cur = (lhs + rhs) / 2;
+
+        debug!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
+
+        block = BlocksLookupBlock::seqno(
+            BlockId::new(workchain, shard.clone(), cur)
+        ).call(client).await;
+    }
+
+    GetBlockHeader::new(block?).call(client).await
 }

@@ -25,6 +25,7 @@ config = { version = "0.13", default-features = false }
 url = { version = "2.3", features = ["serde"] }
 rand = "0.8"
 itertools = "0.10"
+derive-new = "0.5.9"
 async-trait = "0.1.57"
 
 [dev-dependencies]
