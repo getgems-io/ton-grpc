@@ -2,14 +2,16 @@ use std::cmp::Ordering;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::Service;
-use anyhow::Result;
-use futures::FutureExt;
+use anyhow::{anyhow, Result};
+use futures::{FutureExt, try_join};
 use tokio::sync::watch::Receiver;
 use tokio::time::{interval, MissedTickBehavior};
+use tokio_retry::Retry;
+use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
-use tracing::{debug, error, trace};
-use crate::block::Sync;
+use tracing::{error, trace};
+use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::request::Requestable;
 use crate::session::{SessionClient, SessionRequest};
@@ -17,8 +19,8 @@ use crate::session::{SessionClient, SessionRequest};
 pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
 
-    first_block_rx: Receiver<Option<BlockHeader>>,
-    last_block_rx: Receiver<Option<BlockHeader>>,
+    first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
+    last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
 
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
@@ -52,22 +54,22 @@ impl CursorClient {
                                     trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered")
                                 }
                             }
-                            let last_block = sync(&mut client).await;
 
-                            match last_block {
-                                Ok(last_block) => {
-                                    masterchain_info.last = last_block.id.clone();
-                                    trace!(seqno = last_block.id.seqno, "block reached");
+                            match fetch_last_headers(&mut client).await {
+                                Ok((last_master_chain_header, last_work_chain_header)) => {
+                                    masterchain_info.last = last_master_chain_header.id.clone();
+                                    trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
+                                    trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
 
                                     current.replace(masterchain_info.clone());
 
                                     mtx.send(Some(masterchain_info)).unwrap();
-                                    ctx.send(Some(last_block)).unwrap();
+                                    ctx.send(Some((last_master_chain_header, last_work_chain_header))).unwrap();
                                 },
-                                Err(e) => error!("{}", e)
+                                Err(e) => error!(e = ?e, "unable to fetch last headers")
                             }
                         },
-                        Err(e) => error!("{}", e)
+                        Err(e) => error!(e = ?e, "unable to get master chain info")
                     }
                 }
             }
@@ -76,7 +78,7 @@ impl CursorClient {
         let (ftx, frx) = tokio::sync::watch::channel(None);
         tokio::spawn({
             let mut client = client.clone();
-            let mut first_block: Option<BlockHeader> = None;
+            let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
 
             async move {
                 let mut timer = interval(Duration::from_secs(30));
@@ -84,13 +86,13 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    if let Some(fb) = first_block.clone() {
-                        let fb = BlocksLookupBlock::seqno(fb.into())
-                            .call(&mut client)
-                            .await;
-
-                        if let Err(e) = fb {
-                            error!("{}", e);
+                    if let Some((mfb, wfb)) = first_block.clone() {
+                        let mut clone = client.clone();
+                        if let Err(e) = try_join!(
+                            BlocksLookupBlock::seqno(mfb.into()).call(&mut clone),
+                            BlocksLookupBlock::seqno(wfb.into()).call(&mut client)
+                        ) {
+                            error!(e = ?e, "first block not available anymore");
                             first_block = None;
                         } else {
                             trace!("first block still available")
@@ -98,17 +100,18 @@ impl CursorClient {
                     }
 
                     if first_block.is_none() {
-                        let fb = find_first_block(&mut client).await;
+                        let fb = find_first_blocks(&mut client).await;
 
                         match fb {
-                            Ok(fb) => {
-                                trace!("new first block seqno: {}", fb.id.seqno);
+                            Ok((mfb, wfb)) => {
+                                trace!(seqno = mfb.id.seqno, "master cain first block");
+                                trace!(seqno = wfb.id.seqno, "work cain first block");
 
-                                first_block = Some(fb.clone());
+                                first_block = Some((mfb.clone(), wfb.clone()));
 
-                                ftx.send(Some(fb)).unwrap();
+                                ftx.send(Some((mfb, wfb))).unwrap();
                             },
-                            Err(e) => error!("{}", e)
+                            Err(e) => error!(e = ?e, "unable to fetch first headers")
                         }
                     }
                 }
@@ -177,8 +180,8 @@ impl tower::load::Load for CursorClient {
 
 #[derive(Debug)]
 pub struct Metrics {
-    pub first_block: BlockHeader,
-    pub last_block: BlockHeader,
+    pub first_block: (BlockHeader, BlockHeader),
+    pub last_block: (BlockHeader, BlockHeader),
     pub ewma: Cost
 }
 
@@ -194,26 +197,14 @@ impl PartialOrd<Self> for Metrics {
     }
 }
 
-async fn sync(client: &mut ConcurrencyLimit<SessionClient>) -> Result<BlockHeader> {
-    let id = Sync::default()
-        .call(client)
-        .await?;
-
-    GetBlockHeader::new(id).call(client).await
-}
-
-async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>) -> Result<BlockHeader> {
-    let masterchain_info = GetMasterchainInfo::default()
-        .call(client)
-        .await?;
-
-    let length = masterchain_info.last.seqno;
+async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>, start: BlockIdExt) -> Result<BlockHeader> {
+    let length = start.seqno;
     let mut cur = length / 2;
     let mut rhs = length;
     let mut lhs = 1;
 
-    let workchain = masterchain_info.last.workchain;
-    let shard = masterchain_info.last.shard;
+    let workchain = start.workchain;
+    let shard = start.shard;
 
     let mut block = BlocksLookupBlock::seqno(
         BlockId::new(workchain, shard.clone(), cur)
@@ -229,12 +220,79 @@ async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>) -> Resul
 
         cur = (lhs + rhs) / 2;
 
-        debug!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
+        trace!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
 
         block = BlocksLookupBlock::seqno(
             BlockId::new(workchain, shard.clone(), cur)
         ).call(client).await;
     }
 
-    GetBlockHeader::new(block?).call(client).await
+    let block = block?;
+
+    trace!(seqno = block.seqno, "first seqno");
+
+    GetBlockHeader::new(block).call(client).await
+}
+
+async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
+    let master_chain_last_block_id = GetMasterchainInfo::default()
+        .call(client)
+        .await?.last;
+
+    let shards = BlocksGetShards::new(master_chain_last_block_id.clone())
+        .call(client)
+        .await?;
+
+    let work_chain_last_block_id = shards.shards.first()
+        .ok_or_else(|| anyhow!("last block for work chain not found"))?
+        .clone();
+
+    let mut clone = client.clone();
+    let (master_chain_header, work_chain_header) = try_join!(
+        find_first_block(&mut clone, master_chain_last_block_id),
+        find_first_block(client, work_chain_last_block_id)
+    )?;
+
+    Ok((master_chain_header, work_chain_header))
+}
+
+
+async fn fetch_last_headers(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
+    let master_chain_last_block_id = Sync::default()
+        .call(client)
+        .await?;
+
+    let shards = BlocksGetShards::new(master_chain_last_block_id.clone())
+        .call(client)
+        .await?.shards;
+
+    let work_chain_last_block_id = shards.first()
+        .ok_or_else(|| anyhow!("last block for work chain not found"))?
+        .clone();
+
+    let mut clone = client.clone();
+    let (master_chain_header, work_chain_header) = try_join!(
+        GetBlockHeader::new(master_chain_last_block_id).call(&mut clone),
+        wait_for_block_header(work_chain_last_block_id, client)
+    )?;
+
+    Ok((master_chain_header, work_chain_header))
+}
+
+async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLimit<SessionClient>) -> Result<BlockHeader> {
+    let retry = ExponentialBackoff::from_millis(4)
+        .max_delay(Duration::from_millis(256))
+        .map(jitter)
+        .take(16);
+
+    let header = Retry::spawn(retry, || {
+        let block_id = block_id.clone();
+        let mut client = client.clone();
+
+        async move {
+            GetBlockHeader::new(block_id).call(&mut client).await
+        }
+    }).await;
+
+    header
 }

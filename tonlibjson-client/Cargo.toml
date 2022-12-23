@@ -27,6 +27,7 @@ rand = "0.8"
 itertools = "0.10"
 derive-new = "0.5.9"
 async-trait = "0.1.57"
+tokio-retry = "0.3"
 
 [dev-dependencies]
 hex = { workspace = true }

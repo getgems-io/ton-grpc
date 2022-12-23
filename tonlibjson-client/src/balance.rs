@@ -69,8 +69,8 @@ impl Route {
                         .and_then(|(_, svc)| svc.load())
                         .map(|m| (i, m)))
                     .filter(|(_, metrics)| match criteria {
-                            BlockCriteria::LogicalTime(lt) => metrics.first_block.start_lt <= *lt && *lt < metrics.last_block.end_lt,
-                            BlockCriteria::Seqno(seqno) => metrics.first_block.id.seqno <= *seqno && *seqno < metrics.last_block.id.seqno
+                            BlockCriteria::LogicalTime(lt) => metrics.first_block.0.start_lt <= *lt && *lt < metrics.last_block.0.end_lt,
+                            BlockCriteria::Seqno(seqno) => metrics.first_block.0.id.seqno <= *seqno && *seqno < metrics.last_block.0.id.seqno
                         })
                     .collect();
 
@@ -82,8 +82,8 @@ impl Route {
                         .get_ready_index(i)
                         .and_then(|(_, svc)| svc.load())
                         .map(|m| (i, m)))
-                    .sorted_by_key(|(_, metrics)| -metrics.last_block.id.seqno)
-                    .group_by(|(_, metrics)| metrics.last_block.id.seqno);
+                    .sorted_by_key(|(_, metrics)| -metrics.last_block.0.id.seqno)
+                    .group_by(|(_, metrics)| metrics.last_block.0.id.seqno);
 
 
                 let mut idxs: Vec<(usize, Metrics)> = vec![];
