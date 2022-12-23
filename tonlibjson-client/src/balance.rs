@@ -19,7 +19,7 @@ use crate::cursor_client::Metrics;
 pub enum Route {
     Any,
     Block { chain: i64, criteria: BlockCriteria },
-    Latest
+    Latest { chain: i64 }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -83,14 +83,20 @@ impl Route {
 
                 self.choose_from_vec(&mut idxs)
             },
-            Route::Latest => {
+            Route::Latest { chain } => {
                 let groups = (0..cache.ready_len())
                     .filter_map(|i| cache
                         .get_ready_index(i)
                         .and_then(|(_, svc)| svc.load())
                         .map(|m| (i, m)))
-                    .sorted_by_key(|(_, metrics)| -metrics.last_block.0.id.seqno)
-                    .group_by(|(_, metrics)| metrics.last_block.0.id.seqno);
+                    .sorted_by_key(|(_, metrics)| match chain {
+                        -1 => -metrics.last_block.0.id.seqno,
+                        _ => -metrics.last_block.1.id.seqno
+                    })
+                    .group_by(|(_, metrics)| match chain {
+                        -1 => metrics.last_block.0.id.seqno,
+                        _ => metrics.last_block.1.id.seqno
+                    });
 
 
                 let mut idxs: Vec<(usize, Metrics)> = vec![];
@@ -161,10 +167,10 @@ impl BalanceRequest {
         }
     }
 
-    pub fn latest(request: SessionRequest) -> Self {
+    pub fn latest(chain: i64, request: SessionRequest) -> Self {
         Self {
             request,
-            route: Route::Latest
+            route: Route::Latest { chain }
         }
     }
 
@@ -176,9 +182,11 @@ impl BalanceRequest {
     }
 }
 
+
+// TODO[akostylev0]
 impl From<SessionRequest> for BalanceRequest {
     fn from(request: SessionRequest) -> Self {
-        BalanceRequest::latest(request)
+        BalanceRequest::latest(-1, request)
     }
 }
 
