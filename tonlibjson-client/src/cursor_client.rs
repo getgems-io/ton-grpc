@@ -63,8 +63,8 @@ impl CursorClient {
 
                                     current.replace(masterchain_info.clone());
 
-                                    mtx.send(Some(masterchain_info)).unwrap();
-                                    ctx.send(Some((last_master_chain_header, last_work_chain_header))).unwrap();
+                                    let _ = mtx.send(Some(masterchain_info));
+                                    let _ = ctx.send(Some((last_master_chain_header, last_work_chain_header)));
                                 },
                                 Err(e) => error!(e = ?e, "unable to fetch last headers")
                             }
@@ -109,7 +109,7 @@ impl CursorClient {
 
                                 first_block = Some((mfb.clone(), wfb.clone()));
 
-                                ftx.send(Some((mfb, wfb))).unwrap();
+                                let _ = ftx.send(Some((mfb, wfb)));
                             },
                             Err(e) => error!(e = ?e, "unable to fetch first headers")
                         }

@@ -18,7 +18,7 @@ use crate::cursor_client::Metrics;
 #[derive(Debug, Clone, Copy)]
 pub enum Route {
     Any,
-    Block(BlockCriteria),
+    Block { chain: i64, criteria: BlockCriteria },
     Latest
 }
 
@@ -62,16 +62,23 @@ impl Route {
                     }
                 }
             },
-            Route::Block(criteria) => {
+            Route::Block { chain, criteria} => {
                 let mut idxs = (0..cache.ready_len())
                     .filter_map(|i| cache
                         .get_ready_index(i)
                         .and_then(|(_, svc)| svc.load())
                         .map(|m| (i, m)))
-                    .filter(|(_, metrics)| match criteria {
-                            BlockCriteria::LogicalTime(lt) => metrics.first_block.0.start_lt <= *lt && *lt < metrics.last_block.0.end_lt,
-                            BlockCriteria::Seqno(seqno) => metrics.first_block.0.id.seqno <= *seqno && *seqno < metrics.last_block.0.id.seqno
-                        })
+                    .filter(|(_, metrics)| {
+                        let (first_block, last_block) = match chain {
+                            -1 => (&metrics.first_block.0, &metrics.last_block.0),
+                            _ => (&metrics.first_block.1, &metrics.last_block.1)
+                        };
+
+                        match criteria {
+                            BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt < last_block.end_lt,
+                            BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno < last_block.id.seqno
+                        }
+                    })
                     .collect();
 
                 self.choose_from_vec(&mut idxs)
@@ -147,10 +154,10 @@ impl BalanceRequest {
         }
     }
 
-    pub fn block(criteria: BlockCriteria, request: SessionRequest) -> Self {
+    pub fn block(chain: i64, criteria: BlockCriteria, request: SessionRequest) -> Self {
         Self {
             request,
-            route: Route::Block(criteria)
+            route: Route::Block { chain, criteria }
         }
     }
 
