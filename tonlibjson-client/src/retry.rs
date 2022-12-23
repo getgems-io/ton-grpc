@@ -43,8 +43,7 @@ impl<E, Res> Policy<SessionRequest, Res, E> for RetryPolicy {
             SessionRequest::RunGetMethod { address, method, stack } => Some(
                 SessionRequest::RunGetMethod {address: address.clone(), method: method.clone(), stack: stack.clone()}
             ),
-            SessionRequest::FindFirstBlock {} => Some(SessionRequest::FindFirstBlock {}),
-            SessionRequest::Synchronize {} => Some(SessionRequest::Synchronize {}),
+            SessionRequest::FindFirstBlock { chain_id } => Some(SessionRequest::FindFirstBlock { chain_id: chain_id.clone() }),
             SessionRequest::GetMasterchainInfo {} => Some(SessionRequest::GetMasterchainInfo {})
         }
     }

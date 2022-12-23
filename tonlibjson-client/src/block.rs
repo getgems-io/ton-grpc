@@ -1,23 +1,41 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::time::Duration;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use serde_aux::prelude::*;
+use crate::balance::{BlockCriteria, Route};
+use crate::request::Requestable;
+use crate::request::Routable;
+use derive_new::new;
 
 #[derive(Debug, Serialize, Default)]
 #[serde(tag = "@type", rename = "sync")]
 pub struct Sync {}
 
-#[derive(Debug, Serialize)]
+impl Requestable for Sync {
+    type Response = BlockIdExt;
+
+    fn timeout(&self) -> Duration {
+        Duration::from_secs(5 * 60)
+    }
+}
+
+#[derive(new, Debug, Serialize)]
 #[serde(tag = "@type", rename = "blocks.getBlockHeader")]
 pub struct GetBlockHeader {
     id: BlockIdExt
 }
 
-impl GetBlockHeader {
-    pub fn new(id: BlockIdExt) -> Self {
-        Self {
-            id
+impl Requestable for GetBlockHeader {
+    type Response = BlockHeader;
+}
+
+impl Routable for GetBlockHeader {
+    fn route(&self) -> Route {
+        Route::Block {
+            workchain: self.id.workchain,
+            criteria: BlockCriteria::Seqno(self.id.seqno)
         }
     }
 }
@@ -27,19 +45,21 @@ impl GetBlockHeader {
 pub struct BlockIdExt {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub workchain: i64,
-    pub shard: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub shard: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub seqno: i32,
     pub root_hash: String,
     pub file_hash: String,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(new, Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "ton.blockId")]
 pub struct BlockId {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub workchain: i64,
-    pub shard: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub shard: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub seqno: i32
 }
@@ -104,7 +124,7 @@ pub struct MasterchainInfo {
     pub state_root_hash: String,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
+#[derive(new, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
 #[serde(tag = "@type", rename = "internal.transactionId")]
 pub struct InternalTransactionId {
     pub hash: String,
@@ -112,17 +132,15 @@ pub struct InternalTransactionId {
     pub lt: i64,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(new, Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "@type", rename = "accountAddress")]
 pub struct AccountAddress {
     pub account_address: String,
 }
 
 impl AccountAddress {
-    pub fn new(account_address: String) -> Self {
-        Self {
-            account_address
-        }
+    pub fn workchain_id(&self) -> i64 {
+        todo!()
     }
 }
 
@@ -171,24 +189,37 @@ pub struct RawTransactions {
 #[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]
 pub struct GetMasterchainInfo {}
 
+impl Requestable for GetMasterchainInfo {
+    type Response = MasterchainInfo;
+}
+
+impl Routable for GetMasterchainInfo {}
+
 #[derive(Debug, Serialize)]
 #[serde(tag = "@type", rename = "blocks.lookupBlock")]
 pub struct BlocksLookupBlock {
     pub mode: i32,
     pub id: BlockId,
     pub lt: i64,
-    pub utime: i32
+    pub utime: i32,
+
+    #[serde(skip)]
+    criteria: BlockCriteria
 }
 
 impl BlocksLookupBlock {
     pub fn seqno(id: BlockId) -> Self {
         let mode = 1;
 
+        let seqno = id.seqno;
+
         Self {
             mode,
             id,
             lt: 0,
-            utime: 0
+            utime: 0,
+
+            criteria: BlockCriteria::Seqno(seqno)
         }
     }
 
@@ -199,7 +230,41 @@ impl BlocksLookupBlock {
             mode,
             id,
             lt,
-            utime: 0
+            utime: 0,
+
+            criteria: BlockCriteria::LogicalTime(lt)
+        }
+    }
+}
+
+impl Requestable for BlocksLookupBlock {
+    type Response = BlockIdExt;
+}
+
+impl Routable for BlocksLookupBlock {
+    fn route(&self) -> Route {
+        Route::Block {
+            workchain: self.id.workchain,
+            criteria: self.criteria
+        }
+    }
+}
+
+#[derive(new, Debug, Serialize)]
+#[serde(tag = "@type", rename = "blocks.getShards")]
+pub struct BlocksGetShards {
+    pub id: BlockIdExt
+}
+
+impl Requestable for BlocksGetShards {
+    type Response = ShardsResponse;
+}
+
+impl Routable for BlocksGetShards {
+    fn route(&self) -> Route {
+        Route::Block {
+            workchain: self.id.workchain,
+            criteria: BlockCriteria::Seqno(self.id.seqno)
         }
     }
 }
@@ -210,14 +275,14 @@ pub struct ShardsResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct TransactionsResponse {
+pub struct BlockTransactions {
     pub id: BlockIdExt,
     pub incomplete: bool,
     pub req_count: u32,
     pub transactions: Vec<ShortTxId>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(new, Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.accountTransactionId")]
 pub struct AccountTransactionId {
     pub account: String,
@@ -228,17 +293,23 @@ pub struct AccountTransactionId {
 impl Default for AccountTransactionId {
     fn default() -> Self {
         Self {
-            account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
-            lt: "".to_string(),
+            account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_owned(),
+            lt: "".to_owned(),
         }
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(new, Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "raw.sendMessage")]
 pub struct RawSendMessage {
     pub body: String,
 }
+
+impl Requestable for RawSendMessage {
+    type Response = Value;
+}
+
+impl Routable for RawSendMessage {}
 
 impl From<&ShortTxId> for AccountTransactionId {
     fn from(v: &ShortTxId) -> Self {
@@ -264,22 +335,12 @@ impl SmcLoad {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(new, Debug, Serialize)]
 #[serde(tag = "@type", rename = "smc.runGetMethod")]
 pub struct SmcRunGetMethod {
     id: i64,
     method: SmcMethodId,
     stack: SmcStack
-}
-
-impl SmcRunGetMethod {
-    pub fn new(contract_id: i64, method: SmcMethodId, stack: SmcStack) -> Self {
-        Self {
-            id: contract_id,
-            method,
-            stack
-        }
-    }
 }
 
 pub type SmcStack = Vec<StackEntry>;
@@ -351,6 +412,110 @@ pub enum StackEntry {
 pub struct SmcInfo {
     pub id: i64
 }
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "@type")]
+#[serde(rename = "raw.getAccountState")]
+pub struct RawGetAccountState {
+    #[serde(rename = "account_address")]
+    account_address: AccountAddress
+}
+
+impl RawGetAccountState {
+    pub fn new(address: String) -> Self {
+        Self {
+            account_address: AccountAddress::new(address)
+        }
+    }
+}
+
+impl Requestable for RawGetAccountState {
+    type Response = Value;
+}
+
+impl Routable for RawGetAccountState {}
+
+#[derive(Debug, Serialize)]
+#[serde(tag = "@type")]
+#[serde(rename = "getAccountState")]
+pub struct GetAccountState {
+    account_address: AccountAddress
+}
+
+impl GetAccountState {
+    pub fn new(address: String) -> Self {
+        Self {
+            account_address: AccountAddress::new(address)
+        }
+    }
+}
+
+impl Requestable for GetAccountState {
+    type Response = Value;
+}
+
+impl Routable for GetAccountState {}
+
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(tag = "@type")]
+#[serde(rename = "raw.getTransactionsV2")]
+pub struct RawGetTransactionsV2 {
+    pub account_address: AccountAddress,
+    from_transaction_id: InternalTransactionId,
+    count: i8,
+    try_decode_messages: bool
+}
+
+impl RawGetTransactionsV2 {
+    pub fn new(address: String, from_hash: String, from_lt: i64) -> Self {
+        Self {
+            account_address: AccountAddress::new(address),
+            from_transaction_id: InternalTransactionId::new(from_hash, from_lt),
+            count: 16,
+            try_decode_messages: false
+        }
+    }
+}
+
+impl Requestable for RawGetTransactionsV2 {
+    type Response = RawTransactions;
+}
+
+impl Routable for RawGetTransactionsV2 {
+    fn route(&self) -> Route {
+        Route::Block {
+            workchain: self.account_address.workchain_id(),
+            criteria: BlockCriteria::LogicalTime(self.from_transaction_id.lt)
+        }
+    }
+}
+
+#[derive(new, Debug, Serialize, Clone)]
+#[serde(tag = "@type")]
+#[serde(rename = "blocks.getTransactions")]
+pub struct BlocksGetTransactions {
+    id: BlockIdExt,
+    #[new(value = "135")]
+    mode: i32,
+    #[new(value = "30")]
+    count: i32,
+    after: AccountTransactionId
+}
+
+impl Requestable for BlocksGetTransactions {
+    type Response = BlockTransactions;
+}
+
+impl Routable for BlocksGetTransactions {
+    fn route(&self) -> Route {
+        Route::Block {
+            workchain: self.id.workchain,
+            criteria: BlockCriteria::Seqno(self.id.seqno)
+        }
+    }
+}
+
 
 #[derive(Debug, Deserialize)]
 pub struct TonError {

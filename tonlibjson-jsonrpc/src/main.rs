@@ -12,9 +12,9 @@ use serde_json::{json, Value};
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 use tonlibjson_client::ton::TonClient;
-use tonlibjson_client::block::{BlockIdExt, InternalTransactionId, RawTransaction, ShortTxId, SmcStack};
+use tonlibjson_client::block::{InternalTransactionId, RawTransaction, ShortTxId, SmcStack};
 use crate::params::{RunGetMethodParams, Stack};
-use crate::view::TransactionView;
+use crate::view::{BlockHeaderView, BlockIdExtView, ShardsView, TransactionView};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -164,16 +164,23 @@ impl RpcServer {
         let workchain = params.workchain;
         let shard = params.shard.parse::<i64>()?;
 
-        match (params.seqno, params.lt, params.unixtime) {
+        let response: BlockIdExtView = match (params.seqno, params.lt, params.unixtime) {
             (Some(seqno), None, None) => self.client.look_up_block_by_seqno(workchain, shard, seqno).await,
             (None, Some(lt), None) => self.client.look_up_block_by_lt(workchain, shard, lt).await,
             (None, None, Some(_)) => Err(anyhow!("unixtime is not supported")),
             _ => Err(anyhow!("seqno or lt or unixtime must be provided"))
-        }
+        }?.into();
+
+        let response = serde_json::to_value(response)?;
+
+        Ok(response)
     }
 
     async fn shards(&self, params: ShardsParams) -> RpcResponse<Value> {
-        let response = self.client.get_shards(params.seqno).await?;
+        let response: ShardsView = self.client
+            .get_main_shards(params.seqno)
+            .await?
+            .into();
 
         Ok(serde_json::to_value(response)?)
     }
@@ -181,20 +188,19 @@ impl RpcServer {
     async fn get_block_header(&self, params: BlockHeaderParams) -> RpcResponse<Value> {
         let shard = params.shard.parse::<i64>()?;
 
-        self.client.get_block_header(
-            params.workchain,
-            shard,
-            params.seqno
-        ).await
+        let response: BlockHeaderView = self.client
+            .get_block_header(params.workchain, shard, params.seqno)
+            .await?
+            .into();
+
+        Ok(serde_json::to_value(response)?)
     }
 
     async fn get_block_transactions(&self, params: BlockTransactionsParams) -> RpcResponse<Value> {
         let shard = params.shard.parse::<i64>()?;
         let count = params.count.unwrap_or(200);
 
-        let block_json = self.client.look_up_block_by_seqno(params.workchain, shard, params.seqno).await?;
-
-        let block = serde_json::from_value::<BlockIdExt>(block_json)?;
+        let block = self.client.look_up_block_by_seqno(params.workchain, shard, params.seqno).await?;
 
         let stream = self.client.get_tx_stream(block.clone()).await;
         let txs: Vec<ShortTxId> = stream.try_collect().await?;
@@ -210,6 +216,7 @@ impl RpcServer {
             }).collect();
 
 
+        let block: BlockIdExtView = block.into();
         Ok(json!({
                 "@type": "blocks.transactions",
                 "id": &block,

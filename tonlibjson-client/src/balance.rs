@@ -18,8 +18,10 @@ use crate::cursor_client::Metrics;
 #[derive(Debug, Clone, Copy)]
 pub enum Route {
     Any,
-    Block(BlockCriteria),
-    Latest
+    Block {workchain: i64, criteria: BlockCriteria },
+    Latest,
+    // TODO[akostylev0]
+    // Target(CursorClientDiscover::Key),
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -62,7 +64,8 @@ impl Route {
                     }
                 }
             },
-            Route::Block(criteria) => {
+            Route::Block { workchain, criteria} => {
+                // TODO[akostylev0]
                 let mut idxs = (0..cache.ready_len())
                     .filter_map(|i| cache
                         .get_ready_index(i)
@@ -144,13 +147,6 @@ impl BalanceRequest {
         Self {
             request,
             route: Route::Any
-        }
-    }
-
-    pub fn block(criteria: BlockCriteria, request: SessionRequest) -> Self {
-        Self {
-            request,
-            route: Route::Block(criteria)
         }
     }
 

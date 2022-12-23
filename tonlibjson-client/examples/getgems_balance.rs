@@ -2,7 +2,6 @@ use futures::StreamExt;
 use tokio::time::Instant;
 use tracing::info;
 use tonlibjson_client::block::RawTransaction;
-
 use tonlibjson_client::ton::TonClient;
 
 #[tokio::main]

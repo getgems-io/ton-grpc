@@ -3,9 +3,11 @@ use tokio::time::interval;
 use tower::{Service, ServiceExt};
 use tower::load::{Load, PeakEwma};
 use tracing::info;
+use tonlibjson_client::block::{AccountTransactionId, BlocksGetShards, BlocksGetTransactions};
 use tonlibjson_client::config::AppConfig;
 use tonlibjson_client::cursor_client::CursorClient;
 use tonlibjson_client::make::{CursorClientFactory, ClientFactory};
+use tonlibjson_client::request::Requestable;
 use tonlibjson_client::session::SessionRequest;
 
 use tonlibjson_client::ton_config::load_ton_config;
@@ -20,7 +22,7 @@ async fn main() -> anyhow::Result<()> {
     let client = ClientFactory::default()
         .ready()
         .await?
-        .call(ton_config)
+        .call(ton_config.with_liteserver(ton_config.liteservers.first().take().unwrap()))
         .await?;
 
 
@@ -34,13 +36,17 @@ async fn main() -> anyhow::Result<()> {
     for _ in 0.. 20 * 5 {
         timer.tick().await;
 
-        let current_block = client.load().unwrap().last_block.id.seqno;
+        let current_block = client.load().unwrap().first_block;
 
-        info!("current seqno: {:?}", current_block);
+        info!(chain = current_block.id.workchain, seqno = current_block.id.seqno, "seqno");
 
-        let info = client.ready().await?.call(SessionRequest::GetMasterchainInfo {}).await?;
+        let last_block = client
+            .ready()
+            .await?
+            .call(SessionRequest::FindFirstBlock { chain_id: 0 })
+            .await;
 
-        info!("{:?}", info);
+        info!(last_block =? last_block, "last_block")
     }
 
     Ok(())

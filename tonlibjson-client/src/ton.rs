@@ -2,25 +2,28 @@ use std::path::PathBuf;
 use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt};
 use anyhow::anyhow;
-use serde_json::{json, Value};
-use tower::ServiceExt;
+use serde::de::DeserializeOwned;
+use serde_json::Value;
+use tower::{Layer, ServiceExt};
 use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tower::Service;
 use url::Url;
-use crate::balance::{Balance, BalanceRequest, BlockCriteria};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, SmcStack};
+use crate::balance::{Balance, BalanceRequest, BlockCriteria, Route};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, BlockTransactions, ShortTxId, RawSendMessage, SmcStack, BlocksLookupBlock, BlockId, BlockHeader, RawGetAccountState, GetMasterchainInfo, BlocksGetShards, GetBlockHeader, GetAccountState, RawGetTransactionsV2, BlocksGetTransactions};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
-use crate::request::Request;
+use crate::error::{ErrorLayer, ErrorService};
+use crate::request::{Forward, Requestable};
 use crate::retry::RetryPolicy;
 use crate::session::SessionRequest;
+use crate::request::Routable;
 
 #[derive(Clone)]
 pub struct TonClient {
-    client: Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>
+    client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>
 }
 
 const MAIN_WORKCHAIN: i64 = -1;
@@ -44,7 +47,7 @@ impl TonClient {
             10,
             0.1
         )), client);
-
+        let client = ErrorLayer::default().layer(client);
 
         Ok(Self {
             client
@@ -72,7 +75,7 @@ impl TonClient {
             10,
             0.1
         )), client);
-
+        let client = ErrorLayer::default().layer(client);
 
         Ok(Self {
             client
@@ -89,9 +92,7 @@ impl TonClient {
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
-        let response = self.call_session_request(SessionRequest::GetMasterchainInfo {}).await?;
-
-        Ok(serde_json::from_value(response)?)
+        self.call_ton(GetMasterchainInfo::default()).await
     }
 
     pub async fn look_up_block_by_seqno(
@@ -99,26 +100,18 @@ impl TonClient {
         workchain: i64,
         shard: i64,
         seqno: i32,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<BlockIdExt> {
         if seqno <= 0 {
             return Err(anyhow!("seqno must be greater than 0"));
         }
 
-        let mode: i32 = 1;
-        let criteria = BlockCriteria::Seqno(seqno);
-
-        let request = json!({
-            "@type": "blocks.lookupBlock",
-            "mode": mode,
-            "id": {
-                "@type": "ton.blockId",
-                "workchain": workchain,
-                "shard": shard,
-                "seqno": seqno
-            }
+        let request = BlocksLookupBlock::seqno(BlockId {
+            workchain,
+            shard,
+            seqno
         });
 
-        self.call_with_block(criteria, request).await
+        self.call_ton(request).await
     }
 
     pub async fn look_up_block_by_lt(
@@ -126,41 +119,28 @@ impl TonClient {
         workchain: i64,
         shard: i64,
         lt: i64,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<BlockIdExt> {
         if lt <= 0 {
             return Err(anyhow!("lt must be greater than 0"));
         }
 
-        let mode: i32 = 2;
-        let criteria = BlockCriteria::LogicalTime(lt);
+        let request = BlocksLookupBlock::logical_time(
+            BlockId::new(workchain, shard, 0), lt
+        );
 
-        let request = json!({
-            "@type": "blocks.lookupBlock",
-            "mode": mode,
-            "id": {
-                "@type": "ton.blockId",
-                "workchain": workchain,
-                "shard": shard
-            },
-            "lt": lt
-        });
-
-        self.call_with_block(criteria, request).await
+        self.call_ton(request).await
     }
 
-    pub async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<ShardsResponse> {
+    pub async fn get_shards(&self, workchain: i64, shard: i64, seqno: i32) -> anyhow::Result<ShardsResponse> {
         let block = self
-            .look_up_block_by_seqno(MAIN_WORKCHAIN, MAIN_SHARD, master_seqno)
+            .look_up_block_by_seqno(workchain, shard, seqno)
             .await?;
 
-        let request = json!({
-            "@type": "blocks.getShards",
-            "id": block
-        });
+        self.call_ton(BlocksGetShards::new(block)).await
+    }
 
-        let response = self.call_with_block(BlockCriteria::Seqno(master_seqno), request).await?;
-
-        Ok(serde_json::from_value(response)?)
+    pub async fn get_main_shards(&self, seqno: i32) -> anyhow::Result<ShardsResponse> {
+        self.get_shards(MAIN_WORKCHAIN, MAIN_SHARD, seqno).await
     }
 
     pub async fn get_block_header(
@@ -168,26 +148,16 @@ impl TonClient {
         workchain: i64,
         shard: i64,
         seqno: i32,
-    ) -> anyhow::Result<Value> {
+    ) -> anyhow::Result<BlockHeader> {
         let block = self.look_up_block_by_seqno(workchain, shard, seqno).await?;
 
-        let request = json!({
-            "@type": "blocks.getBlockHeader",
-            "id": block
-        });
-
-        self.call_with_block(BlockCriteria::Seqno(seqno), request).await
+        self.call_ton(GetBlockHeader::new(block)).await
     }
 
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
-        let request = json!({
-            "@type": "raw.getAccountState",
-            "account_address": {
-                "account_address": address
-            }
-        });
+        let request = RawGetAccountState::new(address.to_string());
 
-        let mut response = self.call(request).await?;
+        let mut response = self.call_ton(request).await?;
 
         let code = response["code"].as_str().unwrap_or("");
         let state: &str = if code.is_empty() || code.parse::<i64>().is_ok() {
@@ -211,14 +181,7 @@ impl TonClient {
     }
 
     pub async fn get_account_state(&self, address: &str) -> anyhow::Result<Value> {
-        let request = json!({
-            "@type": "getAccountState",
-            "account_address": {
-                "account_address": address
-            }
-        });
-
-        self.call(request).await
+        self.call_ton(GetAccountState::new(address.to_owned())).await
     }
 
     pub async fn raw_get_transactions(
@@ -227,31 +190,24 @@ impl TonClient {
         from_lt: i64,
         from_hash: &str,
     ) -> anyhow::Result<RawTransactions> {
-        let request = json!({
-            "@type": "raw.getTransactionsV2",
-            "account_address": {
-                "account_address": address
-            },
-            "from_transaction_id": {
-                "@type": "internal.transactionId",
-                "lt": from_lt,
-                "hash": from_hash
-            },
-            "try_decode_messages": false,
-            "count": 16
-        });
+        let request = RawGetTransactionsV2::new(
+            address.to_owned(),
+            from_hash.to_owned(),
+            from_lt
+        );
 
-        let response = self.call_with_block(BlockCriteria::LogicalTime(from_lt), request.clone()).await?;
-        let response: RawTransactions = serde_json::from_value(response)?;
+        let response = self.call_ton(request.clone()).await?;
 
         if response.transactions.len() <= 1 {
-            let archive_response = self.call_with_block(BlockCriteria::LogicalTime(1000000), request).await?;
-            let archive_response: RawTransactions = serde_json::from_value(archive_response)?;
+            let workchain = request.account_address.workchain_id();
+            let forwarded = Forward::new(
+                request,
+                Route::Block { workchain, criteria: BlockCriteria::LogicalTime(1000000) }
+            );
+            let archive_response = self.call_ton(forwarded).await?;
 
-            return if archive_response.transactions.len() <= 1 {
-                Ok(response)
-            } else {
-                Ok(archive_response)
+            if archive_response.transactions.len() > 1 {
+                return Ok(archive_response)
             }
         }
 
@@ -261,28 +217,17 @@ impl TonClient {
     async fn blocks_get_transactions(
         &self,
         block: &BlockIdExt,
-        count: u32,
         tx: Option<AccountTransactionId>
-    ) -> anyhow::Result<TransactionsResponse> {
-        let request = json!({
-            "@type": "blocks.getTransactions",
-            "id": block,
-            "mode": 7 + 128,
-            "count": count,
-            "after": tx.unwrap_or_default(),
-        });
+    ) -> anyhow::Result<BlockTransactions> {
+        let request = BlocksGetTransactions::new(block.clone(), tx.unwrap_or_default());
 
-        let response = self.call_with_block(BlockCriteria::Seqno(block.seqno), request).await?;
-
-        Ok(serde_json::from_value(response)?)
+        self.call_ton(request).await
     }
 
     pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
-        let request = json!(RawSendMessage {
-            body: message.to_string()
-        });
+        let request = RawSendMessage::new(message.to_owned());
 
-        self.call(request).await
+        self.call_ton(request).await
     }
 
     pub async fn get_tx_stream(
@@ -309,7 +254,7 @@ impl TonClient {
                         return anyhow::Ok(None);
                     }
 
-                    let txs= state.this.blocks_get_transactions(&state.block, 30, state.last_tx).await?;
+                    let txs= state.this.blocks_get_transactions(&state.block, state.last_tx).await?;
 
                     tracing::debug!("got {} transactions", txs.transactions.len());
 
@@ -341,7 +286,7 @@ impl TonClient {
             .ok_or_else(||anyhow!("Unexpected missed last_transaction_id"))?;
         let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned())?;
 
-        return Ok(self.get_account_tx_stream_from(address, last_tx));
+        Ok(self.get_account_tx_stream_from(address, last_tx))
     }
 
     pub fn get_account_tx_stream_from(
@@ -399,31 +344,29 @@ impl TonClient {
             .await
     }
 
-    async fn call_session_request(&self, req: SessionRequest) -> anyhow::Result<Value> {
-        let mut ton = self.clone();
-        let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
-        let call = ready.call(req.into()).await.map_err(|e| anyhow!(e))?;
+    async fn call_session_request<D : DeserializeOwned>(&self, req: SessionRequest) -> anyhow::Result<D> {
+        let response = self.client
+            .clone()
+            .ready()
+            .await?
+            .call(req.into())
+            .await?;
 
-        Ok(call)
+        serde_json::from_value(response)
+            .map_err(anyhow::Error::from)
     }
 
-    async fn call(&self, data: Value) -> anyhow::Result<Value> {
-        let request = SessionRequest::Atomic(Request::new(data)?);
+    async fn call_ton<Req : Routable + Requestable>(&self, req: Req) -> anyhow::Result<Req::Response> {
+        let request = req.into_balance_request()?;
 
-        let mut ton = self.clone();
-        let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
-        let call = ready.call(request.into()).await.map_err(|e| anyhow!(e))?;
+        let response = self.client
+            .clone()
+            .ready()
+            .await?
+            .call(request)
+            .await?;
 
-        Ok(call)
-    }
-
-    async fn call_with_block(&self, criteria: BlockCriteria, data: Value) -> anyhow::Result<Value> {
-        let request = BalanceRequest::block(criteria, SessionRequest::Atomic(Request::new(data)?));
-
-        let mut ton = self.clone();
-        let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
-        let call = ready.call(request).await.map_err(|e| anyhow!(e))?;
-
-        Ok(call)
+        serde_json::from_value(response)
+            .map_err(anyhow::Error::from)
     }
 }

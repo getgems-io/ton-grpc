@@ -1,23 +1,37 @@
+use std::borrow::BorrowMut;
 use std::cmp::Ordering;
+use std::future::Future;
+use std::process::Output;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use derive_new::new;
 use futures::{FutureExt, TryFutureExt};
+use futures::future::BoxFuture;
 use tokio::sync::watch::Receiver;
+use tokio::task::JoinHandle;
 use tokio::time::{interval, MissedTickBehavior};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
-use tracing::{error, trace};
-use crate::block::{BlockHeader, BlocksLookupBlock, MasterchainInfo};
-use crate::request::Request;
+use tracing::{debug, error, trace};
+use crate::block::{BlockHeader, BlockId, BlockIdExt, BlocksGetShards, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo};
+use crate::request::{Request, Requestable};
 use crate::session::{SessionClient, SessionRequest};
+
+pub const MAINCHAIN_ID: i64 = -1;
+
+#[derive(new, Clone)]
+pub struct ChainState {
+    pub main_chain: BlockHeader,
+    pub work_chain: BlockHeader
+}
 
 pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
 
-    first_block_rx: Receiver<Option<BlockHeader>>,
-    last_block_rx: Receiver<Option<BlockHeader>>,
+    first_block_rx: Receiver<Option<ChainState>>,
+    last_block_rx: Receiver<Option<ChainState>>,
 
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
@@ -26,6 +40,7 @@ impl CursorClient {
     pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
         let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
+
         tokio::spawn({
             let mut client = client.clone();
             async move {
@@ -36,10 +51,8 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    let masterchain_info: Result<MasterchainInfo> = client
-                        .ready()
-                        .and_then(|c| c.call(SessionRequest::GetMasterchainInfo {}))
-                        .map_ok(|val| serde_json::from_value::<MasterchainInfo>(val).unwrap())
+                    let masterchain_info: Result<MasterchainInfo> = GetMasterchainInfo::default()
+                        .call(client.borrow_mut())
                         .await;
 
                     match masterchain_info {
@@ -54,16 +67,18 @@ impl CursorClient {
                                 }
                             }
 
+                            let state = synchronize(client.borrow_mut()).await;
+
                             let last_block: Result<BlockHeader> = client
                                 .ready()
                                 .and_then(|c| c.call(SessionRequest::Synchronize {}))
                                 .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
                                 .await;
 
-                            match last_block {
-                                Ok(last_block) => {
-                                    masterchain_info.last = last_block.id.clone();
-                                    trace!(seqno = last_block.id.seqno, "block reached");
+                            match state {
+                                Ok(state) => {
+                                    masterchain_info.last = state.main_chain.id.clone();
+                                    trace!(seqno = state.main_chain.id.seqno, "block reached");
 
                                     current.replace(masterchain_info.clone());
 
@@ -82,7 +97,7 @@ impl CursorClient {
         let (ftx, frx) = tokio::sync::watch::channel(None);
         tokio::spawn({
             let mut client = client.clone();
-            let mut first_block: Option<BlockHeader> = None;
+            let mut state: Option<ChainState> = None;
 
             async move {
                 let mut timer = interval(Duration::from_secs(30));
@@ -90,25 +105,21 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    if let Some(fb) = first_block.clone() {
-                        let request = BlocksLookupBlock::seqno(fb.into());
-                        let fb = client
-                            .ready()
-                            .and_then(|c| c.call(SessionRequest::Atomic(Request::new(request).unwrap())))
-                            .await;
-
+                    if let Some(fb) = state.clone() {
+                        let fb = BlocksLookupBlock::seqno(fb.main_chain.into()).call(client.borrow_mut()).await;
                         if let Err(e) = fb {
                             error!("{}", e);
-                            first_block = None;
+                            state = None;
                         } else {
                             trace!("first block still available")
                         }
                     }
 
-                    if first_block.is_none() {
+                    if state.is_none() {
+                        let fs = find_first_state(client.borrow_mut(), )
                         let fb = client
                             .ready()
-                            .and_then(|c| c.call(SessionRequest::FindFirstBlock {}))
+                            .and_then(|c| c.call(SessionRequest::FindFirstBlock { chain_id: MAINCHAIN_ID}))
                             .map_ok(|val| serde_json::from_value::<BlockHeader>(val).unwrap())
                             .await;
 
@@ -135,6 +146,64 @@ impl CursorClient {
             masterchain_info_rx: mrx
         }
     }
+}
+
+async fn synchronize(client: &mut ConcurrencyLimit<SessionClient>) -> Result<ChainState> {
+    let block = Sync::default()
+        .call(client.borrow_mut())
+        .await?;
+
+    let header_request = GetBlockHeader::new(block.clone());
+    let shards_request = BlocksGetShards::new(block.clone());
+
+    let (block_header, shards) = futures::future::try_join(
+        header_request.call(client.borrow_mut()),
+        shards_request.call(client.borrow_mut())
+    ).await?;
+
+    let work_block = shards.shards.first()
+        .ok_or_else(|| anyhow!("workchain shard not found"))?
+        .to_owned();
+    let work_header = GetBlockHeader::new(work_block)
+        .call(client.borrow_mut())
+        .await?;
+
+    Ok(ChainState::new(block_header, work_header))
+}
+
+async fn find_first_state(client: &mut ConcurrencyLimit<SessionClient>, last: BlockIdExt) -> Result<BlockHeader> {
+    let length = last.seqno;
+    let mut cur = length / 2;
+    let mut rhs = length;
+    let mut lhs = 1;
+
+    let workchain = last.workchain;
+    let shard = last.shard;
+
+    let mut block = BlocksLookupBlock::seqno(BlockId {
+        workchain,
+        shard,
+        seqno: cur
+    }).call(client.borrow_mut()).await;
+
+    while lhs < rhs {
+        // TODO[akostylev0] specify error
+        if block.is_err() {
+            lhs = cur + 1;
+        } else {
+            rhs = cur;
+        }
+
+        cur = (lhs + rhs) / 2;
+
+        debug!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
+
+        block = BlocksLookupBlock::seqno(BlockId { workchain, shard, seqno: cur })
+            .call(client.borrow_mut())
+            .await;
+    }
+
+    GetBlockHeader::new(block?).call(client.borrow_mut()).await
 }
 
 impl Service<SessionRequest> for CursorClient {

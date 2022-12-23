@@ -1,23 +1,24 @@
-use std::future::Future;
+use std::borrow::BorrowMut;
+use std::future::{Future, join};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use futures::FutureExt;
+use anyhow::anyhow;
+use futures::{FutureExt, TryFutureExt};
 use serde_json::Value;
 use tower::{Layer, Service, ServiceExt};
 use tower::load::{Load, PeakEwma};
 use tower::load::peak_ewma::Cost;
 use tracing::debug;
 use crate::{client::Client, request::Request};
-use crate::block::{Sync, BlockId, BlockIdExt, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo, SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
+use crate::block::{Sync, BlockId, BlockIdExt, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo, SmcInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack, BlocksGetShards, ShardsResponse};
+use crate::request::Requestable;
 use crate::shared::{SharedLayer, SharedService};
 
 #[derive(Clone)]
 pub enum SessionRequest {
     RunGetMethod { address: String, method: String, stack: SmcStack },
     Atomic(Request),
-    Synchronize {},
-    FindFirstBlock {},
     GetMasterchainInfo {},
 }
 
@@ -55,11 +56,8 @@ impl Service<SessionRequest> for SessionClient {
             SessionRequest::RunGetMethod { address, method, stack} => {
                 self.run_get_method(address, method, stack).boxed()
             },
-            SessionRequest::Synchronize {} => {
-                self.synchronize().boxed()
-            },
-            SessionRequest::FindFirstBlock {} => {
-                self.find_first_block().boxed()
+            SessionRequest::FindFirstBlock { chain_id } => {
+                self.find_first_block(chain_id).boxed()
             },
             SessionRequest::GetMasterchainInfo {} => self.get_masterchain_info().boxed()
         }
@@ -131,97 +129,37 @@ impl SessionClient {
                 .await
         }
     }
+}
 
-    pub fn synchronize(&self) -> impl Future<Output=anyhow::Result<Value>> {
-        let mut client = self.inner.clone();
+async fn find_last_block(client: &mut SharedService<PeakEwma<Client>>, workchain: i64) -> anyhow::Result<BlockIdExt> {
+    let masterchain_info = client
+        .ready()
+        .await?
+        .call(GetMasterchainInfo::default().into_request()?)
+        .await?;
+    let masterchain_info: MasterchainInfo = serde_json::from_value(masterchain_info)?;
 
-        async move {
-            let request = Request::with_timeout(Sync::default(), Duration::from_secs(5 * 60))?;
+    match workchain {
+        -1 => {
+            Ok(masterchain_info.last)
+        },
+        chain_id => {
+            let request = BlocksGetShards::new(masterchain_info.last).into_request()?;
 
-            let response = client
+            let shards = client
                 .ready()
                 .await?
                 .call(request)
                 .await?;
+            let shards: ShardsResponse = serde_json::from_value(shards)?;
 
-            let block = serde_json::from_value::<BlockIdExt>(response)?;
-
-            let request = Request::new(GetBlockHeader::new(block))?;
-            let response = client
-                .ready()
-                .await?
-                .call(request)
-                .await?;
-
-            Ok(response)
-        }
-    }
-
-    pub fn find_first_block(&self) -> impl Future<Output=anyhow::Result<Value>> {
-        let mut client = self.inner.clone();
-
-        async move {
-            let masterchain_info = client
-                .ready()
-                .await?
-                .call(Request::new(GetMasterchainInfo {})?)
-                .await?;
-            let masterchain_info: MasterchainInfo = serde_json::from_value(masterchain_info)?;
-
-            let length = masterchain_info.last.seqno;
-            let mut cur = length / 2;
-            let mut rhs = length;
-            let mut lhs = masterchain_info.init.seqno;
-
-            let workchain = masterchain_info.last.workchain;
-            let shard = masterchain_info.last.shard;
-
-            let request = BlocksLookupBlock::seqno(BlockId {
-                workchain,
-                shard: shard.clone(),
-                seqno: cur
-            });
-            let mut block = client
-                .ready()
-                .await?
-                .call(Request::new(request)?)
-                .await;
-
-            while lhs < rhs {
-                // TODO[akostylev0] specify error
-                if block.is_err() {
-                    lhs = cur + 1;
-                } else {
-                    rhs = cur;
+            for shard in shards.shards {
+                if shard.workchain == chain_id {
+                    return Ok(shard)
                 }
-
-                cur = (lhs + rhs) / 2;
-
-                debug!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
-
-                let request = BlocksLookupBlock::seqno(BlockId {
-                    workchain,
-                    shard: shard.clone(),
-                    seqno: cur
-                });
-
-                block = client
-                    .ready()
-                    .await?
-                    .call(Request::new(request)?)
-                    .await;
             }
 
-            let block: BlockIdExt = serde_json::from_value(block?)?;
-
-            let request = Request::new(GetBlockHeader::new(block))?;
-            let response = client
-                .ready()
-                .await?
-                .call(request)
-                .await?;
-
-            Ok(response)
+            Err(anyhow!("chain not found"))
         }
     }
 }
