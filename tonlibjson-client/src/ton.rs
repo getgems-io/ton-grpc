@@ -11,7 +11,7 @@ use tower::retry::Retry;
 use tower::Service;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest, BlockCriteria};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, ShardsResponse, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, SmcStack};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, TransactionsResponse, ShortTxId, RawSendMessage, SmcStack};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::request::Request;
@@ -148,7 +148,7 @@ impl TonClient {
         self.call_with_block(criteria, request).await
     }
 
-    pub async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<ShardsResponse> {
+    pub async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<BlocksShards> {
         let block = self
             .look_up_block_by_seqno(MAIN_WORKCHAIN, MAIN_SHARD, master_seqno)
             .await?;

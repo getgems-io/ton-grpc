@@ -227,8 +227,18 @@ impl BlocksLookupBlock {
     }
 }
 
+#[derive(new, Debug, Serialize)]
+#[serde(tag = "@type", rename = "blocks.getShards")]
+pub struct BlocksGetShards {
+    id: BlockIdExt
+}
+
+impl Requestable for BlocksGetShards {
+    type Response = BlocksShards;
+}
+
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ShardsResponse {
+pub struct BlocksShards {
     pub shards: Vec<BlockIdExt>,
 }
 
