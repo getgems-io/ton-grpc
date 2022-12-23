@@ -150,7 +150,7 @@ impl AccountAddress {
             return Ok(if workchain == u8::MAX { -1 } else { workchain as i64 })
         }
 
-        Err(anyhow!("unknown address format"))
+        Err(anyhow!("unknown address format: {}", self.account_address))
     }
 }
 
