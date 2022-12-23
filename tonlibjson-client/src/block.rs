@@ -1,6 +1,7 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
+use anyhow::anyhow;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
@@ -138,6 +139,18 @@ impl AccountAddress {
         Self {
             account_address
         }
+    }
+
+    pub fn chain_id(&self) -> anyhow::Result<i64> {
+        if hex::decode(&self.account_address).is_ok() {
+            return Ok(-1)
+        } else if let Ok(data) = base64::decode_config(&self.account_address, base64::URL_SAFE) {
+            let workchain = data[1];
+
+            return Ok(if workchain == u8::MAX { -1 } else { workchain as i64 })
+        }
+
+        Err(anyhow!("unknown address format"))
     }
 }
 
@@ -417,8 +430,17 @@ impl Error for TonError {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{Cell, List, Number, Slice, StackEntry, Tuple, SmcMethodId};
+    use crate::block::{Cell, List, Number, Slice, StackEntry, Tuple, SmcMethodId, AccountAddress};
     use serde_json::json;
+    use tracing_test::traced_test;
+
+    #[test]
+    #[traced_test]
+    fn account_address_workchain_id() {
+        let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned());
+
+        assert_eq!(0, tx_id.chain_id().unwrap())
+    }
 
     #[test]
     fn slice_correct_json() {
