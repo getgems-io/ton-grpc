@@ -142,7 +142,9 @@ impl AccountAddress {
     }
 
     pub fn chain_id(&self) -> anyhow::Result<i64> {
-        if hex::decode(&self.account_address).is_ok() {
+        if let Some(pos) = self.account_address.find(":") {
+            return Ok(self.account_address[0..pos].parse()?)
+        } else if hex::decode(&self.account_address).is_ok() {
             return Ok(-1)
         } else if let Ok(data) = base64::decode_config(&self.account_address, base64::URL_SAFE) {
             let workchain = data[1];
@@ -438,7 +440,12 @@ mod tests {
     #[traced_test]
     fn account_address_workchain_id() {
         let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned());
+        assert_eq!(0, tx_id.chain_id().unwrap());
 
+        let tx_id = AccountAddress::new("-1:qweq".to_owned());
+        assert_eq!(-1, tx_id.chain_id().unwrap());
+
+        let tx_id = AccountAddress::new("0:qweq".to_owned());
         assert_eq!(0, tx_id.chain_id().unwrap())
     }
 
