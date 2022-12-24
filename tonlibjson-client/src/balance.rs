@@ -14,6 +14,7 @@ use crate::discover::CursorClientDiscover;
 use itertools::Itertools;
 use rand::seq::index::sample;
 use crate::cursor_client::Metrics;
+use crate::request::{RequestableWrapper, Routable};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Route {
@@ -151,19 +152,26 @@ pub struct BalanceRequest {
     pub route: Route
 }
 
+impl<T> TryFrom<RequestableWrapper<T>> for BalanceRequest where T : Routable {
+    type Error = anyhow::Error;
+
+    fn try_from(req: RequestableWrapper<T>) -> Result<Self, Self::Error> {
+        let route = req.inner.route()?;
+
+        req.inner.into_request()
+            .map(SessionRequest::Atomic)
+            .map(|r| {
+                BalanceRequest::new(route, r)
+            })
+    }
+}
+
 impl BalanceRequest {
     #[allow(dead_code)]
     pub fn any(request: SessionRequest) -> Self {
         Self {
             request,
             route: Route::Any
-        }
-    }
-
-    pub fn block(chain: i64, criteria: BlockCriteria, request: SessionRequest) -> Self {
-        Self {
-            request,
-            route: Route::Block { chain, criteria }
         }
     }
 

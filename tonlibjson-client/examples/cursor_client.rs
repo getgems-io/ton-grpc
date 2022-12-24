@@ -17,30 +17,24 @@ async fn main() -> anyhow::Result<()> {
     let app_config = AppConfig::from_env()?;
     let ton_config = load_ton_config(app_config.config_url).await?;
 
-    let client = ClientFactory::default()
-        .ready()
-        .await?
-        .call(ton_config)
-        .await?;
+    for ls in ton_config.liteservers.clone() {
+        let client = ClientFactory::default()
+            .ready()
+            .await?
+            .call(ton_config.clone().with_liteserver(&ls))
+            .await?;
 
+        let mut client: CursorClient = CursorClientFactory::create(PeakEwma::new(client, Duration::from_secs(5), 500000.0, tower::load::CompleteOnResponse::default()));
 
-    let mut client: CursorClient = CursorClientFactory::create(PeakEwma::new(client, Duration::from_secs(5), 500000.0, tower::load::CompleteOnResponse::default()));
-    let mut timer = interval(Duration::from_secs(5));
+        client.ready().await?;
 
-    client.ready().await?;
+        let metrics = client.load().unwrap();
 
-    info!("client ready");
+        error!(seqno = metrics.first_block.0.id.seqno, lt = metrics.first_block.0.start_lt, "master start");
+        error!(seqno = metrics.last_block.0.id.seqno, lt = metrics.last_block.0.end_lt, "master end");
 
-    for _ in 0.. 20 * 5 {
-        timer.tick().await;
-
-        let current_block = client.load().unwrap().last_block.id.seqno;
-
-        info!("current seqno: {:?}", current_block);
-
-        let info = client.ready().await?.call(SessionRequest::GetMasterchainInfo {}).await?;
-
-        info!("{:?}", info);
+        error!(seqno = metrics.first_block.1.id.seqno, lt = metrics.first_block.1.start_lt, "work start");
+        error!(seqno = metrics.last_block.1.id.seqno, lt = metrics.last_block.1.end_lt, "work end");
     }
 
     Ok(())
