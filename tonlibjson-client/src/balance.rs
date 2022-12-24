@@ -5,6 +5,7 @@ use tower::ready_cache::ReadyCache;
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::marker::PhantomData;
 use std::{fmt, pin::Pin, task::{Context, Poll}};
+use derive_new::new;
 use futures::{future, ready};
 use tracing::{debug, info, trace};
 use tower::BoxError;
@@ -14,7 +15,7 @@ use crate::discover::CursorClientDiscover;
 use itertools::Itertools;
 use rand::seq::index::sample;
 use crate::cursor_client::Metrics;
-use crate::request::{RequestableWrapper, Routable};
+use crate::request::{Requestable, RequestableWrapper, Routable};
 
 #[derive(Debug, Clone, Copy)]
 pub enum Route {
@@ -147,12 +148,13 @@ impl Route {
 }
 
 
+#[derive(new)]
 pub struct BalanceRequest {
-    pub request: SessionRequest,
-    pub route: Route
+    pub route: Route,
+    pub request: SessionRequest
 }
 
-impl<T> TryFrom<RequestableWrapper<T>> for BalanceRequest where T : Routable {
+impl<T> TryFrom<RequestableWrapper<T>> for BalanceRequest where T : Routable + Requestable {
     type Error = anyhow::Error;
 
     fn try_from(req: RequestableWrapper<T>) -> Result<Self, Self::Error> {
@@ -166,27 +168,11 @@ impl<T> TryFrom<RequestableWrapper<T>> for BalanceRequest where T : Routable {
     }
 }
 
-impl BalanceRequest {
-    pub fn latest(chain: i64, request: SessionRequest) -> Self {
-        Self {
-            request,
-            route: Route::Latest { chain }
-        }
-    }
-
-    pub fn new(route: Route, request: SessionRequest) -> Self {
-        Self {
-            request,
-            route
-        }
-    }
-}
-
-
-// TODO[akostylev0]
 impl From<SessionRequest> for BalanceRequest {
     fn from(request: SessionRequest) -> Self {
-        BalanceRequest::latest(-1, request)
+        let route = request.route();
+
+        BalanceRequest::new(route, request)
     }
 }
 
