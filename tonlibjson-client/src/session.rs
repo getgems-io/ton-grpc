@@ -1,26 +1,54 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use derive_new::new;
 use futures::FutureExt;
 use serde_json::Value;
 use tower::{Layer, Service};
 use tower::load::{Load, PeakEwma};
 use tower::load::peak_ewma::Cost;
 use crate::{client::Client, request::Request};
+use crate::balance::{BalanceRequest, Route};
 use crate::block::{AccountAddress, GetMasterchainInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
-use crate::request::{Requestable, RequestableWrapper};
+use crate::request::{Requestable, RequestableWrapper, Routable};
 use crate::shared::{SharedLayer, SharedService};
+use crate::request::Callable;
 
-#[derive(Clone)]
+#[derive(new, Clone)]
 pub enum SessionRequest {
-    RunGetMethod { address: String, method: String, stack: SmcStack },
+    RunGetMethod { address: AccountAddress, method: String, stack: SmcStack },
     Atomic(Request),
     GetMasterchainInfo {},
 }
 
+impl Callable for SessionRequest {
+    type Response = Value;
+}
+
 impl From<Request> for SessionRequest {
     fn from(req: Request) -> Self {
-        SessionRequest::Atomic(req)
+        SessionRequest::new_atomic(req)
+    }
+}
+
+impl Routable for SessionRequest {
+    fn route(&self) -> Route {
+        match self {
+            // TODO[akostylev0] fallback for atomic request
+            SessionRequest::Atomic(_) => Route::Latest { chain: -1 },
+            SessionRequest::GetMasterchainInfo {} => Route::Latest { chain: -1 },
+            SessionRequest::RunGetMethod { address, .. } => Route::Latest { chain: address.chain_id() }
+        }
+    }
+}
+
+impl TryFrom<RequestableWrapper<SessionRequest>> for BalanceRequest {
+    type Error = anyhow::Error;
+
+    fn try_from(req: RequestableWrapper<SessionRequest>) -> Result<Self, Self::Error> {
+        let req = req.inner;
+
+        Ok(BalanceRequest::new(req.route(), req))
     }
 }
 
@@ -66,23 +94,26 @@ impl Service<SessionRequest> for SessionClient {
 }
 
 impl SessionClient {
+    // TODO[akostylev0] drop
     fn get_masterchain_info(&self) -> impl Future<Output=anyhow::Result<Value>> {
         let mut client = self.inner.clone();
 
+        // TODO[akostylev0]
         async move {
-            GetMasterchainInfo::default().call_value(&mut client).await
+            let response = GetMasterchainInfo::default().call(&mut client).await?;
+
+            Ok(serde_json::to_value(response)?)
         }
     }
 
-    fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> impl Future<Output=anyhow::Result<Value>> {
+    fn run_get_method(&self, address: AccountAddress, method: String, stack: SmcStack) -> impl Future<Output=anyhow::Result<Value>> {
         let mut client = self.inner.clone();
 
         async move {
-            let address = AccountAddress::new(address)?;
             let info = SmcLoad::new(address).call(&mut client).await?;
 
             SmcRunGetMethod::new(info.id, SmcMethodId::new_name(method), stack)
-                .call_value(&mut client)
+                .call(&mut client)
                 .await
         }
     }

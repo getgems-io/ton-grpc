@@ -9,19 +9,9 @@ use tower::{Service, ServiceExt};
 use crate::balance::Route;
 
 #[async_trait]
-pub trait Requestable where Self : Serialize + Sized {
+pub trait Callable : Sized {
     type Response : DeserializeOwned;
-
-    fn timeout(&self) -> Duration {
-        Duration::from_secs(3)
-    }
-
-    fn into_request(self) -> anyhow::Result<Request> {
-        let timeout = self.timeout();
-
-        Request::with_timeout(self, timeout)
-    }
-
+    
     async fn call<Req, S : Service<Req, Response = Value, Error = anyhow::Error>>(self, client: &mut S) -> Result<Self::Response, S::Error>
         where Req: Send,
               S : Send,
@@ -40,25 +30,28 @@ pub trait Requestable where Self : Serialize + Sized {
 
         Ok(response)
     }
+}
 
-    // TODO[akostylev0] typed response
-    async fn call_value<S : Service<Request, Response = Value, Error = anyhow::Error>>(self, client: &mut S) -> Result<Value, anyhow::Error>
-        where S : Send, S::Future : Send
-    {
-        let request = self.into_request();
+#[async_trait]
+pub trait Requestable where Self : Serialize + Sized {
+    type Response : DeserializeOwned;
 
-        let json = client
-            .ready()
-            .await?
-            .call(request?)
-            .await?;
+    fn timeout(&self) -> Duration {
+        Duration::from_secs(3)
+    }
 
-        Ok(json)
+    fn into_request(self) -> anyhow::Result<Request> {
+        let timeout = self.timeout();
+
+        Request::with_timeout(self, timeout)
     }
 }
 
+impl<T> Callable for T where T : Requestable {
+    type Response = T::Response;
+}
 
-pub trait Routable : Requestable {
+pub trait Routable {
     fn route(&self) -> Route;
 }
 

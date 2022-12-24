@@ -39,11 +39,8 @@ impl<E, Res> Policy<SessionRequest, Res, E> for RetryPolicy {
 
     fn clone_request(&self, req: &SessionRequest) -> Option<SessionRequest> {
         match req {
-            SessionRequest::Atomic(req) => Some(SessionRequest::Atomic(req.with_new_id())),
-            SessionRequest::RunGetMethod { address, method, stack } => Some(
-                SessionRequest::RunGetMethod {address: address.clone(), method: method.clone(), stack: stack.clone()}
-            ),
-            SessionRequest::GetMasterchainInfo {} => Some(SessionRequest::GetMasterchainInfo {})
+            SessionRequest::Atomic(req) => Some(SessionRequest::new_atomic(req.with_new_id())),
+            _ => Some(req.clone())
         }
     }
 }

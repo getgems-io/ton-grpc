@@ -13,8 +13,8 @@ use tower::load::peak_ewma::Cost;
 use tracing::{error, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
-use crate::request::Requestable;
 use crate::session::{SessionClient, SessionRequest};
+use crate::request::Callable;
 
 pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
@@ -149,9 +149,7 @@ impl Service<SessionRequest> for CursorClient {
         match req {
             SessionRequest::GetMasterchainInfo {} => {
                 let masterchain_info = self.masterchain_info_rx.borrow().as_ref().unwrap().clone();
-                async {
-                    Ok(serde_json::to_value(masterchain_info)?)
-                }.boxed()
+                async { Ok(serde_json::to_value(masterchain_info)?) }.boxed()
             },
             _ => self.client.call(req).boxed()
         }

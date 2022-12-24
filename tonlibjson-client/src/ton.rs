@@ -3,21 +3,21 @@ use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt};
 use anyhow::anyhow;
 use serde_json::Value;
-use tower::{Layer, ServiceExt};
+use tower::Layer;
 use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
-use tower::Service;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest, BlockCriteria, Route};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
-use crate::request::{Forward, Requestable};
+use crate::request::Forward;
 use crate::retry::RetryPolicy;
 use crate::session::SessionRequest;
+use crate::request::Callable;
 
 #[derive(Clone)]
 pub struct TonClient {
@@ -90,7 +90,10 @@ impl TonClient {
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
-        let response = self.call_session_request(SessionRequest::GetMasterchainInfo {}).await?;
+        let mut client = self.client.clone();
+        let response = SessionRequest::new_get_masterchain_info()
+            .call(&mut client)
+            .await?;
 
         Ok(serde_json::from_value(response)?)
     }
@@ -352,16 +355,11 @@ impl TonClient {
     }
 
     pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {
-        self
-            .call_session_request(SessionRequest::RunGetMethod { address, method, stack })
+        let address = AccountAddress::new(address)?;
+        let mut client = self.client.clone();
+
+        SessionRequest::new_run_get_method(address, method, stack)
+            .call(&mut client)
             .await
-    }
-
-    async fn call_session_request(&self, req: SessionRequest) -> anyhow::Result<Value> {
-        let mut ton = self.clone();
-        let ready = ton.client.ready().await.map_err(|e| anyhow!(e))?;
-        let call = ready.call(req.into()).await.map_err(|e| anyhow!(e))?;
-
-        Ok(call)
     }
 }
