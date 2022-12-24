@@ -155,7 +155,7 @@ impl TonClient {
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
         let mut client = self.client.clone();
 
-        let account_address = AccountAddress::new(address.to_owned());
+        let account_address = AccountAddress::new(address.to_owned())?;
 
         let mut response = RawGetAccountState::new(account_address)
             .call(&mut client)
@@ -185,7 +185,7 @@ impl TonClient {
     pub async fn get_account_state(&self, address: &str) -> anyhow::Result<Value> {
         let mut client = self.client.clone();
 
-        let account_address = AccountAddress::new(address.to_owned());
+        let account_address = AccountAddress::new(address.to_owned())?;
 
         GetAccountState::new(account_address)
             .call(&mut client)
@@ -200,8 +200,8 @@ impl TonClient {
     ) -> anyhow::Result<RawTransactions> {
         let mut client = self.client.clone();
 
-        let address = AccountAddress::new(address.to_owned());
-        let chain = address.chain_id()?;
+        let address = AccountAddress::new(address.to_owned())?;
+        let chain = address.chain_id();
 
         let request = RawGetTransactionsV2::new(
             address,

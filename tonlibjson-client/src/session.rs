@@ -7,7 +7,7 @@ use tower::{Layer, Service};
 use tower::load::{Load, PeakEwma};
 use tower::load::peak_ewma::Cost;
 use crate::{client::Client, request::Request};
-use crate::block::{GetMasterchainInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
+use crate::block::{AccountAddress, GetMasterchainInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
 use crate::request::{Requestable, RequestableWrapper};
 use crate::shared::{SharedLayer, SharedService};
 
@@ -78,6 +78,7 @@ impl SessionClient {
         let mut client = self.inner.clone();
 
         async move {
+            let address = AccountAddress::new(address)?;
             let info = SmcLoad::new(address).call(&mut client).await?;
 
             SmcRunGetMethod::new(info.id, SmcMethodId::new_name(method), stack)
