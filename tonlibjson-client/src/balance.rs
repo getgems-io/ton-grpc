@@ -167,14 +167,6 @@ impl<T> TryFrom<RequestableWrapper<T>> for BalanceRequest where T : Routable {
 }
 
 impl BalanceRequest {
-    #[allow(dead_code)]
-    pub fn any(request: SessionRequest) -> Self {
-        Self {
-            request,
-            route: Route::Any
-        }
-    }
-
     pub fn latest(chain: i64, request: SessionRequest) -> Self {
         Self {
             request,
