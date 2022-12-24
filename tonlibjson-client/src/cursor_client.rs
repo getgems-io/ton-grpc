@@ -12,7 +12,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tracing::{error, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
-use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, GetBlockHeader, GetMasterchainInfo, MasterchainInfo};
+use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::request::Requestable;
 use crate::session::{SessionClient, SessionRequest};
 
@@ -207,7 +207,7 @@ async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>, start: B
     let shard = start.shard;
 
     let mut block = BlocksLookupBlock::seqno(
-        BlockId::new(workchain, shard.clone(), cur)
+        BlockId::new(workchain, shard, cur)
     ).call(client).await;
 
     while lhs < rhs {
@@ -223,7 +223,7 @@ async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>, start: B
         trace!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
 
         block = BlocksLookupBlock::seqno(
-            BlockId::new(workchain, shard.clone(), cur)
+            BlockId::new(workchain, shard, cur)
         ).call(client).await;
     }
 
@@ -231,7 +231,7 @@ async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>, start: B
 
     trace!(seqno = block.seqno, "first seqno");
 
-    GetBlockHeader::new(block).call(client).await
+    BlocksGetBlockHeader::new(block).call(client).await
 }
 
 async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
@@ -272,7 +272,7 @@ async fn fetch_last_headers(client: &mut ConcurrencyLimit<SessionClient>) -> Res
 
     let mut clone = client.clone();
     let (master_chain_header, work_chain_header) = try_join!(
-        GetBlockHeader::new(master_chain_last_block_id).call(&mut clone),
+        BlocksGetBlockHeader::new(master_chain_last_block_id).call(&mut clone),
         wait_for_block_header(work_chain_last_block_id, client)
     )?;
 
@@ -290,7 +290,7 @@ async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLim
         let mut client = client.clone();
 
         async move {
-            GetBlockHeader::new(block_id).call(&mut client).await
+            BlocksGetBlockHeader::new(block_id).call(&mut client).await
         }
     }).await;
 
