@@ -9,7 +9,7 @@ use tracing::{debug};
 use crate::block::GetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
-use crate::request::Request;
+use crate::request::Requestable;
 use crate::session::SessionClient;
 use crate::ton_config::TonConfig;
 
@@ -34,7 +34,9 @@ impl Service<TonConfig> for ClientFactory {
                 .build()
                 .await?;
 
-            let _ = client.call(Request::new(GetMasterchainInfo {})?).await?;
+            let _ = GetMasterchainInfo::default()
+                .call(&mut client)
+                .await?;
 
             debug!("successfully made new client");
 
@@ -118,10 +120,10 @@ impl ClientBuilder {
     async fn build(&self) -> anyhow::Result<Client> {
         let mut client = Client::new();
         if let Some(ref disable_logging) = self.disable_logging {
-            client.call(Request::new(disable_logging.clone())?).await?;
+            disable_logging.clone().call(&mut client).await?;
         }
 
-        client.call(Request::new(self.config.clone())?).await?;
+        self.config.clone().call(&mut client).await?;
 
         Ok(client)
     }

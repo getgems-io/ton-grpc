@@ -7,9 +7,9 @@ use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use serde_aux::prelude::*;
 use crate::balance::{BlockCriteria, Route};
-use crate::request::{Requestable, Routable};
+use crate::request::{Requestable, RequestBody, Routable};
 
-#[derive(Debug, Serialize, Default)]
+#[derive(Debug, Serialize, Default, Clone)]
 #[serde(tag = "@type", rename = "sync")]
 pub struct Sync {}
 
@@ -19,9 +19,13 @@ impl Requestable for Sync {
     fn timeout(&self) -> Duration {
         Duration::from_secs(5 * 60)
     }
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::Sync(self)
+    }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.getBlockHeader")]
 pub struct BlocksGetBlockHeader {
     id: BlockIdExt
@@ -29,6 +33,10 @@ pub struct BlocksGetBlockHeader {
 
 impl Requestable for BlocksGetBlockHeader {
     type Response = BlockHeader;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::BlocksGetBlockHeader(self)
+    }
 }
 
 impl Routable for BlocksGetBlockHeader {
@@ -176,7 +184,7 @@ impl AccountAddress {
     }
 }
 
-#[derive(new, Debug, Serialize)]
+#[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type")]
 #[serde(rename = "raw.getAccountState")]
 pub struct RawGetAccountState {
@@ -186,6 +194,10 @@ pub struct RawGetAccountState {
 
 impl Requestable for RawGetAccountState {
     type Response = Value;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::RawGetAccountState(self)
+    }
 }
 
 impl Routable for RawGetAccountState {
@@ -194,7 +206,7 @@ impl Routable for RawGetAccountState {
     }
 }
 
-#[derive(new, Debug, Serialize)]
+#[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type")]
 #[serde(rename = "getAccountState")]
 pub struct GetAccountState {
@@ -203,6 +215,10 @@ pub struct GetAccountState {
 
 impl Requestable for GetAccountState {
     type Response = Value;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::GetAccountState(self)
+    }
 }
 
 impl Routable for GetAccountState {
@@ -252,15 +268,19 @@ pub struct RawTransactions {
     pub previous_transaction_id: InternalTransactionId,
 }
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]
 pub struct GetMasterchainInfo {}
 
 impl Requestable for GetMasterchainInfo {
     type Response = MasterchainInfo;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::GetMasterchainInfo(self)
+    }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.lookupBlock")]
 pub struct BlocksLookupBlock {
     pub mode: i32,
@@ -274,6 +294,10 @@ pub struct BlocksLookupBlock {
 
 impl Requestable for BlocksLookupBlock {
     type Response = BlockIdExt;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::BlocksLookupBlock(self)
+    }
 }
 
 impl Routable for BlocksLookupBlock {
@@ -312,7 +336,7 @@ impl BlocksLookupBlock {
     }
 }
 
-#[derive(new, Debug, Serialize)]
+#[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.getShards")]
 pub struct BlocksGetShards {
     id: BlockIdExt
@@ -320,6 +344,10 @@ pub struct BlocksGetShards {
 
 impl Requestable for BlocksGetShards {
     type Response = BlocksShards;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::BlocksGetShards(self)
+    }
 }
 
 impl Routable for BlocksGetShards {
@@ -348,6 +376,10 @@ pub struct BlocksGetTransactions {
 
 impl Requestable for BlocksGetTransactions {
     type Response = BlocksTransactions;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::BlocksGetTransactions(self)
+    }
 }
 
 impl Routable for BlocksGetTransactions {
@@ -399,6 +431,10 @@ pub struct RawSendMessage {
 impl Requestable for RawSendMessage {
     // TODO[akostylev0]
     type Response = Value;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::RawSendMessage(self)
+    }
 }
 
 impl Routable for RawSendMessage {
@@ -408,7 +444,7 @@ impl Routable for RawSendMessage {
 }
 
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "smc.load")]
 pub struct SmcLoad {
     pub account_address: AccountAddress
@@ -416,6 +452,10 @@ pub struct SmcLoad {
 
 impl Requestable for SmcLoad {
     type Response = SmcInfo;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::SmcLoad(self)
+    }
 }
 
 impl Routable for SmcLoad {
@@ -432,7 +472,7 @@ impl SmcLoad {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "smc.runGetMethod")]
 pub struct SmcRunGetMethod {
     id: i64,
@@ -442,6 +482,10 @@ pub struct SmcRunGetMethod {
 
 impl Requestable for SmcRunGetMethod {
     type Response = Value;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::SmcRunGetMethod(self)
+    }
 }
 
 impl SmcRunGetMethod {
@@ -456,7 +500,7 @@ impl SmcRunGetMethod {
 
 pub type SmcStack = Vec<StackEntry>;
 
-#[derive(new, Debug, Serialize)]
+#[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type")]
 pub enum SmcMethodId {
     #[serde(rename = "smc.methodIdNumber")]
@@ -538,6 +582,10 @@ pub struct RawGetTransactionsV2 {
 
 impl Requestable for RawGetTransactionsV2 {
     type Response = RawTransactions;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::RawGetTransactionsV2(self)
+    }
 }
 
 impl Routable for RawGetTransactionsV2 {
