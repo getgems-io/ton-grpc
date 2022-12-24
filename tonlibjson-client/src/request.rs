@@ -155,6 +155,27 @@ impl Serialize for RequestBody {
     }
 }
 
+impl Routable for RequestBody {
+    fn route(&self) -> Route {
+        match self {
+            RequestBody::GetMasterchainInfo(b) => b.route(),
+            RequestBody::GetAccountState(b) => b.route(),
+            RequestBody::BlocksGetShards(b) => b.route(),
+            RequestBody::BlocksGetBlockHeader(b) => b.route(),
+            RequestBody::BlocksLookupBlock(b) => b.route(),
+            RequestBody::BlocksGetTransactions(b) => b.route(),
+            RequestBody::RawSendMessage(b) => b.route(),
+            RequestBody::RawGetAccountState(b) => b.route(),
+            RequestBody::RawGetTransactionsV2(b) => b.route(),
+            RequestBody::SmcLoad(b) => b.route(),
+
+            // fallback
+            _ => Route::Latest { chain: -1 }
+        }
+    }
+}
+
+
 #[derive(Serialize, Clone)]
 pub struct Request {
     #[serde(rename="@extra")]

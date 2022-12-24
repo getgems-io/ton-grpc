@@ -14,7 +14,7 @@ use tracing::{error, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::session::{SessionClient, SessionRequest};
-use crate::request::Callable;
+use crate::request::{Callable, Request, RequestBody};
 
 pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
@@ -147,7 +147,7 @@ impl Service<SessionRequest> for CursorClient {
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
         match req {
-            SessionRequest::GetMasterchainInfo {} => {
+            SessionRequest::Atomic(Request { body: RequestBody::GetMasterchainInfo(_), .. }) => {
                 let masterchain_info = self.masterchain_info_rx.borrow().as_ref().unwrap().clone();
                 async { Ok(serde_json::to_value(masterchain_info)?) }.boxed()
             },

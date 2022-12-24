@@ -8,11 +8,11 @@ async fn main() -> anyhow::Result<()> {
 
     let ton = TonClient::from_env().await?;
 
-    let now = Instant::now();
-
     let master = ton.get_masterchain_info().await?;
 
-    stream::iter(master.last.seqno - 10000..master.last.seqno)
+    let now = Instant::now();
+
+    stream::iter(master.last.seqno - 25000..master.last.seqno)
         .for_each_concurrent(500, |seqno| {
             let ton = ton.clone();
             async move {

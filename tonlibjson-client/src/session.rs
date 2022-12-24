@@ -9,16 +9,15 @@ use tower::load::{Load, PeakEwma};
 use tower::load::peak_ewma::Cost;
 use crate::{client::Client, request::Request};
 use crate::balance::{BalanceRequest, Route};
-use crate::block::{AccountAddress, GetMasterchainInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
+use crate::block::{AccountAddress, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
 use crate::request::{Requestable, RequestableWrapper, Routable};
 use crate::shared::{SharedLayer, SharedService};
 use crate::request::Callable;
 
 #[derive(new, Clone)]
 pub enum SessionRequest {
-    RunGetMethod { address: AccountAddress, method: String, stack: SmcStack },
-    Atomic(Request),
-    GetMasterchainInfo {},
+    RunGetMethod { address: AccountAddress, method: SmcMethodId, stack: SmcStack },
+    Atomic(Request)
 }
 
 impl Callable for SessionRequest {
@@ -34,9 +33,7 @@ impl From<Request> for SessionRequest {
 impl Routable for SessionRequest {
     fn route(&self) -> Route {
         match self {
-            // TODO[akostylev0] fallback for atomic request
-            SessionRequest::Atomic(_) => Route::Latest { chain: -1 },
-            SessionRequest::GetMasterchainInfo {} => Route::Latest { chain: -1 },
+            SessionRequest::Atomic(req) => req.body.route(),
             SessionRequest::RunGetMethod { address, .. } => Route::Latest { chain: address.chain_id() }
         }
     }
@@ -87,32 +84,19 @@ impl Service<SessionRequest> for SessionClient {
             },
             SessionRequest::RunGetMethod { address, method, stack} => {
                 self.run_get_method(address, method, stack).boxed()
-            },
-            SessionRequest::GetMasterchainInfo {} => self.get_masterchain_info().boxed()
+            }
         }
     }
 }
 
 impl SessionClient {
-    // TODO[akostylev0] drop
-    fn get_masterchain_info(&self) -> impl Future<Output=anyhow::Result<Value>> {
-        let mut client = self.inner.clone();
-
-        // TODO[akostylev0]
-        async move {
-            let response = GetMasterchainInfo::default().call(&mut client).await?;
-
-            Ok(serde_json::to_value(response)?)
-        }
-    }
-
-    fn run_get_method(&self, address: AccountAddress, method: String, stack: SmcStack) -> impl Future<Output=anyhow::Result<Value>> {
+    fn run_get_method(&self, address: AccountAddress, method: SmcMethodId, stack: SmcStack) -> impl Future<Output=anyhow::Result<Value>> {
         let mut client = self.inner.clone();
 
         async move {
             let info = SmcLoad::new(address).call(&mut client).await?;
 
-            SmcRunGetMethod::new(info.id, SmcMethodId::new_name(method), stack)
+            SmcRunGetMethod::new(info.id, method, stack)
                 .call(&mut client)
                 .await
         }
