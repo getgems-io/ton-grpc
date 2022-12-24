@@ -15,7 +15,7 @@ impl From<MasterchainInfo> for MasterchainInfoView {
         Self {
             init: info.init.into(),
             last: info.last.into(),
-            state_root_hash: info.state_root_hash.clone()
+            state_root_hash: info.state_root_hash
         }
     }
 }

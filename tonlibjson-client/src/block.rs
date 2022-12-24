@@ -162,7 +162,7 @@ impl AccountAddress {
     }
 
     fn parse_chain_id(address: &str) -> anyhow::Result<i64> {
-        if let Some(pos) = address.find(":") {
+        if let Some(pos) = address.find(':') {
             return Ok(address[0..pos].parse()?)
         } else if hex::decode(address).is_ok() {
             return Ok(-1)
