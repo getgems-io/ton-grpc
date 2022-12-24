@@ -280,6 +280,12 @@ impl Requestable for GetMasterchainInfo {
     }
 }
 
+impl Routable for GetMasterchainInfo {
+    fn route(&self) -> Route {
+        Route::Latest { chain: -1 }
+    }
+}
+
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.lookupBlock")]
 pub struct BlocksLookupBlock {

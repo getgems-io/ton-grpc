@@ -10,7 +10,7 @@ use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest, BlockCriteria, Route};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
@@ -91,11 +91,10 @@ impl TonClient {
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
         let mut client = self.client.clone();
-        let response = SessionRequest::new_get_masterchain_info()
-            .call(&mut client)
-            .await?;
 
-        Ok(serde_json::from_value(response)?)
+        GetMasterchainInfo::default()
+            .call(&mut client)
+            .await
     }
 
     pub async fn look_up_block_by_seqno(
@@ -356,6 +355,7 @@ impl TonClient {
 
     pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {
         let address = AccountAddress::new(address)?;
+        let method = SmcMethodId::new_name(method);
         let mut client = self.client.clone();
 
         SessionRequest::new_run_get_method(address, method, stack)

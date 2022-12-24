@@ -9,9 +9,9 @@ use tracing::{debug};
 use crate::block::GetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
-use crate::request::Requestable;
 use crate::session::SessionClient;
 use crate::ton_config::TonConfig;
+use crate::request::Callable;
 
 #[derive(Default, Debug)]
 pub struct ClientFactory;
