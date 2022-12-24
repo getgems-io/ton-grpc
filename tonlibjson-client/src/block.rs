@@ -32,8 +32,8 @@ impl Requestable for BlocksGetBlockHeader {
 }
 
 impl Routable for BlocksGetBlockHeader {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) })
+    fn route(&self) -> Route {
+        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) }
     }
 }
 
@@ -142,27 +142,37 @@ pub struct InternalTransactionId {
 #[serde(tag = "@type", rename = "accountAddress")]
 pub struct AccountAddress {
     pub account_address: String,
+
+    #[serde(skip)]
+    _chain_id: i64
 }
 
 impl AccountAddress {
-    pub fn new(account_address: String) -> Self {
-        Self {
-            account_address
-        }
+    pub fn new(account_address: String) -> anyhow::Result<Self> {
+        let chain_id = Self::parse_chain_id(&account_address)?;
+
+        Ok(Self {
+            account_address,
+            _chain_id: chain_id
+        })
     }
 
-    pub fn chain_id(&self) -> anyhow::Result<i64> {
-        if let Some(pos) = self.account_address.find(":") {
-            return Ok(self.account_address[0..pos].parse()?)
-        } else if hex::decode(&self.account_address).is_ok() {
+    pub fn chain_id(&self) -> i64 {
+        self._chain_id
+    }
+
+    fn parse_chain_id(address: &str) -> anyhow::Result<i64> {
+        if let Some(pos) = address.find(":") {
+            return Ok(address[0..pos].parse()?)
+        } else if hex::decode(address).is_ok() {
             return Ok(-1)
-        } else if let Ok(data) = base64::decode_config(&self.account_address, base64::URL_SAFE) {
+        } else if let Ok(data) = base64::decode_config(address, base64::URL_SAFE) {
             let workchain = data[1];
 
             return Ok(if workchain == u8::MAX { -1 } else { workchain as i64 })
         }
 
-        Err(anyhow!("unknown address format: {}", self.account_address))
+        Err(anyhow!("unknown address format: {}", address))
     }
 }
 
@@ -179,8 +189,8 @@ impl Requestable for RawGetAccountState {
 }
 
 impl Routable for RawGetAccountState {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(Route::Latest { chain: self.account_address.chain_id()? })
+    fn route(&self) -> Route {
+        Route::Latest { chain: self.account_address.chain_id() }
     }
 }
 
@@ -196,8 +206,8 @@ impl Requestable for GetAccountState {
 }
 
 impl Routable for GetAccountState {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(Route::Latest { chain: self.account_address.chain_id()? })
+    fn route(&self) -> Route {
+        Route::Latest { chain: self.account_address.chain_id() }
     }
 }
 
@@ -267,8 +277,8 @@ impl Requestable for BlocksLookupBlock {
 }
 
 impl Routable for BlocksLookupBlock {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(Route::Block { chain: self.id.workchain, criteria: self._criteria })
+    fn route(&self) -> Route {
+        Route::Block { chain: self.id.workchain, criteria: self._criteria }
     }
 }
 
@@ -313,8 +323,8 @@ impl Requestable for BlocksGetShards {
 }
 
 impl Routable for BlocksGetShards {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) })
+    fn route(&self) -> Route {
+        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) }
     }
 }
 
@@ -341,8 +351,8 @@ impl Requestable for BlocksGetTransactions {
 }
 
 impl Routable for BlocksGetTransactions {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) })
+    fn route(&self) -> Route {
+        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) }
     }
 }
 
@@ -392,8 +402,8 @@ impl Requestable for RawSendMessage {
 }
 
 impl Routable for RawSendMessage {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(Route::Any)
+    fn route(&self) -> Route {
+        Route::Any
     }
 }
 
@@ -409,17 +419,15 @@ impl Requestable for SmcLoad {
 }
 
 impl Routable for SmcLoad {
-    fn route(&self) -> anyhow::Result<Route> {
-        self.account_address
-            .chain_id()
-            .map(|chain| Route::Latest { chain })
+    fn route(&self) -> Route {
+        Route::Latest { chain: self.account_address.chain_id() }
     }
 }
 
 impl SmcLoad {
-    pub fn new(address: String) -> Self {
+    pub fn new(address: AccountAddress) -> Self {
         Self {
-            account_address: AccountAddress::new(address)
+            account_address: address
         }
     }
 }
@@ -533,11 +541,11 @@ impl Requestable for RawGetTransactionsV2 {
 }
 
 impl Routable for RawGetTransactionsV2 {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(Route::Block {
-            chain: self.account_address.chain_id()?,
+    fn route(&self) -> Route {
+        Route::Block {
+            chain: self.account_address.chain_id(),
             criteria: BlockCriteria::LogicalTime(self.from_transaction_id.lt)
-        })
+        }
     }
 }
 

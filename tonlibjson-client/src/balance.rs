@@ -156,7 +156,7 @@ impl<T> TryFrom<RequestableWrapper<T>> for BalanceRequest where T : Routable {
     type Error = anyhow::Error;
 
     fn try_from(req: RequestableWrapper<T>) -> Result<Self, Self::Error> {
-        let route = req.inner.route()?;
+        let route = req.inner.route();
 
         req.inner.into_request()
             .map(SessionRequest::Atomic)

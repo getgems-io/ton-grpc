@@ -59,7 +59,7 @@ pub trait Requestable where Self : Serialize + Sized {
 
 
 pub trait Routable : Requestable {
-    fn route(&self) -> anyhow::Result<Route>;
+    fn route(&self) -> Route;
 }
 
 #[derive(new, Debug)]
@@ -87,9 +87,7 @@ impl<Req> Requestable for Forward<Req> where Req : Requestable {
 }
 
 impl<Req> Routable for Forward<Req> where Req : Requestable {
-    fn route(&self) -> anyhow::Result<Route> {
-        Ok(self.route)
-    }
+    fn route(&self) -> Route { self.route }
 }
 
 #[derive(new)]
