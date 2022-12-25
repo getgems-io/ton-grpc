@@ -6,8 +6,9 @@ use serde::{Serialize, Deserialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service, ServiceExt};
-use crate::balance::Route;
+use crate::balance::{BalanceRequest, Route};
 use crate::block::{BlocksGetBlockHeader, BlocksGetShards, BlocksGetTransactions, BlocksLookupBlock, GetAccountState, GetMasterchainInfo, RawGetAccountState, RawGetTransactionsV2, RawSendMessage, SmcLoad, SmcRunGetMethod, Sync};
+use crate::session::SessionRequest;
 
 #[async_trait]
 pub trait Callable : Sized {
@@ -17,9 +18,9 @@ pub trait Callable : Sized {
         where Req: Send,
               S : Send,
               S::Future : Send,
-              RequestableWrapper<Self> : TryInto<Req, Error = S::Error>
+              CallableWrapper<Self> : Into<Req>
     {
-        let request = RequestableWrapper::new(self).try_into()?;
+        let request = CallableWrapper::new(self).into();
 
         let json = client
             .ready()
@@ -42,12 +43,6 @@ pub trait Requestable where Self : Serialize + Sized {
     }
 
     fn into_request_body(self) -> RequestBody;
-
-    fn into_request(self) -> anyhow::Result<Request> {
-        let timeout = self.timeout();
-
-        Request::new(self.into_request_body(), timeout)
-    }
 }
 
 impl<T> Callable for T where T : Requestable {
@@ -80,10 +75,6 @@ impl<Req> Requestable for Forward<Req> where Req : Requestable {
     fn into_request_body(self) -> RequestBody {
         self.req.into_request_body()
     }
-
-    fn into_request(self) -> anyhow::Result<Request> {
-        self.req.into_request()
-    }
 }
 
 impl<Req> Routable for Forward<Req> where Req : Requestable {
@@ -91,15 +82,30 @@ impl<Req> Routable for Forward<Req> where Req : Requestable {
 }
 
 #[derive(new)]
-pub struct RequestableWrapper<T> {
+pub struct CallableWrapper<T> {
     pub inner: T
 }
 
-impl<T> TryFrom<RequestableWrapper<T>> for Request where T : Requestable {
-    type Error = anyhow::Error;
+impl<T> From<CallableWrapper<T>> for Request where T : Requestable {
+    fn from(req: CallableWrapper<T>) -> Self {
+        let timeout = req.inner.timeout();
+        let body = req.inner.into_request_body();
 
-    fn try_from(req: RequestableWrapper<T>) -> Result<Self, Self::Error> {
-        req.inner.into_request()
+        Request::new(body, timeout)
+    }
+}
+
+impl<T> From<CallableWrapper<T>> for SessionRequest where T : Requestable {
+    fn from(req: CallableWrapper<T>) -> Self {
+        SessionRequest::new_atomic(req.into())
+    }
+}
+
+impl<T> From<CallableWrapper<T>> for BalanceRequest where T : Routable, CallableWrapper<T> : Into<SessionRequest> {
+    fn from(req: CallableWrapper<T>) -> Self {
+        let route = req.inner.route();
+
+        BalanceRequest::new(route, req.into())
     }
 }
 
@@ -113,7 +119,8 @@ impl Requestable for Value {
 
 pub type RequestId = Uuid;
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
+#[serde(untagged)]
 pub enum RequestBody {
     Sync(Sync),
 
@@ -133,46 +140,6 @@ pub enum RequestBody {
     SmcRunGetMethod(SmcRunGetMethod),
 
     Value(Value)
-}
-
-impl Serialize for RequestBody {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        match self {
-            RequestBody::Sync(b) => b.serialize(serializer),
-            RequestBody::GetMasterchainInfo(b) => b.serialize(serializer),
-            RequestBody::GetAccountState(b) => b.serialize(serializer),
-            RequestBody::BlocksGetShards(b) => b.serialize(serializer),
-            RequestBody::BlocksGetBlockHeader(b) => b.serialize(serializer),
-            RequestBody::BlocksLookupBlock(b) => b.serialize(serializer),
-            RequestBody::BlocksGetTransactions(b) => b.serialize(serializer),
-            RequestBody::RawSendMessage(b) => b.serialize(serializer),
-            RequestBody::RawGetAccountState(b) => b.serialize(serializer),
-            RequestBody::RawGetTransactionsV2(b) => b.serialize(serializer),
-            RequestBody::SmcLoad(b) => b.serialize(serializer),
-            RequestBody::SmcRunGetMethod(b) => b.serialize(serializer),
-            RequestBody::Value(b) => b.serialize(serializer),
-        }
-    }
-}
-
-impl Routable for RequestBody {
-    fn route(&self) -> Route {
-        match self {
-            RequestBody::GetMasterchainInfo(b) => b.route(),
-            RequestBody::GetAccountState(b) => b.route(),
-            RequestBody::BlocksGetShards(b) => b.route(),
-            RequestBody::BlocksGetBlockHeader(b) => b.route(),
-            RequestBody::BlocksLookupBlock(b) => b.route(),
-            RequestBody::BlocksGetTransactions(b) => b.route(),
-            RequestBody::RawSendMessage(b) => b.route(),
-            RequestBody::RawGetAccountState(b) => b.route(),
-            RequestBody::RawGetTransactionsV2(b) => b.route(),
-            RequestBody::SmcLoad(b) => b.route(),
-
-            // fallback
-            _ => Route::Latest { chain: -1 }
-        }
-    }
 }
 
 
@@ -198,12 +165,12 @@ pub struct Response {
 }
 
 impl Request {
-    pub fn new(body: RequestBody, timeout: Duration) -> anyhow::Result<Self> {
-        Ok(Self {
+    pub fn new(body: RequestBody, timeout: Duration) -> Self {
+        Self {
             id: RequestId::new_v4(),
             timeout,
             body
-        })
+        }
     }
 
     pub fn with_new_id(&self) -> Self {

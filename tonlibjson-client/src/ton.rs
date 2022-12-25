@@ -16,7 +16,7 @@ use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
 use crate::request::Forward;
 use crate::retry::RetryPolicy;
-use crate::session::SessionRequest;
+use crate::session::RunGetMethod;
 use crate::request::Callable;
 
 #[derive(Clone)]
@@ -358,7 +358,7 @@ impl TonClient {
         let method = SmcMethodId::new_name(method);
         let mut client = self.client.clone();
 
-        SessionRequest::new_run_get_method(address, method, stack)
+        RunGetMethod::new(address, method, stack)
             .call(&mut client)
             .await
     }

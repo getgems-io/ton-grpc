@@ -8,9 +8,9 @@ use tower::{Layer, Service};
 use tower::load::{Load, PeakEwma};
 use tower::load::peak_ewma::Cost;
 use crate::{client::Client, request::Request};
-use crate::balance::{BalanceRequest, Route};
+use crate::balance::Route;
 use crate::block::{AccountAddress, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
-use crate::request::{Requestable, RequestableWrapper, Routable};
+use crate::request::{CallableWrapper, Routable};
 use crate::shared::{SharedLayer, SharedService};
 use crate::request::Callable;
 
@@ -20,40 +20,29 @@ pub enum SessionRequest {
     Atomic(Request)
 }
 
-impl Callable for SessionRequest {
+
+#[derive(new)]
+pub struct RunGetMethod {
+    address: AccountAddress,
+    method: SmcMethodId,
+    stack: SmcStack
+}
+
+impl Callable for RunGetMethod {
     type Response = Value;
 }
 
-impl From<Request> for SessionRequest {
-    fn from(req: Request) -> Self {
-        SessionRequest::new_atomic(req)
-    }
-}
-
-impl Routable for SessionRequest {
+impl Routable for RunGetMethod {
     fn route(&self) -> Route {
-        match self {
-            SessionRequest::Atomic(req) => req.body.route(),
-            SessionRequest::RunGetMethod { address, .. } => Route::Latest { chain: address.chain_id() }
-        }
+        Route::Latest { chain: self.address.chain_id() }
     }
 }
 
-impl TryFrom<RequestableWrapper<SessionRequest>> for BalanceRequest {
-    type Error = anyhow::Error;
+impl From<CallableWrapper<RunGetMethod>> for SessionRequest {
+    fn from(value: CallableWrapper<RunGetMethod>) -> Self {
+        let value = value.inner;
 
-    fn try_from(req: RequestableWrapper<SessionRequest>) -> Result<Self, Self::Error> {
-        let req = req.inner;
-
-        Ok(BalanceRequest::new(req.route(), req))
-    }
-}
-
-impl<T> TryFrom<RequestableWrapper<T>> for SessionRequest where T : Requestable {
-    type Error = anyhow::Error;
-
-    fn try_from(req: RequestableWrapper<T>) -> Result<Self, Self::Error> {
-        req.inner.into_request().map(SessionRequest::Atomic)
+        SessionRequest::RunGetMethod { address: value.address, method: value.method, stack: value.stack }
     }
 }
 
