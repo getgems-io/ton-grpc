@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use anyhow::anyhow;
+use base64::{Engine, engine::general_purpose::URL_SAFE as base64};
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
@@ -174,7 +175,7 @@ impl AccountAddress {
             return Ok(address[0..pos].parse()?)
         } else if hex::decode(address).is_ok() {
             return Ok(-1)
-        } else if let Ok(data) = base64::decode_config(address, base64::URL_SAFE) {
+        } else if let Ok(data) = base64.decode(address) {
             let workchain = data[1];
 
             return Ok(if workchain == u8::MAX { -1 } else { workchain as i64 })

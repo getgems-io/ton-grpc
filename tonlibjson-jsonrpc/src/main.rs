@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::anyhow;
 use axum::{Json, Router, routing::post};
+use base64::{Engine, engine::general_purpose::URL_SAFE as base64};
 use futures::future::Either::{Left, Right};
 use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
@@ -279,8 +280,8 @@ impl RpcServer {
     }
 
     async fn send_boc(&self, params: SendBocParams) -> RpcResponse<Value> {
-        let boc = base64::decode(params.boc)?;
-        let b64 = base64::encode(boc);
+        let boc = base64.decode(params.boc)?;
+        let b64 = base64.encode(boc);
 
         self.client.send_message(&b64).await
     }
@@ -354,7 +355,7 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn base64_to_hex(b: &str) -> anyhow::Result<String> {
-    let bytes = base64::decode(b)?;
+    let bytes = base64.decode(b)?;
     let hex = hex::encode(bytes);
 
     Ok(hex)
@@ -362,7 +363,7 @@ fn base64_to_hex(b: &str) -> anyhow::Result<String> {
 
 fn hex_to_base64(b: &str) -> anyhow::Result<String> {
     let bytes = hex::decode(b)?;
-    let base64 = base64::encode(bytes);
+    let encoded = base64.encode(bytes);
 
-    Ok(base64)
+    Ok(encoded)
 }
