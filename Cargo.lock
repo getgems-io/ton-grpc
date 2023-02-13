@@ -1428,7 +1428,7 @@ dependencies = [
  "anyhow",
  "async-stream",
  "async-trait",
- "base64 0.13.1",
+ "base64 0.21.0",
  "config",
  "dashmap",
  "derive-new",
@@ -1459,7 +1459,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
- "base64 0.13.1",
+ "base64 0.21.0",
  "cmake",
  "futures",
  "hex",
