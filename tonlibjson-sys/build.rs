@@ -26,13 +26,14 @@ fn main() {
             .define("CMAKE_C_COMPILER", "clang")
             .define("CMAKE_CXX_COMPILER", "clang++")
             .define("CMAKE_CXX_STANDARD", "14")
+            .define("BUILD_SHARED_LIBS", "OFF")
             .cxxflag("-std=c++14")
             .cxxflag("-stdlib=libc++")
             .cxxflag("-fuse-ld=lld")
             .cxxflag("-Wno-error=unused-command-line-argument")
             .cxxflag("-flto")
             .uses_cxx11()
-            .build_target("tonlibjson_static")
+            .build_target("tonlibjson")
             .build()
     } else {
         Config::new(ton_dir)
@@ -41,9 +42,10 @@ fn main() {
             .define("CMAKE_C_COMPILER", "clang")
             .define("CMAKE_CXX_COMPILER", "clang++")
             .define("CMAKE_CXX_STANDARD", "14")
+            .define("BUILD_SHARED_LIBS", "OFF")
             .cxxflag("-std=c++14")
             .cxxflag("-stdlib=libc++")
-            .build_target("tonlibjson_static")
+            .build_target("tonlibjson")
             .build()
     };
 
@@ -90,11 +92,13 @@ fn main() {
     println!("cargo:rustc-link-lib=static=tddb");
     println!("cargo:rustc-link-lib=static=tddb_utils");
     println!("cargo:rustc-link-lib=static=tdutils");
-
     println!("cargo:rustc-link-lib=static=tl-lite-utils");
+
+    println!("cargo:rustc-link-search=native={}/build/emulator", dst.display());
+    println!("cargo:rustc-link-lib=static=emulator_static");
 
     println!("cargo:rustc-link-search=native={}/build/tonlib", dst.display());
     println!("cargo:rustc-link-lib=static=tonlib");
     println!("cargo:rustc-link-lib=static=tonlibjson_private");
-    println!("cargo:rustc-link-lib=static=tonlibjson_static");
+    println!("cargo:rustc-link-lib=static=tonlibjson");
 }
