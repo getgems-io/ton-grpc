@@ -635,14 +635,14 @@ mod tests {
     #[test]
     #[traced_test]
     fn account_address_workchain_id() {
-        let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned());
-        assert_eq!(0, tx_id.chain_id().unwrap());
+        let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned()).unwrap();
+        assert_eq!(0, tx_id.chain_id());
 
-        let tx_id = AccountAddress::new("-1:qweq".to_owned());
-        assert_eq!(-1, tx_id.chain_id().unwrap());
+        let tx_id = AccountAddress::new("-1:qweq".to_owned()).unwrap();
+        assert_eq!(-1, tx_id.chain_id());
 
-        let tx_id = AccountAddress::new("0:qweq".to_owned());
-        assert_eq!(0, tx_id.chain_id().unwrap())
+        let tx_id = AccountAddress::new("0:qweq".to_owned()).unwrap();
+        assert_eq!(0, tx_id.chain_id())
     }
 
     #[test]

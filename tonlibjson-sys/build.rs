@@ -17,37 +17,10 @@ fn main() {
         ).unwrap();
 
     let ton_dir = if cfg!(feature = "testnet") { "ton-testnet" } else { "ton" };
+    let build_tonlibjson = cfg!(feature = "tonlibjson");
+    let build_emulator = cfg!(feature = "tonemulator");
 
     eprintln!("ton dir is {}", ton_dir);
-
-    let dst= if !is_darwin && is_release {
-        Config::new(ton_dir)
-            .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", "clang")
-            .define("CMAKE_CXX_COMPILER", "clang++")
-            .define("CMAKE_CXX_STANDARD", "14")
-            .define("BUILD_SHARED_LIBS", "OFF")
-            .cxxflag("-std=c++14")
-            .cxxflag("-stdlib=libc++")
-            .cxxflag("-fuse-ld=lld")
-            .cxxflag("-Wno-error=unused-command-line-argument")
-            .cxxflag("-flto")
-            .uses_cxx11()
-            .build_target("tonlibjson")
-            .build()
-    } else {
-        Config::new(ton_dir)
-            .uses_cxx11()
-            .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", "clang")
-            .define("CMAKE_CXX_COMPILER", "clang++")
-            .define("CMAKE_CXX_STANDARD", "14")
-            .define("BUILD_SHARED_LIBS", "OFF")
-            .cxxflag("-std=c++14")
-            .cxxflag("-stdlib=libc++")
-            .build_target("tonlibjson")
-            .build()
-    };
 
     if is_darwin {
         println!("cargo:rustc-link-lib=dylib=c++");
@@ -59,46 +32,116 @@ fn main() {
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
 
-    for item in ["tdnet", "keys", "tdactor", "tl-utils", "tdutils"] {
-        println!("cargo:rustc-link-search=native={}/build/{}", dst.display(), item);
-        println!("cargo:rustc-link-lib=static={}", item)
+    if build_tonlibjson {
+        let dst= if !is_darwin && is_release {
+            Config::new(ton_dir)
+                .define("TON_ONLY_TONLIB", "ON")
+                .define("CMAKE_C_COMPILER", "clang")
+                .define("CMAKE_CXX_COMPILER", "clang++")
+                .define("CMAKE_CXX_STANDARD", "14")
+                .define("BUILD_SHARED_LIBS", "OFF")
+                .cxxflag("-std=c++14")
+                .cxxflag("-stdlib=libc++")
+                .cxxflag("-fuse-ld=lld")
+                .cxxflag("-Wno-error=unused-command-line-argument")
+                .cxxflag("-flto")
+                .uses_cxx11()
+                .build_target("tonlibjson")
+                .build()
+        } else {
+            Config::new(ton_dir)
+                .uses_cxx11()
+                .define("TON_ONLY_TONLIB", "ON")
+                .define("CMAKE_C_COMPILER", "clang")
+                .define("CMAKE_CXX_COMPILER", "clang++")
+                .define("CMAKE_CXX_STANDARD", "14")
+                .define("BUILD_SHARED_LIBS", "OFF")
+                .cxxflag("-std=c++14")
+                .cxxflag("-stdlib=libc++")
+                .build_target("tonlibjson")
+                .build()
+        };
+
+        for item in ["tdnet", "keys", "tdactor", "tl-utils", "tdutils"] {
+            println!("cargo:rustc-link-search=native={}/build/{}", dst.display(), item);
+            println!("cargo:rustc-link-lib=static={}", item)
+        }
+
+        println!("cargo:rustc-link-search=native={}/build/adnl", dst.display());
+        println!("cargo:rustc-link-lib=static=adnllite");
+
+        println!("cargo:rustc-link-search=native={}/build/lite-client", dst.display());
+        println!("cargo:rustc-link-lib=static=lite-client-common");
+
+        println!("cargo:rustc-link-search=native={}/build/crypto", dst.display());
+        println!("cargo:rustc-link-lib=static=ton_crypto");
+        println!("cargo:rustc-link-lib=static=ton_block");
+        println!("cargo:rustc-link-lib=static=smc-envelope");
+
+        println!("cargo:rustc-link-search=native={}/build/tl", dst.display());
+        println!("cargo:rustc-link-lib=static=tl_api");
+        println!("cargo:rustc-link-lib=static=tl_lite_api");
+        println!("cargo:rustc-link-lib=static=tl_tonlib_api");
+        println!("cargo:rustc-link-lib=static=tl_tonlib_api_json");
+
+        println!("cargo:rustc-link-search=native={}/build/tddb", dst.display());
+        println!("cargo:rustc-link-lib=static=tddb_utils");
+
+        println!("cargo:rustc-link-search=native={}/build/third-party/crc32c", dst.display());
+        println!("cargo:rustc-link-lib=static=crc32c");
+
+        println!("cargo:rustc-link-search=native={}/lib", dst.display());
+        println!("cargo:rustc-link-lib=static=tdactor");
+        println!("cargo:rustc-link-lib=static=tddb");
+        println!("cargo:rustc-link-lib=static=tddb_utils");
+        println!("cargo:rustc-link-lib=static=tdutils");
+        println!("cargo:rustc-link-lib=static=tl-lite-utils");
+
+        println!("cargo:rustc-link-search=native={}/build/emulator", dst.display());
+        println!("cargo:rustc-link-lib=static=emulator_static");
+
+        println!("cargo:rustc-link-search=native={}/build/tonlib", dst.display());
+        println!("cargo:rustc-link-lib=static=tonlib");
+        println!("cargo:rustc-link-lib=static=tonlibjson_private");
+        println!("cargo:rustc-link-lib=static=tonlibjson");
     }
 
-    println!("cargo:rustc-link-search=native={}/build/adnl", dst.display());
-    println!("cargo:rustc-link-lib=static=adnllite");
+    if build_emulator {
+        let dst= if !is_darwin && is_release {
+            Config::new(ton_dir)
+                .define("TON_ONLY_TONLIB", "ON")
+                .define("CMAKE_C_COMPILER", "clang")
+                .define("CMAKE_CXX_COMPILER", "clang++")
+                .define("CMAKE_CXX_STANDARD", "14")
+                .define("BUILD_SHARED_LIBS", "OFF")
+                .cxxflag("-std=c++14")
+                .cxxflag("-stdlib=libc++")
+                .cxxflag("-fuse-ld=lld")
+                .cxxflag("-Wno-error=unused-command-line-argument")
+                .cxxflag("-flto")
+                .uses_cxx11()
+                .build_target("emulator_static")
+                .build()
+        } else {
+            Config::new(ton_dir)
+                .uses_cxx11()
+                .define("TON_ONLY_TONLIB", "ON")
+                .define("CMAKE_C_COMPILER", "clang")
+                .define("CMAKE_CXX_COMPILER", "clang++")
+                .define("CMAKE_CXX_STANDARD", "14")
+                .define("BUILD_SHARED_LIBS", "OFF")
+                .cxxflag("-std=c++14")
+                .cxxflag("-stdlib=libc++")
+                .build_target("emulator")
+                .build()
+        };
+        println!("cargo:rustc-link-search=native={}/build/crypto", dst.display());
+        println!("cargo:rustc-link-lib=static=ton_crypto");
+        println!("cargo:rustc-link-lib=static=ton_block");
+        println!("cargo:rustc-link-lib=static=smc-envelope");
 
-    println!("cargo:rustc-link-search=native={}/build/lite-client", dst.display());
-    println!("cargo:rustc-link-lib=static=lite-client-common");
-
-    println!("cargo:rustc-link-search=native={}/build/crypto", dst.display());
-    println!("cargo:rustc-link-lib=static=ton_crypto");
-    println!("cargo:rustc-link-lib=static=ton_block");
-    println!("cargo:rustc-link-lib=static=smc-envelope");
-
-    println!("cargo:rustc-link-search=native={}/build/tl", dst.display());
-    println!("cargo:rustc-link-lib=static=tl_api");
-    println!("cargo:rustc-link-lib=static=tl_lite_api");
-    println!("cargo:rustc-link-lib=static=tl_tonlib_api");
-    println!("cargo:rustc-link-lib=static=tl_tonlib_api_json");
-
-    println!("cargo:rustc-link-search=native={}/build/tddb", dst.display());
-    println!("cargo:rustc-link-lib=static=tddb_utils");
-
-    println!("cargo:rustc-link-search=native={}/build/third-party/crc32c", dst.display());
-    println!("cargo:rustc-link-lib=static=crc32c");
-
-    println!("cargo:rustc-link-search=native={}/lib", dst.display());
-    println!("cargo:rustc-link-lib=static=tdactor");
-    println!("cargo:rustc-link-lib=static=tddb");
-    println!("cargo:rustc-link-lib=static=tddb_utils");
-    println!("cargo:rustc-link-lib=static=tdutils");
-    println!("cargo:rustc-link-lib=static=tl-lite-utils");
-
-    println!("cargo:rustc-link-search=native={}/build/emulator", dst.display());
-    println!("cargo:rustc-link-lib=static=emulator_static");
-
-    println!("cargo:rustc-link-search=native={}/build/tonlib", dst.display());
-    println!("cargo:rustc-link-lib=static=tonlib");
-    println!("cargo:rustc-link-lib=static=tonlibjson_private");
-    println!("cargo:rustc-link-lib=static=tonlibjson");
+        println!("cargo:rustc-link-search=native={}/build/emulator", dst.display());
+        println!("cargo:rustc-link-lib=static=emulator_static");
+        println!("cargo:rustc-link-lib=static=emulator");
+    }
 }
