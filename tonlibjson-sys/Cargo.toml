@@ -16,7 +16,7 @@ pkg-config = "0.3"
 procinfo = "0.4"
 
 [features]
-#default = ["tonlibjson"]
+default = ["tonlibjson", "tonemulator"]
 testnet = []
 tonlibjson = []
 tonemulator = []
