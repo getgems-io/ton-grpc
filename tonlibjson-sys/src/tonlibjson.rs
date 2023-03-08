@@ -87,9 +87,7 @@ impl Client {
             CStr::from_ptr(ptr)
         };
 
-        let str = response.to_str()?;
-
-        Ok(str)
+        Ok(response.to_str()?)
     }
 
     pub fn execute(&self, request: &str) -> Result<&str> {
