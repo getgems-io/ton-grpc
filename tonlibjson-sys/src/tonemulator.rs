@@ -140,10 +140,9 @@ pub mod tests {
     fn tvm_emulator_create_test() {
         let code = "te6cckEBAQEAcQAA3v8AIN0gggFMl7ohggEznLqxn3Gw7UTQ0x/THzHXC//jBOCk8mCDCNcYINMf0x/TH/gjE7vyY+1E0NMf0x/T/9FRMrryoVFEuvKiBPkBVBBV+RDyo/gAkyDXSpbTB9QC+wDo0QGkyMsfyx/L/8ntVBC9ba0=";
         let data = "te6cckEBAQEAKgAAUAAAAAspqaMXeFMWBTkvznPWzYwz6MYIKICIXmLZbe9Dp1kz2XjSSeprfXb5";
+
         let p = TvmEmulator::new(code, data, 1);
-
         assert!(p.is_ok());
-
         let emulator = p.unwrap();
 
         assert!(emulator.set_libraries("te6cckEBAQEABQAABgAAANAJX0U=").is_ok());
@@ -155,9 +154,23 @@ pub mod tests {
     fn tvm_run_get_method_test() {
         let code = "te6cckEBBAEAIAABFP8A9KQT9LzyyAsBAgFiAwIAEaE2DeWGEwIGEwAC0EJ6zz0=";
         let data = "te6cckEBAQEAAgAAAEysuc0=";
-
         let emulator = TvmEmulator::new(code, data, 0).unwrap();
+
         let result = emulator.run_get_method(105222, "te6cckEBAQEABQAABgAAANAJX0U=");
+
+        println!("{:?}", result);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn tvm_send_external_message_test() {
+        TvmEmulator::set_verbosity_level(0);
+        let code = "te6cckEBCgEA7AABFP8A9KQT9LzyyAsBAgEgBQIC+PKDCNcYINMf0z/4I6ofUyC58mPtRNDTH9M/0//0BNFTYIBA9A5voTHyYFFzuvKiB/kBVBCH+RDyowL0BNH4AAGDJaHIQEWAQPRDjhoggED0lm+lbBIglDBTBLneIJMzNwGSbCHis+YyyMsfFMs/Esv/EvQAye1U+A9/iuYEAwACWwAsIYAQ9HhvpSCYAtMH1DAB+wCRMuIBswIBSAkGAgEgCAcAQb5fl2omhpj5jpn+n/mPoCaKkQQCB6BzfQmMktv8ld0fFAAXvZznaiaGmvmOuF/8AATQMOmpuQQ=";
+        let data = "te6cckEBAQEALwAAWQAAAAEAAAAAAAAAABtY0QWqTQGmid9pV0qDlpriOstf5KwjIcX+lmf2oOR8QHHe0ys=";
+        let emulator = TvmEmulator::new(code, data, 0).unwrap();
+
+        let body = "te6cckEBAwEAiwABmU9Ixy590w1KbQEhtnM/bc6Z4R37unJhdZ5qL+c4gcOgXgUIRouixUgkDX5KjSTMO1N5Lyyry8pPJ9mrYFqJyQIAAAABZAnLkpmlwn3AAQEE0AICAGhiAGihZ5e1vhbvvT4MiEuZcPvPZy8sh4bGgqvHe4vMyoD5odzWUAAAAAAAAAAAAAAAAAAAyNE/vw==";
+        let result = emulator.send_external_message(body);
 
         println!("{:?}", result);
         assert!(result.is_ok());
