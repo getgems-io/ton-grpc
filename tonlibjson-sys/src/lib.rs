@@ -6,4 +6,5 @@ mod tonemulator;
 #[cfg(feature = "tonlibjson")]
 pub use self::tonlibjson::Client;
 
+#[cfg(feature = "tonemulator")]
 pub use self::tonemulator::TvmEmulator;
