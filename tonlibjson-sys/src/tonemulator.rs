@@ -25,9 +25,9 @@ extern {
     fn tvm_emulator_destroy(p: *mut c_void);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TvmEmulator {
-    pointer: Arc<Mutex<*mut c_void>>,
+    pointer: Mutex<*mut c_void>,
 }
 
 impl TvmEmulator {
@@ -40,9 +40,9 @@ impl TvmEmulator {
         let data = CString::new(data)?;
 
         Ok(Self {
-            pointer: Arc::new(Mutex::new(unsafe {
+            pointer: Mutex::new(unsafe {
                 tvm_emulator_create(code.as_ptr(), data.as_ptr(), vm_log_verbosity)
-            }))
+            })
         })
     }
 
@@ -127,8 +127,6 @@ impl Drop for TvmEmulator {
 }
 
 unsafe impl Send for TvmEmulator {}
-
-unsafe impl Sync for TvmEmulator {}
 
 
 #[cfg(test)]
