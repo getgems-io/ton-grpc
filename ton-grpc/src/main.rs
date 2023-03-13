@@ -84,6 +84,7 @@ fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> any
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
+    tonlibjson_sys::TvmEmulator::set_verbosity_level(0);
 
     let reflection = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(tvm_emulator::FILE_DESCRIPTOR_SET)

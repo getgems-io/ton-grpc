@@ -1,5 +1,5 @@
 use std::ffi::{c_void, CStr, CString};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use libc::{c_int, c_char, c_uint, c_ulong, c_long};
 use anyhow::{anyhow, Result};
 
@@ -31,7 +31,7 @@ pub struct TvmEmulator {
 }
 
 impl TvmEmulator {
-    fn set_verbosity_level(level: i32) -> bool {
+    pub fn set_verbosity_level(level: i32) -> bool {
         unsafe { emulator_set_verbosity_level(level) }
     }
 

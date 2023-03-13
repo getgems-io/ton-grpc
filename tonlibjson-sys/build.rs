@@ -107,7 +107,7 @@ fn main() {
     }
 
     if build_emulator {
-        let dst= if !is_darwin && is_release {
+        let dst = if !is_darwin && is_release {
             Config::new(ton_dir)
                 .define("TON_ONLY_TONLIB", "ON")
                 .define("CMAKE_C_COMPILER", "clang")
@@ -120,7 +120,7 @@ fn main() {
                 .cxxflag("-Wno-error=unused-command-line-argument")
                 .cxxflag("-flto")
                 .uses_cxx11()
-                .build_target("emulator_static")
+                .build_target("emulator")
                 .build()
         } else {
             Config::new(ton_dir)
