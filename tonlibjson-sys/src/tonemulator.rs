@@ -1,4 +1,5 @@
 use std::ffi::{c_void, CStr, CString};
+use std::sync::{Arc, Mutex};
 use libc::{c_int, c_char, c_uint, c_ulong, c_long};
 use anyhow::{anyhow, Result};
 
@@ -24,9 +25,9 @@ extern {
     fn tvm_emulator_destroy(p: *mut c_void);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TvmEmulator {
-    pointer: *mut c_void,
+    pointer: Arc<Mutex<*mut c_void>>,
 }
 
 impl TvmEmulator {
@@ -39,9 +40,9 @@ impl TvmEmulator {
         let data = CString::new(data)?;
 
         Ok(Self {
-            pointer: unsafe {
+            pointer: Arc::new(Mutex::new(unsafe {
                 tvm_emulator_create(code.as_ptr(), data.as_ptr(), vm_log_verbosity)
-            }
+            }))
         })
     }
 
@@ -49,11 +50,11 @@ impl TvmEmulator {
     pub fn set_libraries(&self, libs_boc: &str) -> Result<bool> {
         let req = CString::new(libs_boc)?;
 
-        Ok(unsafe { tvm_emulator_set_libraries(self.pointer, req.as_ptr()) })
+        Ok(unsafe { tvm_emulator_set_libraries(*self.pointer.lock().unwrap(), req.as_ptr()) })
     }
 
     pub fn set_gas_limit(&self, gas_limit: i64) -> bool {
-        unsafe { tvm_emulator_set_gas_limit(self.pointer, gas_limit) }
+        unsafe { tvm_emulator_set_gas_limit(*self.pointer.lock().unwrap(), gas_limit) }
     }
 
     pub fn set_c7(&self, address: &str, unixtime: u32, balance: u64, rand_seed_hex: &str, config: &str) -> Result<bool> {
@@ -62,7 +63,7 @@ impl TvmEmulator {
         let config = CString::new(config)?;
 
         Ok(unsafe { tvm_emulator_set_c7(
-            self.pointer,
+            *self.pointer.lock().unwrap(),
             address.as_ptr(),
             unixtime,
             balance,
@@ -75,7 +76,7 @@ impl TvmEmulator {
         let stack_boc = CString::new(stack_boc)?;
 
         let result = unsafe {
-            let ptr = tvm_emulator_run_get_method(self.pointer, method_id, stack_boc.as_ptr());
+            let ptr = tvm_emulator_run_get_method(*self.pointer.lock().unwrap(), method_id, stack_boc.as_ptr());
             if ptr.is_null() {
                 return Err(anyhow!("pointer is null"));
             }
@@ -90,7 +91,7 @@ impl TvmEmulator {
         let message_body_boc = CString::new(message_body_boc)?;
 
         let result = unsafe {
-            let ptr = tvm_emulator_send_external_message(self.pointer, message_body_boc.as_ptr());
+            let ptr = tvm_emulator_send_external_message(*self.pointer.lock().unwrap(), message_body_boc.as_ptr());
             if ptr.is_null() {
                 return Err(anyhow!("pointer is null"));
             }
@@ -105,7 +106,7 @@ impl TvmEmulator {
         let message_body_boc = CString::new(message_body_boc)?;
 
         let result = unsafe {
-            let ptr = tvm_emulator_send_internal_message(self.pointer, message_body_boc.as_ptr(), amount);
+            let ptr = tvm_emulator_send_internal_message(*self.pointer.lock().unwrap(), message_body_boc.as_ptr(), amount);
             if ptr.is_null() {
                 return Err(anyhow!("pointer is null"));
             }
@@ -120,10 +121,15 @@ impl TvmEmulator {
 impl Drop for TvmEmulator {
     fn drop(&mut self) {
         unsafe {
-            tvm_emulator_destroy(self.pointer)
+            tvm_emulator_destroy(*self.pointer.lock().unwrap())
         }
     }
 }
+
+unsafe impl Send for TvmEmulator {}
+
+unsafe impl Sync for TvmEmulator {}
+
 
 #[cfg(test)]
 pub mod tests {
@@ -171,6 +177,20 @@ pub mod tests {
 
         let body = "te6cckEBAwEAiwABmU9Ixy590w1KbQEhtnM/bc6Z4R37unJhdZ5qL+c4gcOgXgUIRouixUgkDX5KjSTMO1N5Lyyry8pPJ9mrYFqJyQIAAAABZAnLkpmlwn3AAQEE0AICAGhiAGihZ5e1vhbvvT4MiEuZcPvPZy8sh4bGgqvHe4vMyoD5odzWUAAAAAAAAAAAAAAAAAAAyNE/vw==";
         let result = emulator.send_external_message(body);
+
+        println!("{:?}", result);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn tvm_send_internal_message_test() {
+        TvmEmulator::set_verbosity_level(0);
+        let code = "te6cckECDQEAAdAAART/APSkE/S88sgLAQIBYgMCAAmhH5/gBQICzgcEAgEgBgUAHQDyMs/WM8WAc8WzMntVIAA7O1E0NM/+kAg10nCAJp/AfpA1DAQJBAj4DBwWW1tgAgEgCQgAET6RDBwuvLhTYALXDIhxwCSXwPg0NMDAXGwkl8D4PpA+kAx+gAxcdch+gAx+gAw8AIEs44UMGwiNFIyxwXy4ZUB+kDUMBAj8APgBtMf0z+CEF/MPRRSMLqOhzIQN14yQBPgMDQ0NTWCEC/LJqISuuMCXwSED/LwgCwoAcnCCEIt3FzUFyMv/UATPFhAkgEBwgBDIywVQB88WUAX6AhXLahLLH8s/Im6zlFjPFwGRMuIByQH7AAH2UTXHBfLhkfpAIfAB+kDSADH6AIIK+vCAG6EhlFMVoKHeItcLAcMAIJIGoZE24iDC//LhkiGOPoIQBRONkchQCc8WUAvPFnEkSRRURqBwgBDIywVQB88WUAX6AhXLahLLH8s/Im6zlFjPFwGRMuIByQH7ABBHlBAqN1viDACCAo41JvABghDVMnbbEDdEAG1xcIAQyMsFUAfPFlAF+gIVy2oSyx/LPyJus5RYzxcBkTLiAckB+wCTMDI04lUC8ANqhGIu";
+        let data = "te6cckEBAgEAVAABlQAAAAAAAAMJgA3AYg7i3sgxnyyk1a1EEb5B505IrsYsH6RFmTugKGB3sAM0ui1o/I7J5fMr8wVct4wRDGjgi2GfsnIkqg/6dzElkgEACHRlc3QzfA4c";
+        let emulator = TvmEmulator::new(code, data, 0).unwrap();
+
+        let body = "te6cckEBBQEAwQACDwAAAgQAKUAgAQMCAgMEAgGrSAGaXRa0fkdk8vmV+YKuW8YIhjRwRbDP2TkSVQf9O5iSyQA2ZB341/PoYCGTbNnfvHve1QV6VUI1Iun+2hcd2gdeFRDuaygAAAAAAAAAAAAAAAAAAMADAKVfzD0UAAAAAAAAAACAHfk4ZNa3zjW+wrWrdO9uCikkZxLoPnzxQpl9oWBxQgMwAsUnbNxd2SUfe96ittpj+Int7jiWHRrtJCAU45LvVJ3McxLQCAAAH0OrCQ==";
+        let result = emulator.send_internal_message(body, 1000);
 
         println!("{:?}", result);
         assert!(result.is_ok());

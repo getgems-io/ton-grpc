@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package ton;
+
+service TvmEmulator {
+  rpc Process(stream TvmEmulatorRequest) returns (stream TvmEmulatorResponse);
+}
+
+message TvmEmulatorRequest {
+  oneof Request {
+    TvmEmulatorPrepareRequest prepare = 1;
+    TvmEmulatorRunGetMethodRequest run_get_method = 2;
+  }
+}
+
+message TvmEmulatorResponse {
+  oneof Response {
+    TvmEmulatorPrepareResponse prepare = 1;
+    TvmEmulatorRunGetMethodResponse run_get_method = 2;
+  }
+}
+
+message TvmEmulatorPrepareRequest {
+  string code_boc = 1;
+  string data_boc = 2;
+}
+
+message TvmEmulatorPrepareResponse {
+  bool success = 1;
+}
+
+message TvmEmulatorRunGetMethodRequest {
+  int32 method_id = 1;
+  string stack_boc = 2;
+}
+
+message TvmEmulatorRunGetMethodResponse {
+  int32 vm_exit_code = 1;
+  string gas_used = 2;
+  string vm_log = 3;
+  string stack = 4;
+  optional string missing_library = 5;
+}
