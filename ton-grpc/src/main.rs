@@ -15,10 +15,10 @@ use futures::{Stream, StreamExt};
 use futures::future::ready;
 use serde::Deserialize;
 use tonic::transport::Server;
-use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse};
+use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse};
 use crate::tvm_emulator::tvm_emulator_server::{TvmEmulator, TvmEmulatorServer};
-use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage};
-use crate::tvm_emulator::tvm_emulator_response::Response::{Prepare as PrepareResponse, RunGetMethod as RunGetMethodResponse, SendExternalMessage as SendExternalMessageResponse};
+use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage};
+use crate::tvm_emulator::tvm_emulator_response::Response::{Prepare as PrepareResponse, RunGetMethod as RunGetMethodResponse, SendExternalMessage as SendExternalMessageResponse, SendInternalMessage as SendInternalMessageResponse};
 
 struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
@@ -76,6 +76,14 @@ impl TvmEmulator for TvmEmulatorService {
                         Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
                     }
                 },
+                Ok(TvmEmulatorRequest { request: Some(SendInternalMessage(req)) }) => {
+                    let response = send_internal_message(state, req);
+
+                    match response {
+                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SendInternalMessageResponse(response))}))),
+                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
+                    }
+                }
                 Err(_) | Ok(TvmEmulatorRequest{ request: None }) => ready(None)
             }
         }).boxed();
@@ -90,6 +98,8 @@ fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> any
     };
 
     let response = emu.run_get_method(req.method_id, &req.stack_boc)?;
+    tracing::trace!(method="run_get_method", "{}", response);
+
     let response = serde_json::from_str::<TvmResult<TvmEmulatorRunGetMethodResponse>>(response)?;
 
     response.into()
@@ -101,7 +111,22 @@ fn send_external_message(state: &mut State, req: TvmEmulatorSendExternalMessageR
     };
 
     let response = emu.send_external_message(&req.message_body_boc)?;
+    tracing::trace!(method="send_external_message", "{}", response);
+
     let response = serde_json::from_str::<TvmResult<TvmEmulatorSendExternalMessageResponse>>(response)?;
+
+    response.into()
+}
+
+fn send_internal_message(state: &mut State, req: TvmEmulatorSendInternalMessageRequest) -> anyhow::Result<TvmEmulatorSendInternalMessageResponse> {
+    let Some(emu) = state.emulator.as_ref().take() else {
+        return Err(anyhow!("emulator not initialized"));
+    };
+
+    let response = emu.send_internal_message(&req.message_body_boc, req.amount)?;
+    tracing::trace!(method="send_internal_message", "{}", response);
+
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendInternalMessageResponse>>(response)?;
 
     response.into()
 }
