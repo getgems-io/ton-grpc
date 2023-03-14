@@ -11,6 +11,7 @@ message TvmEmulatorRequest {
     TvmEmulatorPrepareRequest prepare = 1;
     TvmEmulatorRunGetMethodRequest run_get_method = 2;
     TvmEmulatorSendExternalMessageRequest send_external_message = 3;
+    TvmEmulatorSendInternalMessageRequest send_internal_message = 4;
   }
 }
 
@@ -18,7 +19,8 @@ message TvmEmulatorResponse {
   oneof Response {
     TvmEmulatorPrepareResponse prepare = 1;
     TvmEmulatorRunGetMethodResponse run_get_method = 2;
-    TvmEmulatorSendExternalMessageResponse send_external_message = 4;
+    TvmEmulatorSendExternalMessageResponse send_external_message = 3;
+    TvmEmulatorSendInternalMessageResponse send_internal_message = 4;
   }
 }
 
@@ -49,6 +51,22 @@ message TvmEmulatorSendExternalMessageRequest {
 }
 
 message TvmEmulatorSendExternalMessageResponse {
+  int32 vm_exit_code = 1;
+  bool accepted = 2;
+  string gas_used = 3;
+  string vm_log = 4;
+  string new_code = 5;
+  string new_data = 6;
+  optional string missing_library = 7;
+  optional string actions = 8;
+}
+
+message TvmEmulatorSendInternalMessageRequest {
+  uint64 amount = 1;
+  string message_body_boc = 2;
+}
+
+message TvmEmulatorSendInternalMessageResponse {
   int32 vm_exit_code = 1;
   bool accepted = 2;
   string gas_used = 3;
