@@ -15,7 +15,7 @@ use futures::{Stream, StreamExt};
 use futures::future::ready;
 use serde::Deserialize;
 use tonic::transport::Server;
-use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetC7Request, TvmEmulatorSetC7Response, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse};
+use crate::tvm_emulator::{TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetC7Request, TvmEmulatorSetC7Response, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse};
 use crate::tvm_emulator::tvm_emulator_server::{TvmEmulator, TvmEmulatorServer};
 use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::tvm_emulator::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
@@ -51,64 +51,32 @@ impl TvmEmulator for TvmEmulatorService {
 
         let output = stream.scan(State { emulator: None }, |state, msg| {
             match msg {
-                Ok(TvmEmulatorRequest { request: Some(Prepare(prepare))}) => {
-                    let Ok(emulator) = tonlibjson_sys::TvmEmulator::new(&prepare.code_boc, &prepare.data_boc, 1) else {
-                        return ready(Some(Err(Status::internal("cannot create emulator"))));
+                Ok(TvmEmulatorRequest { request: Some(req)}) => {
+                    let response = match req {
+                        Prepare(req) => prepare_emu(state, req).map(PrepareResponse),
+                        RunGetMethod(req) => run_get_method(state, req).map(RunGetMethodResponse),
+                        SendExternalMessage(req) => send_external_message(state, req).map(SendExternalMessageResponse),
+                        SendInternalMessage(req) => send_internal_message(state, req).map(SendInternalMessageResponse),
+                        SetLibraries(req) => set_libraries(state, req).map(SetLibrariesResponse),
+                        SetGasLimit(req) => set_gas_limit(state, req).map(SetGasLimitResponse),
+                        SetC7(req) => set_c7(state, req).map(SetC7Response)
                     };
 
-                    (*state).emulator = Some(emulator);
+                    ready(Some(response
+                        .map(|r| TvmEmulatorResponse { response: Some(r) })
+                        .map_err(|e| Status::internal(e.to_string()))))
 
-                    ready(Some(Ok(TvmEmulatorResponse { response: Some(PrepareResponse(TvmEmulatorPrepareResponse { success: true })) })))
                 },
-                Ok(TvmEmulatorRequest { request: Some(RunGetMethod(req))}) => {
-                    let response = run_get_method(state, req);
+                Ok(TvmEmulatorRequest{ request: None }) => {
+                    tracing::error!(error = ?anyhow!("empty request"));
 
-                    match response {
-                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(RunGetMethodResponse(response)) }))),
-                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
-                    }
+                    ready(None)
                 },
-                Ok(TvmEmulatorRequest { request: Some(SendExternalMessage(req)) }) => {
-                    let response = send_external_message(state, req);
+                Err(e) =>  {
+                    tracing::error!(error = ?e);
 
-                    match response {
-                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SendExternalMessageResponse(response))}))),
-                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
-                    }
-                },
-                Ok(TvmEmulatorRequest { request: Some(SendInternalMessage(req)) }) => {
-                    let response = send_internal_message(state, req);
-
-                    match response {
-                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SendInternalMessageResponse(response))}))),
-                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
-                    }
-                },
-                Ok(TvmEmulatorRequest { request: Some(SetLibraries(req)) }) => {
-                    let response = set_libraries(state, req);
-
-                    match response {
-                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SetLibrariesResponse(response)) }))),
-                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
-                    }
-                },
-                Ok(TvmEmulatorRequest { request: Some(SetGasLimit(req)) }) => {
-                    let response = set_gas_limit(state, req);
-
-                    match response {
-                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SetGasLimitResponse(response)) }))),
-                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
-                    }
-                },
-                Ok(TvmEmulatorRequest { request: Some(SetC7(req)) }) => {
-                    let response = set_c7(state, req);
-
-                    match response {
-                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SetC7Response(response)) }))),
-                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
-                    }
+                    ready(None)
                 }
-                Err(_) | Ok(TvmEmulatorRequest{ request: None }) => ready(None)
             }
         }).boxed();
 
@@ -116,8 +84,18 @@ impl TvmEmulator for TvmEmulatorService {
     }
 }
 
+fn prepare_emu(state: &mut State, req: TvmEmulatorPrepareRequest) -> anyhow::Result<TvmEmulatorPrepareResponse> {
+    if let Ok(emulator) = tonlibjson_sys::TvmEmulator::new(&req.code_boc, &req.data_boc, 1) {
+        state.emulator = Some(emulator);
+
+        Ok(TvmEmulatorPrepareResponse { success: true })
+    } else {
+        Err(anyhow!("cannot create emulator"))
+    }
+}
+
 fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> anyhow::Result<TvmEmulatorRunGetMethodResponse> {
-    let Some(emu) = state.emulator.as_ref().take() else {
+    let Some(emu) = state.emulator.as_ref() else {
         return Err(anyhow!("emulator not initialized"));
     };
 
@@ -130,7 +108,7 @@ fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> any
 }
 
 fn send_external_message(state: &mut State, req: TvmEmulatorSendExternalMessageRequest) -> anyhow::Result<TvmEmulatorSendExternalMessageResponse> {
-    let Some(emu) = state.emulator.as_ref().take() else {
+    let Some(emu) = state.emulator.as_ref() else {
         return Err(anyhow!("emulator not initialized"));
     };
 
@@ -143,7 +121,7 @@ fn send_external_message(state: &mut State, req: TvmEmulatorSendExternalMessageR
 }
 
 fn send_internal_message(state: &mut State, req: TvmEmulatorSendInternalMessageRequest) -> anyhow::Result<TvmEmulatorSendInternalMessageResponse> {
-    let Some(emu) = state.emulator.as_ref().take() else {
+    let Some(emu) = state.emulator.as_ref() else {
         return Err(anyhow!("emulator not initialized"));
     };
 
@@ -156,7 +134,7 @@ fn send_internal_message(state: &mut State, req: TvmEmulatorSendInternalMessageR
 }
 
 fn set_libraries(state: &mut State, req: TvmEmulatorSetLibrariesRequest) -> anyhow::Result<TvmEmulatorSetLibrariesResponse> {
-    let Some(emu) = state.emulator.as_ref().take() else {
+    let Some(emu) = state.emulator.as_ref() else {
         return Err(anyhow!("emulator not initialized"));
     };
 
@@ -167,7 +145,7 @@ fn set_libraries(state: &mut State, req: TvmEmulatorSetLibrariesRequest) -> anyh
 }
 
 fn set_gas_limit(state: &mut State, req: TvmEmulatorSetGasLimitRequest) -> anyhow::Result<TvmEmulatorSetGasLimitResponse> {
-    let Some(emu) = state.emulator.as_ref().take() else {
+    let Some(emu) = state.emulator.as_ref() else {
         return Err(anyhow!("emulator not initialized"));
     };
 
@@ -178,7 +156,7 @@ fn set_gas_limit(state: &mut State, req: TvmEmulatorSetGasLimitRequest) -> anyho
 }
 
 fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> anyhow::Result<TvmEmulatorSetC7Response> {
-    let Some(emu) = state.emulator.as_ref().take() else {
+    let Some(emu) = state.emulator.as_ref() else {
         return Err(anyhow!("emulator not initialized"));
     };
 
