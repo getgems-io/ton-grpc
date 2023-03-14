@@ -9,6 +9,7 @@ mod tvm_emulator {
 }
 
 use std::pin::Pin;
+use std::time::Duration;
 use anyhow::anyhow;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use futures::{Stream, StreamExt};
@@ -85,13 +86,9 @@ impl TvmEmulator for TvmEmulatorService {
 }
 
 fn prepare_emu(state: &mut State, req: TvmEmulatorPrepareRequest) -> anyhow::Result<TvmEmulatorPrepareResponse> {
-    if let Ok(emulator) = tonlibjson_sys::TvmEmulator::new(&req.code_boc, &req.data_boc, 1) {
-        state.emulator = Some(emulator);
+    state.emulator.replace(tonlibjson_sys::TvmEmulator::new(&req.code_boc, &req.data_boc, 1)?);
 
-        Ok(TvmEmulatorPrepareResponse { success: true })
-    } else {
-        Err(anyhow!("cannot create emulator"))
-    }
+    Ok(TvmEmulatorPrepareResponse { success: true })
 }
 
 fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> anyhow::Result<TvmEmulatorRunGetMethodResponse> {
@@ -183,6 +180,8 @@ async fn main() -> anyhow::Result<()> {
     let svc = TvmEmulatorServer::new(route_guide);
 
     Server::builder()
+        .tcp_keepalive(Some(Duration::from_secs(1)))
+        .http2_keepalive_interval(Some(Duration::from_secs(1)))
         .add_service(reflection)
         .add_service(svc)
         .serve(addr)
