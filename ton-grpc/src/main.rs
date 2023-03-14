@@ -33,12 +33,12 @@ struct TvmResult<T> {
     pub data: Option<T>
 }
 
-impl<T> Into<anyhow::Result<T>> for TvmResult<T> where T: Default {
-    fn into(self) -> anyhow::Result<T> {
-        return if self.success {
-            Ok(self.data.unwrap_or_default())
+impl<T> From<TvmResult<T>> for anyhow::Result<T> where T: Default {
+    fn from(value: TvmResult<T>) -> Self {
+        if value.success {
+            Ok(value.data.unwrap_or_default())
         } else {
-            Err(anyhow!(self.error.unwrap_or("ambiguous response".to_owned())))
+            Err(anyhow!(value.error.unwrap_or("ambiguous response".to_owned())))
         }
     }
 }
@@ -169,19 +169,21 @@ async fn main() -> anyhow::Result<()> {
     tonlibjson_sys::TvmEmulator::set_verbosity_level(0);
 
     let reflection = tonic_reflection::server::Builder::configure()
+        .register_encoded_file_descriptor_set(tonic_health::proto::GRPC_HEALTH_V1_FILE_DESCRIPTOR_SET)
         .register_encoded_file_descriptor_set(tvm_emulator::FILE_DESCRIPTOR_SET)
         .build()
         .unwrap();
 
-    let addr = "127.0.0.1:50052".parse().unwrap();
+    let addr = "0.0.0.0:50052".parse().unwrap();
+    let svc = TvmEmulatorServer::new(TvmEmulatorService::default());
 
-    let route_guide = TvmEmulatorService::default();
-
-    let svc = TvmEmulatorServer::new(route_guide);
+    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
+    health_reporter.set_serving::<TvmEmulatorServer<TvmEmulatorService>>().await;
 
     Server::builder()
         .tcp_keepalive(Some(Duration::from_secs(1)))
         .http2_keepalive_interval(Some(Duration::from_secs(1)))
+        .add_service(health_service)
         .add_service(reflection)
         .add_service(svc)
         .serve(addr)
