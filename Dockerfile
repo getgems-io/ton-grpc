@@ -35,19 +35,11 @@ COPY . .
 RUN cargo build -vv --release --target x86_64-unknown-linux-gnu --features "$FEATURES"
 
 
-FROM debian:bullseye-slim AS grpc_runner
-
-RUN apt update && apt install --yes ca-certificates
-
-COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/ton-grpc /app/ton-grpc
-
-CMD ["/app/ton-grpc"]
-
-
 FROM debian:bullseye-slim AS runner
 
 RUN apt update && apt install --yes ca-certificates
 
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/tonlibjson-jsonrpc /app/tonlibjson-jsonrpc
+COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/ton-grpc /app/ton-grpc
 
 CMD ["/app/tonlibjson-jsonrpc"]
