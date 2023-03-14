@@ -15,10 +15,10 @@ use futures::{Stream, StreamExt};
 use futures::future::ready;
 use serde::Deserialize;
 use tonic::transport::Server;
-use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse};
+use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse};
 use crate::tvm_emulator::tvm_emulator_server::{TvmEmulator, TvmEmulatorServer};
-use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage};
-use crate::tvm_emulator::tvm_emulator_response::Response::{Prepare as PrepareResponse, RunGetMethod as RunGetMethodResponse, SendExternalMessage as SendExternalMessageResponse, SendInternalMessage as SendInternalMessageResponse};
+use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetLibraries};
+use crate::tvm_emulator::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetLibrariesResponse};
 
 struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
@@ -83,6 +83,14 @@ impl TvmEmulator for TvmEmulatorService {
                         Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SendInternalMessageResponse(response))}))),
                         Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
                     }
+                },
+                Ok(TvmEmulatorRequest { request: Some(SetLibraries(req)) }) => {
+                    let response = set_libraries(state, req);
+
+                    match response {
+                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SetLibrariesResponse(response)) }))),
+                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
+                    }
                 }
                 Err(_) | Ok(TvmEmulatorRequest{ request: None }) => ready(None)
             }
@@ -129,6 +137,17 @@ fn send_internal_message(state: &mut State, req: TvmEmulatorSendInternalMessageR
     let response = serde_json::from_str::<TvmResult<TvmEmulatorSendInternalMessageResponse>>(response)?;
 
     response.into()
+}
+
+fn set_libraries(state: &mut State, req: TvmEmulatorSetLibrariesRequest) -> anyhow::Result<TvmEmulatorSetLibrariesResponse> {
+    let Some(emu) = state.emulator.as_ref().take() else {
+        return Err(anyhow!("emulator not initialized"));
+    };
+
+    let response = emu.set_libraries(&req.libs_boc)?;
+    tracing::trace!(method="set_libraries", "{}", response);
+
+    Ok(TvmEmulatorSetLibrariesResponse { success: response })
 }
 
 #[tokio::main]
