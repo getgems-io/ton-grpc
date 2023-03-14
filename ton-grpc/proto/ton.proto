@@ -12,15 +12,17 @@ message TvmEmulatorRequest {
     TvmEmulatorRunGetMethodRequest run_get_method = 2;
     TvmEmulatorSendExternalMessageRequest send_external_message = 3;
     TvmEmulatorSendInternalMessageRequest send_internal_message = 4;
+    TvmEmulatorSetLibrariesRequest set_libraries = 5;
   }
 }
 
 message TvmEmulatorResponse {
   oneof Response {
-    TvmEmulatorPrepareResponse prepare = 1;
-    TvmEmulatorRunGetMethodResponse run_get_method = 2;
-    TvmEmulatorSendExternalMessageResponse send_external_message = 3;
-    TvmEmulatorSendInternalMessageResponse send_internal_message = 4;
+    TvmEmulatorPrepareResponse prepare_response = 1;
+    TvmEmulatorRunGetMethodResponse run_get_method_response = 2;
+    TvmEmulatorSendExternalMessageResponse send_external_message_response = 3;
+    TvmEmulatorSendInternalMessageResponse send_internal_message_response = 4;
+    TvmEmulatorSetLibrariesResponse set_libraries_response = 5;
   }
 }
 
@@ -75,4 +77,12 @@ message TvmEmulatorSendInternalMessageResponse {
   string new_data = 6;
   optional string missing_library = 7;
   optional string actions = 8;
+}
+
+message TvmEmulatorSetLibrariesRequest {
+  string libs_boc = 1;
+}
+
+message TvmEmulatorSetLibrariesResponse {
+  bool success = 1;
 }
