@@ -15,10 +15,10 @@ use futures::{Stream, StreamExt};
 use futures::future::ready;
 use serde::Deserialize;
 use tonic::transport::Server;
-use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse};
+use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse};
 use crate::tvm_emulator::tvm_emulator_server::{TvmEmulator, TvmEmulatorServer};
-use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetLibraries};
-use crate::tvm_emulator::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetLibrariesResponse};
+use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetGasLimit, SetLibraries};
+use crate::tvm_emulator::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetGasLimitResponse, SetLibrariesResponse};
 
 struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
@@ -91,6 +91,14 @@ impl TvmEmulator for TvmEmulatorService {
                         Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SetLibrariesResponse(response)) }))),
                         Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
                     }
+                },
+                Ok(TvmEmulatorRequest { request: Some(SetGasLimit(req)) }) => {
+                    let response = set_gas_limit(state, req);
+
+                    match response {
+                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SetGasLimitResponse(response)) }))),
+                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
+                    }
                 }
                 Err(_) | Ok(TvmEmulatorRequest{ request: None }) => ready(None)
             }
@@ -148,6 +156,17 @@ fn set_libraries(state: &mut State, req: TvmEmulatorSetLibrariesRequest) -> anyh
     tracing::trace!(method="set_libraries", "{}", response);
 
     Ok(TvmEmulatorSetLibrariesResponse { success: response })
+}
+
+fn set_gas_limit(state: &mut State, req: TvmEmulatorSetGasLimitRequest) -> anyhow::Result<TvmEmulatorSetGasLimitResponse> {
+    let Some(emu) = state.emulator.as_ref().take() else {
+        return Err(anyhow!("emulator not initialized"));
+    };
+
+    let response = emu.set_gas_limit(req.gas_limit);
+    tracing::trace!(method="set_gas_limit", "{}", response);
+
+    Ok(TvmEmulatorSetGasLimitResponse { success: response })
 }
 
 #[tokio::main]

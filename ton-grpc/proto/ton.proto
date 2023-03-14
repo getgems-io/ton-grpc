@@ -13,6 +13,7 @@ message TvmEmulatorRequest {
     TvmEmulatorSendExternalMessageRequest send_external_message = 3;
     TvmEmulatorSendInternalMessageRequest send_internal_message = 4;
     TvmEmulatorSetLibrariesRequest set_libraries = 5;
+    TvmEmulatorSetGasLimitRequest set_gas_limit = 6;
   }
 }
 
@@ -23,6 +24,7 @@ message TvmEmulatorResponse {
     TvmEmulatorSendExternalMessageResponse send_external_message_response = 3;
     TvmEmulatorSendInternalMessageResponse send_internal_message_response = 4;
     TvmEmulatorSetLibrariesResponse set_libraries_response = 5;
+    TvmEmulatorSetGasLimitResponse set_gas_limit_response = 6;
   }
 }
 
@@ -84,5 +86,13 @@ message TvmEmulatorSetLibrariesRequest {
 }
 
 message TvmEmulatorSetLibrariesResponse {
+  bool success = 1;
+}
+
+message TvmEmulatorSetGasLimitRequest {
+  int64 gas_limit = 1;
+}
+
+message TvmEmulatorSetGasLimitResponse {
   bool success = 1;
 }
