@@ -1,4 +1,4 @@
-FROM rust:1.67.1-bullseye AS builder
+FROM rust:1.68.0-bullseye AS builder
 
 ARG FEATURES
 
@@ -18,10 +18,12 @@ COPY ./Cargo.toml ./Cargo.toml
 RUN USER=root cargo new --lib tonlibjson-sys
 RUN USER=root cargo new --lib tonlibjson-client
 RUN USER=root cargo new --bin tonlibjson-jsonrpc
+RUN USER=root cargo new --bin ton-grpc
 
 COPY ./tonlibjson-sys/Cargo.toml ./tonlibjson-sys/Cargo.toml
 COPY ./tonlibjson-client/Cargo.toml ./tonlibjson-client/Cargo.toml
 COPY ./tonlibjson-jsonrpc/Cargo.toml ./tonlibjson-jsonrpc/Cargo.toml
+COPY ./ton-grpc/Cargo.toml ./ton-grpc/Cargo.toml
 
 ADD .cargo .cargo
 
@@ -31,6 +33,16 @@ RUN cargo build --release --target x86_64-unknown-linux-gnu
 COPY . .
 
 RUN cargo build -vv --release --target x86_64-unknown-linux-gnu --features "$FEATURES"
+
+
+FROM debian:bullseye-slim AS grpc_runner
+
+RUN apt update && apt install --yes ca-certificates
+
+COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/ton-grpc /app/ton-grpc
+
+CMD ["/app/ton-grpc"]
+
 
 FROM debian:bullseye-slim AS runner
 
