@@ -46,7 +46,6 @@ impl TvmEmulator {
         })
     }
 
-    // TODO result
     pub fn set_libraries(&self, libs_boc: &str) -> Result<bool> {
         let req = CString::new(libs_boc)?;
 
