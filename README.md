@@ -26,3 +26,9 @@ curl --request POST 'http://localhost:3030/' \
     "method": "getMasterchainInfo"
 }'
 ```
+
+### ton-grpc
+```bash
+docker pull ghcr.io/akostylev0/tonlibjson:master
+docker run --rm -p 50052:50052 ghcr.io/akostylev0/tonlibjson:master /app/ton-grpc
+```
