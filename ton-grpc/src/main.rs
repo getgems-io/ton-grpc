@@ -15,10 +15,10 @@ use futures::{Stream, StreamExt};
 use futures::future::ready;
 use serde::Deserialize;
 use tonic::transport::Server;
-use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse};
+use crate::tvm_emulator::{TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse};
 use crate::tvm_emulator::tvm_emulator_server::{TvmEmulator, TvmEmulatorServer};
-use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod};
-use crate::tvm_emulator::tvm_emulator_response::Response::{Prepare as PrepareResponse, RunGetMethod as RunGetMethodResponse};
+use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage};
+use crate::tvm_emulator::tvm_emulator_response::Response::{Prepare as PrepareResponse, RunGetMethod as RunGetMethodResponse, SendExternalMessage as SendExternalMessageResponse};
 
 struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
@@ -30,6 +30,16 @@ struct TvmResult<T> {
     pub error: Option<String>,
     #[serde(flatten)]
     pub data: Option<T>
+}
+
+impl<T> Into<anyhow::Result<T>> for TvmResult<T> where T: Default {
+    fn into(self) -> anyhow::Result<T> {
+        return if self.success {
+            Ok(self.data.unwrap_or_default())
+        } else {
+            Err(anyhow!(self.error.unwrap_or("ambiguous response".to_owned())))
+        }
+    }
 }
 
 #[async_trait]
@@ -57,8 +67,16 @@ impl TvmEmulator for TvmEmulatorService {
                         Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(RunGetMethodResponse(response)) }))),
                         Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
                     }
-                }
-                _ => ready(None)
+                },
+                Ok(TvmEmulatorRequest { request: Some(SendExternalMessage(req)) }) => {
+                    let response = send_external_message(state, req);
+
+                    match response {
+                        Ok(response) => ready(Some(Ok(TvmEmulatorResponse { response: Some(SendExternalMessageResponse(response))}))),
+                        Err(e) => ready(Some(Err(Status::internal(e.to_string()))))
+                    }
+                },
+                Err(_) | Ok(TvmEmulatorRequest{ request: None }) => ready(None)
             }
         }).boxed();
 
@@ -74,11 +92,18 @@ fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> any
     let response = emu.run_get_method(req.method_id, &req.stack_boc)?;
     let response = serde_json::from_str::<TvmResult<TvmEmulatorRunGetMethodResponse>>(response)?;
 
-    return if response.success {
-        Ok(response.data.unwrap_or_default())
-    } else {
-        Err(anyhow!(response.error.unwrap_or("ambiguous response".to_owned())))
-    }
+    response.into()
+}
+
+fn send_external_message(state: &mut State, req: TvmEmulatorSendExternalMessageRequest) -> anyhow::Result<TvmEmulatorSendExternalMessageResponse> {
+    let Some(emu) = state.emulator.as_ref().take() else {
+        return Err(anyhow!("emulator not initialized"));
+    };
+
+    let response = emu.send_external_message(&req.message_body_boc)?;
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendExternalMessageResponse>>(response)?;
+
+    response.into()
 }
 
 #[tokio::main]

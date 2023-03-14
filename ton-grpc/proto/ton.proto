@@ -10,6 +10,7 @@ message TvmEmulatorRequest {
   oneof Request {
     TvmEmulatorPrepareRequest prepare = 1;
     TvmEmulatorRunGetMethodRequest run_get_method = 2;
+    TvmEmulatorSendExternalMessageRequest send_external_message = 3;
   }
 }
 
@@ -17,6 +18,7 @@ message TvmEmulatorResponse {
   oneof Response {
     TvmEmulatorPrepareResponse prepare = 1;
     TvmEmulatorRunGetMethodResponse run_get_method = 2;
+    TvmEmulatorSendExternalMessageResponse send_external_message = 4;
   }
 }
 
@@ -40,4 +42,19 @@ message TvmEmulatorRunGetMethodResponse {
   string vm_log = 3;
   string stack = 4;
   optional string missing_library = 5;
+}
+
+message TvmEmulatorSendExternalMessageRequest {
+  string message_body_boc = 1;
+}
+
+message TvmEmulatorSendExternalMessageResponse {
+  int32 vm_exit_code = 1;
+  bool accepted = 2;
+  string gas_used = 3;
+  string vm_log = 4;
+  string new_code = 5;
+  string new_data = 6;
+  optional string missing_library = 7;
+  optional string actions = 8;
 }
