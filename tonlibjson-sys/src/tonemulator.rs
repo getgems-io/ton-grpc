@@ -39,10 +39,15 @@ impl TvmEmulator {
         let code = CString::new(code)?;
         let data = CString::new(data)?;
 
+        let pointer = unsafe {
+            tvm_emulator_create(code.as_ptr(), data.as_ptr(), vm_log_verbosity)
+        };
+        if pointer.is_null() {
+            return Err(anyhow!("pointer is null"));
+        }
+
         Ok(Self {
-            pointer: Mutex::new(unsafe {
-                tvm_emulator_create(code.as_ptr(), data.as_ptr(), vm_log_verbosity)
-            })
+            pointer: Mutex::new(pointer)
         })
     }
 
@@ -137,6 +142,15 @@ pub mod tests {
         let x = TvmEmulator::set_verbosity_level(1);
 
         assert!(x)
+    }
+
+    #[test]
+    fn tvm_emulator_create_bad_input_test() {
+        let code = "qwedsazxc";
+        let data = "hdfkjre";
+
+        let p = TvmEmulator::new(code, data, 1);
+        assert!(p.is_err());
     }
 
     #[test]
