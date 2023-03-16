@@ -186,7 +186,7 @@ async fn main() -> anyhow::Result<()> {
         .add_service(health_service)
         .add_service(reflection)
         .add_service(svc)
-        .serve(addr)
+        .serve_with_shutdown(addr, async move { tokio::signal::ctrl_c().await.unwrap(); })
         .await?;
 
     Ok(())
