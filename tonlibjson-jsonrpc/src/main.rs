@@ -6,7 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use anyhow::anyhow;
 use axum::{Json, Router, routing::post};
-use base64::{Engine, engine::general_purpose::URL_SAFE as base64};
+use base64::{Engine, engine::general_purpose::STANDARD as base64};
 use futures::future::Either::{Left, Right};
 use futures::{TryStreamExt, StreamExt};
 use serde_json::{json, Value};
