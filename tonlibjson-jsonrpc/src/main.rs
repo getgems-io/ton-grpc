@@ -212,13 +212,18 @@ impl RpcServer {
 
         let txs: Vec<ShortTxId> = txs.into_iter()
             .map(|tx: ShortTxId| {
-                let hex = base64_to_hex(&tx.account);
-                if hex.is_err() {
-                    tracing::warn!("unexpected account format: {}", &tx.account);
-                }
+                let address = if tx.account.len() != 64 {
+                    let hex = base64_to_hex(&tx.account);
+                    if hex.is_err() {
+                        tracing::error!("unexpected account format: {}", &tx.account);
+                    }
+                    hex.unwrap()
+                } else {
+                    tx.account
+                };
 
                 ShortTxId {
-                    account: format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap()),
+                    account: format!("{}:{}", block.workchain, address),
                     hash: tx.hash,
                     lt: tx.lt,
                     mode: tx.mode
