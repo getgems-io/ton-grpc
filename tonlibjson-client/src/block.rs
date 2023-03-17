@@ -2,7 +2,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use anyhow::anyhow;
-use base64::{Engine, engine::general_purpose::URL_SAFE as base64};
+use base64::{Engine, engine::general_purpose::STANDARD as base64};
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
