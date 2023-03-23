@@ -8,3 +8,6 @@ pub use self::tonlibjson::Client;
 
 #[cfg(feature = "tonemulator")]
 pub use self::tonemulator::TvmEmulator;
+
+#[cfg(feature = "tonemulator")]
+pub use self::tonemulator::TransactionEmulator;

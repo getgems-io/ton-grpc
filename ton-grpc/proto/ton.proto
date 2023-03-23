@@ -110,3 +110,28 @@ message TvmEmulatorSetC7Request {
 message TvmEmulatorSetC7Response {
   bool success = 1;
 }
+
+service TransactionEmulator {
+  rpc Process(stream TransactionEmulatorRequest) returns (stream TransactionEmulatorResponse);
+}
+
+message TransactionEmulatorRequest {
+  oneof Request {
+    TransactionEmulatorPrepareRequest prepare = 1;
+  }
+}
+
+message TransactionEmulatorResponse {
+  oneof Response {
+    TvmEmulatorPrepareResponse prepare_response = 1;
+  }
+}
+
+message TransactionEmulatorPrepareRequest {
+  string config_boc = 1;
+  int32 vm_log_level = 2;
+}
+
+message TransactionEmulatorPrepareResponse {
+  bool success = 1;
+}

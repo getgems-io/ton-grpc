@@ -1,6 +1,9 @@
 #[derive(Debug, Default)]
 struct TvmEmulatorService;
 
+#[derive(Debug, Default)]
+struct TransactionEmulatorService;
+
 mod tvm_emulator {
     tonic::include_proto!("ton");
 
