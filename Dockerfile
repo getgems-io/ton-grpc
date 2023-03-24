@@ -1,4 +1,4 @@
-FROM rust:1.68.0-bullseye AS builder
+FROM rust:1.68.1-bullseye AS builder
 
 ARG FEATURES
 
