@@ -9,13 +9,6 @@ ENV SCCACHE_GHA_ENABLED=$SCCACHE_GHA_ENABLED
 ENV ACTIONS_CACHE_URL=$ACTIONS_CACHE_URL
 ENV ACTIONS_RUNTIME_TOKEN=$ACTIONS_RUNTIME_TOKEN
 
-RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common
-
-RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 15 all
-RUN ln -sf $(which clang-15) /usr/bin/clang
-RUN ln -sf $(which clang++-15) /usr/bin/clang++
-RUN ln -sf /usr/bin/ld.lld-15 /usr/bin/ld.lld
-
 RUN USER=root cargo new --bin app
 WORKDIR /app
 
