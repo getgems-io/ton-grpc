@@ -7,26 +7,28 @@ service TvmEmulator {
 }
 
 message TvmEmulatorRequest {
+  uint64 request_id = 1;
   oneof Request {
-    TvmEmulatorPrepareRequest prepare = 1;
-    TvmEmulatorRunGetMethodRequest run_get_method = 2;
-    TvmEmulatorSendExternalMessageRequest send_external_message = 3;
-    TvmEmulatorSendInternalMessageRequest send_internal_message = 4;
-    TvmEmulatorSetLibrariesRequest set_libraries = 5;
-    TvmEmulatorSetGasLimitRequest set_gas_limit = 6;
-    TvmEmulatorSetC7Request set_c7 = 7;
+    TvmEmulatorPrepareRequest prepare = 2;
+    TvmEmulatorRunGetMethodRequest run_get_method = 3;
+    TvmEmulatorSendExternalMessageRequest send_external_message = 4;
+    TvmEmulatorSendInternalMessageRequest send_internal_message = 5;
+    TvmEmulatorSetLibrariesRequest set_libraries = 6;
+    TvmEmulatorSetGasLimitRequest set_gas_limit = 7;
+    TvmEmulatorSetC7Request set_c7 = 8;
   }
 }
 
 message TvmEmulatorResponse {
+  uint64 request_id = 1;
   oneof Response {
-    TvmEmulatorPrepareResponse prepare_response = 1;
-    TvmEmulatorRunGetMethodResponse run_get_method_response = 2;
-    TvmEmulatorSendExternalMessageResponse send_external_message_response = 3;
-    TvmEmulatorSendInternalMessageResponse send_internal_message_response = 4;
-    TvmEmulatorSetLibrariesResponse set_libraries_response = 5;
-    TvmEmulatorSetGasLimitResponse set_gas_limit_response = 6;
-    TvmEmulatorSetC7Response set_c7_response = 7;
+    TvmEmulatorPrepareResponse prepare_response = 2;
+    TvmEmulatorRunGetMethodResponse run_get_method_response = 3;
+    TvmEmulatorSendExternalMessageResponse send_external_message_response = 4;
+    TvmEmulatorSendInternalMessageResponse send_internal_message_response = 5;
+    TvmEmulatorSetLibrariesResponse set_libraries_response = 6;
+    TvmEmulatorSetGasLimitResponse set_gas_limit_response = 7;
+    TvmEmulatorSetC7Response set_c7_response = 8;
   }
 }
 
@@ -116,22 +118,24 @@ service TransactionEmulator {
 }
 
 message TransactionEmulatorRequest {
+  uint64 request_id = 1;
   oneof Request {
-    TransactionEmulatorPrepareRequest prepare = 1;
-    TransactionEmulatorEmulateRequest emulate = 2;
+    TransactionEmulatorPrepareRequest prepare = 2;
+    TransactionEmulatorEmulateRequest emulate = 3;
   }
 }
 
 message TransactionEmulatorResponse {
+  uint64 request_id = 1;
   oneof Response {
-    TransactionEmulatorPrepareResponse prepare_response = 1;
-    TransactionEmulatorEmulateResponse emulate_response = 2;
+    TransactionEmulatorPrepareResponse prepare_response = 2;
+    TransactionEmulatorEmulateResponse emulate_response = 3;
   }
 }
 
 message TransactionEmulatorPrepareRequest {
-  string config_boc = 1;
-  int32 vm_log_level = 2;
+  int32 vm_log_level = 1;
+  string config_boc = 2;
 }
 
 message TransactionEmulatorPrepareResponse {

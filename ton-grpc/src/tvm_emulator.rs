@@ -3,6 +3,7 @@ use std::pin::Pin;
 use anyhow::anyhow;
 use futures::{StreamExt, Stream};
 use tonic::{async_trait, Request, Response, Status, Streaming};
+use tracing::{error, Level, span};
 use crate::ton::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::ton::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
 use crate::ton::tvm_emulator_server::TvmEmulator;
@@ -24,7 +25,10 @@ impl TvmEmulator for TvmEmulatorService {
 
         let output = stream.scan(State { emulator: None }, |state, msg| {
             match msg {
-                Ok(TvmEmulatorRequest { request: Some(req)}) => {
+                Ok(TvmEmulatorRequest { request_id, request: Some(req)}) => {
+                    let span = span!(Level::TRACE, "tvm emulator request", request_id=request_id);
+                    let _guard = span.enter();
+
                     let response = match req {
                         Prepare(req) => prepare_emu(state, req).map(PrepareResponse),
                         RunGetMethod(req) => run_get_method(state, req).map(RunGetMethodResponse),
@@ -36,12 +40,15 @@ impl TvmEmulator for TvmEmulatorService {
                     };
 
                     ready(Some(response
-                        .map(|r| TvmEmulatorResponse { response: Some(r) })
-                        .map_err(|e| Status::internal(e.to_string()))))
+                        .map(|r| TvmEmulatorResponse { request_id, response: Some(r) })
+                        .map_err(|e| {
+                            error!(error = ?e);
+                            Status::internal(e.to_string())
+                        })))
 
                 },
-                Ok(TvmEmulatorRequest{ request: None }) => {
-                    tracing::error!(error = ?anyhow!("empty request"));
+                Ok(TvmEmulatorRequest{ request_id, request: None }) => {
+                    tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);
 
                     ready(None)
                 },
