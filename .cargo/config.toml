@@ -6,3 +6,6 @@ rustflags = "-Clinker=clang"
 
 [build]
 target = "x86_64-unknown-linux-gnu"
+
+[registries.crates-io]
+protocol = "sparse"
