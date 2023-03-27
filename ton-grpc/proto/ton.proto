@@ -122,6 +122,13 @@ message TransactionEmulatorRequest {
   oneof Request {
     TransactionEmulatorPrepareRequest prepare = 2;
     TransactionEmulatorEmulateRequest emulate = 3;
+    TransactionEmulatorSetUnixtimeRequest set_unixtime = 4;
+    TransactionEmulatorSetLtRequest set_lt = 5;
+    TransactionEmulatorSetRandSeedRequest set_rand_seed = 6;
+    TransactionEmulatorSetIgnoreChksigRequest set_ignore_chksig = 7;
+    TransactionEmulatorSetConfigRequest set_config = 8;
+    TransactionEmulatorSetLibsRequest set_libs = 9;
+
   }
 }
 
@@ -130,6 +137,12 @@ message TransactionEmulatorResponse {
   oneof Response {
     TransactionEmulatorPrepareResponse prepare_response = 2;
     TransactionEmulatorEmulateResponse emulate_response = 3;
+    TransactionEmulatorSetUnixtimeResponse set_unixtime_response = 4;
+    TransactionEmulatorSetLtResponse set_lt_response = 5;
+    TransactionEmulatorSetRandSeedResponse set_rand_seed_response = 6;
+    TransactionEmulatorSetIgnoreChksigResponse set_ignore_chksig_response = 7;
+    TransactionEmulatorSetConfigResponse set_config_response = 8;
+    TransactionEmulatorSetLibsResponse set_libs_response = 9;
   }
 }
 
@@ -152,4 +165,52 @@ message TransactionEmulatorEmulateResponse {
   string shard_account = 2;
   string vm_log = 3;
   string actions = 4;
+}
+
+message TransactionEmulatorSetUnixtimeRequest {
+  uint32 unixtime = 1;
+}
+
+message TransactionEmulatorSetUnixtimeResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetLtRequest {
+  uint64 lt = 1;
+}
+
+message TransactionEmulatorSetLtResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetRandSeedRequest {
+  string rand_seed = 1;
+}
+
+message TransactionEmulatorSetRandSeedResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetIgnoreChksigRequest {
+  bool ignore_chksig = 1;
+}
+
+message TransactionEmulatorSetIgnoreChksigResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetConfigRequest {
+  string config = 1;
+}
+
+message TransactionEmulatorSetConfigResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetLibsRequest {
+  string libs = 1;
+}
+
+message TransactionEmulatorSetLibsResponse {
+  bool success = 1;
 }
