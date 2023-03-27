@@ -33,8 +33,9 @@ message TvmEmulatorResponse {
 }
 
 message TvmEmulatorPrepareRequest {
-  string code_boc = 1;
-  string data_boc = 2;
+  int32 vm_log_verbosity = 1;
+  string code_boc = 2;
+  string data_boc = 3;
 }
 
 message TvmEmulatorPrepareResponse {

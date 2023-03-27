@@ -65,7 +65,7 @@ impl TvmEmulator for TvmEmulatorService {
 }
 
 fn prepare_emu(state: &mut State, req: TvmEmulatorPrepareRequest) -> anyhow::Result<TvmEmulatorPrepareResponse> {
-    state.emulator.replace(tonlibjson_sys::TvmEmulator::new(&req.code_boc, &req.data_boc, 1)?);
+    state.emulator.replace(tonlibjson_sys::TvmEmulator::new(&req.code_boc, &req.data_boc, req.vm_log_verbosity)?);
 
     Ok(TvmEmulatorPrepareResponse { success: true })
 }
