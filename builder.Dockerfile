@@ -14,5 +14,7 @@ RUN tar xzf sccache-v0.4.1-x86_64-unknown-linux-musl.tar.gz \
     && chmod +x /usr/local/bin/sccache
 
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache
+ENV CMAKE_CC_COMPILER_LAUNCHER=/usr/local/bin/sccache
+ENV CMAKE_CXX_COMPILER_LAUNCHER=/usr/local/bin/sccache
 
 RUN sccache --show-stats
