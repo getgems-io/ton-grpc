@@ -1,3 +1,4 @@
+use base64::Engine;
 use futures::{stream, StreamExt};
 use tokio::time::Instant;
 use tonlibjson_client::ton::TonClient;
@@ -50,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
 
 
 fn base64_to_hex(b: &str) -> anyhow::Result<String> {
-    let bytes = base64::decode(b)?;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(b)?;
     let hex = hex::encode(bytes);
 
     Ok(hex)
