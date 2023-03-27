@@ -1,6 +1,13 @@
-FROM rust:1.68.1-bullseye AS builder
+FROM ghcr.io/akostylev0/tonlibjson-builder:sha-b4bf42cf16b23ac5b102b622f65dcf972611d90b AS builder
 
 ARG FEATURES
+ARG SCCACHE_GHA_ENABLED
+ARG ACTIONS_CACHE_URL
+ARG ACTIONS_RUNTIME_TOKEN
+
+ENV SCCACHE_GHA_ENABLED=$SCCACHE_GHA_ENABLED
+ENV ACTIONS_CACHE_URL=$ACTIONS_CACHE_URL
+ENV ACTIONS_RUNTIME_TOKEN=$ACTIONS_RUNTIME_TOKEN
 
 RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common
 
