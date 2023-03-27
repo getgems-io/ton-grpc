@@ -2,8 +2,9 @@ use std::future::ready;
 use std::pin::Pin;
 use futures::{Stream, StreamExt};
 use tonic::{async_trait, Request, Response, Status, Streaming};
-use tracing::{error};
+use tracing::{error, span};
 use anyhow::anyhow;
+use tracing::Level;
 use crate::ton::transaction_emulator_server::TransactionEmulator;
 use crate::ton::{TransactionEmulatorEmulateRequest, TransactionEmulatorEmulateResponse, TransactionEmulatorPrepareRequest, TransactionEmulatorPrepareResponse, TransactionEmulatorRequest, TransactionEmulatorResponse, TvmResult};
 use crate::ton::transaction_emulator_request::Request::{Prepare, Emulate};
@@ -26,18 +27,25 @@ impl TransactionEmulator for TransactionEmulatorService {
 
         let output = stream.scan(State::default(), |state, msg| {
             match msg {
-                Ok(TransactionEmulatorRequest { request: Some(req) }) => {
+                Ok(TransactionEmulatorRequest { request_id, request: Some(req) }) => {
+                    let span = span!(Level::TRACE, "transaction emulator request", request_id=request_id);
+                    let _guard = span.enter();
+
                     let response = match req {
                         Prepare(req) => prepare(state, req).map(PrepareResponse),
                         Emulate(req) => emulate(state, req).map(EmulateResponse)
                     };
 
                     ready(Some(response
-                        .map(|r| TransactionEmulatorResponse { response: Some(r) })
-                        .map_err(|e| Status::internal(e.to_string()))))
+                        .map(|r| TransactionEmulatorResponse { request_id, response: Some(r) })
+                        .map_err(|e| {
+                            error!(error = ?e);
+
+                            Status::internal(e.to_string())
+                        })))
                 },
-                Ok(TransactionEmulatorRequest { request: None }) => {
-                    error!(error = ?anyhow!("empty request"));
+                Ok(TransactionEmulatorRequest { request_id, request: None }) => {
+                    error!(error = ?anyhow!("empty request"), request_id=request_id);
 
                     ready(None)
                 },
