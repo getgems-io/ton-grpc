@@ -9,6 +9,18 @@ extern {
 
     fn transaction_emulator_emulate_transaction(p: *mut c_void, shard_account_boc: *const c_char, message_boc: *const c_char) -> *const c_char;
 
+    fn transaction_emulator_set_unixtime(p: *mut c_void, unixtime: c_uint) -> bool;
+
+    fn transaction_emulator_set_lt(p: *mut c_void, lt: c_ulong) -> bool;
+
+    fn transaction_emulator_set_rand_seed(p: *mut c_void, rand_seed_hex: *const c_char) -> bool;
+
+    fn transaction_emulator_set_ignore_chksig(p: *mut c_void, ignore_chksig: bool) -> bool;
+
+    fn transaction_emulator_set_config(p: *mut c_void, config_boc: *const c_char) -> bool;
+
+    fn transaction_emulator_set_libs(p: *mut c_void, libs_boc: *const c_char) -> bool;
+
     fn transaction_emulator_destroy(p: *mut c_void);
 
     fn emulator_set_verbosity_level(level: i32) -> bool;
@@ -70,6 +82,36 @@ impl TransactionEmulator {
         };
 
         Ok(result.to_str()?)
+    }
+
+    pub fn set_unixtime(&self, unixtime: u32) -> bool {
+        unsafe { transaction_emulator_set_unixtime(*self.pointer.lock().unwrap(), unixtime) }
+    }
+
+    pub fn set_lt(&self, lt: u64) -> bool {
+        unsafe { transaction_emulator_set_lt(*self.pointer.lock().unwrap(), lt)}
+    }
+
+    pub fn set_rand_seed(&self, seed: &str) -> Result<bool> {
+        let seed = CString::new(seed)?;
+
+        Ok(unsafe { transaction_emulator_set_rand_seed(*self.pointer.lock().unwrap(), seed.as_ptr()) })
+    }
+
+    pub fn set_ignore_chksig(&self, ignore_chksig: bool) -> bool {
+        unsafe { transaction_emulator_set_ignore_chksig(*self.pointer.lock().unwrap(), ignore_chksig) }
+    }
+
+    pub fn set_config(&self, config: &str) -> Result<bool> {
+        let config = CString::new(config)?;
+
+        Ok(unsafe { transaction_emulator_set_config(*self.pointer.lock().unwrap(), config.as_ptr()) })
+    }
+
+    pub fn set_libs(&self, libs: &str) -> Result<bool> {
+        let libs = CString::new(libs)?;
+
+        Ok(unsafe { transaction_emulator_set_libs(*self.pointer.lock().unwrap(), libs.as_ptr()) })
     }
 }
 
