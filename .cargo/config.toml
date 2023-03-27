@@ -1,5 +1,5 @@
 [target.x86_64-unknown-linux-gnu]
-rustflags = "-Clinker-plugin-lto -Clinker=clang -Clink-arg=-fuse-ld=lld -Ctarget-feature=+crt-static"
+rustflags = "-Clinker-plugin-lto -Clinker=clang -Clink-arg=-fuse-ld=lld -Ctarget-feature=+crt-static -Clink-arg=-flto"
 
 [target.x86_64-apple-darwin]
 rustflags = "-Clinker=clang"
