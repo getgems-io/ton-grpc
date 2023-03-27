@@ -44,6 +44,13 @@ jobs:
             type=ref,event=branch
             type=raw,value=${{ github.head_ref }}
 
+      - name: Configure sccache
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Build and push Docker image
         uses: docker/build-push-action@ad44023a93711e3deb337508980b4b5e9bcdc5dc
         with:
@@ -51,11 +58,10 @@ jobs:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: |
-            type=gha,scope=${{ github.base_ref }}${{ matrix.suffix }}
-            type=gha,scope=${{ github.head_ref }}${{ matrix.suffix }}
-          cache-to: type=gha,mode=max,scope=${{ github.head_ref }}${{ matrix.suffix }}
           build-args: |
             sha=${{ github.sha }}
             sha_short=${{ env.GITHUB_SHA_SHORT }}
             FEATURES=${{ matrix.features }}
+            ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
+            ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
+            SCCACHE_GHA_ENABLED=on

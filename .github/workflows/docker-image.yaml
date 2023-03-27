@@ -58,8 +58,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha,scope=${{ github.ref_name }}${{ matrix.suffix }}
-          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}${{ matrix.suffix }}
           build-args: |
             sha=${{ github.sha }}
             sha_short=${{ env.GITHUB_SHA_SHORT }}
