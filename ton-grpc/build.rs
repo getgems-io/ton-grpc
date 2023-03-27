@@ -10,6 +10,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .type_attribute("TvmEmulatorRunGetMethodResponse", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("TvmEmulatorSendExternalMessageResponse", "#[derive(serde::Deserialize, serde::Serialize)]")
         .type_attribute("TvmEmulatorSendInternalMessageResponse", "#[derive(serde::Deserialize, serde::Serialize)]")
+        .type_attribute("TransactionEmulatorEmulateResponse", "#[derive(serde::Deserialize, serde::Serialize)]")
         .file_descriptor_set_path(out_dir.join("ton_descriptor.bin"))
         .compile(&["proto/ton.proto"], &["proto"])?;
 

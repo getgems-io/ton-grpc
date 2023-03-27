@@ -2,40 +2,17 @@ use std::future::ready;
 use std::pin::Pin;
 use anyhow::anyhow;
 use futures::{StreamExt, Stream};
-use serde::Deserialize;
 use tonic::{async_trait, Request, Response, Status, Streaming};
-use crate::tvm_emulator::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
-use crate::tvm_emulator::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
-use crate::tvm_emulator::tvm_emulator_server::TvmEmulator;
-
-tonic::include_proto!("ton");
-
-pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
-    tonic::include_file_descriptor_set!("ton_descriptor");
+use crate::ton::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
+use crate::ton::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
+use crate::ton::tvm_emulator_server::TvmEmulator;
+use crate::ton::{TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetC7Request, TvmEmulatorSetC7Response, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse, TvmResult};
 
 #[derive(Debug, Default)]
 pub struct TvmEmulatorService;
 
 struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
-}
-
-#[derive(Deserialize)]
-struct TvmResult<T> {
-    pub success: bool,
-    pub error: Option<String>,
-    #[serde(flatten)]
-    pub data: Option<T>
-}
-
-impl<T> From<TvmResult<T>> for anyhow::Result<T> where T: Default {
-    fn from(value: TvmResult<T>) -> Self {
-        if value.success {
-            Ok(value.data.unwrap_or_default())
-        } else {
-            Err(anyhow!(value.error.unwrap_or("ambiguous response".to_owned())))
-        }
-    }
 }
 
 #[async_trait]

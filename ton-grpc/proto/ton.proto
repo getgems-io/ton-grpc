@@ -118,12 +118,14 @@ service TransactionEmulator {
 message TransactionEmulatorRequest {
   oneof Request {
     TransactionEmulatorPrepareRequest prepare = 1;
+    TransactionEmulatorEmulateRequest emulate = 2;
   }
 }
 
 message TransactionEmulatorResponse {
   oneof Response {
-    TvmEmulatorPrepareResponse prepare_response = 1;
+    TransactionEmulatorPrepareResponse prepare_response = 1;
+    TransactionEmulatorEmulateResponse emulate_response = 2;
   }
 }
 
@@ -134,4 +136,16 @@ message TransactionEmulatorPrepareRequest {
 
 message TransactionEmulatorPrepareResponse {
   bool success = 1;
+}
+
+message TransactionEmulatorEmulateRequest {
+  string shard_account_boc = 1;
+  string message_boc = 2;
+}
+
+message TransactionEmulatorEmulateResponse {
+  string transaction = 1;
+  string shard_account = 2;
+  string vm_log = 3;
+  string actions = 4;
 }
