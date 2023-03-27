@@ -1,12 +1,10 @@
 use std::time::Duration;
-use tokio::time::interval;
 use tower::{Service, ServiceExt};
 use tower::load::{Load, PeakEwma};
-use tracing::info;
+use tracing::error;
 use tonlibjson_client::config::AppConfig;
 use tonlibjson_client::cursor_client::CursorClient;
 use tonlibjson_client::make::{CursorClientFactory, ClientFactory};
-use tonlibjson_client::session::SessionRequest;
 
 use tonlibjson_client::ton_config::load_ton_config;
 
