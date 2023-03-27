@@ -9,9 +9,9 @@ env:
 jobs:
   build-docker-image:
     strategy:
+      fail-fast: true
+      max-parallel: 1
       matrix:
-        fail-fast: true
-        max-parallel: 1
         include:
           - suffix: ''
             features: ''
