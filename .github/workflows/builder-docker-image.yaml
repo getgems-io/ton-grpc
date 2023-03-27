@@ -9,6 +9,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}-builder
 jobs:
+  builder-docker-image:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
