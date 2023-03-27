@@ -5,6 +5,7 @@ on:
       - master
     paths:
       - builder.Dockerfile
+  workflow_dispatch:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}-builder
