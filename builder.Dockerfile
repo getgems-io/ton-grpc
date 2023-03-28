@@ -7,6 +7,7 @@ RUN ln -sf $(which clang-15) /usr/bin/clang
 RUN ln -sf $(which clang++-15) /usr/bin/clang++
 RUN ln -sf /usr/bin/ld.lld-15 /usr/bin/ld.lld
 
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
 RUN cargo install --version 0.3.3 sccache
 RUN which sccache
