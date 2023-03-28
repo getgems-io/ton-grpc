@@ -6,11 +6,12 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   build-docker-image:
     strategy:
-      fail-fast: true
-      max-parallel: 1
       matrix:
         include:
           - suffix: ''
@@ -66,4 +67,6 @@ jobs:
             FEATURES=${{ matrix.features }}
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
             ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
+            SCCACHE_GHA_CACHE_FROM=${GITHUB_REF##*/}${{ matrix.suffix }}
+            SCCACHE_GHA_CACHE_TO=${GITHUB_REF##*/}${{ matrix.suffix }}
             SCCACHE_GHA_ENABLED=on
