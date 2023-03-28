@@ -8,10 +8,8 @@ RUN ln -sf $(which clang++-15) /usr/bin/clang++
 RUN ln -sf /usr/bin/ld.lld-15 /usr/bin/ld.lld
 
 
-RUN wget https://github.com/mozilla/sccache/releases/download/v0.4.1/sccache-v0.4.1-x86_64-unknown-linux-musl.tar.gz
-RUN tar xzf sccache-v0.4.1-x86_64-unknown-linux-musl.tar.gz \
-    && mv sccache-v0.4.1-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache \
-    && chmod +x /usr/local/bin/sccache
+RUN cargo install --version 0.3.3 sccache
+RUN which sccache
 
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache
 ENV CMAKE_CC_COMPILER_LAUNCHER=/usr/local/bin/sccache
