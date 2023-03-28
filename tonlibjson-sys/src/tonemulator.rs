@@ -56,7 +56,7 @@ impl TransactionEmulator {
             transaction_emulator_create(config_boc.as_ptr(), vm_log_verbosity)
         };
         if pointer.is_null() {
-            return Err(anyhow!("pointer is null (test)"));
+            return Err(anyhow!("pointer is null"));
         }
 
         Ok(Self {
