@@ -25,6 +25,8 @@ jobs:
         with:
           submodules: recursive
 
+      - uses: arduino/setup-protoc@v1
+
       - name: Restore llvm repos
         run: |
           wget https://apt.llvm.org/llvm.sh
