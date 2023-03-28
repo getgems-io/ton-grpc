@@ -24,3 +24,4 @@ RUN unzip protoc-22.2-linux-x86_64.zip \
     && mv include/* /usr/local/include/
 
 RUN sccache --show-stats
+RUN protoc --version
