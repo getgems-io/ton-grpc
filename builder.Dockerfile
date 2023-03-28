@@ -17,4 +17,10 @@ ENV RUSTC_WRAPPER=/usr/local/bin/sccache
 ENV CMAKE_CC_COMPILER_LAUNCHER=/usr/local/bin/sccache
 ENV CMAKE_CXX_COMPILER_LAUNCHER=/usr/local/bin/sccache
 
+RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v22.2/protoc-22.2-linux-x86_64.zip
+RUN unzip protoc-22.2-linux-x86_64.zip \
+    && mv bin/protoc /usr/local/bin/protoc \
+    && chmod +x /usr/local/bin/protoc \
+    && mv include/* /usr/local/include/
+
 RUN sccache --show-stats
