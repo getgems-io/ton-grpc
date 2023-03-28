@@ -9,12 +9,11 @@ RUN ln -sf /usr/bin/ld.lld-15 /usr/bin/ld.lld
 
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
-RUN cargo install --version 0.3.3 sccache
-RUN which sccache
+RUN cargo install --version 0.3.3 sccache && which sccache
 
-ENV RUSTC_WRAPPER=/usr/local/bin/sccache
-ENV CMAKE_CC_COMPILER_LAUNCHER=/usr/local/bin/sccache
-ENV CMAKE_CXX_COMPILER_LAUNCHER=/usr/local/bin/sccache
+ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
+ENV CMAKE_CC_COMPILER_LAUNCHER=/usr/local/cargo/bin/sccache
+ENV CMAKE_CXX_COMPILER_LAUNCHER=/usr/local/cargo/bin/sccache
 
 RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v22.2/protoc-22.2-linux-x86_64.zip
 RUN unzip protoc-22.2-linux-x86_64.zip \
