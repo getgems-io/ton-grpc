@@ -67,6 +67,4 @@ jobs:
             FEATURES=${{ matrix.features }}
             ACTIONS_CACHE_URL=${{ env.ACTIONS_CACHE_URL }}
             ACTIONS_RUNTIME_TOKEN=${{ env.ACTIONS_RUNTIME_TOKEN }}
-            SCCACHE_GHA_CACHE_FROM=${{ github.ref_name }}${{ matrix.suffix }}
-            SCCACHE_GHA_CACHE_TO=${{ github.ref_name }}${{ matrix.suffix }}
             SCCACHE_GHA_ENABLED=on
