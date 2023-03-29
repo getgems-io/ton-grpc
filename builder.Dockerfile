@@ -9,14 +9,10 @@ RUN ln -sf /usr/bin/ld.lld-15 /usr/bin/ld.lld
 
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
-<<<<<<< HEAD
-RUN cargo install --version 0.3.3 sccache && which sccache
-=======
 RUN wget https://github.com/mozilla/sccache/releases/download/v0.4.1/sccache-v0.4.1-x86_64-unknown-linux-musl.tar.gz
 RUN tar xzf sccache-v0.4.1-x86_64-unknown-linux-musl.tar.gz \
     && mv sccache-v0.4.1-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache \
     && chmod +x /usr/local/bin/sccache
->>>>>>> parent of b8e7660 (downgrade sccache)
 
 ENV RUSTC_WRAPPER=/usr/local/cargo/bin/sccache
 ENV CMAKE_CC_COMPILER_LAUNCHER=/usr/local/cargo/bin/sccache
