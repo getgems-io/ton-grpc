@@ -165,7 +165,7 @@ message TransactionEmulatorEmulateResponse {
   string transaction = 1;
   string shard_account = 2;
   string vm_log = 3;
-  string actions = 4;
+  optional string actions = 4;
 }
 
 message TransactionEmulatorSetUnixtimeRequest {

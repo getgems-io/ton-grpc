@@ -86,6 +86,7 @@ fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> anyhow:
 
 fn emulate(emu: &tonlibjson_sys::TransactionEmulator, req: TransactionEmulatorEmulateRequest) -> anyhow::Result<TransactionEmulatorEmulateResponse> {
     let response = emu.emulate(&req.shard_account_boc, &req.message_boc)?;
+    tracing::trace!(method="emulate", "{}", response);
 
     let response = serde_json::from_str::<TvmResult<TransactionEmulatorEmulateResponse>>(response)?;
 
