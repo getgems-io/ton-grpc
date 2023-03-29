@@ -32,6 +32,8 @@ fn main() {
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
 
+    let target_arch = "x86-64";
+
     if build_tonlibjson {
         let dst= if !is_darwin && is_release {
             Config::new(ton_dir)
@@ -40,6 +42,7 @@ fn main() {
                 .define("CMAKE_CXX_COMPILER", "clang++")
                 .define("CMAKE_CXX_STANDARD", "14")
                 .define("BUILD_SHARED_LIBS", "OFF")
+                .define("TON_ARCH", target_arch)
                 .cxxflag("-std=c++14")
                 .cxxflag("-stdlib=libc++")
                 .cxxflag("-fuse-ld=lld")
@@ -56,6 +59,7 @@ fn main() {
                 .define("CMAKE_CXX_COMPILER", "clang++")
                 .define("CMAKE_CXX_STANDARD", "14")
                 .define("BUILD_SHARED_LIBS", "OFF")
+                .define("TON_ARCH", target_arch)
                 .cxxflag("-std=c++14")
                 .cxxflag("-stdlib=libc++")
                 .build_target("tonlibjson")
@@ -114,6 +118,7 @@ fn main() {
                 .define("CMAKE_CXX_COMPILER", "clang++")
                 .define("CMAKE_CXX_STANDARD", "14")
                 .define("BUILD_SHARED_LIBS", "OFF")
+                .define("TON_ARCH", target_arch)
                 .cxxflag("-std=c++14")
                 .cxxflag("-stdlib=libc++")
                 .cxxflag("-fuse-ld=lld")
@@ -130,6 +135,7 @@ fn main() {
                 .define("CMAKE_CXX_COMPILER", "clang++")
                 .define("CMAKE_CXX_STANDARD", "14")
                 .define("BUILD_SHARED_LIBS", "OFF")
+                .define("TON_ARCH", target_arch)
                 .cxxflag("-std=c++14")
                 .cxxflag("-stdlib=libc++")
                 .build_target("emulator")
