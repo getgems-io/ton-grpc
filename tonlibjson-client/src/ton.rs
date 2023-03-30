@@ -10,7 +10,7 @@ use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest, BlockCriteria, Route};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, Cell, GetShardAccountCell};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
@@ -359,6 +359,14 @@ impl TonClient {
         let mut client = self.client.clone();
 
         RunGetMethod::new(address, method, stack)
+            .call(&mut client)
+            .await
+    }
+
+    pub async fn get_shard_account_cell(&self, address: AccountAddress) -> anyhow::Result<Cell> {
+        let mut client = self.client.clone();
+
+        GetShardAccountCell::new(address)
             .call(&mut client)
             .await
     }

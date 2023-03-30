@@ -608,6 +608,27 @@ impl Routable for RawGetTransactionsV2 {
     }
 }
 
+#[derive(new, Debug, Serialize, Clone)]
+#[serde(tag = "@type")]
+#[serde(rename = "getShardAccountCell")]
+pub struct GetShardAccountCell {
+    pub account_address: AccountAddress
+}
+
+impl Requestable for GetShardAccountCell {
+    type Response = Cell;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::GetShardAccountCell(self)
+    }
+}
+
+impl Routable for GetShardAccountCell {
+    fn route(&self) -> Route {
+        Route::Latest { chain: self.account_address.chain_id() }
+    }
+}
+
 #[derive(Debug, Deserialize)]
 pub struct TonError {
     code: i32,
