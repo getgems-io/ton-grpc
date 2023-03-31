@@ -218,7 +218,7 @@ message TransactionEmulatorSetLibsResponse {
 
 
 service Account {
-    rpc getShardAccountCell (AccountAddress) returns (TvmCell);
+    rpc GetShardAccountCell (AccountAddress) returns (TvmCell);
 }
 
 message AccountAddress {

@@ -1,13 +1,15 @@
+mod account_address;
+
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
-use anyhow::anyhow;
-use base64::Engine;
+use std::str::FromStr;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use serde_aux::prelude::*;
 use crate::balance::{BlockCriteria, Route};
+use crate::block::account_address::AccountAddressValue;
 use crate::request::{Requestable, RequestBody, Routable};
 
 #[derive(Debug, Serialize, Default, Clone)]
@@ -58,7 +60,7 @@ impl BlocksGetBlockHeader {
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub workchain: i64,
+    pub workchain: i32,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub shard: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -71,7 +73,7 @@ pub struct BlockIdExt {
 #[serde(tag = "@type", rename = "ton.blockId")]
 pub struct BlockId {
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub workchain: i64,
+    pub workchain: i32,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub shard: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -150,42 +152,20 @@ pub struct InternalTransactionId {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "@type", rename = "accountAddress")]
 pub struct AccountAddress {
-    pub account_address: String,
-
-    #[serde(skip)]
-    _chain_id: i64
+    pub account_address: AccountAddressValue
 }
 
 impl AccountAddress {
     pub fn new(account_address: String) -> anyhow::Result<Self> {
-        let chain_id = Self::parse_chain_id(&account_address)?;
+        let address = AccountAddressValue::from_str(&account_address)?;
 
         Ok(Self {
-            account_address,
-            _chain_id: chain_id
+            account_address: address
         })
     }
 
-    pub fn chain_id(&self) -> i64 {
-        self._chain_id
-    }
-
-    fn parse_chain_id(address: &str) -> anyhow::Result<i64> {
-        if let Some(pos) = address.find(':') {
-            return Ok(address[0..pos].parse()?)
-        } else if hex::decode(address).is_ok() {
-            return Ok(-1)
-        } else if let Ok(data) = base64::engine::general_purpose::URL_SAFE.decode(address) {
-            let workchain = data[1];
-
-            return Ok(if workchain == u8::MAX { -1 } else { workchain as i64 })
-        } else if let Ok(data) = base64::engine::general_purpose::STANDARD.decode(address) {
-            let workchain = data[1];
-
-            return Ok(if workchain == u8::MAX { -1 } else { workchain as i64 })
-        }
-
-        Err(anyhow!("unknown address format: {}", address))
+    pub fn chain_id(&self) -> i32 {
+        self.account_address.chain_id
     }
 }
 
@@ -662,12 +642,6 @@ mod tests {
     fn account_address_workchain_id() {
         let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned()).unwrap();
         assert_eq!(0, tx_id.chain_id());
-
-        let tx_id = AccountAddress::new("-1:qweq".to_owned()).unwrap();
-        assert_eq!(-1, tx_id.chain_id());
-
-        let tx_id = AccountAddress::new("0:qweq".to_owned()).unwrap();
-        assert_eq!(0, tx_id.chain_id())
     }
 
     #[test]

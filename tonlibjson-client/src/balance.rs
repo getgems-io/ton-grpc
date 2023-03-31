@@ -19,8 +19,8 @@ use crate::cursor_client::Metrics;
 #[derive(Debug, Clone, Copy)]
 pub enum Route {
     Any,
-    Block { chain: i64, criteria: BlockCriteria },
-    Latest { chain: i64 }
+    Block { chain: i32, criteria: BlockCriteria },
+    Latest { chain: i32 }
 }
 
 #[derive(Debug, Clone, Copy)]

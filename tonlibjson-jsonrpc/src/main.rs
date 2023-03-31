@@ -19,7 +19,7 @@ use crate::view::{BlockHeaderView, BlockIdExtView, MasterchainInfoView, ShardsVi
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
-    workchain: i64,
+    workchain: i32,
     shard: String,
     seqno: Option<i32>,
     lt: Option<i64>,

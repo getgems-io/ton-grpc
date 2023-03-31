@@ -30,6 +30,8 @@ async-trait = "0.1.68"
 tokio-retry = "0.3"
 base64 = { workspace = true }
 hex = { workspace = true }
+crc = "3.0.1"
+bytes = "1.4.0"
 
 [dev-dependencies]
 tracing-test = { workspace = true }

@@ -24,7 +24,7 @@ pub struct TonClient {
     client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>
 }
 
-const MAIN_CHAIN: i64 = -1;
+const MAIN_CHAIN: i32 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
@@ -99,7 +99,7 @@ impl TonClient {
 
     pub async fn look_up_block_by_seqno(
         &self,
-        chain: i64,
+        chain: i32,
         shard: i64,
         seqno: i32,
     ) -> anyhow::Result<BlockIdExt> {
@@ -116,7 +116,7 @@ impl TonClient {
 
     pub async fn look_up_block_by_lt(
         &self,
-        chain: i64,
+        chain: i32,
         shard: i64,
         lt: i64,
     ) -> anyhow::Result<BlockIdExt> {
@@ -143,7 +143,7 @@ impl TonClient {
 
     pub async fn get_block_header(
         &self,
-        chain: i64,
+        chain: i32,
         shard: i64,
         seqno: i32,
     ) -> anyhow::Result<BlockHeader> {
