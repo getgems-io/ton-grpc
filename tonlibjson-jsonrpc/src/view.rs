@@ -23,7 +23,7 @@ impl From<MasterchainInfo> for MasterchainInfoView {
 #[derive(Serialize)]
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExtView {
-    pub workchain: i64,
+    pub workchain: i32,
     pub shard: String,
     pub seqno: i32,
     pub root_hash: String,
@@ -126,8 +126,8 @@ pub struct MessageView {
 impl From<&RawMessage> for MessageView {
     fn from(msg: &RawMessage) -> Self {
         Self {
-            source: msg.source.account_address.clone(),
-            destination: msg.destination.account_address.clone(),
+            source: msg.source.account_address.as_base64_string(),
+            destination: msg.destination.account_address.as_base64_string(),
             value: msg.value.to_string(),
             fwd_fee: msg.fwd_fee.clone(),
             ihr_fee: msg.ihr_fee.clone(),

@@ -34,7 +34,7 @@ struct ShardsParams {
 #[allow(dead_code)]
 #[derive(Deserialize)]
 struct BlockHeaderParams {
-    workchain: i64,
+    workchain: i32,
     shard: String,
     seqno: i32,
     root_hash: Option<String>,
@@ -44,7 +44,7 @@ struct BlockHeaderParams {
 #[allow(dead_code)]
 #[derive(Deserialize)]
 struct BlockTransactionsParams {
-    workchain: i64,
+    workchain: i32,
     shard: String,
     seqno: i32,
     root_hash: Option<String>,
