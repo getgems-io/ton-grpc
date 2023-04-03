@@ -1625,7 +1625,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tonic",
+ "tonic 0.9.0",
  "tonic-build",
  "tonic-health",
  "tonic-reflection",
@@ -1642,8 +1642,32 @@ checksum = "8f219fad3b929bef19b1f86fbc0358d35daed8f2cac972037ac0dc10bbb8d5fb"
 dependencies = [
  "async-stream",
  "async-trait",
- "axum",
  "base64 0.13.1",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "http",
+ "http-body",
+ "percent-encoding",
+ "pin-project",
+ "prost",
+ "prost-derive",
+ "tokio-stream",
+ "tokio-util",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
+name = "tonic"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1395a90742867024769551f906de147d352fb7cbdb4fd1cdbffe17734cfb124c"
+dependencies = [
+ "async-trait",
+ "axum",
+ "base64 0.21.0",
  "bytes",
  "futures-core",
  "futures-util",
@@ -1655,15 +1679,12 @@ dependencies = [
  "percent-encoding",
  "pin-project",
  "prost",
- "prost-derive",
  "tokio",
  "tokio-stream",
- "tokio-util",
  "tower",
  "tower-layer",
  "tower-service",
  "tracing",
- "tracing-futures",
 ]
 
 [[package]]
@@ -1690,7 +1711,7 @@ dependencies = [
  "prost",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.8.3",
 ]
 
 [[package]]
@@ -1704,7 +1725,7 @@ dependencies = [
  "prost-types",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.8.3",
 ]
 
 [[package]]
@@ -1834,16 +1855,6 @@ checksum = "24eb03ba0eab1fd845050058ce5e616558e8f8d8fca633e6b163fe25c797213a"
 dependencies = [
  "once_cell",
  "valuable",
-]
-
-[[package]]
-name = "tracing-futures"
-version = "0.2.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
-dependencies = [
- "pin-project",
- "tracing",
 ]
 
 [[package]]
