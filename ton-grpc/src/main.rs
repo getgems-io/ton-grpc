@@ -15,7 +15,7 @@ async fn main() -> anyhow::Result<()> {
     tonlibjson_sys::TvmEmulator::set_verbosity_level(0);
 
     let reflection = tonic_reflection::server::Builder::configure()
-        .register_encoded_file_descriptor_set(tonic_health::proto::GRPC_HEALTH_V1_FILE_DESCRIPTOR_SET)
+        .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
         .register_encoded_file_descriptor_set(ton::FILE_DESCRIPTOR_SET)
         .build()
         .unwrap();
