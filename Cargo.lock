@@ -1625,7 +1625,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
- "tonic",
+ "tonic 0.8.3",
  "tonic-build",
  "tonic-health",
  "tonic-reflection",
@@ -1667,6 +1667,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1395a90742867024769551f906de147d352fb7cbdb4fd1cdbffe17734cfb124c"
+dependencies = [
+ "async-trait",
+ "base64 0.21.0",
+ "bytes",
+ "futures-core",
+ "futures-util",
+ "http",
+ "http-body",
+ "percent-encoding",
+ "pin-project",
+ "prost",
+ "tokio-stream",
+ "tower-layer",
+ "tower-service",
+ "tracing",
+]
+
+[[package]]
 name = "tonic-build"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1681,16 +1703,15 @@ dependencies = [
 
 [[package]]
 name = "tonic-health"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a88aee666ef3a4d1ee46218bbc8e5f69bcf9cc27bf2e871d6b724d83f56d179f"
+checksum = "5d681c535501d2f6392b0b9843e390e5f1aec57381505507075ea5a7b59194be"
 dependencies = [
  "async-stream",
- "bytes",
  "prost",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.9.0",
 ]
 
 [[package]]
@@ -1704,7 +1725,7 @@ dependencies = [
  "prost-types",
  "tokio",
  "tokio-stream",
- "tonic",
+ "tonic 0.8.3",
 ]
 
 [[package]]
