@@ -215,3 +215,16 @@ message TransactionEmulatorSetLibsRequest {
 message TransactionEmulatorSetLibsResponse {
   bool success = 1;
 }
+
+
+service Account {
+  rpc GetShardAccountCell (AccountAddress) returns (TvmCell);
+}
+
+message AccountAddress {
+  string address = 1;
+}
+
+message TvmCell {
+  bytes bytes = 1;
+}

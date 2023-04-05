@@ -58,7 +58,7 @@ impl BlocksGetBlockHeader {
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub workchain: i64,
+    pub workchain: i32,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub shard: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -71,7 +71,7 @@ pub struct BlockIdExt {
 #[serde(tag = "@type", rename = "ton.blockId")]
 pub struct BlockId {
     #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub workchain: i64,
+    pub workchain: i32,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub shard: i64,
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -153,24 +153,24 @@ pub struct AccountAddress {
     pub account_address: String,
 
     #[serde(skip)]
-    _chain_id: i64
+    _chain_id: i32
 }
 
 impl AccountAddress {
     pub fn new(account_address: String) -> anyhow::Result<Self> {
-        let chain_id = Self::parse_chain_id(&account_address)?;
+        let _chain_id = Self::parse_chain_id(&account_address)?;
 
         Ok(Self {
             account_address,
-            _chain_id: chain_id
+            _chain_id
         })
     }
 
-    pub fn chain_id(&self) -> i64 {
+    pub fn chain_id(&self) -> i32 {
         self._chain_id
     }
 
-    fn parse_chain_id(address: &str) -> anyhow::Result<i64> {
+    fn parse_chain_id(address: &str) -> anyhow::Result<i32> {
         if let Some(pos) = address.find(':') {
             return Ok(address[0..pos].parse()?)
         } else if hex::decode(address).is_ok() {
@@ -178,14 +178,35 @@ impl AccountAddress {
         } else if let Ok(data) = base64::engine::general_purpose::URL_SAFE.decode(address) {
             let workchain = data[1];
 
-            return Ok(if workchain == u8::MAX { -1 } else { workchain as i64 })
+            return Ok(if workchain == u8::MAX { -1 } else { workchain as i32 })
         } else if let Ok(data) = base64::engine::general_purpose::STANDARD.decode(address) {
             let workchain = data[1];
 
-            return Ok(if workchain == u8::MAX { -1 } else { workchain as i64 })
+            return Ok(if workchain == u8::MAX { -1 } else { workchain as i32 })
         }
 
         Err(anyhow!("unknown address format: {}", address))
+    }
+}
+
+#[derive(new, Debug, Serialize, Clone)]
+#[serde(tag = "@type")]
+#[serde(rename = "getShardAccountCell")]
+pub struct GetShardAccountCell {
+    pub account_address: AccountAddress
+}
+
+impl Requestable for GetShardAccountCell {
+    type Response = Cell;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::GetShardAccountCell(self)
+    }
+}
+
+impl Routable for GetShardAccountCell {
+    fn route(&self) -> Route {
+        Route::Latest { chain: self.account_address.chain_id() }
     }
 }
 

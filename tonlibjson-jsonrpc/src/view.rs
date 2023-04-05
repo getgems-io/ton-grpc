@@ -23,7 +23,7 @@ impl From<MasterchainInfo> for MasterchainInfoView {
 #[derive(Serialize)]
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExtView {
-    pub workchain: i64,
+    pub workchain: i32,
     pub shard: String,
     pub seqno: i32,
     pub root_hash: String,
