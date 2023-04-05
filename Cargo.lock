@@ -1614,6 +1614,7 @@ name = "ton-grpc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "base64 0.21.0",
  "futures",
  "prost",
  "serde",
@@ -1623,6 +1624,7 @@ dependencies = [
  "tonic-build",
  "tonic-health",
  "tonic-reflection",
+ "tonlibjson-client",
  "tonlibjson-sys",
  "tracing",
  "tracing-subscriber",

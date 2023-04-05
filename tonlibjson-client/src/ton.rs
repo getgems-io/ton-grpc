@@ -10,7 +10,7 @@ use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest, BlockCriteria, Route};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
@@ -24,7 +24,7 @@ pub struct TonClient {
     client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>
 }
 
-const MAIN_CHAIN: i64 = -1;
+const MAIN_CHAIN: i32 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
@@ -99,7 +99,7 @@ impl TonClient {
 
     pub async fn look_up_block_by_seqno(
         &self,
-        chain: i64,
+        chain: i32,
         shard: i64,
         seqno: i32,
     ) -> anyhow::Result<BlockIdExt> {
@@ -116,7 +116,7 @@ impl TonClient {
 
     pub async fn look_up_block_by_lt(
         &self,
-        chain: i64,
+        chain: i32,
         shard: i64,
         lt: i64,
     ) -> anyhow::Result<BlockIdExt> {
@@ -143,7 +143,7 @@ impl TonClient {
 
     pub async fn get_block_header(
         &self,
-        chain: i64,
+        chain: i32,
         shard: i64,
         seqno: i32,
     ) -> anyhow::Result<BlockHeader> {
@@ -360,6 +360,12 @@ impl TonClient {
 
         RunGetMethod::new(address, method, stack)
             .call(&mut client)
+            .await
+    }
+
+    pub async fn get_shard_account_cell(&self, address: AccountAddress) -> anyhow::Result<Cell> {
+        GetShardAccountCell::new(address)
+            .call(&mut self.client.clone())
             .await
     }
 }
