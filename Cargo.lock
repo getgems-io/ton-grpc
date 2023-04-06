@@ -1614,7 +1614,7 @@ name = "ton-grpc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "base64 0.21.0",
+ "base64",
  "futures",
  "prost",
  "serde",
@@ -1673,9 +1673,9 @@ dependencies = [
 
 [[package]]
 name = "tonic-health"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d681c535501d2f6392b0b9843e390e5f1aec57381505507075ea5a7b59194be"
+checksum = "952d35d8f23b6d61e85eee6d4799a6364e10bfe759b97d9cf489b3da9b1fd341"
 dependencies = [
  "async-stream",
  "prost",
