@@ -218,7 +218,37 @@ message TransactionEmulatorSetLibsResponse {
 
 
 service Account {
+  rpc GetAccountState (AccountAddress) returns (AccountState);
+  rpc GetFullAccountState (AccountAddress) returns (FullAccountState);
   rpc GetShardAccountCell (AccountAddress) returns (TvmCell);
+}
+
+message AccountState {
+  bytes code = 1;
+  bytes data = 2;
+  bytes frozen_hash = 3;
+}
+
+message BlockIdExt {
+  int32 workchain = 1;
+  int64 shard = 2;
+  int32 seqno = 3;
+  bytes root_hash = 4;
+  bytes file_hash = 5;
+}
+
+message TransactionId {
+  int64 lt = 1;
+  bytes hash = 2;
+}
+
+message FullAccountState {
+  int64 balance = 1;
+  bytes code = 2;
+  TransactionId last_transaction_id = 3;
+  BlockIdExt block_id = 4;
+  bytes frozen_hash = 5;
+  int64 sync_utime = 6;
 }
 
 message AccountAddress {
