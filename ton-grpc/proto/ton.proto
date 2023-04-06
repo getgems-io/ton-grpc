@@ -218,15 +218,36 @@ message TransactionEmulatorSetLibsResponse {
 
 
 service Account {
-  rpc GetAccountState (AccountAddress) returns (AccountState);
-  rpc GetFullAccountState (AccountAddress) returns (FullAccountState);
-  rpc GetShardAccountCell (AccountAddress) returns (TvmCell);
+  rpc GetAccountState (GetAccountStateRequest) returns (AccountStateResponse);
+  rpc GetShardAccountCell (GetAccountStateRequest) returns (TvmCell);
 }
 
-message AccountState {
-  bytes code = 1;
-  bytes data = 2;
-  bytes frozen_hash = 3;
+message GetAccountStateRequest {
+  AccountAddress account_address = 1;
+  optional BlockIdExt block = 2;
+}
+
+message AccountStateResponse {
+  int64 balance = 1;
+  AccountAddress account_address = 2;
+  BlockIdExt block_id = 3;
+  optional TransactionId last_transaction_id = 4;
+  oneof account_state {
+    ActiveAccountState active = 5;
+    FrozenAccountState frozen = 6;
+    UninitializedAccountState uninitialized = 7;
+  }
+}
+
+message GetShardAccountCellRequest {
+  AccountAddress account_address = 1;
+  optional BlockIdExt block = 2;
+}
+
+message GetShardAccountCellResponse {
+  AccountAddress account_address = 1;
+  BlockIdExt block_id = 2;
+  TvmCell cell = 3;
 }
 
 message BlockIdExt {
@@ -242,13 +263,16 @@ message TransactionId {
   bytes hash = 2;
 }
 
-message FullAccountState {
-  int64 balance = 1;
+message ActiveAccountState {
   bytes code = 2;
-  TransactionId last_transaction_id = 3;
-  BlockIdExt block_id = 4;
-  bytes frozen_hash = 5;
-  int64 sync_utime = 6;
+  bytes data = 3;
+}
+
+message FrozenAccountState {
+  bytes frozen_hash = 2;
+}
+
+message UninitializedAccountState {
 }
 
 message AccountAddress {
