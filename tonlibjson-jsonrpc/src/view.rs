@@ -208,7 +208,7 @@ pub struct AddressInformationView {
 
 impl From<RawFullAccountState> for AddressInformationView {
     fn from(s: RawFullAccountState) -> Self {
-        let state= if s.code.is_none() || s.code.as_ref().unwrap().parse::<i64>().is_ok() {
+        let state = if s.code.is_none() || s.code.as_ref().unwrap().parse::<i64>().is_ok() {
             if s.frozen_hash.is_none() {
                 "uninitialized"
             } else {
