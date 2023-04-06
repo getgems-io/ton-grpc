@@ -6,7 +6,7 @@ use base64::Engine;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
-use serde_aux::prelude::*;
+use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance};
 use crate::balance::{BlockCriteria, Route};
 use crate::request::{Requestable, RequestBody, Routable};
 
@@ -147,6 +147,15 @@ pub struct InternalTransactionId {
     pub lt: i64,
 }
 
+impl Default for InternalTransactionId {
+    fn default() -> Self {
+        Self {
+            hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_owned(),
+            lt: 0
+        }
+    }
+}
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "@type", rename = "accountAddress")]
 pub struct AccountAddress {
@@ -157,11 +166,11 @@ pub struct AccountAddress {
 }
 
 impl AccountAddress {
-    pub fn new(account_address: String) -> anyhow::Result<Self> {
-        let _chain_id = Self::parse_chain_id(&account_address)?;
+    pub fn new(account_address: &str) -> anyhow::Result<Self> {
+        let _chain_id = Self::parse_chain_id(account_address)?;
 
         Ok(Self {
-            account_address,
+            account_address: account_address.to_owned(),
             _chain_id
         })
     }
@@ -218,8 +227,25 @@ pub struct RawGetAccountState {
     account_address: AccountAddress
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(tag = "@type", rename = "raw.FullAccountState")]
+pub struct RawFullAccountState {
+    #[serde(deserialize_with = "deserialize_ton_account_balance")]
+    pub balance: Option<i64>,
+    #[serde(deserialize_with = "deserialize_default_as_none")]
+    pub code: Option<String>,
+    #[serde(deserialize_with = "deserialize_default_as_none")]
+    pub data: Option<String>,
+    #[serde(deserialize_with = "deserialize_default_as_none")]
+    pub last_transaction_id: Option<InternalTransactionId>,
+    pub block_id: BlockIdExt,
+    #[serde(deserialize_with = "deserialize_default_as_none")]
+    pub frozen_hash: Option<String>,
+    pub sync_utime: i64
+}
+
 impl Requestable for RawGetAccountState {
-    type Response = Value;
+    type Response = RawFullAccountState;
 
     fn into_request_body(self) -> RequestBody {
         RequestBody::RawGetAccountState(self)
@@ -660,13 +686,13 @@ mod tests {
     #[test]
     #[traced_test]
     fn account_address_workchain_id() {
-        let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned()).unwrap();
+        let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap();
         assert_eq!(0, tx_id.chain_id());
 
-        let tx_id = AccountAddress::new("-1:qweq".to_owned()).unwrap();
+        let tx_id = AccountAddress::new("-1:qweq").unwrap();
         assert_eq!(-1, tx_id.chain_id());
 
-        let tx_id = AccountAddress::new("0:qweq".to_owned()).unwrap();
+        let tx_id = AccountAddress::new("0:qweq").unwrap();
         assert_eq!(0, tx_id.chain_id())
     }
 

@@ -15,7 +15,7 @@ use tracing::debug;
 use tonlibjson_client::ton::TonClient;
 use tonlibjson_client::block::{InternalTransactionId, RawTransaction, ShortTxId, SmcStack};
 use crate::params::{RunGetMethodParams, Stack};
-use crate::view::{BlockHeaderView, BlockIdExtView, MasterchainInfoView, ShardsView, TransactionView};
+use crate::view::{AddressInformationView, BlockHeaderView, BlockIdExtView, MasterchainInfoView, ShardsView, TransactionView};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -242,7 +242,12 @@ impl RpcServer {
     }
 
     async fn get_address_information(&self, params: AddressParams) -> RpcResponse<Value> {
-        self.client.raw_get_account_state(&params.address).await
+        let state: AddressInformationView = self.client
+            .raw_get_account_state(&params.address)
+            .await?
+            .into();
+
+        Ok(serde_json::to_value(state)?)
     }
 
     async fn get_extended_address_information(&self, params: AddressParams) -> RpcResponse<Value> {

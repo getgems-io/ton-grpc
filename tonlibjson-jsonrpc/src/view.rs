@@ -1,6 +1,6 @@
 use serde::Serialize;
 use serde_json::Value;
-use tonlibjson_client::block::{BlockHeader, BlockIdExt, BlocksShards, InternalTransactionId, MasterchainInfo, RawMessage, RawTransaction};
+use tonlibjson_client::block::{BlockHeader, BlockIdExt, BlocksShards, InternalTransactionId, MasterchainInfo, RawFullAccountState, RawMessage, RawTransaction};
 
 #[derive(Serialize)]
 #[serde(tag = "@type", rename = "blocks.masterchainInfo")]
@@ -154,6 +154,15 @@ impl From<&InternalTransactionId> for TransactionIdView {
     }
 }
 
+impl From<InternalTransactionId> for TransactionIdView {
+    fn from(id: InternalTransactionId) -> Self {
+        Self {
+            hash: id.hash.clone(),
+            lt: id.lt.to_string()
+        }
+    }
+}
+
 #[derive(Serialize)]
 #[serde(tag = "@type", rename = "raw.transaction")]
 pub struct TransactionView {
@@ -180,6 +189,44 @@ impl From<&RawTransaction> for TransactionView {
             other_fee: tx.other_fee.to_string(),
             in_msg: tx.in_msg.as_ref().map(|msg| msg.into()),
             out_msgs: tx.out_msgs.iter().map(Into::into).collect(),
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(tag = "@type", rename = "raw.fullAccountState")]
+pub struct AddressInformationView {
+    pub balance: i64,
+    pub code: String,
+    pub data: String,
+    pub last_transaction_id: TransactionIdView,
+    pub block_id: BlockIdExtView,
+    pub frozen_hash: String,
+    pub sync_utime: i64,
+    pub state: String
+}
+
+impl From<RawFullAccountState> for AddressInformationView {
+    fn from(s: RawFullAccountState) -> Self {
+        let state= if s.code.is_none() || s.code.as_ref().unwrap().parse::<i64>().is_ok() {
+            if s.frozen_hash.is_none() {
+                "uninitialized"
+            } else {
+                "frozen"
+            }
+        } else {
+            "active"
+        };
+
+        Self {
+            balance: s.balance.unwrap_or_default(),
+            code: s.code.unwrap_or_default(),
+            data: s.data.unwrap_or_default(),
+            last_transaction_id: s.last_transaction_id.unwrap_or_default().into(),
+            block_id: s.block_id.into(),
+            frozen_hash: s.frozen_hash.unwrap_or_default(),
+            sync_utime: s.sync_utime,
+            state: state.to_owned()
         }
     }
 }
