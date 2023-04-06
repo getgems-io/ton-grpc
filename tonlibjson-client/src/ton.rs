@@ -10,7 +10,7 @@ use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use url::Url;
 use crate::balance::{Balance, BalanceRequest, BlockCriteria, Route};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
@@ -154,40 +154,20 @@ impl TonClient {
         BlocksGetBlockHeader::new(id).call(&mut client).await
     }
 
-    pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<Value> {
+    pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<RawFullAccountState> {
         let mut client = self.client.clone();
 
-        let account_address = AccountAddress::new(address.to_owned())?;
+        let account_address = AccountAddress::new(address)?;
 
-        let mut response = RawGetAccountState::new(account_address)
+        RawGetAccountState::new(account_address)
             .call(&mut client)
-            .await?;
-
-        let code = response["code"].as_str().unwrap_or("");
-        let state: &str = if code.is_empty() || code.parse::<i64>().is_ok() {
-            if response["frozen_hash"].as_str().unwrap_or("").is_empty() {
-                "uninitialized"
-            } else {
-                "frozen"
-            }
-        } else {
-            "active"
-        };
-
-        response["state"] = Value::from(state);
-        if let Some(balance) = response["balance"].as_i64() {
-            if balance < 0 {
-                response["balance"] = Value::from(0);
-            }
-        }
-
-        Ok(response)
+            .await
     }
 
     pub async fn get_account_state(&self, address: &str) -> anyhow::Result<Value> {
         let mut client = self.client.clone();
 
-        let account_address = AccountAddress::new(address.to_owned())?;
+        let account_address = AccountAddress::new(address)?;
 
         GetAccountState::new(account_address)
             .call(&mut client)
@@ -202,7 +182,7 @@ impl TonClient {
     ) -> anyhow::Result<RawTransactions> {
         let mut client = self.client.clone();
 
-        let address = AccountAddress::new(address.to_owned())?;
+        let address = AccountAddress::new(address)?;
         let chain = address.chain_id();
 
         let request = RawGetTransactionsV2::new(
@@ -294,14 +274,9 @@ impl TonClient {
         &self,
         address: String,
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
-        // TODO[akostylev0] typed
         let account_state = self.raw_get_account_state(&address).await?;
-        let ltx = account_state
-            .get("last_transaction_id")
-            .ok_or_else(||anyhow!("Unexpected missed last_transaction_id"))?;
-        let last_tx = serde_json::from_value::<InternalTransactionId>(ltx.to_owned())?;
 
-        return Ok(self.get_account_tx_stream_from(address, last_tx));
+        return Ok(self.get_account_tx_stream_from(address, account_state.last_transaction_id.unwrap_or_default()));
     }
 
     pub fn get_account_tx_stream_from(
@@ -354,7 +329,7 @@ impl TonClient {
     }
 
     pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {
-        let address = AccountAddress::new(address)?;
+        let address = AccountAddress::new(&address)?;
         let method = SmcMethodId::new_name(method);
         let mut client = self.client.clone();
 
@@ -363,7 +338,9 @@ impl TonClient {
             .await
     }
 
-    pub async fn get_shard_account_cell(&self, address: AccountAddress) -> anyhow::Result<Cell> {
+    pub async fn get_shard_account_cell(&self, address: &str) -> anyhow::Result<Cell> {
+        let address = AccountAddress::new(address)?;
+
         GetShardAccountCell::new(address)
             .call(&mut self.client.clone())
             .await

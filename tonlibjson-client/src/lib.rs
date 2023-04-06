@@ -14,3 +14,4 @@ mod client;
 mod balance;
 mod error;
 mod shared;
+mod deserialize;
