@@ -245,12 +245,15 @@ message GetAccountStateResponse {
 
 message GetShardAccountCellRequest {
   AccountAddress account_address = 1;
-  optional BlockIdExt block_id = 2;
+  /* optional */ oneof criteria {
+    BlockIdExt block_id = 2;
+    TransactionId transaction_id = 3;
+  }
 }
 
 message GetShardAccountCellResponse {
   AccountAddress account_address = 1;
-  BlockIdExt block_id = 2;
+//  BlockIdExt block_id = 2;
   TvmCell cell = 3;
 }
 
