@@ -46,6 +46,20 @@ impl From<block::BlockIdExt> for BlockIdExt {
     }
 }
 
+impl TryFrom<BlockIdExt> for block::BlockIdExt {
+    type Error = anyhow::Error;
+
+    fn try_from(value: BlockIdExt) -> Result<Self, Self::Error> {
+        Ok(Self {
+            workchain: value.workchain,
+            shard: value.shard,
+            seqno: value.seqno,
+            root_hash: String::from_utf8(value.root_hash)?,
+            file_hash: String::from_utf8(value.file_hash)?,
+        })
+    }
+}
+
 impl From<block::InternalTransactionId> for TransactionId {
     fn from(value: block::InternalTransactionId) -> Self {
         Self {

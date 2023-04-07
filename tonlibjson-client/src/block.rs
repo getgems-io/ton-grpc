@@ -677,6 +677,31 @@ impl Error for TonError {
     }
 }
 
+#[derive(new, Serialize, Clone)]
+#[serde(tag = "@type")]
+#[serde(rename = "withBlock")]
+pub struct WithBlock<T> {
+    pub id: BlockIdExt,
+    pub function: T
+}
+
+impl<T> Requestable for WithBlock<T> where T : Requestable {
+    type Response = T::Response;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::Value(serde_json::to_value(self).expect("must be valid"))
+    }
+}
+
+impl<T> Routable for WithBlock<T> {
+    fn route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno(self.id.seqno)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::block::{Cell, List, Number, Slice, StackEntry, Tuple, SmcMethodId, AccountAddress};
