@@ -221,6 +221,28 @@ impl Routable for GetShardAccountCell {
 
 #[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type")]
+#[serde(rename = "getShardAccountCellByTransaction")]
+pub struct GetShardAccountCellByTransaction {
+    pub account_address: AccountAddress,
+    pub transaction_id: InternalTransactionId
+}
+
+impl Requestable for GetShardAccountCellByTransaction {
+    type Response = Cell;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::GetShardAccountCellByTransaction(self)
+    }
+}
+
+impl Routable for GetShardAccountCellByTransaction {
+    fn route(&self) -> Route {
+        Route::Block { chain: self.account_address.chain_id(), criteria: BlockCriteria::LogicalTime(self.transaction_id.lt) }
+    }
+}
+
+#[derive(new, Debug, Serialize, Clone)]
+#[serde(tag = "@type")]
 #[serde(rename = "raw.getAccountState")]
 pub struct RawGetAccountState {
     account_address: AccountAddress
