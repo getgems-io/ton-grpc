@@ -26,7 +26,7 @@ impl Account for AccountService {
         let address = msg.account_address
             .ok_or_else(|| Status::invalid_argument("Empty AccountAddress"))?;
 
-        let block_id = match msg.block {
+        let block_id = match msg.block_id {
             Some(block) => block.try_into()
                 .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?,
             None => self.client.get_masterchain_info().await
@@ -58,18 +58,16 @@ impl Account for AccountService {
         let address = msg.account_address
             .ok_or_else(|| Status::invalid_argument("Empty AccountAddress"))?;
 
-        let block_id = match msg.block {
-            Some(block) => block,
-            None => self.client
-                .get_masterchain_info()
-                .await
+        let block_id = match msg.block_id {
+            Some(block) => block.try_into()
+                .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?,
+            None => self.client.get_masterchain_info().await
                 .map_err(|e| Status::internal(e.to_string()))?
                 .last
-                .into()
         };
 
         let response = self.client
-            .get_shard_account_cell(&address.address)
+            .get_shard_account_cell_on_block(&address.address, block_id.clone())
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
@@ -79,7 +77,7 @@ impl Account for AccountService {
 
         let response = GetShardAccountCellResponse {
             account_address: Some(address),
-            block_id: Some(block_id),
+            block_id: Some(block_id.into()),
             cell: Some(TvmCell { bytes })
         };
 

@@ -224,7 +224,7 @@ service Account {
 
 message GetAccountStateRequest {
   AccountAddress account_address = 1;
-  optional BlockIdExt block = 2;
+  optional BlockIdExt block_id = 2;
 }
 
 message GetAccountStateResponse {
@@ -241,7 +241,7 @@ message GetAccountStateResponse {
 
 message GetShardAccountCellRequest {
   AccountAddress account_address = 1;
-  optional BlockIdExt block = 2;
+  optional BlockIdExt block_id = 2;
 }
 
 message GetShardAccountCellResponse {
