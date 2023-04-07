@@ -27,16 +27,18 @@ impl Account for AccountService {
             .ok_or_else(|| Status::invalid_argument("Empty AccountAddress"))?;
 
         let block_id = match msg.block {
-            Some(block) => block,
+            Some(block) => block.try_into()
+                .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?,
             None => self.client.get_masterchain_info().await
                 .map_err(|e| Status::internal(e.to_string()))?
-                .last.into()
+                .last
         };
 
-        let state = self.client.raw_get_account_state(&address.address)
+        let state = self.client.raw_get_account_state_on_block(&address.address, block_id)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
+        let block_id = state.block_id.clone();
         let balance = state.balance.unwrap_or_default();
         let last_transaction_id = state.last_transaction_id.clone().map(|t| t.into());
         let state: AccountState = state.into();
@@ -44,7 +46,7 @@ impl Account for AccountService {
         Ok(Response::new(GetAccountStateResponse {
             balance,
             account_address: Some(address),
-            block_id: Some(block_id),
+            block_id: Some(block_id.into()),
             last_transaction_id,
             account_state: Some(state)
         }))
