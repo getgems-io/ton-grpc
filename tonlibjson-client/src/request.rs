@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service, ServiceExt};
 use crate::balance::{BalanceRequest, Route};
-use crate::block::{BlocksGetBlockHeader, BlocksGetShards, BlocksGetTransactions, BlocksLookupBlock, GetAccountState, GetMasterchainInfo, GetShardAccountCell, RawGetAccountState, RawGetTransactionsV2, RawSendMessage, SmcLoad, SmcRunGetMethod, Sync};
+use crate::block::{BlocksGetBlockHeader, BlocksGetShards, BlocksGetTransactions, BlocksLookupBlock, GetAccountState, GetMasterchainInfo, GetShardAccountCell, RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage, SmcLoad, SmcRunGetMethod, Sync};
 use crate::session::SessionRequest;
 
 #[async_trait]
@@ -136,6 +136,7 @@ pub enum RequestBody {
 
     RawSendMessage(RawSendMessage),
     RawGetAccountState(RawGetAccountState),
+    RawGetAccountStateByTransaction(RawGetAccountStateByTransaction),
     RawGetTransactionsV2(RawGetTransactionsV2),
 
     SmcLoad(SmcLoad),

@@ -223,7 +223,6 @@ impl Routable for GetShardAccountCell {
 #[serde(tag = "@type")]
 #[serde(rename = "raw.getAccountState")]
 pub struct RawGetAccountState {
-    #[serde(rename = "account_address")]
     account_address: AccountAddress
 }
 
@@ -255,6 +254,28 @@ impl Requestable for RawGetAccountState {
 impl Routable for RawGetAccountState {
     fn route(&self) -> Route {
         Route::Latest { chain: self.account_address.chain_id() }
+    }
+}
+
+#[derive(new, Debug, Serialize, Clone)]
+#[serde(tag = "@type")]
+#[serde(rename = "raw.getAccountStateByTransaction")]
+pub struct RawGetAccountStateByTransaction {
+    account_address: AccountAddress,
+    transaction_id: InternalTransactionId
+}
+
+impl Requestable for RawGetAccountStateByTransaction {
+    type Response = RawFullAccountState;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::RawGetAccountStateByTransaction(self)
+    }
+}
+
+impl Routable for RawGetAccountStateByTransaction {
+    fn route(&self) -> Route {
+        Route::Block { chain: self.account_address.chain_id(), criteria: BlockCriteria::LogicalTime(self.transaction_id.lt)  }
     }
 }
 
