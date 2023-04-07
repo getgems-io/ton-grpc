@@ -69,6 +69,17 @@ impl From<block::InternalTransactionId> for TransactionId {
     }
 }
 
+impl TryFrom<TransactionId> for block::InternalTransactionId {
+    type Error = anyhow::Error;
+
+    fn try_from(value: TransactionId) -> Result<Self, Self::Error> {
+        Ok(Self {
+            hash: String::from_utf8(value.hash)?,
+            lt: value.lt
+        })
+    }
+}
+
 impl From<block::RawFullAccountState> for AccountState {
     fn from(value: block::RawFullAccountState) -> Self {
         if value.code.is_some() {

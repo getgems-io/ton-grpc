@@ -224,7 +224,11 @@ service Account {
 
 message GetAccountStateRequest {
   AccountAddress account_address = 1;
-  optional BlockIdExt block_id = 2;
+
+  /* optional */ oneof criteria {
+    BlockIdExt block_id = 2;
+    TransactionId transaction_id = 3;
+  }
 }
 
 message GetAccountStateResponse {

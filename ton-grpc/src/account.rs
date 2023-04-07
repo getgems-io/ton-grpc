@@ -4,6 +4,7 @@ use anyhow::Result;
 use base64::Engine;
 use crate::ton::account_server::Account;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetShardAccountCellRequest, GetShardAccountCellResponse, TvmCell};
+use crate::ton::get_account_state_request::Criteria;
 use crate::ton::get_account_state_response::AccountState;
 
 pub struct AccountService {
@@ -26,17 +27,26 @@ impl Account for AccountService {
         let address = msg.account_address
             .ok_or_else(|| Status::invalid_argument("Empty AccountAddress"))?;
 
-        let block_id = match msg.block_id {
-            Some(block) => block.try_into()
-                .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?,
-            None => self.client.get_masterchain_info().await
-                .map_err(|e| Status::internal(e.to_string()))?
-                .last
-        };
+        let criteria = match msg.criteria {
+            None => {
+                let block_id = self.client.get_masterchain_info()
+                    .await
+                    .map(|i| i.last);
 
-        let state = self.client.raw_get_account_state_on_block(&address.address, block_id)
-            .await
+                either::Left(block_id)
+            },
+            Some(Criteria::BlockId(block_id)) => either::Left(block_id.try_into()),
+            Some(Criteria::TransactionId(tx_id)) => either::Right(tx_id.try_into())
+        }.factor_err()
             .map_err(|e| Status::internal(e.to_string()))?;
+
+        let state = criteria.map_left(|block_id| async {
+            self.client.raw_get_account_state_on_block(&address.address, block_id)
+                .await
+        }).map_right(|tx_id| async {
+            self.client.raw_get_account_state_by_transaction(&address.address, tx_id)
+                .await
+        }).await.map_err(|e| Status::internal(e.to_string()))?;
 
         let block_id = state.block_id.clone();
         let balance = state.balance.unwrap_or_default();

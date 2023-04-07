@@ -19,6 +19,7 @@ tonic = "0.9"
 tonic-reflection = "0.9"
 tonic-health = "0.9"
 prost = "0.11"
+either = "1.8"
 
 [build-dependencies]
 tonic-build = "0.9"
