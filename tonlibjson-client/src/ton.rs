@@ -355,4 +355,12 @@ impl TonClient {
             .call(&mut self.client.clone())
             .await
     }
+
+    pub async fn get_shard_account_cell_on_block(&self, address: &str, block: BlockIdExt) -> anyhow::Result<Cell> {
+        let address = AccountAddress::new(address)?;
+
+        WithBlock::new(block, GetShardAccountCell::new(address))
+            .call(&mut self.client.clone())
+            .await
+    }
 }
