@@ -34,8 +34,8 @@ async fn main() -> anyhow::Result<()> {
     health_reporter.set_serving::<TvmEmulatorServer<TvmEmulatorService>>().await;
 
     Server::builder()
-        .tcp_keepalive(Some(Duration::from_secs(1)))
-        .http2_keepalive_interval(Some(Duration::from_secs(1)))
+        .tcp_keepalive(Some(Duration::from_secs(120)))
+        .http2_keepalive_interval(Some(Duration::from_secs(90)))
         .add_service(health_service)
         .add_service(reflection)
         .add_service(tvm_emulator_service)

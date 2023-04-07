@@ -218,8 +218,8 @@ message TransactionEmulatorSetLibsResponse {
 
 
 service Account {
-  rpc GetAccountState (GetAccountStateRequest) returns (AccountStateResponse);
-  rpc GetShardAccountCell (GetAccountStateRequest) returns (TvmCell);
+  rpc GetAccountState (GetAccountStateRequest) returns (GetAccountStateResponse);
+  rpc GetShardAccountCell (GetShardAccountCellRequest) returns (GetShardAccountCellResponse);
 }
 
 message GetAccountStateRequest {
@@ -227,10 +227,10 @@ message GetAccountStateRequest {
   optional BlockIdExt block = 2;
 }
 
-message AccountStateResponse {
-  int64 balance = 1;
-  AccountAddress account_address = 2;
-  BlockIdExt block_id = 3;
+message GetAccountStateResponse {
+  AccountAddress account_address = 1;
+  BlockIdExt block_id = 2;
+  int64 balance = 3;
   optional TransactionId last_transaction_id = 4;
   oneof account_state {
     ActiveAccountState active = 5;
