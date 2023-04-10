@@ -1,9 +1,8 @@
 use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
-use base64::Engine;
 use crate::ton::account_server::Account;
-use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetShardAccountCellRequest, GetShardAccountCellResponse, TvmCell};
+use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetShardAccountCellRequest, GetShardAccountCellResponse};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::{get_account_state_request, get_shard_account_cell_request};
 
@@ -19,11 +18,9 @@ impl AccountService {
     }
 }
 
-// TODO[akostylev0] add actual block_id to response
-
 #[async_trait]
 impl Account for AccountService {
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, err)]
     async fn get_account_state(&self, request: Request<GetAccountStateRequest>) -> std::result::Result<Response<GetAccountStateResponse>, Status> {
         let msg = request.into_inner();
 
@@ -34,14 +31,14 @@ impl Account for AccountService {
             None => {
                 let block_id = self.client.get_masterchain_info()
                     .await
-                    .map(|i| i.last);
+                    .map(|i| i.last)
+                    .map_err(|e| Status::internal(e.to_string()))?;
 
                 either::Left(block_id)
             },
-            Some(get_account_state_request::Criteria::BlockId(block_id)) => either::Left(block_id.try_into()),
-            Some(get_account_state_request::Criteria::TransactionId(tx_id)) => either::Right(tx_id.try_into())
-        }.factor_err()
-            .map_err(|e| Status::internal(e.to_string()))?;
+            Some(get_account_state_request::Criteria::BlockId(block_id)) => either::Left(block_id.into()),
+            Some(get_account_state_request::Criteria::TransactionId(tx_id)) => either::Right(tx_id.into())
+        };
 
         let state = criteria.map_left(|block_id| async {
             self.client.raw_get_account_state_on_block(&address.address, block_id)
@@ -55,17 +52,18 @@ impl Account for AccountService {
         let balance = state.balance.unwrap_or_default();
         let last_transaction_id = state.last_transaction_id.clone().map(|t| t.into());
         let state: AccountState = state.into();
+        let block_id = block_id.into();
 
         Ok(Response::new(GetAccountStateResponse {
             balance,
             account_address: Some(address),
-            block_id: Some(block_id.into()),
+            block_id: Some(block_id),
             last_transaction_id,
             account_state: Some(state)
         }))
     }
 
-    #[tracing::instrument(skip_all)]
+    #[tracing::instrument(skip_all, err)]
     async fn get_shard_account_cell(&self, request: Request<GetShardAccountCellRequest>) -> Result<Response<GetShardAccountCellResponse>, Status> {
         let msg = request.into_inner();
 
@@ -76,14 +74,14 @@ impl Account for AccountService {
             None => {
                 let block_id = self.client.get_masterchain_info()
                     .await
-                    .map(|i| i.last);
+                    .map(|i| i.last)
+                    .map_err(|e| Status::internal(e.to_string()))?;
 
                 either::Left(block_id)
             },
-            Some(get_shard_account_cell_request::Criteria::BlockId(block_id)) => either::Left(block_id.try_into()),
-            Some(get_shard_account_cell_request::Criteria::TransactionId(tx_id)) => either::Right(tx_id.try_into())
-        }.factor_err()
-            .map_err(|e| Status::internal(e.to_string()))?;
+            Some(get_shard_account_cell_request::Criteria::BlockId(block_id)) => either::Left(block_id.into()),
+            Some(get_shard_account_cell_request::Criteria::TransactionId(tx_id)) => either::Right(tx_id.into())
+        };
 
         let (block_id, cell) = criteria.map_left(|block_id| async {
             let cell = self.client.get_shard_account_cell_on_block(&address.address, block_id.clone()).await?;
@@ -96,14 +94,13 @@ impl Account for AccountService {
             Ok((state.block_id, cell))
         }).await.map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
-        let bytes = base64::engine::general_purpose::STANDARD
-            .decode(cell.bytes)
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let block_id = block_id.into();
+        let cell = cell.into();
 
         let response = GetShardAccountCellResponse {
             account_address: Some(address),
-            block_id: Some(block_id.into()),
-            cell: Some(TvmCell { bytes })
+            block_id: Some(block_id),
+            cell: Some(cell)
         };
 
         Ok(Response::new(response))

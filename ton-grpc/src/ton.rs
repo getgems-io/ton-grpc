@@ -26,7 +26,7 @@ impl<T> From<TvmResult<T>> for anyhow::Result<T> where T: Default {
     }
 }
 
-impl TryFrom<AccountAddress> for tonlibjson_client::block::AccountAddress {
+impl TryFrom<AccountAddress> for block::AccountAddress {
     type Error = anyhow::Error;
 
     fn try_from(value: AccountAddress) -> Result<Self, Self::Error> {
@@ -34,31 +34,27 @@ impl TryFrom<AccountAddress> for tonlibjson_client::block::AccountAddress {
     }
 }
 
-// TODO[akostylev0] base64 pricoldes
-
 impl From<block::BlockIdExt> for BlockIdExt {
     fn from(value: block::BlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
             shard: value.shard,
             seqno: value.seqno,
-            root_hash: value.root_hash.into_bytes(),
-            file_hash: value.file_hash.into_bytes(),
+            root_hash: value.root_hash.clone(),
+            file_hash: value.file_hash.clone(),
         }
     }
 }
 
-impl TryFrom<BlockIdExt> for block::BlockIdExt {
-    type Error = anyhow::Error;
-
-    fn try_from(value: BlockIdExt) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<BlockIdExt> for block::BlockIdExt {
+    fn from(value: BlockIdExt) -> Self {
+        Self {
             workchain: value.workchain,
             shard: value.shard,
             seqno: value.seqno,
-            root_hash: String::from_utf8(value.root_hash)?,
-            file_hash: String::from_utf8(value.file_hash)?,
-        })
+            root_hash: value.root_hash.clone(),
+            file_hash: value.file_hash.clone(),
+        }
     }
 }
 
@@ -66,19 +62,17 @@ impl From<block::InternalTransactionId> for TransactionId {
     fn from(value: block::InternalTransactionId) -> Self {
         Self {
             lt: value.lt,
-            hash: value.hash.into_bytes()
+            hash: value.hash.clone()
         }
     }
 }
 
-impl TryFrom<TransactionId> for block::InternalTransactionId {
-    type Error = anyhow::Error;
-
-    fn try_from(value: TransactionId) -> Result<Self, Self::Error> {
-        Ok(Self {
-            hash: String::from_utf8(value.hash)?,
+impl From<TransactionId> for block::InternalTransactionId {
+    fn from(value: TransactionId) -> Self {
+        Self {
+            hash: value.hash.clone(),
             lt: value.lt
-        })
+        }
     }
 }
 
@@ -86,15 +80,23 @@ impl From<block::RawFullAccountState> for AccountState {
     fn from(value: block::RawFullAccountState) -> Self {
         if value.code.is_some() {
             AccountState::Active(ActiveAccountState {
-                code: value.code.unwrap_or_default().into_bytes(),
-                data: value.data.unwrap_or_default().into_bytes()
+                code: value.code.unwrap_or_default(),
+                data: value.data.unwrap_or_default()
             })
         } else if value.frozen_hash.is_some() {
             AccountState::Frozen(FrozenAccountState {
-                frozen_hash: value.frozen_hash.unwrap_or_default().into_bytes()
+                frozen_hash: value.frozen_hash.unwrap_or_default()
             })
         } else {
             AccountState::Uninitialized(UninitializedAccountState {})
+        }
+    }
+}
+
+impl From<block::Cell> for TvmCell {
+    fn from(value: block::Cell) -> Self {
+        Self {
+            bytes: value.bytes.clone()
         }
     }
 }
