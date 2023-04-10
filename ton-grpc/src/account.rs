@@ -1,6 +1,7 @@
 use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
+use crate::helpers::{extend_block_id};
 use crate::ton::account_server::Account;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetShardAccountCellRequest, GetShardAccountCellResponse};
 use crate::ton::get_account_state_response::AccountState;
@@ -31,14 +32,15 @@ impl Account for AccountService {
             None => {
                 let block_id = self.client.get_masterchain_info()
                     .await
-                    .map(|i| i.last)
-                    .map_err(|e| Status::internal(e.to_string()))?;
+                    .map(|i| i.last);
 
                 either::Left(block_id)
             },
-            Some(get_account_state_request::Criteria::BlockId(block_id)) => either::Left(block_id.into()),
-            Some(get_account_state_request::Criteria::TransactionId(tx_id)) => either::Right(tx_id.into())
-        };
+            Some(get_account_state_request::Criteria::BlockId(block_id)) => {
+                either::Left(extend_block_id(&self.client, &block_id).await)
+            },
+            Some(get_account_state_request::Criteria::TransactionId(tx_id)) => either::Right(Ok(tx_id.into()))
+        }.factor_err().map_err(|e| Status::internal(e.to_string()))?;
 
         let state = criteria.map_left(|block_id| async {
             self.client.raw_get_account_state_on_block(&address.address, block_id)
@@ -74,14 +76,15 @@ impl Account for AccountService {
             None => {
                 let block_id = self.client.get_masterchain_info()
                     .await
-                    .map(|i| i.last)
-                    .map_err(|e| Status::internal(e.to_string()))?;
+                    .map(|i| i.last);
 
                 either::Left(block_id)
             },
-            Some(get_shard_account_cell_request::Criteria::BlockId(block_id)) => either::Left(block_id.into()),
-            Some(get_shard_account_cell_request::Criteria::TransactionId(tx_id)) => either::Right(tx_id.into())
-        };
+            Some(get_shard_account_cell_request::Criteria::BlockId(block_id)) => {
+                either::Left(extend_block_id(&self.client, &block_id).await)
+            },
+            Some(get_shard_account_cell_request::Criteria::TransactionId(tx_id)) => either::Right(Ok(tx_id.into()))
+        }.factor_err().map_err(|e| Status::internal(e.to_string()))?;
 
         let (block_id, cell) = criteria.map_left(|block_id| async {
             let cell = self.client.get_shard_account_cell_on_block(&address.address, block_id.clone()).await?;
