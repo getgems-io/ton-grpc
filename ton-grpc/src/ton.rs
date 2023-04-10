@@ -34,6 +34,8 @@ impl TryFrom<AccountAddress> for tonlibjson_client::block::AccountAddress {
     }
 }
 
+// TODO[akostylev0] base64 pricoldes
+
 impl From<block::BlockIdExt> for BlockIdExt {
     fn from(value: block::BlockIdExt) -> Self {
         Self {
