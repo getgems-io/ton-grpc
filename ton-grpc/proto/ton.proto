@@ -261,22 +261,22 @@ message BlockIdExt {
   int32 workchain = 1;
   int64 shard = 2;
   int32 seqno = 3;
-  bytes root_hash = 4;
-  bytes file_hash = 5;
+  string root_hash = 4;
+  string file_hash = 5;
 }
 
 message TransactionId {
   int64 lt = 1;
-  bytes hash = 2;
+  string hash = 2;
 }
 
 message ActiveAccountState {
-  bytes code = 2;
-  bytes data = 3;
+  string code = 2;
+  string data = 3;
 }
 
 message FrozenAccountState {
-  bytes frozen_hash = 2;
+  string frozen_hash = 2;
 }
 
 message UninitializedAccountState {
@@ -287,5 +287,5 @@ message AccountAddress {
 }
 
 message TvmCell {
-  bytes bytes = 1;
+  string bytes = 1;
 }
