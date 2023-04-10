@@ -253,7 +253,7 @@ message GetShardAccountCellRequest {
 
 message GetShardAccountCellResponse {
   AccountAddress account_address = 1;
-//  BlockIdExt block_id = 2;
+  BlockIdExt block_id = 2;
   TvmCell cell = 3;
 }
 

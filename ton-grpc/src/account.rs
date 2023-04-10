@@ -23,6 +23,7 @@ impl AccountService {
 
 #[async_trait]
 impl Account for AccountService {
+    #[tracing::instrument(skip_all)]
     async fn get_account_state(&self, request: Request<GetAccountStateRequest>) -> std::result::Result<Response<GetAccountStateResponse>, Status> {
         let msg = request.into_inner();
 
@@ -64,6 +65,7 @@ impl Account for AccountService {
         }))
     }
 
+    #[tracing::instrument(skip_all)]
     async fn get_shard_account_cell(&self, request: Request<GetShardAccountCellRequest>) -> Result<Response<GetShardAccountCellResponse>, Status> {
         let msg = request.into_inner();
 
@@ -83,13 +85,16 @@ impl Account for AccountService {
         }.factor_err()
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let cell = criteria.map_left(|block_id| async {
-            self.client.get_shard_account_cell_on_block(&address.address, block_id)
-                .await
+        let (block_id, cell) = criteria.map_left(|block_id| async {
+            let cell = self.client.get_shard_account_cell_on_block(&address.address, block_id.clone()).await?;
+
+            Ok((block_id, cell))
         }).map_right(|tx_id| async {
-            self.client.get_shard_account_cell_by_transaction(&address.address, tx_id)
-                .await
-        }).await.map_err(|e| Status::internal(e.to_string()))?;
+            let state = self.client.raw_get_account_state_by_transaction(&address.address, tx_id).await?;
+            let cell = self.client.get_shard_account_cell_on_block(&address.address, state.block_id.clone()).await?;
+
+            Ok((state.block_id, cell))
+        }).await.map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(cell.bytes)
@@ -97,7 +102,7 @@ impl Account for AccountService {
 
         let response = GetShardAccountCellResponse {
             account_address: Some(address),
-            // block_id: Some(block_id.into()),
+            block_id: Some(block_id.into()),
             cell: Some(TvmCell { bytes })
         };
 

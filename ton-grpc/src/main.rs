@@ -5,6 +5,8 @@ mod account;
 
 use std::time::Duration;
 use tonic::transport::Server;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
 use crate::account::AccountService;
 use crate::ton::account_server::AccountServer;
 use crate::ton::transaction_emulator_server::TransactionEmulatorServer;
@@ -14,7 +16,11 @@ use crate::tvm_emulator::TvmEmulatorService;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::CLOSE)
+        .init();
+
     tonlibjson_sys::TvmEmulator::set_verbosity_level(0);
 
     let reflection = tonic_reflection::server::Builder::configure()
