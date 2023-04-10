@@ -220,6 +220,7 @@ message TransactionEmulatorSetLibsResponse {
 service Account {
   rpc GetAccountState (GetAccountStateRequest) returns (GetAccountStateResponse);
   rpc GetShardAccountCell (GetShardAccountCellRequest) returns (GetShardAccountCellResponse);
+  rpc GetAccountTransactions (GetAccountTransactionsRequest) returns (stream Transaction);
 }
 
 message GetAccountStateRequest {
@@ -257,6 +258,27 @@ message GetShardAccountCellResponse {
   TvmCell cell = 3;
 }
 
+message GetAccountTransactionsRequest {
+  enum Order {
+    UNORDERED = 0;
+    FROM_NEW_TO_OLD = 1;
+    FROM_OLD_TO_NEW = 2;
+  }
+
+  AccountAddress account_address = 1;
+  Order order = 2;
+
+  /* optional */ oneof from {
+    BlockId from_block_id = 3;
+    TransactionId from_transaction_id = 4;
+  }
+
+  /* optional */ oneof to {
+    BlockId to_block_id = 5;
+    TransactionId to_transaction_id = 6;
+  }
+}
+
 message BlockId {
   int32 workchain = 1;
   int64 shard = 2;
@@ -276,6 +298,10 @@ message BlockIdExt {
 message TransactionId {
   int64 lt = 1;
   string hash = 2;
+}
+
+message Transaction {
+  TransactionId id = 1;
 }
 
 message ActiveAccountState {

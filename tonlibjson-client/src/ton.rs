@@ -293,7 +293,7 @@ impl TonClient {
     pub async fn get_account_tx_stream(
         &self,
         address: String,
-    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
+    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + 'static> {
         let account_state = self.raw_get_account_state(&address).await?;
 
         return Ok(self.get_account_tx_stream_from(address, account_state.last_transaction_id.unwrap_or_default()));
@@ -303,15 +303,15 @@ impl TonClient {
         &self,
         address: String,
         last_tx: InternalTransactionId,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
-        struct State<'a> {
+    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
+        struct State {
             address: String,
             last_tx: InternalTransactionId,
-            this: &'a TonClient,
+            this: TonClient,
             next: bool
         }
 
-        stream::try_unfold(State { address, last_tx, this: self, next: true }, move |state| async move {
+        stream::try_unfold(State { address, last_tx, this: self.clone(), next: true }, move |state| async move {
             if !state.next {
                 return anyhow::Ok(None);
             }

@@ -1,9 +1,12 @@
+use std::pin::Pin;
 use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
+use futures::{Stream, StreamExt};
+use tonlibjson_client::block::{RawTransaction};
 use crate::helpers::{extend_block_id};
 use crate::ton::account_server::Account;
-use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetShardAccountCellRequest, GetShardAccountCellResponse};
+use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::{get_account_state_request, get_shard_account_cell_request};
 
@@ -107,5 +110,26 @@ impl Account for AccountService {
         };
 
         Ok(Response::new(response))
+    }
+
+    type GetAccountTransactionsStream = Pin<Box<dyn Stream<Item=Result<Transaction, Status>> + Send + 'static>>;
+
+    async fn get_account_transactions(&self, request: Request<GetAccountTransactionsRequest>) -> std::result::Result<Response<Self::GetAccountTransactionsStream>, Status> {
+        let msg = request.into_inner();
+        let client = self.client.clone();
+
+        let address = msg.account_address
+            .ok_or_else(|| Status::invalid_argument("Empty AccountAddress"))?;
+
+        let stream = client.get_account_tx_stream(address.address)
+            .await.map_err(|e: anyhow::Error| Status::internal(e.to_string()))?
+            .map(|r| {
+                r
+                    .map(|t: RawTransaction| Transaction { id: Some(t.transaction_id.into()) })
+                    .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
+
+            });
+
+        Ok(Response::new(stream.boxed()))
     }
 }
