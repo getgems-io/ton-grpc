@@ -54,7 +54,7 @@ impl BlocksGetBlockHeader {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {
     #[serde(deserialize_with = "deserialize_number_from_string")]
