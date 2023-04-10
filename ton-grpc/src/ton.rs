@@ -40,8 +40,8 @@ impl From<block::BlockIdExt> for BlockIdExt {
             workchain: value.workchain,
             shard: value.shard,
             seqno: value.seqno,
-            root_hash: value.root_hash.clone(),
-            file_hash: value.file_hash.clone(),
+            root_hash: value.root_hash,
+            file_hash: value.file_hash,
         }
     }
 }
@@ -52,8 +52,8 @@ impl From<BlockIdExt> for block::BlockIdExt {
             workchain: value.workchain,
             shard: value.shard,
             seqno: value.seqno,
-            root_hash: value.root_hash.clone(),
-            file_hash: value.file_hash.clone(),
+            root_hash: value.root_hash,
+            file_hash: value.file_hash,
         }
     }
 }
@@ -62,7 +62,7 @@ impl From<block::InternalTransactionId> for TransactionId {
     fn from(value: block::InternalTransactionId) -> Self {
         Self {
             lt: value.lt,
-            hash: value.hash.clone()
+            hash: value.hash
         }
     }
 }
@@ -70,7 +70,7 @@ impl From<block::InternalTransactionId> for TransactionId {
 impl From<TransactionId> for block::InternalTransactionId {
     fn from(value: TransactionId) -> Self {
         Self {
-            hash: value.hash.clone(),
+            hash: value.hash,
             lt: value.lt
         }
     }
@@ -96,7 +96,7 @@ impl From<block::RawFullAccountState> for AccountState {
 impl From<block::Cell> for TvmCell {
     fn from(value: block::Cell) -> Self {
         Self {
-            bytes: value.bytes.clone()
+            bytes: value.bytes
         }
     }
 }
