@@ -2,6 +2,7 @@ mod tvm_emulator;
 mod transaction_emulator;
 mod ton;
 mod account;
+mod helpers;
 
 use std::time::Duration;
 use tonic::transport::Server;

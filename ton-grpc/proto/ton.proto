@@ -226,7 +226,7 @@ message GetAccountStateRequest {
   AccountAddress account_address = 1;
 
   /* optional */ oneof criteria {
-    BlockIdExt block_id = 2;
+    BlockId block_id = 2;
     TransactionId transaction_id = 3;
   }
 }
@@ -246,7 +246,7 @@ message GetAccountStateResponse {
 message GetShardAccountCellRequest {
   AccountAddress account_address = 1;
   /* optional */ oneof criteria {
-    BlockIdExt block_id = 2;
+    BlockId block_id = 2;
     TransactionId transaction_id = 3;
   }
 }
@@ -255,6 +255,14 @@ message GetShardAccountCellResponse {
   AccountAddress account_address = 1;
   BlockIdExt block_id = 2;
   TvmCell cell = 3;
+}
+
+message BlockId {
+  int32 workchain = 1;
+  int64 shard = 2;
+  int32 seqno = 3;
+  optional string root_hash = 4;
+  optional string file_hash = 5;
 }
 
 message BlockIdExt {
