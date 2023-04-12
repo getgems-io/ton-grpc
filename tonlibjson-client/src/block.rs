@@ -360,7 +360,8 @@ pub struct RawTransaction {
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RawTransactions {
     pub transactions: Vec<RawTransaction>,
-    pub previous_transaction_id: InternalTransactionId,
+    #[serde(deserialize_with = "deserialize_default_as_none")]
+    pub previous_transaction_id: Option<InternalTransactionId>
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

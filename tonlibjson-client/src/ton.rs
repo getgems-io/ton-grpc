@@ -9,12 +9,11 @@ use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use url::Url;
-use crate::balance::{Balance, BalanceRequest, BlockCriteria, Route};
+use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
-use crate::request::Forward;
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::request::Callable;
@@ -203,27 +202,12 @@ impl TonClient {
         let mut client = self.client.clone();
 
         let address = AccountAddress::new(address)?;
-        let chain = address.chain_id();
-
         let request = RawGetTransactionsV2::new(
             address,
             InternalTransactionId::new(from_hash.to_owned(), from_lt)
         );
-        let response = request.clone().call(&mut client).await?;
 
-        if response.transactions.len() <= 1 {
-            let forwarded = Forward::new(
-                request,
-                Route::Block { chain, criteria: BlockCriteria::Seqno(1) }
-            );
-            let archive_response = forwarded.call(&mut client).await?;
-
-            if archive_response.transactions.len() > 1 {
-                return Ok(archive_response)
-            }
-        }
-
-        Ok(response)
+        request.call(&mut client).await
     }
 
     async fn blocks_get_transactions(
@@ -306,44 +290,29 @@ impl TonClient {
     ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
         struct State {
             address: String,
-            last_tx: InternalTransactionId,
-            this: TonClient,
-            next: bool
+            next_id: Option<InternalTransactionId>,
+            this: TonClient
         }
 
-        stream::try_unfold(State { address, last_tx, this: self.clone(), next: true }, move |state| async move {
-            if !state.next {
+        stream::try_unfold(State { address, next_id: Some(last_tx), this: self.clone()}, move |state| async move {
+            let Some(next_id) = state.next_id else {
                 return anyhow::Ok(None);
-            }
+            };
 
             let txs = state.this
-                .raw_get_transactions(&state.address, state.last_tx.lt, &state.last_tx.hash)
+                .raw_get_transactions(&state.address, next_id.lt, &next_id.hash)
                 .await?;
 
-            let mut txs = txs.transactions;
-            if txs.len() == 1 {
-                anyhow::Ok(Some((
-                    stream::iter(txs.into_iter().map(anyhow::Ok)),
-                    State {
-                        address: state.address,
-                        last_tx: state.last_tx,
-                        this: state.this,
-                        next: false
-                    }
-                )))
-            } else if let Some(next_last_tx) = txs.pop() {
-                anyhow::Ok(Some((
-                    stream::iter(txs.into_iter().map(anyhow::Ok)),
-                    State {
-                        address: state.address,
-                        last_tx: next_last_tx.transaction_id,
-                        this: state.this,
-                        next: true
-                    }
-                )))
-            } else {
-                anyhow::Ok(None)
-            }
+            let items = txs.transactions;
+
+            anyhow::Ok(Some((
+                stream::iter(items.into_iter().map(anyhow::Ok)),
+                State {
+                    address: state.address,
+                    next_id: txs.previous_transaction_id,
+                    this: state.this
+                }
+            )))
         })
             .try_flatten()
     }

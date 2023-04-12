@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
         let contains = metrics.last_block.0.id.seqno - metrics.first_block.0.id.seqno;
         let d = contains * 12 / 60 / 60 / 24;
 
-        info!(contains = contains, d = d, "=====");
+        info!(contains = contains, d = d, ls = ?ls, "=====");
     }
 
     info!(dead = dead, alive = alive);
