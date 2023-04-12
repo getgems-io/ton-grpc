@@ -1,7 +1,7 @@
 use std::time::Duration;
 use tower::{Service, ServiceExt};
 use tower::load::{Load, PeakEwma};
-use tracing::error;
+use tracing::info;
 use tonlibjson_client::config::AppConfig;
 use tonlibjson_client::cursor_client::CursorClient;
 use tonlibjson_client::make::{CursorClientFactory, ClientFactory};
@@ -15,12 +15,21 @@ async fn main() -> anyhow::Result<()> {
     let app_config = AppConfig::from_env()?;
     let ton_config = load_ton_config(app_config.config_url).await?;
 
+    let mut alive = 0;
+    let mut dead = 0;
+
     for ls in ton_config.liteservers.clone() {
-        let client = ClientFactory::default()
+        let Ok(client) = ClientFactory::default()
             .ready()
             .await?
             .call(ton_config.clone().with_liteserver(&ls))
-            .await?;
+            .await else {
+            dead += 1;
+            continue
+        };
+
+        alive += 1;
+
 
         let mut client: CursorClient = CursorClientFactory::create(PeakEwma::new(client, Duration::from_secs(5), 500000.0, tower::load::CompleteOnResponse::default()));
 
@@ -28,12 +37,19 @@ async fn main() -> anyhow::Result<()> {
 
         let metrics = client.load().unwrap();
 
-        error!(seqno = metrics.first_block.0.id.seqno, lt = metrics.first_block.0.start_lt, "master start");
-        error!(seqno = metrics.last_block.0.id.seqno, lt = metrics.last_block.0.end_lt, "master end");
+        info!(seqno = metrics.first_block.0.id.seqno, lt = metrics.first_block.0.start_lt, "master start");
+        info!(seqno = metrics.last_block.0.id.seqno, lt = metrics.last_block.0.end_lt, "master end");
 
-        error!(seqno = metrics.first_block.1.id.seqno, lt = metrics.first_block.1.start_lt, "work start");
-        error!(seqno = metrics.last_block.1.id.seqno, lt = metrics.last_block.1.end_lt, "work end");
+        info!(seqno = metrics.first_block.1.id.seqno, lt = metrics.first_block.1.start_lt, "work start");
+        info!(seqno = metrics.last_block.1.id.seqno, lt = metrics.last_block.1.end_lt, "work end");
+
+        let contains = metrics.last_block.0.id.seqno - metrics.first_block.0.id.seqno;
+        let d = contains * 12 / 60 / 60 / 24;
+
+        info!(contains = contains, d = d, "=====");
     }
+
+    info!(dead = dead, alive = alive);
 
     Ok(())
 }
