@@ -10,7 +10,7 @@ use tokio_retry::Retry;
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
-use tracing::{error, trace};
+use tracing::{error, info, instrument, trace, warn};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::session::{SessionClient, SessionRequest};
@@ -66,7 +66,7 @@ impl CursorClient {
                                     let _ = mtx.send(Some(masterchain_info));
                                     let _ = ctx.send(Some((last_master_chain_header, last_work_chain_header)));
                                 },
-                                Err(e) => error!(e = ?e, "unable to fetch last headers")
+                                Err(e) => warn!(e = ?e, "unable to fetch last headers")
                             }
                         },
                         Err(e) => error!(e = ?e, "unable to get master chain info")
@@ -89,10 +89,10 @@ impl CursorClient {
                     if let Some((mfb, wfb)) = first_block.clone() {
                         let mut clone = client.clone();
                         if let Err(e) = try_join!(
-                            BlocksLookupBlock::seqno(mfb.into()).call(&mut clone),
-                            BlocksLookupBlock::seqno(wfb.into()).call(&mut client)
+                            BlocksGetShards::new(mfb.id.clone()).call(&mut clone),
+                            BlocksGetBlockHeader::new(wfb.id.clone()).call(&mut client)
                         ) {
-                            error!(e = ?e, "first block not available anymore");
+                            info!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
                         } else {
                             trace!("first block still available")
@@ -104,8 +104,8 @@ impl CursorClient {
 
                         match fb {
                             Ok((mfb, wfb)) => {
-                                trace!(seqno = mfb.id.seqno, "master cain first block");
-                                trace!(seqno = wfb.id.seqno, "work cain first block");
+                                trace!(seqno = mfb.id.seqno, "master chain first block");
+                                trace!(seqno = wfb.id.seqno, "work chain first block");
 
                                 first_block = Some((mfb.clone(), wfb.clone()));
 
@@ -176,7 +176,6 @@ impl tower::load::Load for CursorClient {
     }
 }
 
-#[derive(Debug)]
 pub struct Metrics {
     pub first_block: (BlockHeader, BlockHeader),
     pub last_block: (BlockHeader, BlockHeader),
@@ -195,7 +194,21 @@ impl PartialOrd<Self> for Metrics {
     }
 }
 
-async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>, start: BlockIdExt) -> Result<BlockHeader> {
+async fn check_block_available(client: &mut ConcurrencyLimit<SessionClient>, block_id: BlockId) -> Result<(BlockIdExt, BlockHeader)> {
+    let block_id = BlocksLookupBlock::seqno(block_id).call(client).await?;
+    let shards = BlocksGetShards::new(block_id.clone()).call(client).await?;
+
+    let work_chain_header = BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()).call(client).await?;
+
+    Ok((block_id, work_chain_header))
+}
+
+#[instrument(skip_all, err)]
+async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
+    let start = GetMasterchainInfo::default()
+        .call(client)
+        .await?.last;
+
     let length = start.seqno;
     let mut cur = length / 2;
     let mut rhs = length;
@@ -204,9 +217,7 @@ async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>, start: B
     let workchain = start.workchain;
     let shard = start.shard;
 
-    let mut block = BlocksLookupBlock::seqno(
-        BlockId::new(workchain, shard, cur)
-    ).call(client).await;
+    let mut block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
 
     while lhs < rhs {
         // TODO[akostylev0] specify error
@@ -218,40 +229,20 @@ async fn find_first_block(client: &mut ConcurrencyLimit<SessionClient>, start: B
 
         cur = (lhs + rhs) / 2;
 
+        if cur == 0 {
+            break;
+        }
+
         trace!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
 
-        block = BlocksLookupBlock::seqno(
-            BlockId::new(workchain, shard, cur)
-        ).call(client).await;
+        block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
     }
 
-    let block = block?;
+    let (block, work_chain_header) = block?;
 
     trace!(seqno = block.seqno, "first seqno");
 
-    BlocksGetBlockHeader::new(block).call(client).await
-}
-
-async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
-    let master_chain_last_block_id = GetMasterchainInfo::default()
-        .call(client)
-        .await?.last;
-
-    let shards = BlocksGetShards::new(master_chain_last_block_id.clone())
-        .call(client)
-        .await?;
-
-    let work_chain_last_block_id = shards.shards.first()
-        .ok_or_else(|| anyhow!("last block for work chain not found"))?
-        .clone();
-
-    let mut clone = client.clone();
-    let (master_chain_header, work_chain_header) = try_join!(
-        find_first_block(&mut clone, master_chain_last_block_id),
-        find_first_block(client, work_chain_last_block_id)
-    )?;
-
-    Ok((master_chain_header, work_chain_header))
+    Ok((BlocksGetBlockHeader::new(block).call(client).await?, work_chain_header))
 }
 
 
@@ -279,7 +270,7 @@ async fn fetch_last_headers(client: &mut ConcurrencyLimit<SessionClient>) -> Res
 
 async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLimit<SessionClient>) -> Result<BlockHeader> {
     let retry = ExponentialBackoff::from_millis(4)
-        .max_delay(Duration::from_millis(256))
+        .max_delay(Duration::from_secs(1))
         .map(jitter)
         .take(16);
 

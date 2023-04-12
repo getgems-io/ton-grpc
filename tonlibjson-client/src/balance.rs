@@ -50,15 +50,6 @@ impl Route {
 
                         let chosen = if aload <= bload { aidx } else { bidx };
 
-                        trace!(
-                            a.index = aidx,
-                            a.load = ?aload,
-                            b.index = bidx,
-                            b.load = ?bload,
-                            chosen = if chosen == aidx { "a" } else { "b" },
-                            "any p2c"
-                        );
-
                         return Some(chosen);
                     }
                 }
@@ -130,15 +121,6 @@ impl Route {
                 let (bidx, bload) = idxs.pop().unwrap();
 
                 let chosen = if aload <= bload { aidx } else { bidx };
-
-                trace!(
-                    a.index = aidx,
-                    a.load = ?aload,
-                    b.index = bidx,
-                    b.load = ?bload,
-                    chosen = if chosen == aidx { "a" } else { "b" },
-                    "any p2c"
-                );
 
                 Some(chosen)
             }
