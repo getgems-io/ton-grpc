@@ -3,7 +3,8 @@ use tonlibjson_client::block;
 use tonlibjson_client::block::InternalTransactionId;
 use tonlibjson_client::ton::TonClient;
 use crate::ton;
-use crate::ton::get_account_transactions_request::From::{FromBlockId, FromTransactionId};
+use crate::ton::get_account_transactions_request::From::{FromTransactionId, FromBlockId};
+use crate::ton::get_account_transactions_request::To::{ToTransactionId, ToBlockId};
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_block_id(client: &TonClient, block_id: &ton::BlockId) -> Result<block::BlockIdExt> {
@@ -34,6 +35,27 @@ pub async fn extend_from_tx_id(client: &TonClient, address: &str, from: Option<t
             state.last_transaction_id
         },
         Some(FromTransactionId(tx_id)) => {
+            let state = client.raw_get_account_state_by_transaction(address, tx_id.into()).await?;
+
+            state.last_transaction_id
+        }
+    })
+}
+
+#[tracing::instrument(skip_all, err)]
+pub async fn extend_to_tx_id(client: &TonClient, address: &str, to: Option<ton::get_account_transactions_request::To>) -> Result<Option<InternalTransactionId>> {
+    Ok(match to {
+        None => {
+            Some(InternalTransactionId::default())
+        },
+        Some(ToBlockId(block_id)) => {
+            let block_id = extend_block_id(client, &block_id).await?;
+            let state = client.raw_get_account_state_on_block(address, block_id).await?;
+
+            state.last_transaction_id
+        },
+        Some(ToTransactionId(tx_id)) => {
+            // TODO[akostylev0] check tx_id exists
             let state = client.raw_get_account_state_by_transaction(address, tx_id.into()).await?;
 
             state.last_transaction_id
