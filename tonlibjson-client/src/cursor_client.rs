@@ -95,10 +95,9 @@ impl CursorClient {
                             info!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
                         } else {
-                            trace!("first block still available")
+                            trace!("first block still available");
                         }
                     }
-
                     if first_block.is_none() {
                         let fb = find_first_blocks(&mut client).await;
 
@@ -194,13 +193,15 @@ impl PartialOrd<Self> for Metrics {
     }
 }
 
-async fn check_block_available(client: &mut ConcurrencyLimit<SessionClient>, block_id: BlockId) -> Result<(BlockIdExt, BlockHeader)> {
+async fn check_block_available(client: &mut ConcurrencyLimit<SessionClient>, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
     let block_id = BlocksLookupBlock::seqno(block_id).call(client).await?;
     let shards = BlocksGetShards::new(block_id.clone()).call(client).await?;
 
-    let work_chain_header = BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()).call(client).await?;
-
-    Ok((block_id, work_chain_header))
+    let mut clone = client.clone();
+    try_join!(
+        BlocksGetBlockHeader::new(block_id).call(&mut clone),
+        BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()).call(client)
+    )
 }
 
 #[instrument(skip_all, err)]
@@ -210,9 +211,9 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Resu
         .await?.last;
 
     let length = start.seqno;
-    let mut cur = length / 2;
     let mut rhs = length;
     let mut lhs = 1;
+    let mut cur = (lhs + rhs) / 2;
 
     let workchain = start.workchain;
     let shard = start.shard;
@@ -238,11 +239,11 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Resu
         block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
     }
 
-    let (block, work_chain_header) = block?;
+    let (master, work) = block?;
 
-    trace!(seqno = block.seqno, "first seqno");
+    trace!(seqno = master.id.seqno, "first seqno");
 
-    Ok((BlocksGetBlockHeader::new(block).call(client).await?, work_chain_header))
+    Ok((master, work))
 }
 
 
