@@ -269,10 +269,13 @@ impl RpcServer {
 
         let stream = match (lt, hash) {
             (Some(lt), Some(hash)) => Left(
-                self.client.get_account_tx_stream_from(address, InternalTransactionId {hash, lt: lt.parse()?})
+                self.client.get_account_tx_stream_from(&address, Some(InternalTransactionId {
+                    hash,
+                    lt: lt.parse()?
+                }))
             ),
             _ => Right(
-                self.client.get_account_tx_stream(address).await?
+                self.client.get_account_tx_stream(&address)
             )
         };
         let stream = match max_lt {
