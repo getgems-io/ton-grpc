@@ -259,24 +259,30 @@ message GetShardAccountCellResponse {
 }
 
 message GetAccountTransactionsRequest {
+  message Bound {
+    enum Type {
+      INCLUDED = 0;
+      EXCLUDED = 1;
+    }
+    Type type = 1;
+
+    oneof bound {
+      BlockId block_id = 2;
+      TransactionId transaction_id = 3;
+    }
+  }
+
   enum Order {
     UNORDERED = 0;
-    FROM_NEW_TO_OLD = 1;
+    FROM_NEW_TO_OLD = 1; // default
     FROM_OLD_TO_NEW = 2;
   }
 
   AccountAddress account_address = 1;
   Order order = 2;
 
-  /* optional */ oneof from {
-    BlockId from_block_id = 3;
-    TransactionId from_transaction_id = 4;
-  }
-
-  /* optional */ oneof to {
-    BlockId to_block_id = 5;
-    TransactionId to_transaction_id = 6;
-  }
+  optional Bound from = 3;
+  optional Bound to = 4;
 }
 
 message BlockId {

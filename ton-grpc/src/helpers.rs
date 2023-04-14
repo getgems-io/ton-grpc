@@ -1,12 +1,12 @@
 use std::ops::Bound;
-use std::ops::Bound::Included;
+use std::ops::Bound::{Excluded, Included};
 use anyhow::{anyhow, Result};
 use tonlibjson_client::block;
 use tonlibjson_client::block::InternalTransactionId;
 use tonlibjson_client::ton::TonClient;
 use crate::ton;
-use crate::ton::get_account_transactions_request::From::{FromTransactionId, FromBlockId};
-use crate::ton::get_account_transactions_request::To::{ToTransactionId, ToBlockId};
+use crate::ton::get_account_transactions_request::bound::Bound::{BlockId, TransactionId};
+use crate::ton::get_account_transactions_request::bound::Type;
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_block_id(client: &TonClient, block_id: &ton::BlockId) -> Result<block::BlockIdExt> {
@@ -29,38 +29,75 @@ pub async fn prev_block_id(client: &TonClient, block_id: &ton::BlockId) -> Resul
 }
 
 #[tracing::instrument(skip_all, err)]
-pub async fn extend_from_tx_id(client: &TonClient, address: &str, from: Option<ton::get_account_transactions_request::From>) -> Result<Bound<InternalTransactionId>> {
+pub async fn extend_from_tx_id(client: &TonClient, address: &str, from: Option<ton::get_account_transactions_request::Bound>) -> Result<Bound<InternalTransactionId>> {
     Ok(match from {
         None => Bound::Unbounded,
-        Some(FromBlockId(block_id)) => {
-            let block_id = extend_block_id(client, &block_id).await?;
-            let state = client.raw_get_account_state_on_block(address, block_id).await?;
+        Some(b) => {
+            let typ = b.r#type();
+            match b.bound {
+                None => Bound::Unbounded,
+                Some(BlockId(block_id)) => {
+                    match typ {
+                        Type::Included => {
+                            let block_id = extend_block_id(client, &block_id).await?;
+                            let state = client.raw_get_account_state_on_block(address, block_id).await?;
 
-            Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
-        },
-        Some(FromTransactionId(tx_id)) => {
-            let state = client.raw_get_account_state_by_transaction(address, tx_id.into()).await?;
+                            Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                        },
+                        Type::Excluded => {
+                            let block_id = prev_block_id(&client, &block_id).await?;
+                            let state = client.raw_get_account_state_on_block(address, block_id).await?;
 
-            Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                            Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                        }
+                    }
+                },
+                Some(TransactionId(tx_id)) => {
+                    let state = client.raw_get_account_state_by_transaction(address, tx_id.into()).await?;
+
+                    match typ {
+                        Type::Included => Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?),
+                        Type::Excluded => Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                    }
+                }
+            }
         }
     })
 }
 
 #[tracing::instrument(skip_all, err)]
-pub async fn extend_to_tx_id(client: &TonClient, address: &str, to: Option<ton::get_account_transactions_request::To>) -> Result<Bound<InternalTransactionId>> {
+pub async fn extend_to_tx_id(client: &TonClient, address: &str, to: Option<ton::get_account_transactions_request::Bound>) -> Result<Bound<InternalTransactionId>> {
     Ok(match to {
         None => Bound::Unbounded,
-        Some(ToBlockId(block_id)) => {
-            let prev_block_id = prev_block_id(client, &block_id).await?;
-            let state = client.raw_get_account_state_on_block(address, prev_block_id).await?;
+        Some(b) => {
+            let typ = b.r#type();
+            match b.bound {
+                None => Bound::Unbounded,
+                Some(BlockId(block_id)) => {
+                    match typ {
+                        Type::Included => {
+                            let block_id = prev_block_id(client, &block_id).await?;
+                            let state = client.raw_get_account_state_on_block(address, block_id).await?;
 
-            Bound::Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
-        },
-        Some(ToTransactionId(tx_id)) => {
-            // check tx exists
-            let _state = client.raw_get_account_state_by_transaction(address, tx_id.clone().into()).await?;
+                            Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                        },
+                        Type::Excluded => {
+                            let block_id = extend_block_id(&client, &block_id).await?;
+                            let state = client.raw_get_account_state_on_block(address, block_id).await?;
 
-            Bound::Included(tx_id.into())
+                            Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                        }
+                    }
+                },
+                Some(TransactionId(tx_id)) => {
+                    let state = client.raw_get_account_state_by_transaction(address, tx_id.into()).await?;
+
+                    match typ {
+                        Type::Included => Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?),
+                        Type::Excluded => Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                    }
+                }
+            }
         }
     })
 }
