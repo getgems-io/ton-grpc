@@ -3,7 +3,6 @@ use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
 use futures::{Stream, StreamExt};
-use tonlibjson_client::block::{RawTransaction};
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_server::Account;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
@@ -129,7 +128,7 @@ impl Account for AccountService {
 
         let stream = client.get_account_tx_range(&address.address, (from_tx, to_tx))
             .map(|r| { r
-                .map(|t: RawTransaction| Transaction { id: Some(t.transaction_id.into()) })
+                .map(|t| t.into())
                 .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
             });
 

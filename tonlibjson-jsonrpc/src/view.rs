@@ -1,6 +1,5 @@
 use serde::Serialize;
-use serde_json::Value;
-use tonlibjson_client::block::{BlockHeader, BlockIdExt, BlocksShards, InternalTransactionId, MasterchainInfo, RawFullAccountState, RawMessage, RawTransaction};
+use tonlibjson_client::block::{BlockHeader, BlockIdExt, BlocksShards, InternalTransactionId, MasterchainInfo, MessageData, RawFullAccountState, RawMessage, RawTransaction};
 
 #[derive(Serialize)]
 #[serde(tag = "@type", rename = "blocks.masterchainInfo")]
@@ -120,7 +119,7 @@ pub struct MessageView {
     pub ihr_fee: String,
     pub created_lt: String,
     pub body_hash: String,
-    pub msg_data: Value
+    pub msg_data: MessageData
 }
 
 impl From<&RawMessage> for MessageView {
@@ -129,9 +128,9 @@ impl From<&RawMessage> for MessageView {
             source: msg.source.account_address.clone(),
             destination: msg.destination.account_address.clone(),
             value: msg.value.to_string(),
-            fwd_fee: msg.fwd_fee.clone(),
-            ihr_fee: msg.ihr_fee.clone(),
-            created_lt: msg.created_lt.clone(),
+            fwd_fee: msg.fwd_fee.to_string(),
+            ihr_fee: msg.ihr_fee.to_string(),
+            created_lt: msg.created_lt.to_string(),
             body_hash: msg.body_hash.clone(),
             msg_data: msg.msg_data.clone()
         }

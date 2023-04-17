@@ -322,7 +322,7 @@ impl Routable for GetAccountState {
     }
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 #[serde(tag = "@type")]
 pub enum MessageData {
     #[serde(rename = "msg.dataRaw")]
@@ -342,9 +342,12 @@ pub struct RawMessage {
     pub destination: AccountAddress,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub value: i64,
-    pub fwd_fee: String,
-    pub ihr_fee: String,
-    pub created_lt: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub fwd_fee: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub ihr_fee: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub created_lt: i64,
     pub body_hash: String,
     pub msg_data: MessageData
 }

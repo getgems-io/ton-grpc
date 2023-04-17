@@ -273,9 +273,9 @@ message GetAccountTransactionsRequest {
   }
 
   enum Order {
-    UNORDERED = 0;
-    FROM_NEW_TO_OLD = 1; // default
-    FROM_OLD_TO_NEW = 2;
+    UNORDERED = 0; // default
+    FROM_NEW_TO_OLD = 1;
+//    FROM_OLD_TO_NEW = 2;
   }
 
   AccountAddress account_address = 1;
@@ -306,8 +306,48 @@ message TransactionId {
   string hash = 2;
 }
 
+message MessageDataRaw {
+  string body = 1;
+  string init_state = 2;
+}
+
+message MessageDataText {
+  string text = 1;
+}
+
+message MessageDataDecryptedText {
+  string text = 1;
+}
+
+message MessageDataEncryptedText {
+  string text = 1;
+}
+
+message Message {
+  AccountAddress source = 1;
+  AccountAddress destination = 2;
+  int64 value = 3;
+  int64 fwd_fee = 4;
+  int64 ihr_fee = 5;
+  int64 created_lt = 6;
+  string body_hash = 7;
+  oneof msg_data {
+      MessageDataRaw raw = 8;
+      MessageDataText text = 9;
+      MessageDataDecryptedText decrypted_text = 10;
+      MessageDataEncryptedText encrypted_text = 11;
+  }
+}
+
 message Transaction {
   TransactionId id = 1;
+  int64 utime = 2;
+  string data = 3;
+  int64 fee = 4;
+  int64 storage_fee = 5;
+  int64 other_fee = 6;
+  optional Message in_msg = 7;
+  repeated Message out_msgs = 8;
 }
 
 message ActiveAccountState {
