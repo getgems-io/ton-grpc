@@ -322,22 +322,37 @@ impl Routable for GetAccountState {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[serde(tag = "@type")]
+pub enum MessageData {
+    #[serde(rename = "msg.dataRaw")]
+    Raw { body: String, init_state: String },
+    #[serde(rename = "msg.dataText")]
+    Text { text: String },
+    #[serde(rename = "msg.dataDecryptedText")]
+    DecryptedText { text: String },
+    #[serde(rename = "msg.dataEncryptedText")]
+    EncryptedText { text: String }
+}
+
+#[derive(Deserialize, Debug)]
 #[serde(tag = "@type", rename = "raw.message")]
 pub struct RawMessage {
     pub source: AccountAddress,
     pub destination: AccountAddress,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub value: i64,
-    pub fwd_fee: String,
-    pub ihr_fee: String,
-    pub created_lt: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub fwd_fee: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub ihr_fee: i64,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub created_lt: i64,
     pub body_hash: String,
-    pub msg_data: Value, // @todo maybe only msg.dataRaw
-    // @todo deserialize boc
+    pub msg_data: MessageData
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Debug)]
 #[serde(tag = "@type", rename = "raw.transaction")]
 pub struct RawTransaction {
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -357,10 +372,11 @@ pub struct RawTransaction {
     pub out_msgs: Vec<RawMessage>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct RawTransactions {
     pub transactions: Vec<RawTransaction>,
-    pub previous_transaction_id: InternalTransactionId,
+    #[serde(deserialize_with = "deserialize_default_as_none")]
+    pub previous_transaction_id: Option<InternalTransactionId>
 }
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]

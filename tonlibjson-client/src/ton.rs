@@ -1,3 +1,5 @@
+use std::collections::Bound;
+use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt};
@@ -9,12 +11,11 @@ use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use url::Url;
-use crate::balance::{Balance, BalanceRequest, BlockCriteria, Route};
+use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
-use crate::request::Forward;
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::request::Callable;
@@ -197,33 +198,17 @@ impl TonClient {
     pub async fn raw_get_transactions(
         &self,
         address: &str,
-        from_lt: i64,
-        from_hash: &str,
+        from_tx: &InternalTransactionId
     ) -> anyhow::Result<RawTransactions> {
         let mut client = self.client.clone();
 
         let address = AccountAddress::new(address)?;
-        let chain = address.chain_id();
-
         let request = RawGetTransactionsV2::new(
             address,
-            InternalTransactionId::new(from_hash.to_owned(), from_lt)
+            from_tx.clone()
         );
-        let response = request.clone().call(&mut client).await?;
 
-        if response.transactions.len() <= 1 {
-            let forwarded = Forward::new(
-                request,
-                Route::Block { chain, criteria: BlockCriteria::Seqno(1) }
-            );
-            let archive_response = forwarded.call(&mut client).await?;
-
-            if archive_response.transactions.len() > 1 {
-                return Ok(archive_response)
-            }
-        }
-
-        Ok(response)
+        request.call(&mut client).await
     }
 
     async fn blocks_get_transactions(
@@ -290,62 +275,98 @@ impl TonClient {
             .try_flatten()
     }
 
-    pub async fn get_account_tx_stream(
+    pub fn get_account_tx_stream(
         &self,
-        address: String,
-    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + '_> {
-        let account_state = self.raw_get_account_state(&address).await?;
+        address: &str,
+    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
+        self.get_account_tx_stream_from(address, None)
+    }
 
-        return Ok(self.get_account_tx_stream_from(address, account_state.last_transaction_id.unwrap_or_default()));
+    pub fn get_account_tx_range<R : RangeBounds<InternalTransactionId> + 'static>(
+        &self,
+        address: &str,
+        range: R
+    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
+        let last_tx = match range.start_bound() {
+            Bound::Included(tx) | Bound::Excluded(tx) => Some(tx.to_owned()),
+            Bound::Unbounded => None,
+        };
+        let stream = self.get_account_tx_stream_from(address, last_tx);
+
+        let exclude = if let Bound::Excluded(tx) = range.start_bound().cloned() { Some(tx) } else { None };
+        let stream = stream.try_skip_while(move |sx| std::future::ready(
+            if let Some(tx) = exclude.as_ref() {
+                Ok(tx == &sx.transaction_id)
+            } else { Ok(false) }
+        ));
+
+        let end = range.end_bound().cloned();
+        let mut found = false;
+        stream.try_take_while(move |x| std::future::ready(Ok({
+            match end.as_ref() {
+                Bound::Unbounded => true,
+                Bound::Included(tx) => {
+                    if tx == &x.transaction_id {
+                        found = true;
+
+                        true
+                    } else {
+                        !found
+                    }
+                },
+                Bound::Excluded(tx) => {
+                    if tx == &x.transaction_id {
+                        found = true;
+
+                        false
+                    } else {
+                        !found
+                    }
+                }
+            }
+        })))
     }
 
     pub fn get_account_tx_stream_from(
         &self,
-        address: String,
-        last_tx: InternalTransactionId,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + '_ {
-        struct State<'a> {
+        address: &str,
+        last_tx: Option<InternalTransactionId>,
+    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
+        struct State {
             address: String,
-            last_tx: InternalTransactionId,
-            this: &'a TonClient,
+            next_id: Option<InternalTransactionId>,
+            this: TonClient,
             next: bool
         }
 
-        stream::try_unfold(State { address, last_tx, this: self, next: true }, move |state| async move {
+        stream::try_unfold(State { address: address.to_owned(), next_id: last_tx, this: self.clone(), next: true }, move |state| async move {
             if !state.next {
                 return anyhow::Ok(None);
             }
 
+            let next_id = if let Some(id) = state.next_id { id } else {
+                let state = state.this.raw_get_account_state(&state.address).await?;
+
+                state.last_transaction_id.ok_or(anyhow!("transaction_id invalid"))?
+            };
+
             let txs = state.this
-                .raw_get_transactions(&state.address, state.last_tx.lt, &state.last_tx.hash)
+                .raw_get_transactions(&state.address, &next_id)
                 .await?;
 
-            let mut txs = txs.transactions;
-            if txs.len() == 1 {
-                anyhow::Ok(Some((
-                    stream::iter(txs.into_iter().map(anyhow::Ok)),
-                    State {
-                        address: state.address,
-                        last_tx: state.last_tx,
-                        this: state.this,
-                        next: false
-                    }
-                )))
-            } else if let Some(next_last_tx) = txs.pop() {
-                anyhow::Ok(Some((
-                    stream::iter(txs.into_iter().map(anyhow::Ok)),
-                    State {
-                        address: state.address,
-                        last_tx: next_last_tx.transaction_id,
-                        this: state.this,
-                        next: true
-                    }
-                )))
-            } else {
-                anyhow::Ok(None)
-            }
-        })
-            .try_flatten()
+            let items = txs.transactions;
+
+            let next = txs.previous_transaction_id.is_some();
+            anyhow::Ok(Some((
+                stream::iter(items.into_iter().map(anyhow::Ok)),
+                State {
+                    address: state.address,
+                    next_id: txs.previous_transaction_id,
+                    this: state.this,
+                    next
+                }
+            )))
+        }).try_flatten()
     }
 
     pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {

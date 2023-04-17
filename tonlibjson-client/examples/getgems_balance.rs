@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
 
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS";
 
-    let total_value: i64 = ton.get_account_tx_stream(address.to_owned()).await?
+    let total_value: i64 = ton.get_account_tx_stream(address)
         .filter_map(|tx| async {
             let tx: RawTransaction = tx.unwrap();
             if let Some(msg) = tx.out_msgs.first() {
@@ -27,6 +27,7 @@ async fn main() -> anyhow::Result<()> {
 
                 return Some(-msg.value - tx.fee)
             } else if let Some(msg) = tx.in_msg {
+                info!("{:?}", msg.msg_data);
                 return Some(msg.value - tx.fee)
             }
 

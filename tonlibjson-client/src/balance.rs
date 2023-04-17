@@ -7,7 +7,7 @@ use std::marker::PhantomData;
 use std::{fmt, pin::Pin, task::{Context, Poll}};
 use derive_new::new;
 use futures::{future, ready};
-use tracing::{debug, info, trace};
+use tracing::{debug, error, info, trace};
 use tower::BoxError;
 use futures::TryFutureExt;
 use crate::session::SessionRequest;
@@ -109,7 +109,7 @@ impl Route {
     fn choose_from_vec(&self, idxs: &mut Vec<(usize, Metrics)>) -> Option<usize> {
         info!(route = ?self, len = idxs.len(), "choose from");
 
-        return match idxs.len() {
+        match idxs.len() {
             0 => None,
             1 => {
                 let (aidx, _) = idxs.pop().unwrap();
@@ -241,7 +241,7 @@ impl Service<BalanceRequest> for Balance {
         let index = route
             .choose(&self.services, &mut self.rng)
             .or_else(|| {
-                info!(route = ?route, "fallback to any");
+                error!(route = ?route, "fallback to any");
 
                 Route::Any.choose(&self.services, &mut self.rng)
             })
