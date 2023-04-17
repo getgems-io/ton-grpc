@@ -302,7 +302,7 @@ impl TonClient {
 
         let end = range.end_bound().cloned();
         let mut found = false;
-        let stream = stream.try_take_while(move |x| std::future::ready(Ok({
+        stream.try_take_while(move |x| std::future::ready(Ok({
             match end.as_ref() {
                 Bound::Unbounded => true,
                 Bound::Included(tx) => {
@@ -324,9 +324,7 @@ impl TonClient {
                     }
                 }
             }
-        })));
-
-        stream
+        })))
     }
 
     pub fn get_account_tx_stream_from(

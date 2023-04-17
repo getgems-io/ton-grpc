@@ -138,7 +138,7 @@ impl From<block::RawMessage> for Message {
 
 impl From<&block::RawMessage> for Message {
     fn from(value: &block::RawMessage) -> Self {
-        value.clone().into()
+        value.to_owned().into()
     }
 }
 

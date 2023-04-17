@@ -45,7 +45,7 @@ pub async fn extend_from_tx_id(client: &TonClient, address: &str, from: Option<t
                             Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
                         },
                         Type::Excluded => {
-                            let block_id = prev_block_id(&client, &block_id).await?;
+                            let block_id = prev_block_id(client, &block_id).await?;
                             let state = client.raw_get_account_state_on_block(address, block_id).await?;
 
                             Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
@@ -82,7 +82,7 @@ pub async fn extend_to_tx_id(client: &TonClient, address: &str, to: Option<ton::
                             Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
                         },
                         Type::Excluded => {
-                            let block_id = extend_block_id(&client, &block_id).await?;
+                            let block_id = extend_block_id(client, &block_id).await?;
                             let state = client.raw_get_account_state_on_block(address, block_id).await?;
 
                             Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)

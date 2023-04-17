@@ -109,7 +109,7 @@ impl Route {
     fn choose_from_vec(&self, idxs: &mut Vec<(usize, Metrics)>) -> Option<usize> {
         info!(route = ?self, len = idxs.len(), "choose from");
 
-        return match idxs.len() {
+        match idxs.len() {
             0 => None,
             1 => {
                 let (aidx, _) = idxs.pop().unwrap();

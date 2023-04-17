@@ -275,14 +275,12 @@ async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLim
         .map(jitter)
         .take(16);
 
-    let header = Retry::spawn(retry, || {
+    Retry::spawn(retry, || {
         let block_id = block_id.clone();
         let mut client = client.clone();
 
         async move {
             BlocksGetBlockHeader::new(block_id).call(&mut client).await
         }
-    }).await;
-
-    header
+    }).await
 }
