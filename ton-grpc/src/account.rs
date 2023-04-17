@@ -8,6 +8,7 @@ use crate::ton::account_server::Account;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::{get_account_state_request, get_shard_account_cell_request};
+use crate::ton::get_account_transactions_request::Order;
 
 pub struct AccountService {
     client: TonClient
@@ -117,20 +118,28 @@ impl Account for AccountService {
         let msg = request.into_inner();
         let client = self.client.clone();
 
-        let address = msg.account_address
+        let address = msg.account_address.clone()
             .ok_or_else(|| Status::invalid_argument("Empty AccountAddress"))?;
 
         let (from_tx, to_tx) = try_join!(
-            extend_from_tx_id(&client, &address.address, msg.from),
-            extend_to_tx_id(&client, &address.address, msg.to)
+            extend_from_tx_id(&client, &address.address, msg.from.clone()),
+            extend_to_tx_id(&client, &address.address, msg.to.clone())
         ).map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
-        let stream = client.get_account_tx_range(&address.address, (from_tx, to_tx))
-            .map(|r| { r
-                .map(|t| t.into())
-                .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
-            });
+        let stream = match msg.order() {
+            Order::Unordered => {
+                client.get_account_tx_range_unordered(&address.address, (from_tx, to_tx)).await
+                    .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?
+                    .boxed()
+            },
+            Order::FromNewToOld => {
+                client.get_account_tx_range(&address.address, (from_tx, to_tx)).boxed()
+            }
+        }.map(|r| { r
+            .map(|t| t.into())
+            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
+        }).boxed();
 
-        Ok(Response::new(stream.boxed()))
+        Ok(Response::new(stream))
     }
 }
