@@ -1,10 +1,11 @@
+use std::cmp::min;
 use std::collections::Bound;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt, StreamExt};
 use anyhow::anyhow;
-use futures::stream::{BoxStream, select_all};
+use futures::stream::{BoxStream};
 use serde_json::Value;
 use tower::Layer;
 use tower::buffer::Buffer;
@@ -307,24 +308,25 @@ impl TonClient {
         };
         let first_block = self.raw_get_account_state_by_transaction(address, first_tx.clone()).await?.block_id;
 
-        let parallel = 32;
-        let step = (last_block.seqno - first_block.seqno) / parallel;
+        let chunks = min(256, (last_block.seqno - first_block.seqno) / 28800);
+        let step = (last_block.seqno - first_block.seqno) / chunks;
 
         let workchain = first_block.workchain;
         let shard = first_block.shard;
         let seqno = first_block.seqno;
 
-        let blocks = (1..parallel)
+        let mid: Vec<anyhow::Result<InternalTransactionId>> = stream::iter(1..chunks)
             .map(|i| async move {
                 let block = self.look_up_block_by_seqno(workchain, shard, seqno + step * i).await?;
                 let state = self.raw_get_account_state_on_block(address, block).await?;
 
                 anyhow::Ok(state.last_transaction_id.ok_or(anyhow!("invalid last tx"))?)
-            });
+            }).buffered(32).collect().await;
 
-        let mut mid = futures::future::try_join_all(blocks).await?;
+        let mid: anyhow::Result<Vec<InternalTransactionId>> = mid.into_iter().collect();
+
         let mut txs = vec![first_tx.clone()];
-        txs.append(&mut mid);
+        txs.append(&mut mid?);
         txs.push(last_tx.clone());
         txs.dedup();
 
@@ -342,8 +344,7 @@ impl TonClient {
             self.get_account_tx_range(address, r).boxed()
         }).collect();
 
-
-        Ok(select_all(streams))
+        Ok(stream::iter(streams).flatten_unordered(Some(32)).boxed())
     }
 
     pub fn get_account_tx_range<R : RangeBounds<InternalTransactionId> + 'static>(

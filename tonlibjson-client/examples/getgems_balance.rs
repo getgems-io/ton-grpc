@@ -19,7 +19,9 @@ async fn main() -> anyhow::Result<()> {
 
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS";
 
-    let total_value: i64 = ton.get_account_tx_stream(address)
+    let _ = ton.get_block_header(m.last.workchain, m.last.shard, 5).await?;
+
+    let total_value: i64 = ton.get_account_tx_range_unordered(address, ..).await?
         .filter_map(|tx| async {
             let tx: RawTransaction = tx.unwrap();
             if let Some(msg) = tx.out_msgs.first() {
