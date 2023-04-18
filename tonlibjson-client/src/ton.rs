@@ -1,15 +1,18 @@
+use std::cmp::min;
 use std::collections::Bound;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
-use futures::{Stream, stream, TryStreamExt};
+use futures::{Stream, stream, TryStreamExt, StreamExt, try_join};
 use anyhow::anyhow;
+use itertools::Itertools;
 use serde_json::Value;
 use tower::Layer;
 use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
+use tracing::{instrument, trace};
 use url::Url;
 use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction};
@@ -155,6 +158,7 @@ impl TonClient {
         BlocksGetBlockHeader::new(id).call(&mut client).await
     }
 
+    #[instrument(skip_all, err)]
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<RawFullAccountState> {
         let mut client = self.client.clone();
 
@@ -175,6 +179,7 @@ impl TonClient {
             .await
     }
 
+    #[instrument(skip_all, err)]
     pub async fn raw_get_account_state_by_transaction(&self, address: &str, transaction_id: InternalTransactionId) -> anyhow::Result<RawFullAccountState> {
         let mut client = self.client.clone();
 
@@ -280,6 +285,74 @@ impl TonClient {
         address: &str,
     ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
         self.get_account_tx_stream_from(address, None)
+    }
+
+    // TODO[akostylev0] run search of first tx in parallel with `range` stream
+    pub async fn get_account_tx_range_unordered<R : RangeBounds<InternalTransactionId> + 'static>(
+        &self,
+        address: &str,
+        range: R
+    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + 'static> {
+        let ((last_block, last_tx),
+            (first_block, first_tx)) = try_join!(async {
+                let last_tx = match range.start_bound().cloned() {
+                    Bound::Included(tx) | Bound::Excluded(tx) => tx.to_owned(),
+                    Bound::Unbounded => {
+                        let state = self.raw_get_account_state(address).await?;
+
+                        state.last_transaction_id.ok_or_else(|| anyhow!("invalid last tx"))?
+                    },
+                };
+                let last_block = self.raw_get_account_state_by_transaction(address, last_tx.clone()).await?.block_id;
+
+                anyhow::Ok((last_block, last_tx))
+            }, async {
+                let first_tx = match range.end_bound().cloned() {
+                    Bound::Included(tx) | Bound::Excluded(tx) => tx.to_owned(),
+                    Bound::Unbounded => self.find_first_tx(address).await?,
+                };
+                let first_block = self.raw_get_account_state_by_transaction(address, first_tx.clone()).await?.block_id;
+
+                anyhow::Ok((first_block, first_tx))
+            }
+        )?;
+
+        let chunks = min(256, (last_block.seqno - first_block.seqno) / 28800);
+        let step = (last_block.seqno - first_block.seqno) / chunks;
+
+        let workchain = first_block.workchain;
+        let shard = first_block.shard;
+        let seqno = first_block.seqno;
+
+        let mid: Vec<anyhow::Result<InternalTransactionId>> = stream::iter(1..chunks)
+            .map(|i| async move {
+                let block = self.look_up_block_by_seqno(workchain, shard, seqno + step * i).await?;
+                let state = self.raw_get_account_state_on_block(address, block).await?;
+
+                anyhow::Ok(state.last_transaction_id.ok_or(anyhow!("invalid last tx"))?)
+            }).buffered(32).collect().await;
+
+        let mut mid = mid.into_iter()
+            .collect::<anyhow::Result<Vec<InternalTransactionId>>>()?;
+
+        let mut txs = vec![first_tx.clone()];
+        txs.append(&mut mid);
+        txs.push(last_tx.clone());
+        txs.dedup();
+
+        tracing::debug!(txs = ?txs);
+
+        let streams = txs.windows(2).to_owned().map(|e| {
+            let [left, right, ..] = e else {
+                unreachable!()
+            };
+            let left_bound = if left == &first_tx { range.end_bound().cloned() } else { Bound::Included(left.clone()) };
+            let right_bound = if right == &last_tx { range.start_bound().cloned() } else { Bound::Excluded(right.clone()) };
+
+            self.get_account_tx_range(address, (right_bound, left_bound)).boxed()
+        }).collect_vec();
+
+        Ok(stream::iter(streams).flatten_unordered(32))
     }
 
     pub fn get_account_tx_range<R : RangeBounds<InternalTransactionId> + 'static>(
@@ -401,5 +474,53 @@ impl TonClient {
         GetShardAccountCellByTransaction::new(address, transaction)
             .call(&mut self.client.clone())
             .await
+    }
+
+    async fn find_first_tx(&self, account: &str) -> anyhow::Result<InternalTransactionId> {
+        let start = self.get_masterchain_info().await?.last;
+
+        let length = start.seqno;
+        let mut rhs = length;
+        let mut lhs = 1;
+        let mut cur = (lhs + rhs) / 2;
+
+        let workchain = start.workchain;
+        let shard = start.shard;
+
+        let mut tx = self.check_account_available(account, &BlockId::new(workchain, shard, cur)).await;
+
+        while lhs < rhs {
+            // TODO[akostylev0] specify error
+            if tx.is_err() {
+                lhs = cur + 1;
+            } else {
+                rhs = cur;
+            }
+
+            cur = (lhs + rhs) / 2;
+
+            if cur == 0 {
+                break;
+            }
+
+            trace!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
+
+            tx = self.check_account_available(account, &BlockId::new(workchain, shard, cur)).await;
+        }
+
+        let tx = tx?;
+
+        trace!(tx = ?tx, "first tx");
+
+        Ok(tx)
+    }
+
+    async fn check_account_available(&self, account: &str, block: &BlockId) -> anyhow::Result<InternalTransactionId> {
+        let block = self
+            .look_up_block_by_seqno(block.workchain, block.shard, block.seqno).await?;
+        let state = self
+            .raw_get_account_state_on_block(account, block).await?;
+
+        state.last_transaction_id.ok_or(anyhow!("tx not found"))
     }
 }
