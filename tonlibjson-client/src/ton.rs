@@ -3,16 +3,16 @@ use std::collections::Bound;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
-use futures::{Stream, stream, TryStreamExt, StreamExt};
+use futures::{Stream, stream, TryStreamExt, StreamExt, try_join};
 use anyhow::anyhow;
-use futures::stream::{BoxStream};
+use itertools::Itertools;
 use serde_json::Value;
 use tower::Layer;
 use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
-use tracing::trace;
+use tracing::{instrument, trace};
 use url::Url;
 use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction};
@@ -158,6 +158,7 @@ impl TonClient {
         BlocksGetBlockHeader::new(id).call(&mut client).await
     }
 
+    #[instrument(skip_all, err)]
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<RawFullAccountState> {
         let mut client = self.client.clone();
 
@@ -178,6 +179,7 @@ impl TonClient {
             .await
     }
 
+    #[instrument(skip_all, err)]
     pub async fn raw_get_account_state_by_transaction(&self, address: &str, transaction_id: InternalTransactionId) -> anyhow::Result<RawFullAccountState> {
         let mut client = self.client.clone();
 
@@ -285,28 +287,35 @@ impl TonClient {
         self.get_account_tx_stream_from(address, None)
     }
 
+    // TODO[akostylev0] run search of first tx in parallel with `range` stream
     pub async fn get_account_tx_range_unordered<R : RangeBounds<InternalTransactionId> + 'static>(
         &self,
         address: &str,
         range: R
     ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + 'static> {
-        let last_tx = match range.start_bound().cloned() {
-            Bound::Included(tx) | Bound::Excluded(tx) => tx.to_owned(),
-            Bound::Unbounded => {
-                let state = self.raw_get_account_state(address).await?;
+        let ((last_block, last_tx),
+            (first_block, first_tx)) = try_join!(async {
+                let last_tx = match range.start_bound().cloned() {
+                    Bound::Included(tx) | Bound::Excluded(tx) => tx.to_owned(),
+                    Bound::Unbounded => {
+                        let state = self.raw_get_account_state(address).await?;
 
-                state.last_transaction_id.ok_or_else(|| anyhow!("invalid last tx"))?
-            },
-        };
-        let last_block = self.raw_get_account_state_by_transaction(address, last_tx.clone()).await?.block_id;
+                        state.last_transaction_id.ok_or_else(|| anyhow!("invalid last tx"))?
+                    },
+                };
+                let last_block = self.raw_get_account_state_by_transaction(address, last_tx.clone()).await?.block_id;
 
-        let first_tx = match range.end_bound().cloned() {
-            Bound::Included(tx) | Bound::Excluded(tx) => tx.to_owned(),
-            Bound::Unbounded => {
-                self.find_first_tx(address).await?
-            },
-        };
-        let first_block = self.raw_get_account_state_by_transaction(address, first_tx.clone()).await?.block_id;
+                anyhow::Ok((last_block, last_tx))
+            }, async {
+                let first_tx = match range.end_bound().cloned() {
+                    Bound::Included(tx) | Bound::Excluded(tx) => tx.to_owned(),
+                    Bound::Unbounded => self.find_first_tx(address).await?,
+                };
+                let first_block = self.raw_get_account_state_by_transaction(address, first_tx.clone()).await?.block_id;
+
+                anyhow::Ok((first_block, first_tx))
+            }
+        )?;
 
         let chunks = min(256, (last_block.seqno - first_block.seqno) / 28800);
         let step = (last_block.seqno - first_block.seqno) / chunks;
@@ -323,28 +332,27 @@ impl TonClient {
                 anyhow::Ok(state.last_transaction_id.ok_or(anyhow!("invalid last tx"))?)
             }).buffered(32).collect().await;
 
-        let mid: anyhow::Result<Vec<InternalTransactionId>> = mid.into_iter().collect();
+        let mut mid = mid.into_iter()
+            .collect::<anyhow::Result<Vec<InternalTransactionId>>>()?;
 
         let mut txs = vec![first_tx.clone()];
-        txs.append(&mut mid?);
+        txs.append(&mut mid);
         txs.push(last_tx.clone());
         txs.dedup();
 
         tracing::debug!(txs = ?txs);
 
-        let streams: Vec<BoxStream<anyhow::Result<RawTransaction>>> = txs.windows(2).to_owned().map(|e| {
+        let streams = txs.windows(2).to_owned().map(|e| {
             let [left, right, ..] = e else {
                 unreachable!()
             };
             let left_bound = if left == &first_tx { range.end_bound().cloned() } else { Bound::Included(left.clone()) };
             let right_bound = if right == &last_tx { range.start_bound().cloned() } else { Bound::Excluded(right.clone()) };
 
-            (right_bound, left_bound)
-        }).map(|r| {
-            self.get_account_tx_range(address, r).boxed()
-        }).collect();
+            self.get_account_tx_range(address, (right_bound, left_bound)).boxed()
+        }).collect_vec();
 
-        Ok(stream::iter(streams).flatten_unordered(Some(32)).boxed())
+        Ok(stream::iter(streams).flatten_unordered(32))
     }
 
     pub fn get_account_tx_range<R : RangeBounds<InternalTransactionId> + 'static>(
