@@ -369,3 +369,9 @@ message AccountAddress {
 message TvmCell {
   string bytes = 1;
 }
+
+service Block {
+  rpc SubscribeLastBlock (SubscribeLastBlockRequest) returns (stream BlockIdExt);
+}
+
+message SubscribeLastBlockRequest {}
