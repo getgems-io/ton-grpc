@@ -14,6 +14,7 @@ use crate::session::SessionRequest;
 use crate::discover::CursorClientDiscover;
 use itertools::Itertools;
 use rand::seq::index::sample;
+use crate::block::BlockIdExt;
 use crate::cursor_client::Metrics;
 
 #[derive(Debug, Clone, Copy)]
@@ -250,6 +251,14 @@ impl Service<BalanceRequest> for Balance {
         self.services
             .call_ready_index(index, request)
             .map_err(Into::into)
+    }
+}
+
+impl Balance {
+    pub fn last_block_receiver(&self) -> tokio::sync::watch::Receiver<BlockIdExt> {
+        let (_tx, rx) = tokio::sync::watch::channel(BlockIdExt::new(0,0,0, "".to_owned(), "".to_owned()));
+
+        rx
     }
 }
 

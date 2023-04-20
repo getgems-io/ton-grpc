@@ -16,6 +16,10 @@ impl Block for BlockService {
     type SubscribeLastBlockStream = BoxStream<'static, Result<BlockIdExt, Status>>;
 
     async fn subscribe_last_block(&self, _: Request<SubscribeLastBlockRequest>) -> Result<Response<Self::SubscribeLastBlockStream>, Status> {
-        Ok(Response::new(futures::stream::empty().boxed()))
+        let stream = self.client.last_block_stream()
+            .map(|b| Ok(b.into()))
+            .boxed();
+
+        Ok(Response::new(stream))
     }
 }

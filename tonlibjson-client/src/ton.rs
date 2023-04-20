@@ -7,6 +7,7 @@ use futures::{Stream, stream, TryStreamExt, StreamExt, try_join};
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
+use tokio_stream::wrappers::WatchStream;
 use tower::Layer;
 use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
@@ -25,7 +26,8 @@ use crate::request::Callable;
 
 #[derive(Clone)]
 pub struct TonClient {
-    client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>
+    client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>,
+    last_block_receiver: tokio::sync::watch::Receiver<BlockIdExt>
 }
 
 const MAIN_CHAIN: i32 = -1;
@@ -43,6 +45,8 @@ impl TonClient {
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
         let client = Balance::new(cursor_client_discover);
+        let last_block_receiver = client.last_block_receiver();
+
         let client = Buffer::new(client, 200000);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
@@ -52,7 +56,8 @@ impl TonClient {
         let client = ErrorLayer::default().layer(client);
 
         Ok(Self {
-            client
+            client,
+            last_block_receiver
         })
     }
 
@@ -71,6 +76,8 @@ impl TonClient {
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
         let client = Balance::new(cursor_client_discover);
+        let last_block_receiver = client.last_block_receiver();
+
         let client = Buffer::new(client, 200000);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
@@ -80,7 +87,8 @@ impl TonClient {
         let client = ErrorLayer::default().layer(client);
 
         Ok(Self {
-            client
+            client,
+            last_block_receiver
         })
     }
 
@@ -474,6 +482,10 @@ impl TonClient {
         GetShardAccountCellByTransaction::new(address, transaction)
             .call(&mut self.client.clone())
             .await
+    }
+
+    pub fn last_block_stream(&self) -> impl Stream<Item=BlockIdExt> {
+        WatchStream::new(self.last_block_receiver.clone())
     }
 
     async fn find_first_tx(&self, account: &str) -> anyhow::Result<InternalTransactionId> {
