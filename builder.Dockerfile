@@ -1,4 +1,4 @@
-FROM rust:1.68.2-bullseye
+FROM rust:1.69.0-bullseye
 
 RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common unzip
 
