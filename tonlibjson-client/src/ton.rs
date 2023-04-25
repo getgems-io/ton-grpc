@@ -167,6 +167,10 @@ impl TonClient {
     }
 
     pub async fn get_shards_by_block_id(&self, block_id: BlockIdExt) -> anyhow::Result<Vec<BlockIdExt>> {
+        if block_id.workchain != -1 {
+            return Err(anyhow!("workchain must be -1"))
+        }
+
         let mut client = self.client.clone();
 
         Ok(BlocksGetShards::new(block_id).call(&mut client).await?.shards)
