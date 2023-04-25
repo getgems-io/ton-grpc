@@ -247,16 +247,29 @@ impl TonClient {
         request.call(&mut client).await
     }
 
-    async fn blocks_get_transactions(
+    pub async fn blocks_get_transactions(
         &self,
         block: &BlockIdExt,
         tx: Option<AccountTransactionId>
     ) -> anyhow::Result<BlocksTransactions> {
         let mut client = self.client.clone();
 
-        BlocksGetTransactions::new(
+        BlocksGetTransactions::unverified(
             block.to_owned(),
-            tx.unwrap_or_default()
+            tx
+        ).call(&mut client).await
+    }
+
+    pub async fn blocks_get_transactions_verified(
+        &self,
+        block: &BlockIdExt,
+        tx: Option<AccountTransactionId>
+    ) -> anyhow::Result<BlocksTransactions> {
+        let mut client = self.client.clone();
+
+        BlocksGetTransactions::verified(
+            block.to_owned(),
+            tx
         ).call(&mut client).await
     }
 

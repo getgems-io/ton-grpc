@@ -457,16 +457,38 @@ pub struct BlocksShards {
     pub shards: Vec<BlockIdExt>,
 }
 
-#[derive(new, Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type")]
 #[serde(rename = "blocks.getTransactions")]
 pub struct BlocksGetTransactions {
     id: BlockIdExt,
-    #[new(value = "135")]
     mode: i32,
-    #[new(value = "30")]
     count: i32,
     after: AccountTransactionId
+}
+
+impl BlocksGetTransactions {
+    pub fn unverified(block_id: BlockIdExt, after: Option<AccountTransactionId>) -> Self {
+        let mode = 1 + 2 + 4 + if after.is_some() { 128 } else { 0 };
+
+        Self {
+            id: block_id,
+            mode,
+            count: 256,
+            after: after.unwrap_or_default(),
+        }
+    }
+
+    pub fn verified(block_id: BlockIdExt, after: Option<AccountTransactionId>) -> Self {
+        let mode = 32 + 1 + 2 + 4 + if after.is_some() { 128 } else { 0 };
+
+        Self {
+            id: block_id,
+            mode,
+            count: 256,
+            after: after.unwrap_or_default(),
+        }
+    }
 }
 
 impl Requestable for BlocksGetTransactions {
