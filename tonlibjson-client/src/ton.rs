@@ -166,6 +166,12 @@ impl TonClient {
         BlocksGetShards::new(block).call(&mut client).await
     }
 
+    pub async fn get_shards_by_block_id(&self, block_id: BlockIdExt) -> anyhow::Result<Vec<BlockIdExt>> {
+        let mut client = self.client.clone();
+
+        Ok(BlocksGetShards::new(block_id).call(&mut client).await?.shards)
+    }
+
     pub async fn get_block_header(
         &self,
         chain: i32,
