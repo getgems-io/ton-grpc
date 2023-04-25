@@ -371,7 +371,12 @@ message TvmCell {
 }
 
 service Block {
-  rpc SubscribeLastBlock (SubscribeLastBlockRequest) returns (stream BlockIdExt);
+  rpc SubscribeLastBlock (SubscribeLastBlockRequest) returns (stream SubscribeLastBlockEvent);
 }
 
 message SubscribeLastBlockRequest {}
+
+message SubscribeLastBlockEvent {
+  BlockIdExt masterchain = 1;
+  BlockIdExt workchain = 2;
+}

@@ -37,7 +37,11 @@ async fn main() -> anyhow::Result<()> {
     // TODO[akostylev0] env
     let addr = "0.0.0.0:50052".parse().unwrap();
 
-    let client = TonClient::from_env().await?;
+    let mut client = TonClient::from_env().await?;
+
+    client.ready().await?;
+
+    tracing::info!("Ton Client is ready");
 
     let tvm_emulator_service = TvmEmulatorServer::new(TvmEmulatorService::default());
     let transaction_emulator_service = TransactionEmulatorServer::new(TransactionEmulatorService::default());

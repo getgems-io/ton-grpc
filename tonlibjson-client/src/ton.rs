@@ -7,7 +7,6 @@ use futures::{Stream, stream, TryStreamExt, StreamExt, try_join};
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
-use tokio_stream::wrappers::WatchStream;
 use tower::Layer;
 use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
@@ -24,16 +23,30 @@ use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::request::Callable;
 
-#[derive(Clone)]
 pub struct TonClient {
     client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>,
-    last_block_receiver: tokio::sync::watch::Receiver<BlockIdExt>
+    last_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>
+}
+
+impl Clone for TonClient {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            last_block_receiver: self.last_block_receiver.resubscribe()
+        }
+    }
 }
 
 const MAIN_CHAIN: i32 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
+    pub async fn ready(&mut self) -> anyhow::Result<()> {
+        self.get_masterchain_info().await?;
+
+        Ok(())
+    }
+
     pub async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
         let client_discover = ClientDiscover::from_path(path).await?;
         let ewma_discover = PeakEwmaDiscover::new(
@@ -484,8 +497,14 @@ impl TonClient {
             .await
     }
 
-    pub fn last_block_stream(&self) -> impl Stream<Item=BlockIdExt> {
-        WatchStream::new(self.last_block_receiver.clone())
+    pub fn last_block_stream(&self) -> impl Stream<Item=(BlockHeader, BlockHeader)> {
+        tokio_stream::wrappers::BroadcastStream::new(self.last_block_receiver.resubscribe())
+            .filter_map(|r| async {
+                match r {
+                    Ok(v) => Some(v),
+                    Err(e) => { tracing::error!("{}", e); None }
+                }
+            })
     }
 
     async fn find_first_tx(&self, account: &str) -> anyhow::Result<InternalTransactionId> {
