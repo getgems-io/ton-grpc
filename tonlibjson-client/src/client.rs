@@ -29,7 +29,7 @@ impl Client {
         let responses_rcv = Arc::clone(&responses);
         let (stop_signal, stop_receiver) = mpsc::channel();
 
-        let _ = tokio::task::spawn_blocking(move || {
+        tokio::task::spawn_blocking(move || {
             let timeout = Duration::from_secs(20);
 
             loop {

@@ -6,7 +6,7 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 use std::marker::PhantomData;
 use std::{fmt, pin::Pin, task::{Context, Poll}};
 use derive_new::new;
-use futures::{future, ready};
+use futures::{future, ready, StreamExt};
 use tracing::{debug, error, info, trace};
 use tower::BoxError;
 use futures::TryFutureExt;
@@ -14,6 +14,10 @@ use crate::session::SessionRequest;
 use crate::discover::CursorClientDiscover;
 use itertools::Itertools;
 use rand::seq::index::sample;
+use tokio::select;
+use tokio_stream::StreamMap;
+use tokio_stream::wrappers::WatchStream;
+use crate::block::{BlockHeader};
 use crate::cursor_client::Metrics;
 
 #[derive(Debug, Clone, Copy)]
@@ -144,6 +148,8 @@ pub struct Balance
     rng: SmallRng,
 
     _req: PhantomData<SessionRequest>,
+
+    last_headers: BlockChannel
 }
 
 impl Balance {
@@ -161,6 +167,7 @@ impl Balance {
             services: ReadyCache::default(),
 
             _req: PhantomData,
+            last_headers: BlockChannel::new()
         })
     }
 }
@@ -178,10 +185,12 @@ impl Balance {
                 None => return Poll::Ready(None),
                 Some(Change::Remove(key)) => {
                     trace!("remove");
+                    self.last_headers.remove(key.clone());
                     self.services.evict(&key);
                 }
                 Some(Change::Insert(key, svc)) => {
                     trace!("insert");
+                    self.last_headers.insert(key.clone(), svc.last_block_rx.clone());
                     self.services.push(key, svc);
                 }
             }
@@ -253,6 +262,12 @@ impl Service<BalanceRequest> for Balance {
     }
 }
 
+impl Balance {
+    pub fn last_block_receiver(&self) -> tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)> {
+        self.last_headers.receiver()
+    }
+}
+
 
 #[derive(Debug)]
 pub struct DiscoverError(pub(crate) BoxError);
@@ -266,5 +281,65 @@ impl fmt::Display for DiscoverError {
 impl std::error::Error for DiscoverError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         Some(&*self.0)
+    }
+}
+
+type BlockChannelItem = (BlockHeader, BlockHeader);
+
+enum BlockChannelChange {
+    Insert { key: String, watcher: tokio::sync::watch::Receiver<Option<BlockChannelItem>>},
+    Remove { key: String }
+}
+
+struct BlockChannel {
+    changes: tokio::sync::mpsc::UnboundedSender<BlockChannelChange>,
+    joined: tokio::sync::broadcast::Receiver<BlockChannelItem>
+}
+
+impl BlockChannel {
+    pub fn new() -> Self {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<BlockChannelChange>();
+        let (tj, rj) = tokio::sync::broadcast::channel::<BlockChannelItem>(256);
+
+        tokio::spawn(async move {
+            let mut stream_map = StreamMap::new();
+
+            let mut last_seqno = 0;
+
+            loop {
+                select! {
+                    Some(change) = rx.recv() => {
+                        match change {
+                            BlockChannelChange::Insert { key, watcher } => { stream_map.insert(key, WatchStream::from_changes(watcher)); },
+                            BlockChannelChange::Remove { key } => { stream_map.remove(&key); }
+                        }
+                    },
+                    Some((_, Some((master, worker)))) = stream_map.next() => {
+                        if master.id.seqno > last_seqno {
+                            last_seqno = master.id.seqno;
+
+                            let _ = tj.send((master, worker));
+                        }
+                    }
+                };
+            }
+        });
+
+        Self {
+            changes: tx,
+            joined: rj
+        }
+    }
+
+    pub fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<BlockChannelItem>>) {
+        let _ = self.changes.send(BlockChannelChange::Insert { key, watcher });
+    }
+
+    pub fn remove(&self, key: String) {
+        let _ = self.changes.send(BlockChannelChange::Remove { key });
+    }
+
+    pub fn receiver(&self) -> tokio::sync::broadcast::Receiver<BlockChannelItem> {
+        self.joined.resubscribe()
     }
 }

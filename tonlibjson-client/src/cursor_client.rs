@@ -20,7 +20,7 @@ pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
 
     first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
-    last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
+    pub last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
 
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }

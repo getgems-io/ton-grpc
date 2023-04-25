@@ -3,6 +3,7 @@ use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
 use futures::{Stream, StreamExt, try_join};
+use derive_new::new;
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_server::Account;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
@@ -10,16 +11,9 @@ use crate::ton::get_account_state_response::AccountState;
 use crate::ton::{get_account_state_request, get_shard_account_cell_request};
 use crate::ton::get_account_transactions_request::Order;
 
+#[derive(new)]
 pub struct AccountService {
     client: TonClient
-}
-
-impl AccountService {
-    pub async fn from_env() -> Result<Self> {
-        Ok(Self {
-            client: TonClient::from_env().await?
-        })
-    }
 }
 
 #[async_trait]
@@ -114,6 +108,7 @@ impl Account for AccountService {
 
     type GetAccountTransactionsStream = Pin<Box<dyn Stream<Item=Result<Transaction, Status>> + Send + 'static>>;
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_account_transactions(&self, request: Request<GetAccountTransactionsRequest>) -> std::result::Result<Response<Self::GetAccountTransactionsStream>, Status> {
         let msg = request.into_inner();
         let client = self.client.clone();

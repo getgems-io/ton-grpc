@@ -1443,6 +1443,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]
@@ -1464,6 +1465,7 @@ name = "ton-grpc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "derive-new",
  "either",
  "futures",
  "prost",
