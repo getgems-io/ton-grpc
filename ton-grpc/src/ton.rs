@@ -121,11 +121,9 @@ impl From<block::RawMessage> for Message {
     }
 }
 
-impl TryFrom<block::RawTransaction> for Transaction {
-    type Error = anyhow::Error;
-
-    fn try_from(value: block::RawTransaction) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<block::RawTransaction> for Transaction {
+    fn from(value: block::RawTransaction) -> Self {
+        Self {
             id: Some(value.transaction_id.into()),
             utime: value.utime,
             data: value.data.clone(),
@@ -134,6 +132,6 @@ impl TryFrom<block::RawTransaction> for Transaction {
             other_fee: value.other_fee,
             in_msg: value.in_msg.map(Into::into),
             out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
-        })
+        }
     }
 }

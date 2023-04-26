@@ -156,7 +156,7 @@ impl Default for InternalTransactionId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(tag = "@type", rename = "accountAddress")]
 pub struct AccountAddress {
     #[serde(deserialize_with = "deserialize_empty_as_none", serialize_with = "serialize_none_as_empty")]
@@ -171,6 +171,7 @@ impl AccountAddress {
     }
 
     pub fn chain_id(&self) -> i32 {
+        // TODO[akostylev0]
         self.account_address.as_ref().map(|d| d.chain_id).unwrap_or(-1)
     }
 }

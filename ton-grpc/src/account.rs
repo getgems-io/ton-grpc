@@ -122,7 +122,7 @@ impl Account for AccountService {
                 client.get_account_tx_range(&msg.account_address, (from_tx, to_tx)).boxed()
             }
         }
-            .and_then(|r| async { r.try_into() })
+            .map_ok(Into::into)
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
             .boxed();
 
