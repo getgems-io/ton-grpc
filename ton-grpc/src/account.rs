@@ -1,9 +1,11 @@
 use std::pin::Pin;
+use std::str::FromStr;
 use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
 use futures::{Stream, StreamExt, try_join, TryStreamExt};
 use derive_new::new;
+use tonlibjson_client::address::AccountAddressData;
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_server::Account;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
@@ -21,6 +23,9 @@ impl Account for AccountService {
     #[tracing::instrument(skip_all, err)]
     async fn get_account_state(&self, request: Request<GetAccountStateRequest>) -> std::result::Result<Response<GetAccountStateResponse>, Status> {
         let msg = request.into_inner();
+
+        let address = AccountAddressData::from_str(&msg.account_address)
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         let criteria = match msg.criteria {
             None => {
@@ -46,7 +51,7 @@ impl Account for AccountService {
 
         let block_id = state.block_id.clone();
         let balance = state.balance.unwrap_or_default();
-        let last_transaction_id = state.last_transaction_id.clone().map(|t| t.into());
+        let last_transaction_id = state.last_transaction_id.clone().map(|t| (&address, t).into());
         let state: AccountState = state.into();
         let block_id = block_id.into();
 
@@ -107,6 +112,9 @@ impl Account for AccountService {
         let msg = request.into_inner();
         let client = self.client.clone();
 
+        let address = AccountAddressData::from_str(&msg.account_address)
+            .map_err(|e| Status::internal(e.to_string()))?;
+
         let (from_tx, to_tx) = try_join!(
             extend_from_tx_id(&client, &msg.account_address, msg.from.clone()),
             extend_to_tx_id(&client, &msg.account_address, msg.to.clone())
@@ -122,7 +130,7 @@ impl Account for AccountService {
                 client.get_account_tx_range(&msg.account_address, (from_tx, to_tx)).boxed()
             }
         }
-            .map_ok(Into::into)
+            .map_ok(move |t| (&address, t).into())
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
             .boxed();
 

@@ -302,8 +302,9 @@ message BlockIdExt {
 }
 
 message TransactionId {
-  int64 lt = 1;
+  string account_address = 1;
   string hash = 2;
+  int64 lt = 3;
 }
 
 message MessageDataRaw {

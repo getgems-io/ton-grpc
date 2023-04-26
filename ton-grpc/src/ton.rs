@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use serde::Deserialize;
+use tonlibjson_client::address::AccountAddressData;
 use tonlibjson_client::block;
 use tonlibjson_client::block::RawMessage;
 use crate::ton::get_account_state_response::AccountState;
@@ -52,11 +53,12 @@ impl From<BlockIdExt> for block::BlockIdExt {
     }
 }
 
-impl From<block::InternalTransactionId> for TransactionId {
-    fn from(value: block::InternalTransactionId) -> Self {
+impl From<(&AccountAddressData, block::InternalTransactionId)> for TransactionId {
+    fn from((account_address, tx_id): (&AccountAddressData, block::InternalTransactionId)) -> Self {
         Self {
-            lt: value.lt,
-            hash: value.hash
+            account_address: account_address.to_raw_string(),
+            lt: tx_id.lt,
+            hash: tx_id.hash
         }
     }
 }
@@ -121,16 +123,16 @@ impl From<block::RawMessage> for Message {
     }
 }
 
-impl From<block::RawTransaction> for Transaction {
-    fn from(value: block::RawTransaction) -> Self {
+impl From<(&AccountAddressData, block::RawTransaction)> for Transaction {
+    fn from((address, value): (&AccountAddressData, block::RawTransaction)) -> Self {
         Self {
-            id: Some(value.transaction_id.into()),
+            id: Some((address, value.transaction_id).into()),
             utime: value.utime,
             data: value.data.clone(),
             fee: value.fee,
             storage_fee: value.storage_fee,
             other_fee: value.other_fee,
-            in_msg: value.in_msg.map(Into::into),
+            in_msg: Some(value.in_msg.into()),
             out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
         }
     }
