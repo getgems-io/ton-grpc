@@ -1,12 +1,12 @@
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
-use anyhow::anyhow;
-use base64::Engine;
+use std::str::FromStr;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
-use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance};
+use crate::address::AccountAddressData;
+use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
 use crate::balance::{BlockCriteria, Route};
 use crate::request::{Requestable, RequestBody, Routable};
 
@@ -156,45 +156,22 @@ impl Default for InternalTransactionId {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "@type", rename = "accountAddress")]
 pub struct AccountAddress {
-    pub account_address: String,
-
-    #[serde(skip)]
-    _chain_id: i32
+    #[serde(deserialize_with = "deserialize_empty_as_none", serialize_with = "serialize_none_as_empty")]
+    pub account_address: Option<AccountAddressData>,
 }
 
 impl AccountAddress {
     pub fn new(account_address: &str) -> anyhow::Result<Self> {
-        let _chain_id = Self::parse_chain_id(account_address)?;
-
         Ok(Self {
-            account_address: account_address.to_owned(),
-            _chain_id
+            account_address: Some(AccountAddressData::from_str(account_address)?)
         })
     }
 
     pub fn chain_id(&self) -> i32 {
-        self._chain_id
-    }
-
-    fn parse_chain_id(address: &str) -> anyhow::Result<i32> {
-        if let Some(pos) = address.find(':') {
-            return Ok(address[0..pos].parse()?)
-        } else if hex::decode(address).is_ok() {
-            return Ok(-1)
-        } else if let Ok(data) = base64::engine::general_purpose::URL_SAFE.decode(address) {
-            let workchain = data[1];
-
-            return Ok(if workchain == u8::MAX { -1 } else { workchain as i32 })
-        } else if let Ok(data) = base64::engine::general_purpose::STANDARD.decode(address) {
-            let workchain = data[1];
-
-            return Ok(if workchain == u8::MAX { -1 } else { workchain as i32 })
-        }
-
-        Err(anyhow!("unknown address format: {}", address))
+        self.account_address.as_ref().map(|d| d.chain_id).unwrap_or(-1)
     }
 }
 
@@ -766,6 +743,24 @@ mod tests {
     use crate::block::{Cell, List, Number, Slice, StackEntry, Tuple, SmcMethodId, AccountAddress};
     use serde_json::json;
     use tracing_test::traced_test;
+
+    #[test]
+    fn deserialize_account_address_empty() {
+        let json = json!({"account_address": ""});
+
+        let address = serde_json::from_value::<AccountAddress>(json).unwrap();
+
+        assert!(address.account_address.is_none())
+    }
+
+    #[test]
+    fn serialize_account_address_empty() {
+        let address = AccountAddress { account_address: None };
+
+        let json = serde_json::to_string(&address).unwrap();
+
+        assert_eq!(json, "{\"@type\":\"accountAddress\",\"account_address\":\"\"}");
+    }
 
     #[test]
     #[traced_test]

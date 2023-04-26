@@ -42,7 +42,7 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
     pub async fn ready(&mut self) -> anyhow::Result<()> {
-        self.get_masterchain_info().await?;
+        self.look_up_block_by_seqno(MAIN_CHAIN, MAIN_SHARD, 100).await?;
 
         Ok(())
     }

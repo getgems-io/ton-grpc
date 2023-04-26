@@ -224,7 +224,7 @@ service Account {
 }
 
 message GetAccountStateRequest {
-  AccountAddress account_address = 1;
+  string account_address = 1;
 
   /* optional */ oneof criteria {
     BlockId block_id = 2;
@@ -233,7 +233,7 @@ message GetAccountStateRequest {
 }
 
 message GetAccountStateResponse {
-  AccountAddress account_address = 1;
+  string account_address = 1;
   BlockIdExt block_id = 2;
   int64 balance = 3;
   optional TransactionId last_transaction_id = 4;
@@ -245,7 +245,7 @@ message GetAccountStateResponse {
 }
 
 message GetShardAccountCellRequest {
-  AccountAddress account_address = 1;
+  string account_address = 1;
   /* optional */ oneof criteria {
     BlockId block_id = 2;
     TransactionId transaction_id = 3;
@@ -253,7 +253,7 @@ message GetShardAccountCellRequest {
 }
 
 message GetShardAccountCellResponse {
-  AccountAddress account_address = 1;
+  string account_address = 1;
   BlockIdExt block_id = 2;
   TvmCell cell = 3;
 }
@@ -278,7 +278,7 @@ message GetAccountTransactionsRequest {
 //    FROM_OLD_TO_NEW = 2;
   }
 
-  AccountAddress account_address = 1;
+  string account_address = 1;
   Order order = 2;
 
   optional Bound from = 3;
@@ -324,8 +324,8 @@ message MessageDataEncryptedText {
 }
 
 message Message {
-  AccountAddress source = 1;
-  AccountAddress destination = 2;
+  optional string source = 1;
+  string destination = 2;
   int64 value = 3;
   int64 fwd_fee = 4;
   int64 ihr_fee = 5;
@@ -360,10 +360,6 @@ message FrozenAccountState {
 }
 
 message UninitializedAccountState {
-}
-
-message AccountAddress {
-  string address = 1;
 }
 
 message TvmCell {

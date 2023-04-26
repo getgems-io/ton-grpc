@@ -1,6 +1,7 @@
 use anyhow::anyhow;
 use serde::Deserialize;
 use tonlibjson_client::block;
+use tonlibjson_client::block::RawMessage;
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;
 
@@ -24,14 +25,6 @@ impl<T> From<TvmResult<T>> for anyhow::Result<T> where T: Default {
         } else {
             Err(anyhow!(value.error.unwrap_or("ambiguous response".to_owned())))
         }
-    }
-}
-
-impl TryFrom<AccountAddress> for block::AccountAddress {
-    type Error = anyhow::Error;
-
-    fn try_from(value: AccountAddress) -> Result<Self, Self::Error> {
-        Self::new(&value.address)
     }
 }
 
@@ -102,14 +95,6 @@ impl From<block::Cell> for TvmCell {
     }
 }
 
-impl From<block::AccountAddress> for AccountAddress {
-    fn from(value: block::AccountAddress) -> Self {
-        Self {
-            address: value.account_address,
-        }
-    }
-}
-
 impl From<block::MessageData> for MsgData {
     fn from(value: block::MessageData) -> Self {
         match value {
@@ -121,38 +106,36 @@ impl From<block::MessageData> for MsgData {
     }
 }
 
-impl From<block::RawMessage> for Message {
-    fn from(value: block::RawMessage) -> Self {
-        Self {
-            source: Some(value.source.into()),
-            destination: Some(value.destination.into()),
+impl TryFrom<block::RawMessage> for Message {
+    type Error = anyhow::Error;
+
+    fn try_from(value: RawMessage) -> Result<Self, Self::Error> {
+        Ok(Self {
+            source: value.source.account_address.map(|s| s.to_string()),
+            destination: value.destination.account_address.ok_or(anyhow!("empty account address"))?.to_string(),
             value: value.value,
             fwd_fee: value.fwd_fee,
             ihr_fee: value.ihr_fee,
             created_lt: value.created_lt,
             body_hash: value.body_hash.clone(),
             msg_data: Some(value.msg_data.into()),
-        }
+        })
     }
 }
 
-impl From<&block::RawMessage> for Message {
-    fn from(value: &block::RawMessage) -> Self {
-        value.to_owned().into()
-    }
-}
+impl TryFrom<block::RawTransaction> for Transaction {
+    type Error = anyhow::Error;
 
-impl From<block::RawTransaction> for Transaction {
-    fn from(value: block::RawTransaction) -> Self {
-        Self {
+    fn try_from(value: block::RawTransaction) -> Result<Self, Self::Error> {
+        Ok(Self {
             id: Some(value.transaction_id.into()),
             utime: value.utime,
             data: value.data.clone(),
             fee: value.fee,
             storage_fee: value.storage_fee,
             other_fee: value.other_fee,
-            in_msg: value.in_msg.map(Into::into),
-            out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
-        }
+            in_msg: value.in_msg.map(TryInto::<Message>::try_into).transpose()?,
+            out_msgs: value.out_msgs.into_iter().map(TryInto::<Message>::try_into).collect::<anyhow::Result<Vec<Message>>>()?,
+        })
     }
 }

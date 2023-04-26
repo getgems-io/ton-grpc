@@ -9,17 +9,13 @@ use tonlibjson_client::ton::TonClient;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let ton = TonClient::from_env().await?;
+    let mut ton = TonClient::from_env().await?;
+
+    ton.ready().await?;
 
     let now = Instant::now();
 
-    let m = ton.get_masterchain_info().await?;
-
-    info!("masterchain block: {:?}", m);
-
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS";
-
-    let _ = ton.get_block_header(m.last.workchain, m.last.shard, 5).await?;
 
     let total_value: i64 = ton.get_account_tx_range_unordered(address, ..).await?
         .filter_map(|tx| async {
