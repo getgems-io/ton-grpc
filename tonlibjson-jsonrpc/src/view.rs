@@ -125,8 +125,8 @@ pub struct MessageView {
 impl From<&RawMessage> for MessageView {
     fn from(msg: &RawMessage) -> Self {
         Self {
-            source: msg.source.account_address.clone(),
-            destination: msg.destination.account_address.clone(),
+            source: msg.source.account_address.as_ref().map(|m| m.to_string()).unwrap_or_default(),
+            destination: msg.destination.account_address.as_ref().map(|m| m.to_string()).unwrap_or_default(),
             value: msg.value.to_string(),
             fwd_fee: msg.fwd_fee.to_string(),
             ihr_fee: msg.ihr_fee.to_string(),
