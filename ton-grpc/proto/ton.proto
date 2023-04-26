@@ -325,7 +325,7 @@ message MessageDataEncryptedText {
 
 message Message {
   optional string source = 1;
-  string destination = 2;
+  optional string destination = 2;
   int64 value = 3;
   int64 fwd_fee = 4;
   int64 ihr_fee = 5;

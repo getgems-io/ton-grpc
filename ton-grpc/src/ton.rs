@@ -106,20 +106,18 @@ impl From<block::MessageData> for MsgData {
     }
 }
 
-impl TryFrom<block::RawMessage> for Message {
-    type Error = anyhow::Error;
-
-    fn try_from(value: RawMessage) -> Result<Self, Self::Error> {
-        Ok(Self {
+impl From<block::RawMessage> for Message {
+    fn from(value: RawMessage) -> Self {
+        Self {
             source: value.source.account_address.map(|s| s.to_string()),
-            destination: value.destination.account_address.ok_or(anyhow!("empty account address"))?.to_string(),
+            destination: value.destination.account_address.map(|s| s.to_string()),
             value: value.value,
             fwd_fee: value.fwd_fee,
             ihr_fee: value.ihr_fee,
             created_lt: value.created_lt,
             body_hash: value.body_hash.clone(),
             msg_data: Some(value.msg_data.into()),
-        })
+        }
     }
 }
 
@@ -134,8 +132,8 @@ impl TryFrom<block::RawTransaction> for Transaction {
             fee: value.fee,
             storage_fee: value.storage_fee,
             other_fee: value.other_fee,
-            in_msg: value.in_msg.map(TryInto::<Message>::try_into).transpose()?,
-            out_msgs: value.out_msgs.into_iter().map(TryInto::<Message>::try_into).collect::<anyhow::Result<Vec<Message>>>()?,
+            in_msg: value.in_msg.map(Into::into),
+            out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
         })
     }
 }
