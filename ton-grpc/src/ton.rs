@@ -72,6 +72,15 @@ impl From<TransactionId> for block::InternalTransactionId {
     }
 }
 
+impl From<PartialTransactionId> for block::InternalTransactionId {
+    fn from(value: PartialTransactionId) -> Self {
+        Self {
+            hash: value.hash,
+            lt: value.lt
+        }
+    }
+}
+
 impl From<block::RawFullAccountState> for AccountState {
     fn from(value: block::RawFullAccountState) -> Self {
         if value.code.is_some() {
