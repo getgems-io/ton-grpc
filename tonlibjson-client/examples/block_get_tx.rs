@@ -1,6 +1,8 @@
+use futures::StreamExt;
 // use std::sync::{Arc, Mutex};
 // use futures::{stream, StreamExt};
 // use tokio::sync::RwLock;
+use futures::TryStreamExt;
 use tokio::time::Instant;
 use tonlibjson_client::ton::TonClient;
 
@@ -14,22 +16,29 @@ async fn main() -> anyhow::Result<()> {
 
     let block = ton.get_masterchain_info().await?.last;
 
-    let block = ton.get_shards_by_block_id(block.clone()).await?
-        .first().unwrap().to_owned();
+    // let block = ton.get_shards_by_block_id(block.clone()).await?
+    //     .first().unwrap().to_owned();
 
     let block = ton.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
     tracing::info!("run");
 
     let now = Instant::now();
-    let txs = ton.blocks_get_transactions_verified(&block, None).await?;
+    let txs = ton.get_block_tx_stream(block.clone(), false).count().await;
     tracing::info!("{:?}", txs);
     let elapsed = now.elapsed();
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let txs = ton.blocks_get_transactions(&block, None, false).await?;
+    let txs = ton.get_block_tx_stream(block.clone(), true).count().await;
+    tracing::info!("{:?}", txs);
+    let elapsed = now.elapsed();
+
+    tracing::info!("Elapsed: {:.2?}", elapsed);
+
+    let now = Instant::now();
+    let txs = ton.get_block_tx_stream_unordered(block).count().await;
     tracing::info!("{:?}", txs);
     let elapsed = now.elapsed();
 

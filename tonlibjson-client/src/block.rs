@@ -133,6 +133,14 @@ pub struct ShortTxId {
     pub mode: u8,
 }
 
+impl PartialEq for ShortTxId {
+    fn eq(&self, other: &Self) -> bool {
+        self.account == other.account
+        && self.hash == other.hash
+        && self.lt == other.lt
+    }
+}
+
 impl ShortTxId {
     pub fn get_account_address(&self) -> anyhow::Result<String> {
         Ok(hex::encode(base64::engine::general_purpose::STANDARD.decode(&self.account)?))

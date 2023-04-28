@@ -82,3 +82,19 @@ async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+
+#[tokio::test]
+#[traced_test]
+async fn get_block_tx_stream_unordered_correct() -> anyhow::Result<()> {
+    let client = TonClient::from_env().await?;
+    let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
+
+    let len = client.get_block_tx_stream_unordered(block)
+        .count()
+        .await;
+
+    assert_eq!(len, 512);
+
+    Ok(())
+}

@@ -283,7 +283,7 @@ impl TonClient {
         RawSendMessage::new(message.to_string()).call(&mut client).await
     }
 
-    pub fn get_block_tx_stream_unordered(&self, block: BlockIdExt) -> impl Stream<Item = anyhow::Result<ShortTxId>> + 'static {
+    pub fn get_block_tx_stream_unordered(&self, block: BlockIdExt) -> impl TryStream<Ok=ShortTxId, Error=anyhow::Error> + 'static {
         let lstream = self.get_block_tx_stream(block.clone(), false).into_stream();
         let rstream = self.get_block_tx_stream(block, true).into_stream();
 
@@ -291,11 +291,42 @@ impl TonClient {
             tokio::pin!(lstream);
             tokio::pin!(rstream);
 
-            let lhs = lstream.try_next().await?.unwrap();
-            let rhs = rstream.try_next().await?.unwrap();
+            let mut last_ltx = None;
+            let mut last_rtx = None;
 
-            yield lhs;
-            yield rhs;
+            loop {
+                tokio::select! {
+                    Some(tx) = lstream.next() => {
+                        match tx {
+                            Err(e) => yield Err(e)?,
+                            Ok(tx) => {
+                                if let Some(ref rtx) = last_rtx {
+                                    if rtx == &tx {
+                                        return;
+                                    }
+                                }
+                                last_ltx.replace(tx.clone());
+                                yield tx
+                            }
+                        }
+                    },
+                    Some(tx) = rstream.next() => {
+                        match tx {
+                            Err(e) => yield Err(e)?,
+                            Ok(tx) => {
+                                if let Some(ref ltx) = last_ltx {
+                                    if ltx == &tx {
+                                        return;
+                                    }
+                                }
+                                last_rtx.replace(tx.clone());
+                                yield tx
+                            }
+                        }
+                    },
+                    else => return
+                }
+            }
         }
     }
 
@@ -324,7 +355,7 @@ impl TonClient {
                         return anyhow::Ok(None);
                     }
 
-                    let txs= state.this.blocks_get_transactions(&state.block, state.last_tx, reverse).await?;
+                    let txs = state.this.blocks_get_transactions(&state.block, state.last_tx, reverse).await?;
 
                     tracing::debug!("got {} transactions", txs.transactions.len());
 
