@@ -186,7 +186,7 @@ impl From<&RawTransaction> for TransactionView {
             fee: tx.fee.to_string(),
             storage_fee: tx.storage_fee.to_string(),
             other_fee: tx.other_fee.to_string(),
-            in_msg: tx.in_msg.as_ref().map(|msg| msg.into()),
+            in_msg: Some((&tx.in_msg).into()),
             out_msgs: tx.out_msgs.iter().map(Into::into).collect(),
         }
     }

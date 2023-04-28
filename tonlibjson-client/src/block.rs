@@ -345,8 +345,7 @@ pub struct RawTransaction {
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub other_fee: i64,
 
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub in_msg: Option<RawMessage>,
+    pub in_msg: RawMessage,
     pub out_msgs: Vec<RawMessage>,
 }
 
