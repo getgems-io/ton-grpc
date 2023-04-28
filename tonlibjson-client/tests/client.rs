@@ -18,7 +18,7 @@ async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
     };
 
     let transaction_list: Vec<anyhow::Result<RawTransaction>> = client
-        .get_account_tx_stream_from(address, tx.clone())
+        .get_account_tx_stream_from(&address, Some(tx.clone()))
         .take(1)
         .collect()
         .await;
@@ -40,8 +40,7 @@ async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result
     let address = "EQBO_mAVkaHxt6Ibz7wqIJ_UIDmxZBFcgkk7fvIzkh7l42wO".to_owned();
 
     let transaction_list: Vec<anyhow::Result<RawTransaction>> = client
-        .get_account_tx_stream(address)
-        .await?
+        .get_account_tx_stream(&address)
         .take(1)
         .collect()
         .await;
@@ -49,6 +48,37 @@ async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result
     debug!("{:#?}", transaction_list);
 
     assert_eq!(transaction_list.len(), 1);
+
+    Ok(())
+}
+
+
+#[tokio::test]
+#[traced_test]
+async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
+    let client = TonClient::from_env().await?;
+    let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
+
+    let len = client.get_block_tx_stream(block, false)
+        .count()
+        .await;
+
+    assert_eq!(len, 512);
+
+    Ok(())
+}
+
+#[tokio::test]
+#[traced_test]
+async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
+    let client = TonClient::from_env().await?;
+    let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
+
+    let len = client.get_block_tx_stream(block, true)
+        .count()
+        .await;
+
+    assert_eq!(len, 512);
 
     Ok(())
 }

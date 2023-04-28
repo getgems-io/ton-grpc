@@ -3,7 +3,7 @@ use std::collections::Bound;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
-use futures::{Stream, stream, TryStreamExt, StreamExt, try_join};
+use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream};
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
@@ -42,7 +42,7 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
     pub async fn ready(&mut self) -> anyhow::Result<()> {
-        self.look_up_block_by_seqno(MAIN_CHAIN, MAIN_SHARD, 100).await?;
+        self.get_block_header(0, MAIN_SHARD, 100).await?;
 
         Ok(())
     }
@@ -250,26 +250,30 @@ impl TonClient {
     pub async fn blocks_get_transactions(
         &self,
         block: &BlockIdExt,
-        tx: Option<AccountTransactionId>
+        tx: Option<AccountTransactionId>,
+        reverse: bool
     ) -> anyhow::Result<BlocksTransactions> {
         let mut client = self.client.clone();
 
         BlocksGetTransactions::unverified(
             block.to_owned(),
-            tx
+            tx,
+            reverse
         ).call(&mut client).await
     }
 
     pub async fn blocks_get_transactions_verified(
         &self,
         block: &BlockIdExt,
-        tx: Option<AccountTransactionId>
+        tx: Option<AccountTransactionId>,
+        reverse: bool
     ) -> anyhow::Result<BlocksTransactions> {
         let mut client = self.client.clone();
 
         BlocksGetTransactions::verified(
             block.to_owned(),
-            tx
+            tx,
+            reverse
         ).call(&mut client).await
     }
 
@@ -279,10 +283,27 @@ impl TonClient {
         RawSendMessage::new(message.to_string()).call(&mut client).await
     }
 
-    pub fn get_tx_stream(
+    pub fn get_block_tx_stream_unordered(&self, block: BlockIdExt) -> impl Stream<Item = anyhow::Result<ShortTxId>> + 'static {
+        let lstream = self.get_block_tx_stream(block.clone(), false).into_stream();
+        let rstream = self.get_block_tx_stream(block, true).into_stream();
+
+        async_stream::try_stream! {
+            tokio::pin!(lstream);
+            tokio::pin!(rstream);
+
+            let lhs = lstream.try_next().await?.unwrap();
+            let rhs = rstream.try_next().await?.unwrap();
+
+            yield lhs;
+            yield rhs;
+        }
+    }
+
+    pub fn get_block_tx_stream(
         &self,
         block: BlockIdExt,
-    ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + 'static {
+        reverse: bool
+    ) -> impl TryStream<Ok = ShortTxId, Error = anyhow::Error> + 'static {
         struct State {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
@@ -303,7 +324,7 @@ impl TonClient {
                         return anyhow::Ok(None);
                     }
 
-                    let txs= state.this.blocks_get_transactions(&state.block, state.last_tx).await?;
+                    let txs= state.this.blocks_get_transactions(&state.block, state.last_tx, reverse).await?;
 
                     tracing::debug!("got {} transactions", txs.transactions.len());
 

@@ -1,3 +1,6 @@
+// use std::sync::{Arc, Mutex};
+// use futures::{stream, StreamExt};
+// use tokio::sync::RwLock;
 use tokio::time::Instant;
 use tonlibjson_client::ton::TonClient;
 
@@ -14,6 +17,8 @@ async fn main() -> anyhow::Result<()> {
     let block = ton.get_shards_by_block_id(block.clone()).await?
         .first().unwrap().to_owned();
 
+    let block = ton.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
+
     tracing::info!("run");
 
     let now = Instant::now();
@@ -24,11 +29,34 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let txs = ton.blocks_get_transactions(&block, None).await?;
+    let txs = ton.blocks_get_transactions(&block, None, false).await?;
     tracing::info!("{:?}", txs);
     let elapsed = now.elapsed();
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
+
+    // let max = Arc::new(RwLock::new(0));
+    //
+    // tracing::info!(from = block.seqno - 100000, to = block.seqno);
+    //
+    // let _ = stream::iter((block.seqno - 100000 .. block.seqno).rev())
+    //     .for_each_concurrent(1000, |seqno| {
+    //         let max = max.clone();
+    //         let ton = ton.clone();
+    //
+    //         async move {
+    //             let Ok(block_id) = ton.look_up_block_by_seqno(block.workchain, block.shard, seqno).await else {
+    //                 return;
+    //             };
+    //
+    //             let tx_count = ton.get_tx_stream(block_id).count().await;
+    //
+    //             if tx_count > *(max.read().await) {
+    //                 *max.write().await = tx_count;
+    //                 tracing::info!(count = tx_count, seqno = seqno, "new max")
+    //             }
+    //         }
+    //     }).await;
 
     Ok(())
 }

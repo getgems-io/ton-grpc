@@ -67,7 +67,7 @@ impl Block for BlockService {
         let block_id = extend_block_id(&self.client, &block_id).await
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let stream = self.client.get_tx_stream(block_id)
+        let stream = self.client.get_block_tx_stream(block_id, false)
             .and_then(move |t| async move { (chain_id, t).try_into() })
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
