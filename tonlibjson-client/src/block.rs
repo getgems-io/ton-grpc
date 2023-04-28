@@ -2,6 +2,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use std::str::FromStr;
+use base64::Engine;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
@@ -127,8 +128,15 @@ impl From<BlockHeader> for BlockId {
 pub struct ShortTxId {
     pub account: String,
     pub hash: String,
-    pub lt: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub lt: i64,
     pub mode: u8,
+}
+
+impl ShortTxId {
+    pub fn get_account_address(&self) -> anyhow::Result<String> {
+        Ok(hex::encode(base64::engine::general_purpose::STANDARD.decode(&self.account)?))
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -516,15 +524,15 @@ pub struct BlocksTransactions {
 #[serde(tag = "@type", rename = "blocks.accountTransactionId")]
 pub struct AccountTransactionId {
     pub account: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub lt: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub lt: i64,
 }
 
 impl Default for AccountTransactionId {
     fn default() -> Self {
         Self {
             account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
-            lt: "".to_string(),
+            lt: 0,
         }
     }
 }

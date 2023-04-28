@@ -279,15 +279,15 @@ impl TonClient {
         RawSendMessage::new(message.to_string()).call(&mut client).await
     }
 
-    pub async fn get_tx_stream(
+    pub fn get_tx_stream(
         &self,
         block: BlockIdExt,
-    ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + '_ {
-        struct State<'a> {
+    ) -> impl Stream<Item = anyhow::Result<ShortTxId>> + 'static {
+        struct State {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
             block: BlockIdExt,
-            this: &'a TonClient
+            this: TonClient
         }
 
         stream::try_unfold(
@@ -295,7 +295,7 @@ impl TonClient {
                 last_tx: None,
                 incomplete: true,
                 block,
-                this: self
+                this: self.clone()
             },
             move |state| {
                 async move {

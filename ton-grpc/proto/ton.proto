@@ -377,6 +377,7 @@ service Block {
   rpc GetLastBlock (GetLastBlockRequest) returns (BlockIdExt);
   rpc GetBlock (BlockId) returns (BlockIdExt);
   rpc GetShards (BlockId) returns (GetShardsResponse);
+  rpc GetBlockTransactionIds (GetBlockTransactionIdsRequest) returns (stream TransactionId);
 }
 
 message SubscribeLastBlockRequest {}
@@ -390,4 +391,8 @@ message GetLastBlockRequest {}
 
 message GetShardsResponse {
   repeated BlockIdExt shards = 1;
+}
+
+message GetBlockTransactionIdsRequest {
+  BlockId block_id = 1;
 }
