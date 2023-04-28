@@ -228,7 +228,7 @@ message GetAccountStateRequest {
 
   /* optional */ oneof criteria {
     BlockId block_id = 2;
-    TransactionId transaction_id = 3;
+    PartialTransactionId transaction_id = 3;
   }
 }
 
@@ -248,7 +248,7 @@ message GetShardAccountCellRequest {
   string account_address = 1;
   /* optional */ oneof criteria {
     BlockId block_id = 2;
-    TransactionId transaction_id = 3;
+    PartialTransactionId transaction_id = 3;
   }
 }
 
@@ -268,7 +268,7 @@ message GetAccountTransactionsRequest {
 
     oneof bound {
       BlockId block_id = 2;
-      TransactionId transaction_id = 3;
+      PartialTransactionId transaction_id = 3;
     }
   }
 
@@ -302,8 +302,14 @@ message BlockIdExt {
 }
 
 message TransactionId {
-  int64 lt = 1;
+  string account_address = 1;
   string hash = 2;
+  int64 lt = 3;
+}
+
+message PartialTransactionId {
+  string hash = 1;
+  int64 lt = 2;
 }
 
 message MessageDataRaw {
