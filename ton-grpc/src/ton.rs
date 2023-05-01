@@ -53,17 +53,15 @@ impl From<BlockIdExt> for block::BlockIdExt {
     }
 }
 
-impl TryFrom<(i32, block::ShortTxId)> for TransactionId {
-    type Error = anyhow::Error;
+impl From<(i32, block::ShortTxId)> for TransactionId {
+    fn from((chain_id, value): (i32, ShortTxId)) -> Self {
+        let address = format!("{}:{}", chain_id, hex::encode(value.account.bytes));
 
-    fn try_from((chain_id, value): (i32, ShortTxId)) -> Result<Self, Self::Error> {
-        let address = format!("{}:{}", chain_id, value.get_account_address()?);
-
-        Ok(Self {
+        Self {
             account_address: address,
             lt: value.lt,
             hash: value.hash
-        })
+        }
     }
 }
 

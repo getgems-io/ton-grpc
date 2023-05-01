@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::BufMut;
 use crc::Crc;
@@ -124,6 +124,50 @@ impl AccountAddressData {
         buf.put_u16(crc16);
 
         base64::engine::general_purpose::URL_SAFE.encode(buf)
+    }
+}
+
+
+#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+pub struct ShardContextAccountAddress {
+    pub bytes: [u8; 32]
+}
+
+impl FromStr for ShardContextAccountAddress {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = base64::engine::general_purpose::STANDARD.decode(s)
+            .with_context(|| format!("input string is {}", s))?;
+
+        if bytes.len() != 32 {
+            return Err(anyhow!("invalid length, expected 32 got {} bytes", bytes.len()));
+        }
+
+        let mut buf = [0; 32];
+        buf.copy_from_slice(&bytes);
+
+        Ok(Self { bytes: buf })
+    }
+}
+
+impl ToString for ShardContextAccountAddress {
+    fn to_string(&self) -> String {
+        base64::engine::general_purpose::STANDARD.encode(&self.bytes)
+    }
+}
+
+impl Serialize for ShardContextAccountAddress {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ShardContextAccountAddress {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+
+        FromStr::from_str(&s).map_err(de::Error::custom)
     }
 }
 

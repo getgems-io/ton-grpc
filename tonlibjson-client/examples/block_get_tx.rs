@@ -1,8 +1,7 @@
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 // use std::sync::{Arc, Mutex};
 // use futures::{stream, StreamExt};
 // use tokio::sync::RwLock;
-use futures::TryStreamExt;
 use tokio::time::Instant;
 use tonlibjson_client::ton::TonClient;
 
@@ -14,7 +13,7 @@ async fn main() -> anyhow::Result<()> {
 
     ton.ready().await?;
 
-    let block = ton.get_masterchain_info().await?.last;
+    // let block = ton.get_masterchain_info().await?.last;
 
     // let block = ton.get_shards_by_block_id(block.clone()).await?
     //     .first().unwrap().to_owned();
@@ -24,22 +23,22 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("run");
 
     let now = Instant::now();
-    let txs = ton.get_block_tx_stream(block.clone(), false).count().await;
-    tracing::info!("{:?}", txs);
+    let txs = ton.get_block_tx_stream(block.clone(), false).try_collect::<Vec<_>>().await;
+    tracing::info!(txs = ?txs);
     let elapsed = now.elapsed();
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let txs = ton.get_block_tx_stream(block.clone(), true).count().await;
-    tracing::info!("{:?}", txs);
+    let txs = ton.get_block_tx_stream(block.clone(), true).try_collect::<Vec<_>>().await;
+    tracing::info!(txs = ?txs);
     let elapsed = now.elapsed();
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let txs = ton.get_block_tx_stream_unordered(block).count().await;
-    tracing::info!("{:?}", txs);
+    let txs = ton.get_block_tx_stream_unordered(block).try_collect::<Vec<_>>().await;
+    tracing::info!(txs = ?txs);
     let elapsed = now.elapsed();
 
     tracing::info!("Elapsed: {:.2?}", elapsed);

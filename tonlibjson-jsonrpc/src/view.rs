@@ -229,3 +229,13 @@ impl From<RawFullAccountState> for AddressInformationView {
         }
     }
 }
+
+#[derive(Serialize)]
+#[serde(tag = "@type", rename = "blocks.shortTxId")]
+pub struct ShortTxIdView {
+    pub account: String,
+    pub hash: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub lt: i64,
+    pub mode: u8,
+}

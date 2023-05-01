@@ -2,11 +2,10 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use std::str::FromStr;
-use base64::Engine;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
-use crate::address::AccountAddressData;
+use crate::address::{AccountAddressData, ShardContextAccountAddress};
 use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
 use crate::balance::{BlockCriteria, Route};
 use crate::request::{Requestable, RequestBody, Routable};
@@ -123,10 +122,10 @@ impl From<BlockHeader> for BlockId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.shortTxId")]
 pub struct ShortTxId {
-    pub account: String,
+    pub account: ShardContextAccountAddress,
     pub hash: String,
     #[serde(deserialize_with = "deserialize_number_from_string")]
     pub lt: i64,
@@ -138,12 +137,6 @@ impl PartialEq for ShortTxId {
         self.account == other.account
         && self.hash == other.hash
         && self.lt == other.lt
-    }
-}
-
-impl ShortTxId {
-    pub fn get_account_address(&self) -> anyhow::Result<String> {
-        Ok(hex::encode(base64::engine::general_purpose::STANDARD.decode(&self.account)?))
     }
 }
 
@@ -524,7 +517,7 @@ impl Routable for BlocksGetTransactions {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct BlocksTransactions {
     pub id: BlockIdExt,
     pub incomplete: bool,
@@ -552,7 +545,7 @@ impl Default for AccountTransactionId {
 impl From<&ShortTxId> for AccountTransactionId {
     fn from(v: &ShortTxId) -> Self {
         AccountTransactionId {
-            account: v.account.clone(),
+            account: v.account.to_string(),
             lt: v.lt.clone(),
         }
     }
