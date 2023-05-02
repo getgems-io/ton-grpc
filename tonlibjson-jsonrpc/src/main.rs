@@ -207,7 +207,7 @@ impl RpcServer {
             .look_up_block_by_seqno(params.workchain, shard, params.seqno)
             .await?;
 
-        let stream = self.client.get_block_tx_stream(block.clone(), false);
+        let stream = self.client.get_block_tx_stream(&block, false);
         let txs: Vec<ShortTxId> = stream.try_collect().await?;
 
         let txs: Vec<ShortTxIdView> = txs.into_iter()

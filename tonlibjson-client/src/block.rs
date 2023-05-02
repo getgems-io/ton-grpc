@@ -476,7 +476,8 @@ pub struct BlocksGetTransactions {
 }
 
 impl BlocksGetTransactions {
-    pub fn unverified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool) -> Self {
+    pub fn unverified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool, count: i32) -> Self {
+        let count = if count > 256 { 256 } else { count };
         let mode = 1 + 2 + 4
             + if after.is_some() { 128 } else { 0 }
             + if reverse { 64 } else { 0 };
@@ -484,12 +485,13 @@ impl BlocksGetTransactions {
         Self {
             id: block_id,
             mode,
-            count: 256,
+            count,
             after: after.unwrap_or_default(),
         }
     }
 
-    pub fn verified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool) -> Self {
+    pub fn verified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool, count: i32) -> Self {
+        let count = if count > 256 { 256 } else { count };
         let mode = 32 + 1 + 2 + 4
             + if after.is_some() { 128 } else { 0 }
             + if reverse { 64 } else { 0 };
@@ -497,7 +499,7 @@ impl BlocksGetTransactions {
         Self {
             id: block_id,
             mode,
-            count: 256,
+            count,
             after: after.unwrap_or_default(),
         }
     }

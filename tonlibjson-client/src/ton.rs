@@ -3,7 +3,7 @@ use std::collections::Bound;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
-use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream};
+use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, FutureExt};
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
@@ -14,6 +14,7 @@ use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tracing::{instrument, trace};
 use url::Url;
+use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
 use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction};
 use crate::config::AppConfig;
@@ -251,14 +252,16 @@ impl TonClient {
         &self,
         block: &BlockIdExt,
         tx: Option<AccountTransactionId>,
-        reverse: bool
+        reverse: bool,
+        count: i32
     ) -> anyhow::Result<BlocksTransactions> {
         let mut client = self.client.clone();
 
         BlocksGetTransactions::unverified(
             block.to_owned(),
             tx,
-            reverse
+            reverse,
+            count
         ).call(&mut client).await
     }
 
@@ -266,14 +269,16 @@ impl TonClient {
         &self,
         block: &BlockIdExt,
         tx: Option<AccountTransactionId>,
-        reverse: bool
+        reverse: bool,
+        count: i32
     ) -> anyhow::Result<BlocksTransactions> {
         let mut client = self.client.clone();
 
         BlocksGetTransactions::verified(
             block.to_owned(),
             tx,
-            reverse
+            reverse,
+            count
         ).call(&mut client).await
     }
 
@@ -283,9 +288,9 @@ impl TonClient {
         RawSendMessage::new(message.to_string()).call(&mut client).await
     }
 
-    pub fn get_block_tx_stream_unordered(&self, block: BlockIdExt) -> impl TryStream<Ok=ShortTxId, Error=anyhow::Error> + 'static {
-        let lstream = self.get_block_tx_stream(block.clone(), false).into_stream();
-        let rstream = self.get_block_tx_stream(block, true).into_stream();
+    pub fn get_block_tx_stream_unordered(&self, block: &BlockIdExt) -> impl TryStream<Ok=ShortTxId, Error=anyhow::Error> + 'static {
+        let lstream = self.get_block_tx_stream(&block, false).into_stream();
+        let rstream = self.get_block_tx_stream(&block, true).into_stream();
 
         async_stream::try_stream! {
             tokio::pin!(lstream);
@@ -332,22 +337,24 @@ impl TonClient {
 
     pub fn get_block_tx_stream(
         &self,
-        block: BlockIdExt,
+        block: &BlockIdExt,
         reverse: bool
     ) -> impl TryStream<Ok = ShortTxId, Error = anyhow::Error> + 'static {
         struct State {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
             block: BlockIdExt,
-            this: TonClient
+            this: TonClient,
+            exp: u32
         }
 
         stream::try_unfold(
             State {
                 last_tx: None,
                 incomplete: true,
-                block,
-                this: self.clone()
+                block: block.clone(),
+                this: self.clone(),
+                exp: 4
             },
             move |state| {
                 async move {
@@ -355,7 +362,7 @@ impl TonClient {
                         return anyhow::Ok(None);
                     }
 
-                    let txs = state.this.blocks_get_transactions(&state.block, state.last_tx, reverse).await?;
+                    let txs = state.this.blocks_get_transactions(&state.block, state.last_tx, reverse, 2_i32.pow(state.exp)).await?;
 
                     tracing::debug!("got {} transactions", txs.transactions.len());
 
@@ -367,7 +374,8 @@ impl TonClient {
                             last_tx,
                             incomplete: txs.incomplete,
                             block: state.block,
-                            this: state.this
+                            this: state.this,
+                            exp: min(8, state.exp + 1)
                         },
                     )))
                 }
@@ -580,6 +588,70 @@ impl TonClient {
                     Err(e) => { tracing::error!("{}", e); None }
                 }
             })
+    }
+
+    pub fn get_accounts_in_block(&self, block: &BlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
+        let block = block.clone();
+        let lstream = self.get_block_tx_stream(&block, false).into_stream();
+        let rstream = self.get_block_tx_stream(&block, true).into_stream();
+
+        let stream = async_stream::try_stream! {
+            tokio::pin!(lstream);
+            tokio::pin!(rstream);
+
+            let mut last_laddr: Option<ShardContextAccountAddress> = None;
+            let mut last_raddr: Option<ShardContextAccountAddress> = None;
+
+            loop {
+                tokio::select! {
+                    Some(tx) = lstream.next() => {
+                        match tx {
+                            Err(e) => yield Err(e)?,
+                            Ok(tx) => {
+                                if let Some(ref raddr) = last_raddr {
+                                    if raddr == &tx.account {
+                                        return;
+                                    }
+                                }
+
+                                if let Some(ref laddr) = last_laddr {
+                                    if laddr == &tx.account {
+                                        continue;
+                                    }
+                                }
+
+                                last_laddr.replace(tx.account.clone());
+                                yield tx.account.clone();
+                            }
+                        }
+                    },
+                    Some(tx) = rstream.next() => {
+                        match tx {
+                            Err(e) => yield Err(e)?,
+                            Ok(tx) => {
+                                if let Some(ref laddr) = last_laddr {
+                                    if laddr == &tx.account {
+                                        return;
+                                    }
+                                }
+
+                                if let Some(ref raddr) = last_raddr {
+                                    if raddr == &tx.account {
+                                        continue;
+                                    }
+                                }
+
+                                last_raddr.replace(tx.account.clone());
+                                yield tx.account.clone();
+                            }
+                        }
+                    },
+                    else => return
+                }
+            }
+        };
+
+        stream.map_ok(move |a: ShardContextAccountAddress| a.into_internal(block.workchain))
     }
 
     async fn find_first_tx(&self, account: &str) -> anyhow::Result<InternalTransactionId> {

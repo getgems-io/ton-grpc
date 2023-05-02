@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
                 match ton.get_shards(seqno).await {
                     Ok(shards) => {
                         if let Some(block) = shards.shards.first() {
-                            ton.get_block_tx_stream(block.clone(), false)
+                            ton.get_block_tx_stream(&block, false)
                                 .for_each_concurrent(10, |tx| async {
                                     let Ok(tx) = tx else {
                                         tracing::error!("{:?}", tx.unwrap_err());

@@ -59,7 +59,7 @@ async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
     let client = TonClient::from_env().await?;
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
-    let len = client.get_block_tx_stream(block, false)
+    let len = client.get_block_tx_stream(&block, false)
         .count()
         .await;
 
@@ -74,7 +74,7 @@ async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
     let client = TonClient::from_env().await?;
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
-    let len = client.get_block_tx_stream(block, true)
+    let len = client.get_block_tx_stream(&block, true)
         .count()
         .await;
 
@@ -90,7 +90,7 @@ async fn get_block_tx_stream_unordered_correct() -> anyhow::Result<()> {
     let client = TonClient::from_env().await?;
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
-    let len = client.get_block_tx_stream_unordered(block)
+    let len = client.get_block_tx_stream_unordered(&block)
         .count()
         .await;
 

@@ -55,7 +55,7 @@ impl From<BlockIdExt> for block::BlockIdExt {
 
 impl From<(i32, block::ShortTxId)> for TransactionId {
     fn from((chain_id, value): (i32, ShortTxId)) -> Self {
-        let address = format!("{}:{}", chain_id, hex::encode(value.account.bytes));
+        let address = value.account.into_internal(chain_id).to_string();
 
         Self {
             account_address: address,

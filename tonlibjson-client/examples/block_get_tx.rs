@@ -23,25 +23,31 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("run");
 
     let now = Instant::now();
-    let txs = ton.get_block_tx_stream(block.clone(), false).try_collect::<Vec<_>>().await;
-    tracing::info!(txs = ?txs);
+    let txs = ton.get_block_tx_stream(&block, false).try_collect::<Vec<_>>().await;
     let elapsed = now.elapsed();
+    // tracing::info!(txs = ?txs);
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let txs = ton.get_block_tx_stream(block.clone(), true).try_collect::<Vec<_>>().await;
-    tracing::info!(txs = ?txs);
+    let txs = ton.get_block_tx_stream(&block, true).try_collect::<Vec<_>>().await;
     let elapsed = now.elapsed();
+    // tracing::info!(txs = ?txs);
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let txs = ton.get_block_tx_stream_unordered(block).try_collect::<Vec<_>>().await;
-    tracing::info!(txs = ?txs);
+    let txs = ton.get_block_tx_stream_unordered(&block).try_collect::<Vec<_>>().await;
     let elapsed = now.elapsed();
+    // tracing::info!(txs = ?txs);
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
+
+    let now = Instant::now();
+    let accounts = ton.get_accounts_in_block(&block).try_collect::<Vec<_>>().await?;
+    let elapsed = now.elapsed();
+
+    tracing::info!(accounts = ?accounts, elapsed = ?elapsed);
 
     // let max = Arc::new(RwLock::new(0));
     //

@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::Debug;
 use std::str::FromStr;
 use anyhow::{anyhow, Context};
 use base64::Engine;
@@ -128,7 +130,7 @@ impl AccountAddressData {
 }
 
 
-#[derive(Clone, Debug, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ShardContextAccountAddress {
     pub bytes: [u8; 32]
 }
@@ -168,6 +170,43 @@ impl<'de> Deserialize<'de> for ShardContextAccountAddress {
         let s = String::deserialize(deserializer)?;
 
         FromStr::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
+impl Debug for ShardContextAccountAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ShardContextAccountAddress")
+            .field("bytes", &hex::encode(&self.bytes))
+            .finish()
+    }
+}
+
+impl ShardContextAccountAddress {
+    pub fn into_internal(self, chain_id: i32) -> InternalAccountAddress {
+        InternalAccountAddress {
+            chain_id,
+            bytes: self.bytes
+        }
+    }
+}
+
+pub struct InternalAccountAddress {
+    pub chain_id: i32,
+    pub bytes: [u8; 32]
+}
+
+impl Debug for InternalAccountAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("InternalAccountAddress")
+            .field("chain_id", &self.chain_id)
+            .field("bytes", &hex::encode(&self.bytes))
+            .finish()
+    }
+}
+
+impl ToString for InternalAccountAddress {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.chain_id, hex::encode(&self.bytes))
     }
 }
 
