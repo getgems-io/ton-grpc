@@ -34,6 +34,7 @@ crc = "3.0.1"
 
 [dev-dependencies]
 tracing-test = { workspace = true }
+serial_test = "2.0.0"
 
 [features]
 testnet = ["tonlibjson-sys/testnet"]

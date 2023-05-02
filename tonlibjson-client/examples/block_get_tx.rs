@@ -44,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let accounts = ton.get_accounts_in_block(&block).try_collect::<Vec<_>>().await?;
+    let accounts = ton.get_accounts_in_block_stream(&block).try_collect::<Vec<_>>().await?;
     let elapsed = now.elapsed();
 
     tracing::info!(accounts = ?accounts, elapsed = ?elapsed);

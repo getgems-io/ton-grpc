@@ -1,11 +1,13 @@
 use tonlibjson_client::block::{InternalTransactionId, RawTransaction};
 use tonlibjson_client::ton::TonClient;
 use futures::StreamExt;
+use serial_test::serial;
 use tracing::debug;
 use tracing_test::traced_test;
 
 #[tokio::test]
 #[traced_test]
+#[serial]
 async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
     let client = TonClient::from_env().await?;
 
@@ -34,6 +36,7 @@ async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[traced_test]
+#[serial]
 async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result<()> {
     let client = TonClient::from_env().await?;
 
@@ -55,6 +58,7 @@ async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result
 
 #[tokio::test]
 #[traced_test]
+#[serial]
 async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
     let client = TonClient::from_env().await?;
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
@@ -70,6 +74,7 @@ async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[traced_test]
+#[serial]
 async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
     let client = TonClient::from_env().await?;
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
@@ -86,6 +91,7 @@ async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
 
 #[tokio::test]
 #[traced_test]
+#[serial]
 async fn get_block_tx_stream_unordered_correct() -> anyhow::Result<()> {
     let client = TonClient::from_env().await?;
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;

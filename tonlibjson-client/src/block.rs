@@ -805,11 +805,13 @@ mod tests {
         let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap();
         assert_eq!(0, tx_id.chain_id());
 
-        let tx_id = AccountAddress::new("-1:qweq").unwrap();
+        let tx_id = AccountAddress::new("-1:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18").unwrap();
         assert_eq!(-1, tx_id.chain_id());
 
-        let tx_id = AccountAddress::new("0:qweq").unwrap();
-        assert_eq!(0, tx_id.chain_id())
+        let tx_id = AccountAddress::new("0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18").unwrap();
+        assert_eq!(0, tx_id.chain_id());
+
+        assert!(AccountAddress::new("-1:0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18").is_err());
     }
 
     #[test]

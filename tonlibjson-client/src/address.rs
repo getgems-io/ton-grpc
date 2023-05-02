@@ -226,20 +226,6 @@ mod tests {
     }
 
     #[test]
-    fn account_address_serialize() {
-        let address = AccountAddressData::from_str("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap();
-
-        assert_eq!(serde_json::to_string(&address).unwrap(), "\"0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18\"")
-    }
-
-    #[test]
-    fn account_address_deserialize() {
-        let json = "\"0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18\"";
-        let address = serde_json::from_str::<AccountAddressData>(json).unwrap();
-        assert_eq!(AccountAddressData::from_str("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap(), address);
-    }
-
-    #[test]
     fn account_address_base64() {
         assert_eq!(AccountAddressData::from_str("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap().bounceable().to_flagged_string(), "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS");
         assert_eq!(AccountAddressData::from_str("EQB5HQfjevz9su4ZQGcDT_4IB0IUGh5PM2vAXPU2e4O6_d2j").unwrap().bounceable().to_flagged_string(), "EQB5HQfjevz9su4ZQGcDT_4IB0IUGh5PM2vAXPU2e4O6_d2j")

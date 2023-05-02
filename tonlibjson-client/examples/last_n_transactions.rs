@@ -29,7 +29,7 @@ async fn main() -> anyhow::Result<()> {
 
                                     tracing::info!(tx = ?tx);
 
-                                    let address = format!("{}:{}", block.workchain, tx.get_account_address().expect("must be valid"));
+                                    let address = tx.account.into_internal(block.workchain).to_string();
                                     match ton.get_account_state(&address).await {
                                         Ok(account) => tracing::info!("{}: {}", &address, account["balance"].as_str().unwrap()),
                                         Err(e) => tracing::error!("{:?}", e)
