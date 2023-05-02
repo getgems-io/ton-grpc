@@ -379,7 +379,6 @@ service Block {
   rpc GetShards (BlockId) returns (GetShardsResponse);
   rpc GetBlockTransactionIds (GetBlockTransactionIdsRequest) returns (stream TransactionId);
   rpc GetAccountAddresses (BlockId) returns (stream AccountAddress);
-//  rpc GetTransaction (TransactionId) returns (Transaction);
 }
 
 message SubscribeLastBlockRequest {}
