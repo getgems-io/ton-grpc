@@ -3,7 +3,7 @@ use std::collections::Bound;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
-use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, FutureExt};
+use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream};
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
@@ -14,7 +14,7 @@ use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tracing::{instrument, trace};
 use url::Url;
-use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
+use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
 use crate::balance::{Balance, BalanceRequest};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction};
 use crate::config::AppConfig;
@@ -288,7 +288,7 @@ impl TonClient {
         RawSendMessage::new(message.to_string()).call(&mut client).await
     }
 
-    pub fn get_block_tx_stream_unordered(&self, block: &BlockIdExt) -> impl TryStream<Ok=ShortTxId, Error=anyhow::Error> + 'static {
+    pub fn get_block_tx_stream_unordered(&self, block: &BlockIdExt) -> impl Stream<Item=anyhow::Result<ShortTxId>> + 'static {
         let lstream = self.get_block_tx_stream(&block, false).into_stream();
         let rstream = self.get_block_tx_stream(&block, true).into_stream();
 
@@ -339,7 +339,7 @@ impl TonClient {
         &self,
         block: &BlockIdExt,
         reverse: bool
-    ) -> impl TryStream<Ok = ShortTxId, Error = anyhow::Error> + 'static {
+    ) -> impl Stream<Item=anyhow::Result<ShortTxId>> + 'static {
         struct State {
             last_tx: Option<AccountTransactionId>,
             incomplete: bool,
@@ -354,7 +354,7 @@ impl TonClient {
                 incomplete: true,
                 block: block.clone(),
                 this: self.clone(),
-                exp: 4
+                exp: 5
             },
             move |state| {
                 async move {
@@ -590,7 +590,7 @@ impl TonClient {
             })
     }
 
-    pub fn get_accounts_in_block(&self, block: &BlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
+    pub fn get_accounts_in_block_stream(&self, block: &BlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
         let block = block.clone();
         let lstream = self.get_block_tx_stream(&block, false).into_stream();
         let rstream = self.get_block_tx_stream(&block, true).into_stream();

@@ -6,7 +6,8 @@ use derive_new::new;
 use tonlibjson_client::ton::TonClient;
 use crate::helpers::extend_block_id;
 use crate::ton::block_server::Block;
-use crate::ton::{BlockId, BlockIdExt, GetBlockTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, SubscribeLastBlockEvent, SubscribeLastBlockRequest, TransactionId};
+use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetBlockTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, SubscribeLastBlockEvent, SubscribeLastBlockRequest, TransactionId};
+use crate::ton::get_block_transaction_ids_request::Order;
 
 #[derive(new)]
 pub struct BlockService {
@@ -59,16 +60,37 @@ impl Block for BlockService {
     async fn get_block_transaction_ids(&self, request: Request<GetBlockTransactionIdsRequest>) -> Result<Response<Self::GetBlockTransactionIdsStream>, Status> {
         let msg = request.into_inner();
 
+        let order = msg.order();
         let block_id = msg.block_id.context("block id is required")
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let chain_id = block_id.workchain;
-
         let block_id = extend_block_id(&self.client, &block_id).await
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let stream = self.client.get_block_tx_stream(&block_id, false)
+        let stream = match order {
+            Order::Unordered => self.client.get_block_tx_stream_unordered(&block_id).boxed(),
+            Order::Asc => self.client.get_block_tx_stream(&block_id, false).boxed(),
+            Order::Desc => self.client.get_block_tx_stream(&block_id, true).boxed(),
+        };
+
+        let stream = stream
             .map_ok(move |t| { (chain_id, t).into() })
+            .map_err(|e| Status::internal(e.to_string()))
+            .boxed();
+
+        Ok(Response::new(stream))
+    }
+
+    type GetAccountAddressesStream = BoxStream<'static, Result<AccountAddress, Status>>;
+
+    async fn get_account_addresses(&self, request: Request<BlockId>) -> Result<Response<Self::GetAccountAddressesStream>, Status> {
+        let msg = request.into_inner();
+        let block_id = extend_block_id(&self.client, &msg).await
+            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
+
+        let stream = self.client.get_accounts_in_block_stream(&block_id)
+            .map_ok(|a| AccountAddress { address: a.to_string() })
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
 
