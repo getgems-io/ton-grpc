@@ -6,8 +6,8 @@ use derive_new::new;
 use tonlibjson_client::ton::TonClient;
 use crate::helpers::extend_block_id;
 use crate::ton::block_server::Block;
-use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetBlockTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, SubscribeLastBlockEvent, SubscribeLastBlockRequest, TransactionId};
-use crate::ton::get_block_transaction_ids_request::Order;
+use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, SubscribeLastBlockEvent, SubscribeLastBlockRequest, TransactionId};
+use crate::ton::get_transaction_ids_request::Order;
 
 #[derive(new)]
 pub struct BlockService {
@@ -55,9 +55,9 @@ impl Block for BlockService {
         }))
     }
 
-    type GetBlockTransactionIdsStream = BoxStream<'static, Result<TransactionId, Status>>;
+    type GetTransactionIdsStream = BoxStream<'static, Result<TransactionId, Status>>;
 
-    async fn get_block_transaction_ids(&self, request: Request<GetBlockTransactionIdsRequest>) -> Result<Response<Self::GetBlockTransactionIdsStream>, Status> {
+    async fn get_transaction_ids(&self, request: Request<GetTransactionIdsRequest>) -> Result<Response<Self::GetTransactionIdsStream>, Status> {
         let msg = request.into_inner();
 
         let order = msg.order();
