@@ -1,5 +1,5 @@
 use std::cmp::min;
-use std::collections::Bound;
+use std::collections::{Bound, HashMap};
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -7,6 +7,7 @@ use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream};
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
+use tokio_stream::StreamMap;
 use tower::Layer;
 use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
@@ -289,48 +290,29 @@ impl TonClient {
     }
 
     pub fn get_block_tx_stream_unordered(&self, block: &BlockIdExt) -> impl Stream<Item=anyhow::Result<ShortTxId>> + 'static {
-        let lstream = self.get_block_tx_stream(&block, false).into_stream();
-        let rstream = self.get_block_tx_stream(&block, true).into_stream();
+        #[derive(Eq, PartialEq, Hash, Clone)]
+        enum Side { Left, Right }
+        impl Side { fn opposite(&self) -> Self { match self {
+            Side::Left => Side::Right,
+            Side::Right => Side::Left,
+        }}}
+
+        let mut stream_map = StreamMap::with_capacity(2);
+        stream_map.insert(Side::Left, self.get_block_tx_stream(&block, false).boxed());
+        stream_map.insert(Side::Right, self.get_block_tx_stream(&block, true).boxed());
 
         async_stream::try_stream! {
-            tokio::pin!(lstream);
-            tokio::pin!(rstream);
+            let mut last = HashMap::with_capacity(2);
 
-            let mut last_ltx = None;
-            let mut last_rtx = None;
-
-            loop {
-                tokio::select! {
-                    Some(tx) = lstream.next() => {
-                        match tx {
-                            Err(e) => yield Err(e)?,
-                            Ok(tx) => {
-                                if let Some(ref rtx) = last_rtx {
-                                    if rtx == &tx {
-                                        return;
-                                    }
-                                }
-                                last_ltx.replace(tx.clone());
-                                yield tx
-                            }
-                        }
-                    },
-                    Some(tx) = rstream.next() => {
-                        match tx {
-                            Err(e) => yield Err(e)?,
-                            Ok(tx) => {
-                                if let Some(ref ltx) = last_ltx {
-                                    if ltx == &tx {
-                                        return;
-                                    }
-                                }
-                                last_rtx.replace(tx.clone());
-                                yield tx
-                            }
-                        }
-                    },
-                    else => return
+            while let Some((key, tx)) = stream_map.next().await {
+                let tx = tx?;
+                if let Some(prev_tx) = last.get(&key.opposite()) {
+                    if prev_tx == &tx {
+                        return;
+                    }
                 }
+                last.insert(key, tx.clone());
+                yield tx;
             }
         }
     }
