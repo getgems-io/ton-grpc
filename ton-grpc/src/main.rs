@@ -4,6 +4,7 @@ mod ton;
 mod account;
 mod helpers;
 mod block;
+mod message;
 
 use std::time::Duration;
 use tonic::transport::Server;

@@ -408,3 +408,15 @@ message GetTransactionIdsRequest {
 message AccountAddress {
   string address = 1;
 }
+
+service MessageService {
+  rpc SendMessage (SendRequest) returns (SendResponse);
+}
+
+message SendRequest {
+  string body = 1;
+}
+
+message SendResponse {
+  string hash = 1;
+}
