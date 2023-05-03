@@ -51,11 +51,11 @@ impl FromStr for AccountAddressData {
                 .replace('_', "/");
 
             let Ok(data) = base64::engine::general_purpose::STANDARD.decode(&s) else {
-                return Err(anyhow!("unexpected address format"))
+                return Err(anyhow!("invalid address: {}", &s))
             };
 
             let [_flags, workchain_id, data @ ..] = &data[..] else {
-                return Err(anyhow!("invalid base64 address: {}", &s))
+                return Err(anyhow!("invalid base64 address: {}", &s)
             };
 
             // 32 is length of address and 2 is length of crc16
