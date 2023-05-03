@@ -44,8 +44,16 @@ const MAIN_CHAIN: i32 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
+    #[cfg(not(feature = "testnet"))]
     pub async fn ready(&mut self) -> anyhow::Result<()> {
         self.get_block_header(0, MAIN_SHARD, 100).await?;
+
+        Ok(())
+    }
+
+    #[cfg(feature = "testnet")]
+    pub async fn ready(&mut self) -> anyhow::Result<()> {
+        self.get_masterchain_info().await?;
 
         Ok(())
     }
