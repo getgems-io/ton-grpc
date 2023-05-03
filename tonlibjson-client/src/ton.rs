@@ -21,6 +21,7 @@ use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, Maste
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
+use crate::helper::Side;
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::request::Callable;
@@ -290,21 +291,15 @@ impl TonClient {
     }
 
     pub fn get_block_tx_stream_unordered(&self, block: &BlockIdExt) -> impl Stream<Item=anyhow::Result<ShortTxId>> + 'static {
-        #[derive(Eq, PartialEq, Hash, Clone)]
-        enum Side { Left, Right }
-        impl Side { fn opposite(&self) -> Self { match self {
-            Side::Left => Side::Right,
-            Side::Right => Side::Left,
-        }}}
-
-        let mut stream_map = StreamMap::with_capacity(2);
-        stream_map.insert(Side::Left, self.get_block_tx_stream(&block, false).boxed());
-        stream_map.insert(Side::Right, self.get_block_tx_stream(&block, true).boxed());
+        let streams = Side::values().map(move |side| {
+            (side, self.get_block_tx_stream(&block, side.is_right()).boxed())
+        });
+        let stream_map = StreamMap::from_iter(streams);
 
         async_stream::try_stream! {
             let mut last = HashMap::with_capacity(2);
 
-            while let Some((key, tx)) = stream_map.next().await {
+            for await (key, tx) in stream_map {
                 let tx = tx?;
                 if let Some(prev_tx) = last.get(&key.opposite()) {
                     if prev_tx == &tx {
@@ -573,67 +568,32 @@ impl TonClient {
     }
 
     pub fn get_accounts_in_block_stream(&self, block: &BlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
-        let block = block.clone();
-        let lstream = self.get_block_tx_stream(&block, false).into_stream();
-        let rstream = self.get_block_tx_stream(&block, true).into_stream();
+        let chain = block.workchain;
+        let streams = Side::values().map(move |side| {
+            (side, self.get_block_tx_stream(&block, side.is_right()).boxed())
+        });
+        let stream_map = StreamMap::from_iter(streams);
 
         let stream = async_stream::try_stream! {
-            tokio::pin!(lstream);
-            tokio::pin!(rstream);
+            let mut last = HashMap::with_capacity(2);
 
-            let mut last_laddr: Option<ShardContextAccountAddress> = None;
-            let mut last_raddr: Option<ShardContextAccountAddress> = None;
+            for await (key, tx) in stream_map {
+                let tx = tx?;
 
-            loop {
-                tokio::select! {
-                    Some(tx) = lstream.next() => {
-                        match tx {
-                            Err(e) => yield Err(e)?,
-                            Ok(tx) => {
-                                if let Some(ref raddr) = last_raddr {
-                                    if raddr == &tx.account {
-                                        return;
-                                    }
-                                }
-
-                                if let Some(ref laddr) = last_laddr {
-                                    if laddr == &tx.account {
-                                        continue;
-                                    }
-                                }
-
-                                last_laddr.replace(tx.account.clone());
-                                yield tx.account.clone();
-                            }
-                        }
-                    },
-                    Some(tx) = rstream.next() => {
-                        match tx {
-                            Err(e) => yield Err(e)?,
-                            Ok(tx) => {
-                                if let Some(ref laddr) = last_laddr {
-                                    if laddr == &tx.account {
-                                        return;
-                                    }
-                                }
-
-                                if let Some(ref raddr) = last_raddr {
-                                    if raddr == &tx.account {
-                                        continue;
-                                    }
-                                }
-
-                                last_raddr.replace(tx.account.clone());
-                                yield tx.account.clone();
-                            }
-                        }
-                    },
-                    else => return
+                if let Some(addr) = last.get(&key.opposite()) {
+                    if addr == &tx.account { return }
                 }
+
+                if let Some(addr) = last.get(&key) {
+                    if addr == &tx.account { continue }
+                }
+
+                last.insert(key, tx.account.clone());
+                yield tx.account;
             }
         };
 
-        stream.map_ok(move |a: ShardContextAccountAddress| a.into_internal(block.workchain))
+        stream.map_ok(move |a: ShardContextAccountAddress| a.into_internal(chain))
     }
 
     async fn find_first_tx(&self, account: &str) -> anyhow::Result<InternalTransactionId> {
