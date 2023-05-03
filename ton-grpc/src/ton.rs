@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use serde::Deserialize;
 use tonlibjson_client::address::AccountAddressData;
 use tonlibjson_client::block;
-use tonlibjson_client::block::RawMessage;
+use tonlibjson_client::block::{RawMessage, ShortTxId};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;
 
@@ -49,6 +49,18 @@ impl From<BlockIdExt> for block::BlockIdExt {
             seqno: value.seqno,
             root_hash: value.root_hash,
             file_hash: value.file_hash,
+        }
+    }
+}
+
+impl From<(i32, block::ShortTxId)> for TransactionId {
+    fn from((chain_id, value): (i32, ShortTxId)) -> Self {
+        let address = value.account.into_internal(chain_id).to_string();
+
+        Self {
+            account_address: address,
+            lt: value.lt,
+            hash: value.hash
         }
     }
 }

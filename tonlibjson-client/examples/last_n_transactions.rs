@@ -1,4 +1,3 @@
-use base64::Engine;
 use futures::{stream, StreamExt};
 use tokio::time::Instant;
 use tonlibjson_client::ton::TonClient;
@@ -20,14 +19,17 @@ async fn main() -> anyhow::Result<()> {
                 match ton.get_shards(seqno).await {
                     Ok(shards) => {
                         if let Some(block) = shards.shards.first() {
-                            ton.get_tx_stream(block.clone()).await
+                            ton.get_block_tx_stream(&block, false)
                                 .for_each_concurrent(10, |tx| async {
                                     let Ok(tx) = tx else {
                                         tracing::error!("{:?}", tx.unwrap_err());
 
                                         return
                                     };
-                                    let address = format!("{}:{}", block.workchain, base64_to_hex(&tx.account).unwrap());
+
+                                    tracing::info!(tx = ?tx);
+
+                                    let address = tx.account.into_internal(block.workchain).to_string();
                                     match ton.get_account_state(&address).await {
                                         Ok(account) => tracing::info!("{}: {}", &address, account["balance"].as_str().unwrap()),
                                         Err(e) => tracing::error!("{:?}", e)
@@ -47,12 +49,4 @@ async fn main() -> anyhow::Result<()> {
     println!("Time: {:?}", timing);
 
     Ok(())
-}
-
-
-fn base64_to_hex(b: &str) -> anyhow::Result<String> {
-    let bytes = base64::engine::general_purpose::STANDARD.decode(b)?;
-    let hex = hex::encode(bytes);
-
-    Ok(hex)
 }

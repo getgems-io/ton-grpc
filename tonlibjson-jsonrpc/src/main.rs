@@ -15,7 +15,7 @@ use tracing::debug;
 use tonlibjson_client::ton::TonClient;
 use tonlibjson_client::block::{InternalTransactionId, RawTransaction, ShortTxId, SmcStack};
 use crate::params::{RunGetMethodParams, Stack};
-use crate::view::{AddressInformationView, BlockHeaderView, BlockIdExtView, MasterchainInfoView, ShardsView, TransactionView};
+use crate::view::{AddressInformationView, BlockHeaderView, BlockIdExtView, MasterchainInfoView, ShardsView, ShortTxIdView, TransactionView};
 
 #[derive(Deserialize, Debug)]
 struct LookupBlockParams {
@@ -207,22 +207,14 @@ impl RpcServer {
             .look_up_block_by_seqno(params.workchain, shard, params.seqno)
             .await?;
 
-        let stream = self.client.get_tx_stream(block.clone()).await;
+        let stream = self.client.get_block_tx_stream(&block, false);
         let txs: Vec<ShortTxId> = stream.try_collect().await?;
 
-        let txs: Vec<ShortTxId> = txs.into_iter()
+        let txs: Vec<ShortTxIdView> = txs.into_iter()
             .map(|tx: ShortTxId| {
-                let address = if tx.account.len() != 64 {
-                    let hex = base64_to_hex(&tx.account);
-                    if hex.is_err() {
-                        tracing::error!("unexpected account format: {}", &tx.account);
-                    }
-                    hex.unwrap()
-                } else {
-                    tx.account
-                };
+                let address = tx.account.to_string();
 
-                ShortTxId {
+                ShortTxIdView {
                     account: format!("{}:{}", block.workchain, address),
                     hash: tx.hash,
                     lt: tx.lt,
@@ -370,13 +362,6 @@ async fn main() -> anyhow::Result<()> {
         .unwrap();
 
     Ok(())
-}
-
-fn base64_to_hex(b: &str) -> anyhow::Result<String> {
-    let bytes = base64.decode(b)?;
-    let hex = hex::encode(bytes);
-
-    Ok(hex)
 }
 
 fn hex_to_base64(b: &str) -> anyhow::Result<String> {

@@ -5,7 +5,7 @@ use std::str::FromStr;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
-use crate::address::AccountAddressData;
+use crate::address::{AccountAddressData, ShardContextAccountAddress};
 use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
 use crate::balance::{BlockCriteria, Route};
 use crate::request::{Requestable, RequestBody, Routable};
@@ -122,13 +122,22 @@ impl From<BlockHeader> for BlockId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.shortTxId")]
 pub struct ShortTxId {
-    pub account: String,
+    pub account: ShardContextAccountAddress,
     pub hash: String,
-    pub lt: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub lt: i64,
     pub mode: u8,
+}
+
+impl PartialEq for ShortTxId {
+    fn eq(&self, other: &Self) -> bool {
+        self.account == other.account
+        && self.hash == other.hash
+        && self.lt == other.lt
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
@@ -456,16 +465,44 @@ pub struct BlocksShards {
     pub shards: Vec<BlockIdExt>,
 }
 
-#[derive(new, Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type")]
 #[serde(rename = "blocks.getTransactions")]
 pub struct BlocksGetTransactions {
     id: BlockIdExt,
-    #[new(value = "135")]
     mode: i32,
-    #[new(value = "30")]
     count: i32,
     after: AccountTransactionId
+}
+
+impl BlocksGetTransactions {
+    pub fn unverified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool, count: i32) -> Self {
+        let count = if count > 256 { 256 } else { count };
+        let mode = 1 + 2 + 4
+            + if after.is_some() { 128 } else { 0 }
+            + if reverse { 64 } else { 0 };
+
+        Self {
+            id: block_id,
+            mode,
+            count,
+            after: after.unwrap_or_default(),
+        }
+    }
+
+    pub fn verified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool, count: i32) -> Self {
+        let count = if count > 256 { 256 } else { count };
+        let mode = 32 + 1 + 2 + 4
+            + if after.is_some() { 128 } else { 0 }
+            + if reverse { 64 } else { 0 };
+
+        Self {
+            id: block_id,
+            mode,
+            count,
+            after: after.unwrap_or_default(),
+        }
+    }
 }
 
 impl Requestable for BlocksGetTransactions {
@@ -482,7 +519,7 @@ impl Routable for BlocksGetTransactions {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Deserialize)]
 pub struct BlocksTransactions {
     pub id: BlockIdExt,
     pub incomplete: bool,
@@ -494,15 +531,15 @@ pub struct BlocksTransactions {
 #[serde(tag = "@type", rename = "blocks.accountTransactionId")]
 pub struct AccountTransactionId {
     pub account: String,
-    #[serde(skip_serializing_if = "String::is_empty")]
-    pub lt: String,
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    pub lt: i64,
 }
 
 impl Default for AccountTransactionId {
     fn default() -> Self {
         Self {
             account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
-            lt: "".to_string(),
+            lt: 0,
         }
     }
 }
@@ -510,8 +547,8 @@ impl Default for AccountTransactionId {
 impl From<&ShortTxId> for AccountTransactionId {
     fn from(v: &ShortTxId) -> Self {
         AccountTransactionId {
-            account: v.account.clone(),
-            lt: v.lt.clone(),
+            account: v.account.to_string(),
+            lt: v.lt,
         }
     }
 }
@@ -768,11 +805,13 @@ mod tests {
         let tx_id = AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap();
         assert_eq!(0, tx_id.chain_id());
 
-        let tx_id = AccountAddress::new("-1:qweq").unwrap();
+        let tx_id = AccountAddress::new("-1:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18").unwrap();
         assert_eq!(-1, tx_id.chain_id());
 
-        let tx_id = AccountAddress::new("0:qweq").unwrap();
-        assert_eq!(0, tx_id.chain_id())
+        let tx_id = AccountAddress::new("0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18").unwrap();
+        assert_eq!(0, tx_id.chain_id());
+
+        assert!(AccountAddress::new("-1:0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18").is_err());
     }
 
     #[test]

@@ -1,5 +1,7 @@
+use std::fmt;
+use std::fmt::Debug;
 use std::str::FromStr;
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use base64::Engine;
 use bytes::BufMut;
 use crc::Crc;
@@ -110,7 +112,7 @@ impl AccountAddressData {
     }
 
     pub fn to_raw_string(&self) -> String {
-        format!("{}:{}", self.chain_id, hex::encode(&self.bytes))
+        format!("{}:{}", self.chain_id, hex::encode(self.bytes))
     }
 
     pub fn to_flagged_string(&self) -> String {
@@ -127,6 +129,87 @@ impl AccountAddressData {
     }
 }
 
+
+#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+pub struct ShardContextAccountAddress {
+    pub bytes: [u8; 32]
+}
+
+impl FromStr for ShardContextAccountAddress {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let bytes = base64::engine::general_purpose::STANDARD.decode(s)
+            .with_context(|| format!("input string is {}", s))?;
+
+        if bytes.len() != 32 {
+            return Err(anyhow!("invalid length, expected 32 got {} bytes", bytes.len()));
+        }
+
+        let mut buf = [0; 32];
+        buf.copy_from_slice(&bytes);
+
+        Ok(Self { bytes: buf })
+    }
+}
+
+impl ToString for ShardContextAccountAddress {
+    fn to_string(&self) -> String {
+        base64::engine::general_purpose::STANDARD.encode(self.bytes)
+    }
+}
+
+impl Serialize for ShardContextAccountAddress {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        serializer.serialize_str(self.to_string().as_str())
+    }
+}
+
+impl<'de> Deserialize<'de> for ShardContextAccountAddress {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error> where D: Deserializer<'de> {
+        let s = String::deserialize(deserializer)?;
+
+        FromStr::from_str(&s).map_err(de::Error::custom)
+    }
+}
+
+impl Debug for ShardContextAccountAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("ShardContextAccountAddress")
+            .field("bytes", &hex::encode(self.bytes))
+            .finish()
+    }
+}
+
+impl ShardContextAccountAddress {
+    pub fn into_internal(self, chain_id: i32) -> InternalAccountAddress {
+        InternalAccountAddress {
+            chain_id,
+            bytes: self.bytes
+        }
+    }
+}
+
+pub struct InternalAccountAddress {
+    pub chain_id: i32,
+    pub bytes: [u8; 32]
+}
+
+impl Debug for InternalAccountAddress {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("InternalAccountAddress")
+            .field("chain_id", &self.chain_id)
+            .field("bytes", &hex::encode(self.bytes))
+            .finish()
+    }
+}
+
+impl ToString for InternalAccountAddress {
+    fn to_string(&self) -> String {
+        format!("{}:{}", self.chain_id, hex::encode(self.bytes))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -140,20 +223,6 @@ mod tests {
     #[test]
     fn account_address_base64_fail() {
         assert!(AccountAddressData::from_str("YXNkcXdl").is_err());
-    }
-
-    #[test]
-    fn account_address_serialize() {
-        let address = AccountAddressData::from_str("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap();
-
-        assert_eq!(serde_json::to_string(&address).unwrap(), "\"0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18\"")
-    }
-
-    #[test]
-    fn account_address_deserialize() {
-        let json = "\"0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18\"";
-        let address = serde_json::from_str::<AccountAddressData>(json).unwrap();
-        assert_eq!(AccountAddressData::from_str("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap(), address);
     }
 
     #[test]

@@ -377,6 +377,8 @@ service Block {
   rpc GetLastBlock (GetLastBlockRequest) returns (BlockIdExt);
   rpc GetBlock (BlockId) returns (BlockIdExt);
   rpc GetShards (BlockId) returns (GetShardsResponse);
+  rpc GetTransactionIds (GetTransactionIdsRequest) returns (stream TransactionId);
+  rpc GetAccountAddresses (BlockId) returns (stream AccountAddress);
 }
 
 message SubscribeLastBlockRequest {}
@@ -390,4 +392,19 @@ message GetLastBlockRequest {}
 
 message GetShardsResponse {
   repeated BlockIdExt shards = 1;
+}
+
+message GetTransactionIdsRequest {
+  enum Order {
+    UNORDERED = 0;
+    ASC = 1;
+    DESC = 2;
+  }
+
+  BlockId block_id = 1;
+  Order order = 2;
+}
+
+message AccountAddress {
+  string address = 1;
 }
