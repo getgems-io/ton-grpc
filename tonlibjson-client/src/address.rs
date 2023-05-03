@@ -112,7 +112,7 @@ impl AccountAddressData {
     }
 
     pub fn to_raw_string(&self) -> String {
-        format!("{}:{}", self.chain_id, hex::encode(&self.bytes))
+        format!("{}:{}", self.chain_id, hex::encode(self.bytes))
     }
 
     pub fn to_flagged_string(&self) -> String {
@@ -155,7 +155,7 @@ impl FromStr for ShardContextAccountAddress {
 
 impl ToString for ShardContextAccountAddress {
     fn to_string(&self) -> String {
-        base64::engine::general_purpose::STANDARD.encode(&self.bytes)
+        base64::engine::general_purpose::STANDARD.encode(self.bytes)
     }
 }
 
@@ -176,7 +176,7 @@ impl<'de> Deserialize<'de> for ShardContextAccountAddress {
 impl Debug for ShardContextAccountAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("ShardContextAccountAddress")
-            .field("bytes", &hex::encode(&self.bytes))
+            .field("bytes", &hex::encode(self.bytes))
             .finish()
     }
 }
@@ -199,14 +199,14 @@ impl Debug for InternalAccountAddress {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("InternalAccountAddress")
             .field("chain_id", &self.chain_id)
-            .field("bytes", &hex::encode(&self.bytes))
+            .field("bytes", &hex::encode(self.bytes))
             .finish()
     }
 }
 
 impl ToString for InternalAccountAddress {
     fn to_string(&self) -> String {
-        format!("{}:{}", self.chain_id, hex::encode(&self.bytes))
+        format!("{}:{}", self.chain_id, hex::encode(self.bytes))
     }
 }
 

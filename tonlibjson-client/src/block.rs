@@ -548,7 +548,7 @@ impl From<&ShortTxId> for AccountTransactionId {
     fn from(v: &ShortTxId) -> Self {
         AccountTransactionId {
             account: v.account.to_string(),
-            lt: v.lt.clone(),
+            lt: v.lt,
         }
     }
 }
