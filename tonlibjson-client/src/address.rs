@@ -55,7 +55,7 @@ impl FromStr for AccountAddressData {
             };
 
             let [_flags, workchain_id, data @ ..] = &data[..] else {
-                return Err(anyhow!("invalid base64 address: {}", &s)
+                return Err(anyhow!("invalid base64 address: {}", &s));
             };
 
             // 32 is length of address and 2 is length of crc16
