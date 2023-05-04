@@ -570,10 +570,32 @@ impl Requestable for RawSendMessage {
 
 impl Routable for RawSendMessage {
     fn route(&self) -> Route {
-        Route::Any
+        Route::Latest { chain: -1 }
     }
 }
 
+#[derive(new, Debug, Serialize, Deserialize, Clone)]
+#[serde(tag = "@type", rename = "raw.sendMessageReturnHash")]
+pub struct RawSendMessageReturnHash {
+    pub body: String,
+}
+
+impl Requestable for RawSendMessageReturnHash {
+    type Response = RawExtMessageInfo;
+
+    fn into_request_body(self) -> RequestBody {
+        RequestBody::RawSendMessageReturnHash(self)
+    }
+}
+
+impl Routable for RawSendMessageReturnHash {
+    fn route(&self) -> Route { Route::Latest { chain: -1 } }
+}
+
+#[derive(Deserialize)]
+pub struct RawExtMessageInfo {
+    pub hash: String
+}
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "smc.load")]

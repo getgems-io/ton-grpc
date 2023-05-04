@@ -3,7 +3,7 @@ use std::collections::{Bound, HashMap};
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
-use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream};
+use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, TryFutureExt};
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
@@ -17,7 +17,7 @@ use tracing::{instrument, trace};
 use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
 use crate::balance::{Balance, BalanceRequest};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::{ErrorLayer, ErrorService};
@@ -296,6 +296,15 @@ impl TonClient {
         let mut client = self.client.clone();
 
         RawSendMessage::new(message.to_string()).call(&mut client).await
+    }
+
+    pub async fn send_message_returning_hash(&self, message: &str) -> anyhow::Result<String> {
+        let mut client = self.client.clone();
+
+        RawSendMessageReturnHash::new(message.to_string())
+            .call(&mut client)
+            .map_ok(|r| r.hash)
+            .await
     }
 
     pub fn get_block_tx_stream_unordered(&self, block: &BlockIdExt) -> impl Stream<Item=anyhow::Result<ShortTxId>> + 'static {
