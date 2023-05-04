@@ -7,7 +7,7 @@ use futures::{Stream, StreamExt, try_join, TryStreamExt};
 use derive_new::new;
 use tonlibjson_client::address::AccountAddressData;
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
-use crate::ton::account_server::Account;
+use crate::ton::account_service_server::AccountService as BaseAccountService;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::{get_account_state_request, get_shard_account_cell_request};
@@ -19,7 +19,7 @@ pub struct AccountService {
 }
 
 #[async_trait]
-impl Account for AccountService {
+impl BaseAccountService for AccountService {
     #[tracing::instrument(skip_all, err)]
     async fn get_account_state(&self, request: Request<GetAccountStateRequest>) -> std::result::Result<Response<GetAccountStateResponse>, Status> {
         let msg = request.into_inner();

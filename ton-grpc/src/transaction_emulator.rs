@@ -5,7 +5,7 @@ use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error, span};
 use anyhow::anyhow;
 use tracing::Level;
-use crate::ton::transaction_emulator_server::TransactionEmulator;
+use crate::ton::transaction_emulator_service_server::TransactionEmulatorService as BaseTransactionEmulatorService;
 use crate::ton::{TransactionEmulatorEmulateRequest, TransactionEmulatorEmulateResponse, TransactionEmulatorPrepareRequest, TransactionEmulatorPrepareResponse, TransactionEmulatorRequest, TransactionEmulatorResponse, TransactionEmulatorSetConfigRequest, TransactionEmulatorSetConfigResponse, TransactionEmulatorSetIgnoreChksigRequest, TransactionEmulatorSetIgnoreChksigResponse, TransactionEmulatorSetLibsRequest, TransactionEmulatorSetLibsResponse, TransactionEmulatorSetLtRequest, TransactionEmulatorSetLtResponse, TransactionEmulatorSetRandSeedRequest, TransactionEmulatorSetRandSeedResponse, TransactionEmulatorSetUnixtimeRequest, TransactionEmulatorSetUnixtimeResponse, TvmResult};
 use crate::ton::transaction_emulator_request::Request::*;
 use crate::ton::transaction_emulator_response::Response::*;
@@ -19,7 +19,7 @@ struct State {
 }
 
 #[async_trait]
-impl TransactionEmulator for TransactionEmulatorService {
+impl BaseTransactionEmulatorService for TransactionEmulatorService {
     type ProcessStream = Pin<Box<dyn Stream<Item=Result<TransactionEmulatorResponse, Status>> + Send>>;
 
     async fn process(&self, request: Request<Streaming<TransactionEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
