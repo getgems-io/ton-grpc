@@ -581,10 +581,10 @@ pub struct RawSendMessageReturnHash {
 }
 
 impl Requestable for RawSendMessageReturnHash {
-    type Response = Value;
+    type Response = RawExtMessageInfo;
 
     fn into_request_body(self) -> RequestBody {
-        RequestBody::RawSendMessage(self)
+        RequestBody::RawSendMessageReturnHash(self)
     }
 }
 
@@ -596,7 +596,6 @@ impl Routable for RawSendMessageReturnHash {
 pub struct RawExtMessageInfo {
     pub hash: String
 }
-
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "smc.load")]
