@@ -13,10 +13,12 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tonlibjson_client::ton::TonClient;
 use crate::account::AccountService;
 use crate::block::BlockService;
-use crate::ton::account_server::AccountServer;
-use crate::ton::block_server::BlockServer;
-use crate::ton::transaction_emulator_server::TransactionEmulatorServer;
-use crate::ton::tvm_emulator_server::TvmEmulatorServer;
+use crate::message::MessageService;
+use crate::ton::account_service_server::AccountServiceServer;
+use crate::ton::block_service_server::BlockServiceServer;
+use crate::ton::message_service_server::MessageServiceServer;
+use crate::ton::transaction_emulator_service_server::TransactionEmulatorServiceServer;
+use crate::ton::tvm_emulator_service_server::TvmEmulatorServiceServer;
 use crate::transaction_emulator::TransactionEmulatorService;
 use crate::tvm_emulator::TvmEmulatorService;
 
@@ -44,23 +46,21 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Ton Client is ready");
 
-    let tvm_emulator_service = TvmEmulatorServer::new(TvmEmulatorService::default());
-    let transaction_emulator_service = TransactionEmulatorServer::new(TransactionEmulatorService::default());
-    let account_service = AccountServer::new(AccountService::new(client.clone()));
-    let block_service = BlockServer::new(BlockService::new(client));
-
-    let (mut health_reporter, health_service) = tonic_health::server::health_reporter();
-    health_reporter.set_serving::<TvmEmulatorServer<TvmEmulatorService>>().await;
+    let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default());
+    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default());
+    let account_service = AccountServiceServer::new(AccountService::new(client.clone()));
+    let block_service = BlockServiceServer::new(BlockService::new(client.clone()));
+    let message_service = MessageServiceServer::new(MessageService::new(client));
 
     Server::builder()
         .tcp_keepalive(Some(Duration::from_secs(120)))
         .http2_keepalive_interval(Some(Duration::from_secs(90)))
-        .add_service(health_service)
         .add_service(reflection)
         .add_service(tvm_emulator_service)
         .add_service(transaction_emulator_service)
         .add_service(account_service)
         .add_service(block_service)
+        .add_service(message_service)
         .serve_with_shutdown(addr, async move { tokio::signal::ctrl_c().await.unwrap(); })
         .await?;
 

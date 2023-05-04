@@ -6,7 +6,7 @@ use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error, Level, span};
 use crate::ton::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::ton::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
-use crate::ton::tvm_emulator_server::TvmEmulator;
+use crate::ton::tvm_emulator_service_server::TvmEmulatorService as BaseTvmEmulatorService;
 use crate::ton::{TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetC7Request, TvmEmulatorSetC7Response, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse, TvmResult};
 
 #[derive(Debug, Default)]
@@ -17,7 +17,7 @@ struct State {
 }
 
 #[async_trait]
-impl TvmEmulator for TvmEmulatorService {
+impl BaseTvmEmulatorService for TvmEmulatorService {
     type ProcessStream = Pin<Box<dyn Stream<Item=Result<TvmEmulatorResponse, Status>> + Send>>;
 
     async fn process(&self, request: Request<Streaming<TvmEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {

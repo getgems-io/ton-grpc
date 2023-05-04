@@ -1,8 +1,10 @@
 use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
+use derive_new::new;
 use crate::ton::message_service_server::MessageService as BaseMessageService;
 use crate::ton::{SendRequest, SendResponse};
 
+#[derive(new)]
 pub struct MessageService {
     client: TonClient
 }

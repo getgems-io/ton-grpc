@@ -91,9 +91,11 @@ impl Service<Request> for Client {
         let (tx, rx) = tokio::sync::oneshot::channel::<Response>();
         requests.insert(req.id, tx);
 
-        let _ = self.client.send(&query);
+        let sent = self.client.send(&query);
 
         Box::pin(async move {
+            sent?;
+
             let result = tokio::time::timeout(req.timeout, rx).await;
             requests.remove(&req.id);
 

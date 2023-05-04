@@ -5,7 +5,7 @@ use tonic::{async_trait, Request, Response, Status};
 use derive_new::new;
 use tonlibjson_client::ton::TonClient;
 use crate::helpers::extend_block_id;
-use crate::ton::block_server::Block;
+use crate::ton::block_service_server::BlockService as BaseBlockService;
 use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, SubscribeLastBlockEvent, SubscribeLastBlockRequest, TransactionId};
 use crate::ton::get_transaction_ids_request::Order;
 
@@ -15,7 +15,7 @@ pub struct BlockService {
 }
 
 #[async_trait]
-impl Block for BlockService {
+impl BaseBlockService for BlockService {
     type SubscribeLastBlockStream = BoxStream<'static, Result<SubscribeLastBlockEvent, Status>>;
 
     async fn subscribe_last_block(&self, _: Request<SubscribeLastBlockRequest>) -> Result<Response<Self::SubscribeLastBlockStream>, Status> {

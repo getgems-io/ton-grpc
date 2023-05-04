@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package ton;
 
-service TvmEmulator {
+service TvmEmulatorService {
   rpc Process(stream TvmEmulatorRequest) returns (stream TvmEmulatorResponse);
 }
 
@@ -114,7 +114,7 @@ message TvmEmulatorSetC7Response {
   bool success = 1;
 }
 
-service TransactionEmulator {
+service TransactionEmulatorService {
   rpc Process(stream TransactionEmulatorRequest) returns (stream TransactionEmulatorResponse);
 }
 
@@ -217,7 +217,7 @@ message TransactionEmulatorSetLibsResponse {
 }
 
 
-service Account {
+service AccountService {
   rpc GetAccountState (GetAccountStateRequest) returns (GetAccountStateResponse);
   rpc GetShardAccountCell (GetShardAccountCellRequest) returns (GetShardAccountCellResponse);
   rpc GetAccountTransactions (GetAccountTransactionsRequest) returns (stream Transaction);
@@ -372,7 +372,7 @@ message TvmCell {
   string bytes = 1;
 }
 
-service Block {
+service BlockService {
   rpc SubscribeLastBlock (SubscribeLastBlockRequest) returns (stream SubscribeLastBlockEvent);
   rpc GetLastBlock (GetLastBlockRequest) returns (BlockIdExt);
   rpc GetBlock (BlockId) returns (BlockIdExt);
