@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service, ServiceExt};
 use crate::balance::{BalanceRequest, Route};
-use crate::block::{BlocksGetBlockHeader, BlocksGetShards, BlocksGetTransactions, BlocksLookupBlock, GetAccountState, GetMasterchainInfo, GetShardAccountCell, GetShardAccountCellByTransaction, RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage, RawSendMessageReturnHash, SmcLoad, SmcRunGetMethod, Sync};
+use crate::block::{BlocksGetBlockHeader, BlocksGetShards, BlocksGetTransactions, BlocksLookupBlock, GetAccountState, GetMasterchainInfo, GetShardAccountCell, GetShardAccountCellByTransaction, RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage, RawSendMessageReturnHash, SmcLoad, SmcRunGetMethod, Sync, TonError};
 use crate::session::SessionRequest;
 
 #[async_trait]
@@ -161,12 +161,19 @@ pub struct Request {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(untagged)]
+pub enum DataOrError {
+    Error(TonError),
+    Data(Value)
+}
+
+#[derive(Deserialize, Debug)]
 pub struct Response {
     #[serde(rename="@extra")]
     pub id: RequestId,
 
     #[serde(flatten)]
-    pub data: Value
+    pub body: DataOrError
 }
 
 impl Request {
