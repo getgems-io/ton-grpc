@@ -18,8 +18,16 @@ impl<S> Layer<S> for ErrorLayer {
 }
 
 #[derive(Clone)]
-pub struct ErrorService<S> where {
+pub struct ErrorService<S> {
     inner: S
+}
+
+impl<S> ErrorService<S> {
+    pub fn new(inner: S) -> Self {
+        ErrorService {
+            inner
+        }
+    }
 }
 
 impl<S, Req> Service<Req> for ErrorService<S> where

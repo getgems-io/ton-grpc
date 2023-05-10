@@ -1,5 +1,9 @@
-use std::sync::{Arc, RwLock};
+use std::future::Future;
+use std::pin::Pin;
+use std::sync::{Arc};
 use std::task::{Context, Poll};
+use futures::FutureExt;
+use tokio::sync::RwLock;
 use tower::{Layer, Service};
 use tower::load::Load;
 
@@ -33,10 +37,13 @@ impl<S> SharedService<S> {
 }
 
 impl<S, Req> Service<Req> for SharedService<S>
-    where S : Service<Req> {
+    where S : Service<Req> + Sync + Send + 'static,
+          S::Future : Send,
+          Req: Send + 'static,
+{
     type Response = S::Response;
     type Error = S::Error;
-    type Future = S::Future;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.inner.try_write() {
@@ -52,7 +59,11 @@ impl<S, Req> Service<Req> for SharedService<S>
     }
 
     fn call(&mut self, req: Req) -> Self::Future {
-        self.inner.write().expect("call ready first").call(req)
+        let inner = self.inner.clone();
+
+        async move {
+            inner.write().await.call(req).await
+        }.boxed()
     }
 }
 
@@ -60,6 +71,10 @@ impl<S> Load for SharedService<S> where S : Load {
     type Metric = S::Metric;
 
     fn load(&self) -> Self::Metric {
-        self.inner.read().unwrap().load()
+        tokio::task::block_in_place(|| {
+            let svc = self.inner.blocking_read();
+
+            svc.load()
+        })
     }
 }

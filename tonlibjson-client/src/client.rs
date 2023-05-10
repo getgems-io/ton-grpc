@@ -1,3 +1,5 @@
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -9,6 +11,8 @@ use tokio_tower::multiplex::TagStore;
 use tower::Service;
 use crate::request::{DataOrError, Request, RequestId, Response};
 use futures::FutureExt;
+use pin_project_lite::pin_project;
+use tokio::time::Sleep;
 
 #[derive(Default)]
 struct Transport { inner: tonlibjson_sys::Client }
@@ -63,8 +67,33 @@ impl TagStore<Request, Response> for Transport {
     fn finish_tag(self: Pin<&mut Self>, r: &Response) -> Self::Tag { r.id }
 }
 
+#[derive(Debug)]
+struct Error {
+    inner: anyhow::Error
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        std::fmt::Display::fmt(&self.inner, f)
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<tokio_tower::Error<Transport, Request>> for Error{
+    fn from(value: tokio_tower::Error<Transport, Request>) -> Self {
+        Self { inner: anyhow!(value) }
+    }
+}
+
+impl From<anyhow::Error> for Error{
+    fn from(value: anyhow::Error) -> Self {
+        Self { inner: value }
+    }
+}
+
 pub struct Client {
-    inner: tokio_tower::multiplex::Client<Transport, tokio_tower::Error<Transport, Request>, Request>
+    inner: tokio_tower::multiplex::Client<Transport, Error, Request>
 }
 
 impl Client {
@@ -83,7 +112,9 @@ impl Service<Request> for Client {
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
-        self.inner.call(req)
+        let timeout = req.timeout;
+
+        let response = self.inner.call(req)
             .map(|response| {
                 match response {
                     Ok(response) => match response.body {
@@ -93,6 +124,49 @@ impl Service<Request> for Client {
                     Err(e) => Err(anyhow!(e))
                 }
             })
-            .boxed()
+            .boxed();
+
+        let sleep = tokio::time::sleep(timeout);
+
+        ResponseFuture::new(response, sleep).boxed()
+    }
+}
+
+
+pin_project! {
+    #[derive(Debug)]
+    struct ResponseFuture<T> {
+        #[pin]
+        response: T,
+        #[pin]
+        sleep: Sleep,
+    }
+}
+
+impl<T> ResponseFuture<T> {
+    fn new(response: T, sleep: Sleep) -> Self {
+        ResponseFuture { response, sleep }
+    }
+}
+
+impl<F, T, E> Future for ResponseFuture<F>
+    where
+        F: Future<Output = Result<T, E>>,
+        E: Into<tower::BoxError>,
+{
+    type Output = Result<T, anyhow::Error>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.project();
+
+        match this.response.poll(cx) {
+            Poll::Ready(v) => return Poll::Ready(v.map_err(|e| anyhow!(Into::<tower::BoxError>::into(e)))),
+            Poll::Pending => {}
+        }
+
+        match this.sleep.poll(cx) {
+            Poll::Pending => Poll::Pending,
+            Poll::Ready(_) => Poll::Ready(Err(anyhow!("request timed out"))),
+        }
     }
 }

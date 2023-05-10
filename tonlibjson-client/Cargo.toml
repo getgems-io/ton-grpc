@@ -31,10 +31,11 @@ async-trait = "0.1.68"
 tokio-retry = "0.3"
 bytes = "1.4"
 crc = "3.0.1"
-
+pin-project-lite = { version = "0.2" }
 [dev-dependencies]
 tracing-test = { workspace = true }
 serial_test = "2.0.0"
+console-subscriber = "0.1"
 
 [features]
 testnet = ["tonlibjson-sys/testnet"]

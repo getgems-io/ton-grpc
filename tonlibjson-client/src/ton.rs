@@ -7,6 +7,7 @@ use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, TryF
 use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
+use tokio::sync::Semaphore;
 use tokio_stream::StreamMap;
 use tower::Layer;
 use tower::buffer::Buffer;
@@ -16,7 +17,7 @@ use tower::retry::Retry;
 use tracing::{instrument, trace};
 use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
-use crate::balance::{Balance, BalanceRequest};
+use crate::balance::{Balance, BalanceRequest, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
@@ -46,7 +47,7 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 impl TonClient {
     #[cfg(not(feature = "testnet"))]
     pub async fn ready(&mut self) -> anyhow::Result<()> {
-        self.get_block_header(0, MAIN_SHARD, 100).await?;
+        self.get_block_header(-1, MAIN_SHARD, 100).await?;
 
         Ok(())
     }
@@ -68,10 +69,11 @@ impl TonClient {
         );
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
-        let client = Balance::new(cursor_client_discover);
+        let client = Router::new(cursor_client_discover);
         let last_block_receiver = client.last_block_receiver();
 
-        let client = Buffer::new(client, 200000);
+        let client = Balance::new(client);
+        let client = Buffer::new(client, Semaphore::MAX_PERMITS);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
             10,
@@ -99,10 +101,11 @@ impl TonClient {
         );
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
-        let client = Balance::new(cursor_client_discover);
+        let client = Router::new(cursor_client_discover);
         let last_block_receiver = client.last_block_receiver();
 
-        let client = Buffer::new(client, 200000);
+        let client = Balance::new(client);
+        let client = Buffer::new(client, Semaphore::MAX_PERMITS);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
             10,

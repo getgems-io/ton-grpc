@@ -1,4 +1,6 @@
 use std::cmp::Ordering;
+use std::future::Future;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::Service;
@@ -16,6 +18,7 @@ use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader
 use crate::session::{SessionClient, SessionRequest};
 use crate::request::{Callable, Request, RequestBody};
 
+#[derive(Clone)]
 pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
 
@@ -129,8 +132,8 @@ impl CursorClient {
 
 impl Service<SessionRequest> for CursorClient {
     type Response = <SessionClient as Service<SessionRequest>>::Response;
-    type Error = <SessionClient as Service<SessionRequest>>::Error;
-    type Future = <SessionClient as Service<SessionRequest>>::Future;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.last_block_rx.borrow().is_some()
@@ -175,6 +178,7 @@ impl tower::load::Load for CursorClient {
     }
 }
 
+#[derive(Debug)]
 pub struct Metrics {
     pub first_block: (BlockHeader, BlockHeader),
     pub last_block: (BlockHeader, BlockHeader),
