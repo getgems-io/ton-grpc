@@ -197,14 +197,9 @@ impl Service<BalanceRequest> for Balance {
 
         self.router
             .call(route)
-            .and_then(|mut svc| async move { svc
-                .ready()
-                .await
-                .map_err(|e| anyhow!(e))?
-                .call(request)
-                .await
-                .map_err(|e| anyhow!(e))
-        }).boxed()
+            .and_then(|svc|
+                svc.oneshot(request).map_err(|e| anyhow!(e)))
+            .boxed()
     }
 }
 
