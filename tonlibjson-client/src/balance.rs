@@ -7,6 +7,7 @@ use std::future::Future;
 use anyhow::anyhow;
 use derive_new::new;
 use futures::{ready, StreamExt};
+use std::future::Ready;
 use tracing::debug;
 use futures::TryFutureExt;
 use crate::session::SessionRequest;
@@ -137,7 +138,7 @@ impl Router {
 impl Service<Route> for Router {
     type Response = tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, SessionRequest>;
     type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx)?;
@@ -154,13 +155,11 @@ impl Service<Route> for Router {
     fn call(&mut self, req: Route) -> Self::Future {
         let services = req.choose(&self.services);
 
-        async move {
-            if services.is_empty() {
-                Err(anyhow!("no services available for {:?}", req))
-            } else {
-                Ok(tower::balance::p2c::Balance::new(ServiceList::new(services)))
-            }
-        }.boxed()
+        std::future::ready(if services.is_empty() {
+            Err(anyhow!("no services available for {:?}", req))
+        } else {
+            Ok(tower::balance::p2c::Balance::new(ServiceList::new(services)))
+        })
     }
 }
 
