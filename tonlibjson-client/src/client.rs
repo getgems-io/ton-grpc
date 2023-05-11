@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use serde_json::Value;
 use dashmap::DashMap;
 use tower::{Service};
-use tracing::warn;
+use tracing::trace;
 use crate::block::TonError;
 use crate::request::{Request, RequestId, Response};
 
@@ -35,7 +35,6 @@ impl Client {
             loop {
                 match stop_receiver.try_recv() {
                     Ok(_) | Err(TryRecvError::Disconnected) => {
-                        tracing::warn!("Stop thread");
                         return
                     },
                     Err(TryRecvError::Empty) => {
@@ -103,7 +102,7 @@ impl Service<Request> for Client {
 
             // TODO[akostylev0] refac
             if response.data["@type"] == "error" {
-                warn!("Error occurred: {:?}", &response.data);
+                trace!("Error occurred: {:?}", &response.data);
                 let error = serde_json::from_value::<TonError>(response.data)?;
 
                 return Err(anyhow!(error))
@@ -111,12 +110,6 @@ impl Service<Request> for Client {
 
             Ok(response.data)
         })
-    }
-}
-
-impl Drop for Client {
-    fn drop(&mut self) {
-        warn!("Drop client");
     }
 }
 

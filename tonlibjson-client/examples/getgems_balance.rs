@@ -12,6 +12,8 @@ async fn main() -> anyhow::Result<()> {
 
     ton.ready().await?;
 
+    tracing::info!("Ton ready");
+
     let now = Instant::now();
 
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS";
@@ -19,6 +21,8 @@ async fn main() -> anyhow::Result<()> {
     let total_value: i64 = ton.get_account_tx_range_unordered(address, ..).await?
         .filter_map(|tx| async {
             let tx: RawTransaction = tx.unwrap();
+
+            tracing::info!(fee = tx.fee, "got tx");
             if let Some(msg) = tx.out_msgs.first() {
                 Some(-msg.value - tx.fee)
             } else {

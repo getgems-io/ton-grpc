@@ -16,7 +16,7 @@ use tower::retry::Retry;
 use tracing::{instrument, trace};
 use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
-use crate::balance::{Balance, BalanceRequest};
+use crate::balance::{Balance, BalanceRequest, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
@@ -28,6 +28,7 @@ use crate::request::Callable;
 
 pub struct TonClient {
     client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>,
+    first_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>,
     last_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>
 }
 
@@ -35,6 +36,7 @@ impl Clone for TonClient {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
+            first_block_receiver: self.first_block_receiver.resubscribe(),
             last_block_receiver: self.last_block_receiver.resubscribe()
         }
     }
@@ -46,9 +48,22 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 impl TonClient {
     #[cfg(not(feature = "testnet"))]
     pub async fn ready(&mut self) -> anyhow::Result<()> {
-        self.get_block_header(0, MAIN_SHARD, 100).await?;
+        let _ = self.get_masterchain_info().await?;
 
-        Ok(())
+        tracing::info!("ready loop");
+        loop {
+            let Ok((block_header, _)) = self.first_block_receiver.recv().await else {
+                tracing::warn!("first_block_receiver closed");
+                continue;
+            };
+
+            tracing::info!(seqno = block_header.id.seqno);
+
+            if block_header.id.seqno <= 153290 {
+                tracing::info!("ready finish");
+                return Ok(());
+            }
+        }
     }
 
     #[cfg(feature = "testnet")]
@@ -68,8 +83,10 @@ impl TonClient {
         );
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
-        let client = Balance::new(cursor_client_discover);
-        let last_block_receiver = client.last_block_receiver();
+        let router = Router::new(cursor_client_discover);
+        let first_block_receiver = router.first_block_receiver();
+        let last_block_receiver = router.last_block_receiver();
+        let client = Balance::new(router);
 
         let client = Buffer::new(client, 200000);
         let client = Retry::new(RetryPolicy::new(Budget::new(
@@ -81,6 +98,7 @@ impl TonClient {
 
         Ok(Self {
             client,
+            first_block_receiver,
             last_block_receiver
         })
     }
@@ -99,8 +117,10 @@ impl TonClient {
         );
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
-        let client = Balance::new(cursor_client_discover);
-        let last_block_receiver = client.last_block_receiver();
+        let router = Router::new(cursor_client_discover);
+        let first_block_receiver = router.first_block_receiver();
+        let last_block_receiver = router.last_block_receiver();
+        let client = Balance::new(router);
 
         let client = Buffer::new(client, 200000);
         let client = Retry::new(RetryPolicy::new(Budget::new(
@@ -112,6 +132,7 @@ impl TonClient {
 
         Ok(Self {
             client,
+            first_block_receiver,
             last_block_receiver
         })
     }
