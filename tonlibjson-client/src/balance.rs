@@ -163,7 +163,7 @@ impl Service<Route> for Router {
             if services.is_empty() {
                 Err(anyhow!("no services available for {:?}", req))
             } else {
-                Ok(tower::balance::p2c::Balance::ne
+                Ok(tower::balance::p2c::Balance::new(ServiceList::new(services)))
             }
         }.boxed()
     }
