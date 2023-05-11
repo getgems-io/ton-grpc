@@ -17,21 +17,21 @@ use tokio::select;
 use tokio_stream::StreamMap;
 use tokio_stream::wrappers::WatchStream;
 use crate::block::{BlockHeader};
-use crate::cursor_client::CursorClient;
+use crate::cursor_client::{CursorClient, Metrics};
 use futures::FutureExt;
 use tower::ServiceExt;
+
+#[derive(Debug, Clone, Copy)]
+pub enum BlockCriteria {
+    Seqno(i32),
+    LogicalTime(i64)
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Route {
     Any,
     Block { chain: i32, criteria: BlockCriteria },
     Latest { chain: i32 }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum BlockCriteria {
-    Seqno(i32),
-    LogicalTime(i64)
 }
 
 impl Route {
@@ -56,17 +56,15 @@ impl Route {
                     .collect()
             },
             Route::Latest { chain } => {
+                fn seqno(chain: &i32, metrics: &Metrics) -> i32 { match chain {
+                    -1 => metrics.last_block.0.id.seqno,
+                    _ => metrics.last_block.1.id.seqno
+                }}
+
                 let groups = services.values()
                     .filter_map(|s| s.load().map(|m| (s, m)))
-                    .sorted_by_key(|(_, metrics)| match chain {
-                        -1 => -metrics.last_block.0.id.seqno,
-                        _ => -metrics.last_block.1.id.seqno
-                    })
-                    .group_by(|(_, metrics)| match chain {
-                        -1 => metrics.last_block.0.id.seqno,
-                        _ => metrics.last_block.1.id.seqno
-                    });
-
+                    .sorted_unstable_by_key(|(_, metrics)| -seqno(chain, metrics))
+                    .group_by(|(_, metrics)| seqno(chain, metrics));
 
                 let mut idxs = vec![];
                 for (_, group) in &groups {
