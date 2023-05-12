@@ -1,6 +1,5 @@
 use tower::Service;
 use tower::discover::{Change, Discover, ServiceList};
-use tower::load::Load;
 use std::{pin::Pin, task::{Context, Poll}};
 use std::collections::HashMap;
 use std::future::Future;
@@ -17,7 +16,7 @@ use tokio::select;
 use tokio_stream::StreamMap;
 use tokio_stream::wrappers::WatchStream;
 use crate::block::{BlockHeader};
-use crate::cursor_client::{CursorClient, Metrics};
+use crate::cursor_client::CursorClient;
 use futures::FutureExt;
 use tower::ServiceExt;
 
@@ -40,31 +39,24 @@ impl Route {
             Route::Any => { services.values().cloned().collect() },
             Route::Block { chain, criteria} => {
                 services.values()
-                    .filter_map(|s| s.load().map(|m| (s, m)))
-                    .filter(|(_, metrics)| {
-                        let (first_block, last_block) = match chain {
-                            -1 => (&metrics.first_block.0, &metrics.last_block.0),
-                            _ => (&metrics.first_block.1, &metrics.last_block.1)
-                        };
-                        match criteria {
-                            BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
-                            BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
-                        }
-                    })
+                    .filter_map(|s| s.headers(*chain).map(|m| (s, m)))
+                    .filter(|(_, (first_block, last_block))| { match criteria {
+                        BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
+                        BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
+                    }})
                     .map(|(s, _)| s)
                     .cloned()
                     .collect()
             },
             Route::Latest { chain } => {
-                fn seqno(chain: &i32, metrics: &Metrics) -> i32 { match chain {
-                    -1 => metrics.last_block.0.id.seqno,
-                    _ => metrics.last_block.1.id.seqno
-                }}
+                fn last_seqno(client: &CursorClient, chain: &i32) -> Option<i32> {
+                    client.headers(*chain).map(|(_, l)| l.id.seqno)
+                }
 
                 let groups = services.values()
-                    .filter_map(|s| s.load().map(|m| (s, m)))
-                    .sorted_unstable_by_key(|(_, metrics)| -seqno(chain, metrics))
-                    .group_by(|(_, metrics)| seqno(chain, metrics));
+                    .filter_map(|s| last_seqno(s, chain).map(|seqno| (s, seqno)))
+                    .sorted_unstable_by_key(|(_, seqno)| -seqno)
+                    .group_by(|(_, seqno)| seqno.clone());
 
                 let mut idxs = vec![];
                 for (_, group) in &groups {
@@ -141,7 +133,7 @@ impl Service<Route> for Router {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx)?;
 
-        if self.services.values().any(|s| s.load().is_some()) {
+        if self.services.values().any(|s| s.headers(-1).is_some()) {
             Poll::Ready(Ok(()))
         } else {
             cx.waker().wake_by_ref();
