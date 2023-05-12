@@ -135,9 +135,9 @@ impl<S: Service<Req>, Req> Future for ResponseFuture<S, Req> where
 
                             return Poll::Pending;
                         }
-
-                        this.state.set(ResponseState::Waiting { future });
                     }
+
+                    this.state.set(ResponseState::Waiting { future });
                 }
                 ResponseStateProj::Waiting { future } => {
                     let response = ready!(future.poll(cx));
