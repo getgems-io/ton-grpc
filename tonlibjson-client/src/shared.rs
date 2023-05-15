@@ -3,7 +3,7 @@ use std::pin::Pin;
 use std::sync::{Arc, RwLock};
 use std::task::{Context, Poll};
 use futures::ready;
-use pin_project_lite::pin_project;
+use pin_project::pin_project;
 use tower::{Layer, Service};
 use tower::load::Load;
 use crate::shared::ResponseState::Locking;
@@ -73,24 +73,18 @@ impl<S> Load for SharedService<S> where S : Load {
     }
 }
 
-pin_project! {
-    pub struct ResponseFuture<S: Service<Req>, Req>
-    {
-        request: Option<Req>,
-        #[pin]
-        state: ResponseState<S, Req>
-    }
+#[pin_project]
+pub struct ResponseFuture<S: Service<Req>, Req>
+{
+    request: Option<Req>,
+    #[pin]
+    state: ResponseState<S, Req>
 }
 
-pin_project! {
-    #[project = ResponseStateProj]
-    enum ResponseState<S, Req> where S : Service<Req> {
-        Locking { service: Arc<RwLock<S>> },
-        Waiting {
-            #[pin]
-            future: S::Future
-        }
-    }
+#[pin_project(project = ResponseStateProj)]
+enum ResponseState<S, Req> where S : Service<Req> {
+    Locking { service: Arc<RwLock<S>> },
+    Waiting { #[pin] future: S::Future }
 }
 
 impl<S: Service<Req>, Req> ResponseFuture<S, Req> where

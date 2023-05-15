@@ -1606,7 +1606,6 @@ dependencies = [
  "hex",
  "itertools",
  "pin-project",
- "pin-project-lite",
  "rand",
  "reqwest",
  "serde",
