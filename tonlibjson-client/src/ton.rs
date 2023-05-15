@@ -84,8 +84,8 @@ impl TonClient {
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
         let router = Router::new(cursor_client_discover);
-        let first_block_receiver = router.first_block_receiver();
-        let last_block_receiver = router.last_block_receiver();
+        let first_block_receiver = router.first_headers.receiver();
+        let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
         let client = Buffer::new(client, 200000);
@@ -118,8 +118,8 @@ impl TonClient {
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
         let router = Router::new(cursor_client_discover);
-        let first_block_receiver = router.first_block_receiver();
-        let last_block_receiver = router.last_block_receiver();
+        let first_block_receiver = router.first_headers.receiver();
+        let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
         let client = Buffer::new(client, 200000);

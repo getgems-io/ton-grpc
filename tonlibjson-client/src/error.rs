@@ -1,5 +1,6 @@
 use std::task::{Context, Poll};
 use anyhow::anyhow;
+use derive_new::new;
 use futures::future::MapErr;
 use futures::TryFutureExt;
 use tower::{Layer, Service};
@@ -11,16 +12,12 @@ impl<S> Layer<S> for ErrorLayer {
     type Service = ErrorService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
-        ErrorService {
-            inner
-        }
+        ErrorService::new(inner)
     }
 }
 
-#[derive(Clone)]
-pub struct ErrorService<S> where {
-    inner: S
-}
+#[derive(new, Clone)]
+pub struct ErrorService<S> { inner: S }
 
 impl<S, Req> Service<Req> for ErrorService<S> where
     S : Service<Req, Error = tower::BoxError>

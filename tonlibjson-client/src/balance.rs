@@ -1,24 +1,20 @@
-use tower::Service;
-use tower::discover::{Change, Discover, ServiceList};
 use std::{pin::Pin, task::{Context, Poll}};
 use std::collections::HashMap;
-use std::future::Future;
-use anyhow::anyhow;
-use derive_new::new;
-use futures::{ready, StreamExt};
-use std::future::Ready;
-use tracing::debug;
-use futures::TryFutureExt;
-use crate::session::SessionRequest;
-use crate::discover::CursorClientDiscover;
-use itertools::Itertools;
+use std::future::{Future, Ready};
+use futures::{ready, StreamExt, TryFutureExt, FutureExt};
 use tokio::select;
 use tokio_stream::StreamMap;
 use tokio_stream::wrappers::WatchStream;
+use tower::{Service, ServiceExt};
+use tower::discover::{Change, Discover, ServiceList};
+use anyhow::anyhow;
+use derive_new::new;
+use itertools::Itertools;
 use crate::block::{BlockHeader};
 use crate::cursor_client::CursorClient;
-use futures::FutureExt;
-use tower::ServiceExt;
+use crate::discover::CursorClientDiscover;
+use crate::error::ErrorService;
+use crate::session::SessionRequest;
 
 #[derive(Debug, Clone, Copy)]
 pub enum BlockCriteria {
@@ -77,8 +73,8 @@ impl Route {
 pub struct Router {
     discover: CursorClientDiscover,
     services: HashMap<String, CursorClient>,
-    first_headers: BlockChannel,
-    last_headers: BlockChannel
+    pub first_headers: BlockChannel,
+    pub last_headers: BlockChannel
 }
 
 impl Router {
@@ -91,19 +87,10 @@ impl Router {
         }
     }
 
-    pub fn first_block_receiver(&self) -> tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)> {
-        self.first_headers.receiver()
-    }
-
-    pub fn last_block_receiver(&self) -> tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)> {
-        self.last_headers.receiver()
-    }
-
     fn update_pending_from_discover(
         &mut self,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<(), anyhow::Error>>> {
-        debug!("updating from discover");
         loop {
             match ready!(Pin::new(&mut self.discover).poll_discover(cx))
                 .transpose()
@@ -112,8 +99,8 @@ impl Router {
                 None => return Poll::Ready(None),
                 Some(Change::Remove(key)) => {
                     self.services.remove(&key);
-                    self.first_headers.remove(key.clone());
-                    self.last_headers.remove(key);
+                    self.first_headers.remove(&key);
+                    self.last_headers.remove(&key);
                 }
                 Some(Change::Insert(key, svc)) => {
                     self.first_headers.insert(key.clone(), svc.first_block_rx.clone());
@@ -126,7 +113,7 @@ impl Router {
 }
 
 impl Service<Route> for Router {
-    type Response = tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, SessionRequest>;
+    type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, SessionRequest>>;
     type Error = anyhow::Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
@@ -148,7 +135,7 @@ impl Service<Route> for Router {
         std::future::ready(if services.is_empty() {
             Err(anyhow!("no services available for {:?}", req))
         } else {
-            Ok(tower::balance::p2c::Balance::new(ServiceList::new(services)))
+            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new(services))))
         })
     }
 }
@@ -161,16 +148,8 @@ pub struct BalanceRequest {
     pub request: SessionRequest
 }
 
-pub struct Balance
-{
-    router: Router
-}
-
-impl Balance {
-    pub fn new(router: Router) -> Self {
-        Balance { router }
-    }
-}
+#[derive(new)]
+pub struct Balance { router: Router }
 
 impl Service<BalanceRequest> for Balance {
     type Response = <<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Response;
@@ -178,7 +157,7 @@ impl Service<BalanceRequest> for Balance {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.router.poll_ready(cx).map_err(|e| anyhow!(e))
+        self.router.poll_ready(cx)
     }
 
     fn call(&mut self, request: BalanceRequest) -> Self::Future {
@@ -187,7 +166,7 @@ impl Service<BalanceRequest> for Balance {
         self.router
             .call(route)
             .and_then(|svc|
-                svc.oneshot(request).map_err(|e| anyhow!(e)))
+                svc.oneshot(request))
             .boxed()
     }
 }
@@ -199,15 +178,12 @@ enum BlockChannelChange {
     Remove { key: String }
 }
 
-struct BlockChannel {
+pub struct BlockChannel {
     changes: tokio::sync::mpsc::UnboundedSender<BlockChannelChange>,
     joined: tokio::sync::broadcast::Receiver<BlockChannelItem>
 }
 
-enum BlockChannelMode {
-    Max,
-    Min
-}
+pub enum BlockChannelMode { Max, Min }
 
 impl BlockChannel {
     pub fn new(mode: BlockChannelMode) -> Self {
@@ -216,7 +192,6 @@ impl BlockChannel {
 
         tokio::spawn(async move {
             let mut stream_map = StreamMap::new();
-
             let mut last_seqno = 0;
 
             loop {
@@ -228,11 +203,10 @@ impl BlockChannel {
                         }
                     },
                     Some((_, Some((master, worker)))) = stream_map.next() => {
-                        let cond = match mode {
+                       if last_seqno == 0 || match mode {
                             BlockChannelMode::Max => { master.id.seqno > last_seqno },
-                            BlockChannelMode::Min => { last_seqno == 0 || master.id.seqno < last_seqno }
-                        };
-                        if cond {
+                            BlockChannelMode::Min => { master.id.seqno < last_seqno }
+                        } {
                             last_seqno = master.id.seqno;
 
                             let _ = tj.send((master, worker));
@@ -249,11 +223,11 @@ impl BlockChannel {
     }
 
     pub fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<BlockChannelItem>>) {
-        let _ = self.changes.send(BlockChannelChange::Insert { key, watcher });
+        let _ = self.changes.send(BlockChannelChange::Insert { key: key, watcher });
     }
 
-    pub fn remove(&self, key: String) {
-        let _ = self.changes.send(BlockChannelChange::Remove { key });
+    pub fn remove(&self, key: &str) {
+        let _ = self.changes.send(BlockChannelChange::Remove { key: key.to_owned() });
     }
 
     pub fn receiver(&self) -> tokio::sync::broadcast::Receiver<BlockChannelItem> {
