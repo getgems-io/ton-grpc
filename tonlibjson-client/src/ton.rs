@@ -59,7 +59,7 @@ impl TonClient {
 
             tracing::info!(seqno = block_header.id.seqno);
 
-            if block_header.id.seqno <= 153290 {
+            if block_header.id.seqno <= 100 {
                 tracing::info!("ready finish");
                 return Ok(());
             }
