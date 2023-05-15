@@ -1,24 +1,26 @@
-use tower::Service;
-use tower::discover::{Change, Discover};
-use tower::load::Load;
-use tower::ready_cache::ReadyCache;
-use rand::{rngs::SmallRng, Rng, SeedableRng};
-use std::marker::PhantomData;
-use std::{fmt, pin::Pin, task::{Context, Poll}};
-use derive_new::new;
-use futures::{future, ready, StreamExt};
-use tracing::{debug, error, info, trace};
-use tower::BoxError;
-use futures::TryFutureExt;
-use crate::session::SessionRequest;
-use crate::discover::CursorClientDiscover;
-use itertools::Itertools;
-use rand::seq::index::sample;
+use std::{pin::Pin, task::{Context, Poll}};
+use std::collections::HashMap;
+use std::future::{Future, Ready};
+use futures::{ready, StreamExt, TryFutureExt, FutureExt};
 use tokio::select;
 use tokio_stream::StreamMap;
 use tokio_stream::wrappers::WatchStream;
+use tower::{Service, ServiceExt};
+use tower::discover::{Change, Discover, ServiceList};
+use anyhow::anyhow;
+use derive_new::new;
+use itertools::Itertools;
 use crate::block::{BlockHeader};
-use crate::cursor_client::Metrics;
+use crate::cursor_client::CursorClient;
+use crate::discover::CursorClientDiscover;
+use crate::error::ErrorService;
+use crate::session::SessionRequest;
+
+#[derive(Debug, Clone, Copy)]
+pub enum BlockCriteria {
+    Seqno(i32),
+    LogicalTime(i64)
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Route {
@@ -27,75 +29,32 @@ pub enum Route {
     Latest { chain: i32 }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum BlockCriteria {
-    Seqno(i32),
-    LogicalTime(i64)
-}
-
 impl Route {
-    pub fn choose(
-        &self,
-        cache: &ReadyCache<<CursorClientDiscover as Discover>::Key, <CursorClientDiscover as Discover>::Service, SessionRequest>,
-        rng: &mut SmallRng
-    ) -> Option<usize> {
+    pub fn choose(&self, services: &HashMap<String, CursorClient>) -> Vec<CursorClient> {
         return match self {
-            Route::Any => {
-                match cache.ready_len() {
-                    0 => None,
-                    1 => Some(0),
-                    len => {
-                        let idxs = sample(rng, len, 2);
-                        let aidx = idxs.index(0);
-                        let bidx = idxs.index(1);
-
-                        let aload = cache.get_ready_index(aidx).expect("invalid index").1.load().expect("service must be ready");
-                        let bload = cache.get_ready_index(bidx).expect("invalid index").1.load().expect("service must be ready");
-
-                        let chosen = if aload <= bload { aidx } else { bidx };
-
-                        return Some(chosen);
-                    }
-                }
-            },
+            Route::Any => { services.values().cloned().collect() },
             Route::Block { chain, criteria} => {
-                let mut idxs = (0..cache.ready_len())
-                    .filter_map(|i| cache
-                        .get_ready_index(i)
-                        .and_then(|(_, svc)| svc.load())
-                        .map(|m| (i, m)))
-                    .filter(|(_, metrics)| {
-                        let (first_block, last_block) = match chain {
-                            -1 => (&metrics.first_block.0, &metrics.last_block.0),
-                            _ => (&metrics.first_block.1, &metrics.last_block.1)
-                        };
-
-                        match criteria {
-                            BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
-                            BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
-                        }
-                    })
-                    .collect();
-
-                self.choose_from_vec(&mut idxs)
+                services.values()
+                    .filter_map(|s| s.headers(*chain).map(|m| (s, m)))
+                    .filter(|(_, (first_block, last_block))| { match criteria {
+                        BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
+                        BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
+                    }})
+                    .map(|(s, _)| s)
+                    .cloned()
+                    .collect()
             },
             Route::Latest { chain } => {
-                let groups = (0..cache.ready_len())
-                    .filter_map(|i| cache
-                        .get_ready_index(i)
-                        .and_then(|(_, svc)| svc.load())
-                        .map(|m| (i, m)))
-                    .sorted_by_key(|(_, metrics)| match chain {
-                        -1 => -metrics.last_block.0.id.seqno,
-                        _ => -metrics.last_block.1.id.seqno
-                    })
-                    .group_by(|(_, metrics)| match chain {
-                        -1 => metrics.last_block.0.id.seqno,
-                        _ => metrics.last_block.1.id.seqno
-                    });
+                fn last_seqno(client: &CursorClient, chain: &i32) -> Option<i32> {
+                    client.headers(*chain).map(|(_, l)| l.id.seqno)
+                }
 
+                let groups = services.values()
+                    .filter_map(|s| last_seqno(s, chain).map(|seqno| (s, seqno)))
+                    .sorted_unstable_by_key(|(_, seqno)| -seqno)
+                    .group_by(|(_, seqno)| seqno.clone());
 
-                let mut idxs: Vec<(usize, Metrics)> = vec![];
+                let mut idxs = vec![];
                 for (_, group) in &groups {
                     idxs = group.collect();
 
@@ -105,32 +64,82 @@ impl Route {
                     }
                 }
 
-                self.choose_from_vec(&mut idxs)
-            }
-        }
-    }
-
-    fn choose_from_vec(&self, idxs: &mut Vec<(usize, Metrics)>) -> Option<usize> {
-        info!(route = ?self, len = idxs.len(), "choose from");
-
-        match idxs.len() {
-            0 => None,
-            1 => {
-                let (aidx, _) = idxs.pop().unwrap();
-
-                Some(aidx)
-            },
-            _ => {
-                let (aidx, aload) = idxs.pop().unwrap();
-                let (bidx, bload) = idxs.pop().unwrap();
-
-                let chosen = if aload <= bload { aidx } else { bidx };
-
-                Some(chosen)
+                idxs.into_iter().map(|(s, _)| s).cloned().collect()
             }
         }
     }
 }
+
+pub struct Router {
+    discover: CursorClientDiscover,
+    services: HashMap<String, CursorClient>,
+    pub first_headers: BlockChannel,
+    pub last_headers: BlockChannel
+}
+
+impl Router {
+    pub fn new(discover: CursorClientDiscover) -> Self {
+        Router {
+            discover,
+            services: HashMap::new(),
+            first_headers: BlockChannel::new(BlockChannelMode::Min),
+            last_headers: BlockChannel::new(BlockChannelMode::Max)
+        }
+    }
+
+    fn update_pending_from_discover(
+        &mut self,
+        cx: &mut Context<'_>,
+    ) -> Poll<Option<Result<(), anyhow::Error>>> {
+        loop {
+            match ready!(Pin::new(&mut self.discover).poll_discover(cx))
+                .transpose()
+                .map_err(|e| anyhow!(e))?
+            {
+                None => return Poll::Ready(None),
+                Some(Change::Remove(key)) => {
+                    self.services.remove(&key);
+                    self.first_headers.remove(&key);
+                    self.last_headers.remove(&key);
+                }
+                Some(Change::Insert(key, svc)) => {
+                    self.first_headers.insert(key.clone(), svc.first_block_rx.clone());
+                    self.last_headers.insert(key.clone(), svc.last_block_rx.clone());
+                    self.services.insert(key, svc);
+                }
+            }
+        }
+    }
+}
+
+impl Service<Route> for Router {
+    type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, SessionRequest>>;
+    type Error = anyhow::Error;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let _ = self.update_pending_from_discover(cx)?;
+
+        if self.services.values().any(|s| s.headers(-1).is_some()) {
+            Poll::Ready(Ok(()))
+        } else {
+            cx.waker().wake_by_ref();
+
+            Poll::Pending
+        }
+    }
+
+    fn call(&mut self, req: Route) -> Self::Future {
+        let services = req.choose(&self.services);
+
+        std::future::ready(if services.is_empty() {
+            Err(anyhow!("no services available for {:?}", req))
+        } else {
+            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new(services))))
+        })
+    }
+}
+
 
 
 #[derive(new)]
@@ -139,148 +148,26 @@ pub struct BalanceRequest {
     pub request: SessionRequest
 }
 
-pub struct Balance
-{
-    discover: CursorClientDiscover,
-
-    services: ReadyCache<<CursorClientDiscover as Discover>::Key, <CursorClientDiscover as Discover>::Service, SessionRequest>,
-
-    rng: SmallRng,
-
-    _req: PhantomData<SessionRequest>,
-
-    last_headers: BlockChannel
-}
-
-impl Balance {
-    /// Constructs a load balancer that uses operating system entropy.
-    pub fn new(discover: CursorClientDiscover) -> Self {
-        Self::from_rng(discover, &mut rand::thread_rng()).expect("ThreadRNG must be valid")
-    }
-
-    /// Constructs a load balancer seeded with the provided random number generator.
-    pub fn from_rng<R: Rng>(discover: CursorClientDiscover, rng: R) -> Result<Self, rand::Error> {
-        let rng = SmallRng::from_rng(rng)?;
-        Ok(Self {
-            rng,
-            discover,
-            services: ReadyCache::default(),
-
-            _req: PhantomData,
-            last_headers: BlockChannel::new()
-        })
-    }
-}
-
-impl Balance {
-    fn update_pending_from_discover(
-        &mut self,
-        cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<(), DiscoverError>>> {
-        loop {
-            match ready!(Pin::new(&mut self.discover).poll_discover(cx))
-                .transpose()
-                .map_err(|e| DiscoverError(e.into()))?
-            {
-                None => return Poll::Ready(None),
-                Some(Change::Remove(key)) => {
-                    trace!("remove");
-                    self.last_headers.remove(key.clone());
-                    self.services.evict(&key);
-                }
-                Some(Change::Insert(key, svc)) => {
-                    trace!("insert");
-                    self.last_headers.insert(key.clone(), svc.last_block_rx.clone());
-                    self.services.push(key, svc);
-                }
-            }
-        }
-    }
-
-    fn promote_pending_to_ready(&mut self, cx: &mut Context<'_>) {
-        loop {
-            match self.services.poll_pending(cx) {
-                Poll::Ready(Ok(())) => {
-                    // There are no remaining pending services.
-                    debug_assert_eq!(self.services.pending_len(), 0);
-                    break;
-                }
-                Poll::Pending => {
-                    // None of the pending services are ready.
-                    debug_assert!(self.services.pending_len() > 0);
-                    break;
-                }
-                Poll::Ready(Err(error)) => {
-                    // An individual service was lost; continue processing
-                    // pending services.
-                    debug!(%error, "dropping failed endpoint");
-                }
-            }
-        }
-        trace!(
-            ready = %self.services.ready_len(),
-            pending = %self.services.pending_len(),
-            "poll_unready"
-        );
-    }
-}
+#[derive(new)]
+pub struct Balance { router: Router }
 
 impl Service<BalanceRequest> for Balance {
     type Response = <<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Response;
-    type Error = BoxError;
-    type Future = future::MapErr<
-        <<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Future,
-        fn(<<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Error) -> BoxError,
-    >;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let _ = self.update_pending_from_discover(cx)?;
-        self.promote_pending_to_ready(cx);
-
-        if self.services.ready_len() > 0 {
-            Poll::Ready(Ok(()))
-        } else {
-            Poll::Pending
-        }
+        self.router.poll_ready(cx)
     }
 
     fn call(&mut self, request: BalanceRequest) -> Self::Future {
         let (route, request) = (request.route, request.request);
 
-        let index = route
-            .choose(&self.services, &mut self.rng)
-            .or_else(|| {
-                error!(route = ?route, "fallback to any");
-
-                Route::Any.choose(&self.services, &mut self.rng)
-            })
-            .expect("called before ready");
-
-        self.services
-            .call_ready_index(index, request)
-            .map_err(Into::into)
-    }
-}
-
-impl Balance {
-    pub fn last_block_receiver(&self) -> tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)> {
-        self.last_headers.receiver()
-    }
-}
-
-
-#[derive(Debug)]
-pub struct DiscoverError(pub(crate) BoxError);
-
-impl fmt::Display for DiscoverError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "load balancer discovery error: {}", self.0)
-    }
-}
-
-impl std::error::Error for DiscoverError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        Some(&*self.0)
+        self.router
+            .call(route)
+            .and_then(|svc|
+                svc.oneshot(request))
+            .boxed()
     }
 }
 
@@ -291,19 +178,20 @@ enum BlockChannelChange {
     Remove { key: String }
 }
 
-struct BlockChannel {
+pub struct BlockChannel {
     changes: tokio::sync::mpsc::UnboundedSender<BlockChannelChange>,
     joined: tokio::sync::broadcast::Receiver<BlockChannelItem>
 }
 
+pub enum BlockChannelMode { Max, Min }
+
 impl BlockChannel {
-    pub fn new() -> Self {
+    pub fn new(mode: BlockChannelMode) -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<BlockChannelChange>();
         let (tj, rj) = tokio::sync::broadcast::channel::<BlockChannelItem>(256);
 
         tokio::spawn(async move {
             let mut stream_map = StreamMap::new();
-
             let mut last_seqno = 0;
 
             loop {
@@ -315,7 +203,10 @@ impl BlockChannel {
                         }
                     },
                     Some((_, Some((master, worker)))) = stream_map.next() => {
-                        if master.id.seqno > last_seqno {
+                       if last_seqno == 0 || match mode {
+                            BlockChannelMode::Max => { master.id.seqno > last_seqno },
+                            BlockChannelMode::Min => { master.id.seqno < last_seqno }
+                        } {
                             last_seqno = master.id.seqno;
 
                             let _ = tj.send((master, worker));
@@ -332,11 +223,11 @@ impl BlockChannel {
     }
 
     pub fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<BlockChannelItem>>) {
-        let _ = self.changes.send(BlockChannelChange::Insert { key, watcher });
+        let _ = self.changes.send(BlockChannelChange::Insert { key: key, watcher });
     }
 
-    pub fn remove(&self, key: String) {
-        let _ = self.changes.send(BlockChannelChange::Remove { key });
+    pub fn remove(&self, key: &str) {
+        let _ = self.changes.send(BlockChannelChange::Remove { key: key.to_owned() });
     }
 
     pub fn receiver(&self) -> tokio::sync::broadcast::Receiver<BlockChannelItem> {

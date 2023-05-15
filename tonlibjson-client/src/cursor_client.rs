@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::Service;
@@ -10,16 +9,17 @@ use tokio_retry::Retry;
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
-use tracing::{error, info, instrument, trace, warn};
+use tracing::{instrument, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::session::{SessionClient, SessionRequest};
 use crate::request::{Callable, Request, RequestBody};
 
+#[derive(Clone)]
 pub struct CursorClient {
     client: ConcurrencyLimit<SessionClient>,
 
-    first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
+    pub first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
     pub last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
 
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
@@ -66,10 +66,10 @@ impl CursorClient {
                                     let _ = mtx.send(Some(masterchain_info));
                                     let _ = ctx.send(Some((last_master_chain_header, last_work_chain_header)));
                                 },
-                                Err(e) => warn!(e = ?e, "unable to fetch last headers")
+                                Err(e) => trace!(e = ?e, "unable to fetch last headers")
                             }
                         },
-                        Err(e) => error!(e = ?e, "unable to get master chain info")
+                        Err(e) => trace!(e = ?e, "unable to get master chain info")
                     }
                 }
             }
@@ -92,7 +92,7 @@ impl CursorClient {
                             BlocksGetShards::new(mfb.id.clone()).call(&mut clone),
                             BlocksGetBlockHeader::new(wfb.id.clone()).call(&mut client)
                         ) {
-                            info!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
+                            trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
                         } else {
                             trace!("first block still available");
@@ -110,7 +110,7 @@ impl CursorClient {
 
                                 let _ = ftx.send(Some((mfb, wfb)));
                             },
-                            Err(e) => error!(e = ?e, "unable to fetch first headers")
+                            Err(e) => trace!(e = ?e, "unable to fetch first headers")
                         }
                     }
                 }
@@ -123,6 +123,20 @@ impl CursorClient {
             first_block_rx: frx,
             last_block_rx: crx,
             masterchain_info_rx: mrx
+        }
+    }
+
+    pub fn headers(&self, chain_id: i32) -> Option<(BlockHeader, BlockHeader)> {
+        let Some(first_block) = self.first_block_rx.borrow().clone() else {
+            return None;
+        };
+        let Some(last_block) = self.last_block_rx.borrow().clone() else {
+            return None;
+        };
+
+        match chain_id {
+            -1 => Some((first_block.0, last_block.0)),
+            _ => Some((first_block.1, last_block.1))
         }
     }
 }
@@ -155,41 +169,11 @@ impl Service<SessionRequest> for CursorClient {
     }
 }
 
-
 impl tower::load::Load for CursorClient {
-    type Metric = Option<Metrics>;
+    type Metric = Cost;
 
     fn load(&self) -> Self::Metric {
-        let Some(first_block) = self.first_block_rx.borrow().clone() else {
-            return None;
-        };
-        let Some(last_block) = self.last_block_rx.borrow().clone() else {
-            return None;
-        };
-
-        Some(Metrics {
-            first_block,
-            last_block,
-            ewma: self.client.load()
-        })
-    }
-}
-
-pub struct Metrics {
-    pub first_block: (BlockHeader, BlockHeader),
-    pub last_block: (BlockHeader, BlockHeader),
-    pub ewma: Cost
-}
-
-impl PartialEq<Self> for Metrics {
-    fn eq(&self, other: &Self) -> bool {
-        self.ewma.eq(&other.ewma)
-    }
-}
-
-impl PartialOrd<Self> for Metrics {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.ewma.partial_cmp(&other.ewma)
+        self.client.load()
     }
 }
 
@@ -204,7 +188,7 @@ async fn check_block_available(client: &mut ConcurrencyLimit<SessionClient>, blo
     )
 }
 
-#[instrument(skip_all, err)]
+#[instrument(skip_all, err, level = "trace")]
 async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
     let start = GetMasterchainInfo::default()
         .call(client)
