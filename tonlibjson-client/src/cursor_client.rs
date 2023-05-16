@@ -14,8 +14,8 @@ use tower::load::peak_ewma::Cost;
 use tracing::{instrument, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
-use crate::session::{SessionClient, SessionRequest};
-use crate::request::{Callable, Request, RequestBody, TypedCallable};
+use crate::session::{SessionClient};
+use crate::request::{TypedCallable};
 
 #[derive(Clone)]
 pub struct CursorClient {
@@ -152,7 +152,8 @@ impl<R : TypedCallable<ConcurrencyLimit<SessionClient>>> Service<R> for CursorCl
         if self.last_block_rx.borrow().is_some()
             && self.first_block_rx.borrow().is_some()
             && self.masterchain_info_rx.borrow().is_some() {
-            return Service::<SessionRequest>::poll_ready(&mut self.client, cx)
+            // TODO[akostylev0]
+            return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx)
         }
 
         cx.waker().wake_by_ref();
@@ -166,34 +167,6 @@ impl<R : TypedCallable<ConcurrencyLimit<SessionClient>>> Service<R> for CursorCl
         async move {
             req.typed_call(&mut client).await
         }.boxed()
-    }
-}
-
-impl Service<SessionRequest> for CursorClient {
-    type Response = <SessionClient as Service<SessionRequest>>::Response;
-    type Error = <SessionClient as Service<SessionRequest>>::Error;
-    type Future = <SessionClient as Service<SessionRequest>>::Future;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.last_block_rx.borrow().is_some()
-            && self.first_block_rx.borrow().is_some()
-            && self.masterchain_info_rx.borrow().is_some() {
-            return Service::<SessionRequest>::poll_ready(&mut self.client, cx)
-        }
-
-        cx.waker().wake_by_ref();
-
-        Poll::Pending
-    }
-
-    fn call(&mut self, req: SessionRequest) -> Self::Future {
-        match req {
-            SessionRequest::Atomic(Request { body: RequestBody::GetMasterchainInfo(_), .. }) => {
-                let masterchain_info = self.masterchain_info_rx.borrow().as_ref().unwrap().clone();
-                async { Ok(serde_json::to_value(masterchain_info)?) }.boxed()
-            },
-            _ => self.client.call(req).boxed()
-        }
     }
 }
 

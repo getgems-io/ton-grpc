@@ -15,8 +15,8 @@ use crate::block::{BlockHeader};
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 use crate::error::ErrorService;
-use crate::request::{Callable, Routable, TypedCallable};
-use crate::session::{SessionClient, SessionRequest};
+use crate::request::{Routable, TypedCallable};
+use crate::session::{SessionClient};
 
 #[derive(Debug, Clone, Copy)]
 pub enum BlockCriteria {
@@ -114,42 +114,6 @@ impl Router {
     }
 }
 
-impl Service<Route> for Router {
-    type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, SessionRequest>>;
-    type Error = anyhow::Error;
-    type Future = Ready<Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let _ = self.update_pending_from_discover(cx)?;
-
-        if self.services.values().any(|s| s.headers(-1).is_some()) {
-            Poll::Ready(Ok(()))
-        } else {
-            cx.waker().wake_by_ref();
-
-            Poll::Pending
-        }
-    }
-
-    fn call(&mut self, req: Route) -> Self::Future {
-        let services = req.choose(&self.services);
-
-        std::future::ready(if services.is_empty() {
-            Err(anyhow!("no services available for {:?}", req))
-        } else {
-            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new::<SessionRequest>(services))))
-        })
-    }
-}
-
-
-
-#[derive(new)]
-pub struct BalanceRequest {
-    pub route: Route,
-    pub request: SessionRequest
-}
-
 #[derive(new)]
 pub struct Balance { router: Router }
 
@@ -191,31 +155,9 @@ impl<R> Service<R> for Balance where R: Routable + TypedCallable<ConcurrencyLimi
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        let route = req.route();
-
         self.router
             .call(req.clone())
             .and_then(|svc| svc.oneshot(req))
-            .boxed()
-    }
-}
-
-impl Service<BalanceRequest> for Balance {
-    type Response = <<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Response;
-    type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Service::<Route>::poll_ready(&mut self.router, cx)
-    }
-
-    fn call(&mut self, request: BalanceRequest) -> Self::Future {
-        let (route, request) = (request.route, request.request);
-
-        self.router
-            .call(route)
-            .and_then(|svc|
-                svc.oneshot(request))
             .boxed()
     }
 }

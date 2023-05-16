@@ -8,7 +8,7 @@ use serde_json::Value;
 use crate::address::{AccountAddressData, ShardContextAccountAddress};
 use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
 use crate::balance::{BlockCriteria, Route};
-use crate::request::{Requestable, RequestBody, Routable};
+use crate::request::{Requestable, Routable};
 
 #[derive(Debug, Serialize, Default, Clone)]
 #[serde(tag = "@type", rename = "sync")]
@@ -20,10 +20,6 @@ impl Requestable for Sync {
     fn timeout(&self) -> Duration {
         Duration::from_secs(5 * 60)
     }
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::Sync(self)
-    }
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -34,10 +30,6 @@ pub struct BlocksGetBlockHeader {
 
 impl Requestable for BlocksGetBlockHeader {
     type Response = BlockHeader;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::BlocksGetBlockHeader(self)
-    }
 }
 
 impl Routable for BlocksGetBlockHeader {
@@ -194,10 +186,6 @@ pub struct GetShardAccountCell {
 
 impl Requestable for GetShardAccountCell {
     type Response = Cell;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::GetShardAccountCell(self)
-    }
 }
 
 impl Routable for GetShardAccountCell {
@@ -216,10 +204,6 @@ pub struct GetShardAccountCellByTransaction {
 
 impl Requestable for GetShardAccountCellByTransaction {
     type Response = Cell;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::GetShardAccountCellByTransaction(self)
-    }
 }
 
 impl Routable for GetShardAccountCellByTransaction {
@@ -254,10 +238,6 @@ pub struct RawFullAccountState {
 
 impl Requestable for RawGetAccountState {
     type Response = RawFullAccountState;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::RawGetAccountState(self)
-    }
 }
 
 impl Routable for RawGetAccountState {
@@ -276,10 +256,6 @@ pub struct RawGetAccountStateByTransaction {
 
 impl Requestable for RawGetAccountStateByTransaction {
     type Response = RawFullAccountState;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::RawGetAccountStateByTransaction(self)
-    }
 }
 
 impl Routable for RawGetAccountStateByTransaction {
@@ -297,10 +273,6 @@ pub struct GetAccountState {
 
 impl Requestable for GetAccountState {
     type Response = Value;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::GetAccountState(self)
-    }
 }
 
 impl Routable for GetAccountState {
@@ -371,10 +343,6 @@ pub struct GetMasterchainInfo {}
 
 impl Requestable for GetMasterchainInfo {
     type Response = MasterchainInfo;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::GetMasterchainInfo(self)
-    }
 }
 
 impl Routable for GetMasterchainInfo {
@@ -397,10 +365,6 @@ pub struct BlocksLookupBlock {
 
 impl Requestable for BlocksLookupBlock {
     type Response = BlockIdExt;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::BlocksLookupBlock(self)
-    }
 }
 
 impl Routable for BlocksLookupBlock {
@@ -447,10 +411,6 @@ pub struct BlocksGetShards {
 
 impl Requestable for BlocksGetShards {
     type Response = BlocksShards;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::BlocksGetShards(self)
-    }
 }
 
 impl Routable for BlocksGetShards {
@@ -507,10 +467,6 @@ impl BlocksGetTransactions {
 
 impl Requestable for BlocksGetTransactions {
     type Response = BlocksTransactions;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::BlocksGetTransactions(self)
-    }
 }
 
 impl Routable for BlocksGetTransactions {
@@ -562,10 +518,6 @@ pub struct RawSendMessage {
 impl Requestable for RawSendMessage {
     // TODO[akostylev0]
     type Response = Value;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::RawSendMessage(self)
-    }
 }
 
 impl Routable for RawSendMessage {
@@ -582,10 +534,6 @@ pub struct RawSendMessageReturnHash {
 
 impl Requestable for RawSendMessageReturnHash {
     type Response = RawExtMessageInfo;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::RawSendMessageReturnHash(self)
-    }
 }
 
 impl Routable for RawSendMessageReturnHash {
@@ -605,10 +553,6 @@ pub struct SmcLoad {
 
 impl Requestable for SmcLoad {
     type Response = SmcInfo;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::SmcLoad(self)
-    }
 }
 
 impl Routable for SmcLoad {
@@ -635,10 +579,6 @@ pub struct SmcRunGetMethod {
 
 impl Requestable for SmcRunGetMethod {
     type Response = Value;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::SmcRunGetMethod(self)
-    }
 }
 
 impl SmcRunGetMethod {
@@ -735,10 +675,6 @@ pub struct RawGetTransactionsV2 {
 
 impl Requestable for RawGetTransactionsV2 {
     type Response = RawTransactions;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::RawGetTransactionsV2(self)
-    }
 }
 
 impl Routable for RawGetTransactionsV2 {
@@ -782,10 +718,6 @@ pub struct WithBlock<T> {
 
 impl<T> Requestable for WithBlock<T> where T : Requestable {
     type Response = T::Response;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::Value(serde_json::to_value(self).expect("must be valid"))
-    }
 }
 
 impl<T> Routable for WithBlock<T> {
