@@ -10,11 +10,13 @@ use tower::discover::{Change, Discover, ServiceList};
 use anyhow::anyhow;
 use derive_new::new;
 use itertools::Itertools;
+use tower::limit::ConcurrencyLimit;
 use crate::block::{BlockHeader};
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 use crate::error::ErrorService;
-use crate::session::SessionRequest;
+use crate::request::{Callable, Routable, TypedCallable};
+use crate::session::{SessionClient, SessionRequest};
 
 #[derive(Debug, Clone, Copy)]
 pub enum BlockCriteria {
@@ -135,7 +137,7 @@ impl Service<Route> for Router {
         std::future::ready(if services.is_empty() {
             Err(anyhow!("no services available for {:?}", req))
         } else {
-            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new(services))))
+            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new::<SessionRequest>(services))))
         })
     }
 }
@@ -151,13 +153,60 @@ pub struct BalanceRequest {
 #[derive(new)]
 pub struct Balance { router: Router }
 
+impl<T: Routable + TypedCallable<ConcurrencyLimit<SessionClient>>> Service<T> for Router {
+    type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, T>>;
+    type Error = anyhow::Error;
+    type Future = Ready<Result<Self::Response, Self::Error>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        let _ = self.update_pending_from_discover(cx)?;
+
+        if self.services.values().any(|s| s.headers(-1).is_some()) {
+            Poll::Ready(Ok(()))
+        } else {
+            cx.waker().wake_by_ref();
+
+            Poll::Pending
+        }
+    }
+
+    fn call(&mut self, req: T) -> Self::Future {
+        let services = req.route().choose(&self.services);
+
+        std::future::ready(if services.is_empty() {
+            Err(anyhow!("no services available for {:?}", req.route()))
+        } else {
+            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new::<T>(services))))
+        })
+    }
+}
+
+impl<R> Service<R> for Balance where R: Routable + TypedCallable<ConcurrencyLimit<SessionClient>> + Clone {
+    type Response = R::Response;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        Service::<R>::poll_ready(&mut self.router, cx)
+    }
+
+    fn call(&mut self, req: R) -> Self::Future {
+        let route = req.route();
+
+        self.router
+            .call(req.clone())
+            .and_then(|svc| svc.oneshot(req))
+            .boxed()
+    }
+}
+
 impl Service<BalanceRequest> for Balance {
     type Response = <<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.router.poll_ready(cx)
+        Service::<Route>::poll_ready(&mut self.router, cx)
     }
 
     fn call(&mut self, request: BalanceRequest) -> Self::Future {

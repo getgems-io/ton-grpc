@@ -1,3 +1,5 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::Service;
@@ -138,6 +140,32 @@ impl CursorClient {
             -1 => Some((first_block.0, last_block.0)),
             _ => Some((first_block.1, last_block.1))
         }
+    }
+}
+
+impl<R : TypedCallable<ConcurrencyLimit<SessionClient>>> Service<R> for CursorClient {
+    type Response = R::Response;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+        if self.last_block_rx.borrow().is_some()
+            && self.first_block_rx.borrow().is_some()
+            && self.masterchain_info_rx.borrow().is_some() {
+            return Service::<SessionRequest>::poll_ready(&mut self.client, cx)
+        }
+
+        cx.waker().wake_by_ref();
+
+        Poll::Pending
+    }
+
+    fn call(&mut self, req: R) -> Self::Future {
+        let mut client = self.client.clone();
+
+        async move {
+            req.typed_call(&mut client).await
+        }.boxed()
     }
 }
 

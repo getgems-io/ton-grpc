@@ -37,7 +37,7 @@ pub trait Callable : Sized {
 }
 
 #[async_trait]
-pub trait TypedCallable<S> : Sized + Send {
+pub trait TypedCallable<S> : Sized + Send + 'static {
     type Response : DeserializeOwned;
 
     async fn typed_call(self, client: &mut S) -> anyhow::Result<Self::Response>;
@@ -45,7 +45,7 @@ pub trait TypedCallable<S> : Sized + Send {
 
 #[async_trait]
 impl<S, T, E: Into<Error>> TypedCallable<S> for T
-    where T : Requestable,
+    where T : Requestable + 'static,
           S : Service<T, Response=T::Response, Error=E> + Send,
           S::Future : Send + 'static,
           S::Error: Send {

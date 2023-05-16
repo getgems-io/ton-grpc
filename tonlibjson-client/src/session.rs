@@ -85,7 +85,7 @@ impl SessionClient {
     }
 }
 
-impl<T> Service<T> for SessionClient where T: TypedCallable<SharedService<PeakEwma<Client>>> + 'static {
+impl<T> Service<T> for SessionClient where T: TypedCallable<SharedService<PeakEwma<Client>>> {
     type Response = T::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
