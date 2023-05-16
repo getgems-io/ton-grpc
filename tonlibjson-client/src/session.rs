@@ -1,8 +1,9 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use async_trait::async_trait;
 use derive_new::new;
-use futures::FutureExt;
+use futures::{FutureExt, TryFutureExt};
 use serde_json::Value;
 use tower::{Layer, Service, ServiceExt};
 use tower::load::{Load, PeakEwma};
@@ -10,6 +11,7 @@ use tower::load::peak_ewma::Cost;
 use crate::{client::Client, request::Request};
 use crate::balance::Route;
 use crate::block::{AccountAddress, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
+use crate::error::Error;
 use crate::request::{CallableWrapper, Routable, TypedCallable};
 use crate::shared::{SharedLayer, SharedService};
 use crate::request::Callable;
@@ -30,6 +32,32 @@ pub struct RunGetMethod {
 
 impl Callable for RunGetMethod {
     type Response = Value;
+}
+
+#[async_trait]
+impl<S, E: Into<Error> + Send> TypedCallable<S> for RunGetMethod
+    where S: Service<SmcLoad, Response=<SmcLoad as Callable>::Response, Error=E>,
+          <S as Service<SmcLoad>>::Future: Send,
+          S: Service<SmcRunGetMethod, Response=<SmcRunGetMethod as Callable>::Response, Error=E>,
+          <S as Service<SmcRunGetMethod>>::Future: Send,
+          S: Send {
+    type Response = <SmcRunGetMethod as Callable>::Response;
+
+    async fn typed_call(self, client: &mut S) -> anyhow::Result<Self::Response> {
+        let info = ServiceExt::<SmcLoad>::ready(client)
+            .map_err(Into::into)
+            .await?
+            .call(SmcLoad::new(self.address))
+            .map_err(Into::into)
+            .await?;
+
+        Ok(ServiceExt::<SmcRunGetMethod>::ready(client)
+            .map_err(Into::into)
+            .await?
+            .call(SmcRunGetMethod::new(info.id, self.method, self.stack))
+            .map_err(Into::into)
+            .await?)
+    }
 }
 
 impl Routable for RunGetMethod {
