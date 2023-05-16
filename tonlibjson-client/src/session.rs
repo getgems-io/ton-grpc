@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 use derive_new::new;
 use futures::FutureExt;
 use serde_json::Value;
-use tower::{Layer, Service};
+use tower::{Layer, Service, ServiceExt};
 use tower::load::{Load, PeakEwma};
 use tower::load::peak_ewma::Cost;
 use crate::{client::Client, request::Request};
@@ -63,7 +63,7 @@ impl Service<SessionRequest> for SessionClient {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.inner.poll_ready(cx)
+        <SharedService<PeakEwma<Client>> as Service<Request>>::poll_ready(&mut self.inner, cx)
     }
 
     fn call(&mut self, req: SessionRequest) -> Self::Future {
@@ -83,11 +83,11 @@ impl SessionClient {
         let mut client = self.inner.clone();
 
         async move {
-            let info = SmcLoad::new(address).call(&mut client).await?;
+            let info = ServiceExt::<SmcLoad>::ready(&mut client).await?
+                .call(SmcLoad::new(address)).await?;
 
-            SmcRunGetMethod::new(info.id, method, stack)
-                .call(&mut client)
-                .await
+            ServiceExt::<SmcRunGetMethod>::ready(&mut client).await?
+                .call(SmcRunGetMethod::new(info.id, method, stack)).await
         }
     }
 }

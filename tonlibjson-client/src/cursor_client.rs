@@ -150,7 +150,7 @@ impl Service<SessionRequest> for CursorClient {
         if self.last_block_rx.borrow().is_some()
             && self.first_block_rx.borrow().is_some()
             && self.masterchain_info_rx.borrow().is_some() {
-            return self.client.poll_ready(cx)
+            return Service::<SessionRequest>::poll_ready(&mut self.client, cx)
         }
 
         cx.waker().wake_by_ref();

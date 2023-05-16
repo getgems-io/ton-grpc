@@ -76,7 +76,7 @@ impl TonClient {
 
     pub async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
         let client_discover = ClientDiscover::from_path(path).await?;
-        let ewma_discover = PeakEwmaDiscover::new(
+        let ewma_discover = PeakEwmaDiscover::new::<Value>(
             client_discover,
             Duration::from_secs(15),
             Duration::from_secs(60),
@@ -109,7 +109,7 @@ impl TonClient {
             Duration::from_secs(60),
             fallback_path
         ).await?;
-        let ewma_discover = PeakEwmaDiscover::new(
+        let ewma_discover = PeakEwmaDiscover::new::<Value>(
             client_discover,
             Duration::from_secs(15),
             Duration::from_secs(60),

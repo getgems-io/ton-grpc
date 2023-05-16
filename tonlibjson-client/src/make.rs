@@ -36,9 +36,9 @@ impl Service<TonConfig> for ClientFactory {
                 .await?;
 
             // TODO[akostylev0]
-            let _ = client.ready()
+            let _ = ServiceExt::<GetMasterchainInfo>::ready(&mut client)
                 .await?
-                .call(Request::new(RequestBody::GetMasterchainInfo(GetMasterchainInfo::default()), Duration::from_secs(3)))
+                .call(GetMasterchainInfo::default())
                 .await?;
 
             debug!("successfully made new client");

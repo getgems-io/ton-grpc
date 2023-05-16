@@ -35,8 +35,8 @@ pub trait Callable : Sized {
 }
 
 #[async_trait]
-pub trait Requestable where Self : Serialize + Sized {
-    type Response : DeserializeOwned;
+pub trait Requestable where Self : Serialize + Sized + Clone + Send + std::marker::Sync {
+    type Response : DeserializeOwned + Send + std::marker::Sync + 'static;
 
     fn timeout(&self) -> Duration {
         Duration::from_secs(3)
@@ -53,8 +53,8 @@ pub trait Routable {
     fn route(&self) -> Route;
 }
 
-#[derive(new, Debug)]
-pub struct Forward<Req : Requestable> {
+#[derive(new, Debug, Clone)]
+pub struct Forward<Req : Requestable + Clone> {
     req: Req,
     route: Route
 }
@@ -158,6 +158,18 @@ pub struct Request {
 
     #[serde(flatten)]
     pub body: RequestBody
+}
+
+#[derive(Serialize, Clone)]
+pub struct TypedRequest<T : Serialize + Clone> {
+    #[serde(rename="@extra")]
+    pub id: RequestId,
+
+    #[serde(skip_serializing)]
+    pub timeout: Duration,
+
+    #[serde(flatten)]
+    pub body: T
 }
 
 #[derive(Deserialize, Debug)]
