@@ -21,9 +21,9 @@ impl From<tower::BoxError> for Error {
     }
 }
 
-impl Into<anyhow::Error> for Error {
-    fn into(self) -> anyhow::Error {
-        self.inner
+impl From<Error> for anyhow::Error {
+    fn from(value: Error) -> Self {
+        value.inner
     }
 }
 

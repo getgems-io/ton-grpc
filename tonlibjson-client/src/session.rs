@@ -10,7 +10,7 @@ use tower::load::peak_ewma::Cost;
 use crate::{client::Client, request::Request};
 use crate::balance::Route;
 use crate::block::{AccountAddress, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
-use crate::request::{CallableWrapper, Routable};
+use crate::request::{CallableWrapper, Routable, TypedCallable};
 use crate::shared::{SharedLayer, SharedService};
 use crate::request::Callable;
 
@@ -54,6 +54,24 @@ pub struct SessionClient {
 impl SessionClient {
     pub fn new(client: PeakEwma<Client>) -> Self {
         Self { inner: SharedLayer::default().layer(client) }
+    }
+}
+
+impl<T> Service<T> for SessionClient where T: TypedCallable<SharedService<PeakEwma<Client>>> + 'static {
+    type Response = T::Response;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        <SharedService<PeakEwma<Client>> as Service<Request>>::poll_ready(&mut self.inner, cx)
+    }
+
+    fn call(&mut self, req: T) -> Self::Future {
+        let mut client = self.inner.clone();
+
+        async move{
+            req.typed_call(&mut client).await
+        }.boxed()
     }
 }
 

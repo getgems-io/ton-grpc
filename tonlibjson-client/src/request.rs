@@ -1,6 +1,7 @@
 use std::time::Duration;
 use async_trait::async_trait;
 use derive_new::new;
+use futures::TryFutureExt;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize, Serializer};
 use serde::de::DeserializeOwned;
@@ -8,6 +9,7 @@ use serde_json::Value;
 use tower::{Service, ServiceExt};
 use crate::balance::{BalanceRequest, Route};
 use crate::block::{BlocksGetBlockHeader, BlocksGetShards, BlocksGetTransactions, BlocksLookupBlock, GetAccountState, GetMasterchainInfo, GetShardAccountCell, GetShardAccountCellByTransaction, RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage, RawSendMessageReturnHash, SmcLoad, SmcRunGetMethod, Sync};
+use crate::error::Error;
 use crate::session::SessionRequest;
 
 #[async_trait]
@@ -31,6 +33,32 @@ pub trait Callable : Sized {
         let response = serde_json::from_value::<Self::Response>(json)?;
 
         Ok(response)
+    }
+}
+
+#[async_trait]
+pub trait TypedCallable<S> : Sized + Send {
+    type Response : DeserializeOwned;
+
+    async fn typed_call(self, client: &mut S) -> anyhow::Result<Self::Response>;
+}
+
+#[async_trait]
+impl<S, T, E: Into<Error>> TypedCallable<S> for T
+    where T : Requestable,
+          S : Service<T, Response=T::Response, Error=E> + Send,
+          S::Future : Send + 'static,
+          S::Error: Send {
+    type Response = T::Response;
+
+    async fn typed_call(self, client: &mut S) -> anyhow::Result<Self::Response> {
+        Ok(client
+            .ready()
+            .map_err(Into::<Error>::into)
+            .await?
+            .call(self)
+            .map_err(Into::<Error>::into)
+            .await?)
     }
 }
 
