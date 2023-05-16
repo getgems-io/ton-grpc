@@ -37,8 +37,8 @@ impl<S, T, E: Into<Error>> TypedCallable<S> for T
 }
 
 #[async_trait]
-pub trait Requestable where Self : Serialize + Sized + Clone + Send + std::marker::Sync {
-    type Response : DeserializeOwned + Send + std::marker::Sync + 'static;
+pub trait Requestable where Self : Serialize + Sized + Clone + Send + Sync {
+    type Response : DeserializeOwned + Send + Sync + 'static;
 
     fn timeout(&self) -> Duration {
         Duration::from_secs(3)
