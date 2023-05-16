@@ -23,7 +23,7 @@ use crate::ton_config::Liteserver;
 type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 
 pub struct ClientDiscover {
-    changes: Pin<Box<dyn Stream<Item = DiscoverResult<Client>> + Send>>,
+    changes: Pin<Box<dyn Stream<Item = DiscoverResult<Client>> + Send + Sync>>,
 }
 
 impl ClientDiscover {

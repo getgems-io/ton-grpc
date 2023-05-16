@@ -25,9 +25,10 @@ use crate::helper::Side;
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::request::Callable;
+use crate::shared::SharedService;
 
 pub struct TonClient {
-    client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>,
+    client: Retry<RetryPolicy, SharedService<Balance>>,
     first_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>,
     last_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>
 }
@@ -88,13 +89,12 @@ impl TonClient {
         let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
-        let client = Buffer::new(client, 200000);
+        let client = SharedService::new(client);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
             10,
             0.1
         )), client);
-        let client = ErrorLayer::default().layer(client);
 
         Ok(Self {
             client,
@@ -122,13 +122,12 @@ impl TonClient {
         let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
-        let client = Buffer::new(client, 200000);
+        let client = SharedService::new(client);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
             10,
             0.1
         )), client);
-        let client = ErrorLayer::default().layer(client);
 
         Ok(Self {
             client,
