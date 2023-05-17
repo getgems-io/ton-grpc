@@ -106,7 +106,7 @@ mod tests {
     use std::time::Duration;
     use serde_json::json;
     use uuid::Uuid;
-    use crate::request::{Request, Request};
+    use crate::request::Request;
 
     #[test]
     fn data_is_flatten() {

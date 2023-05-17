@@ -9,7 +9,8 @@ use tracing_test::traced_test;
 #[traced_test]
 #[serial]
 async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
-    let client = TonClient::from_env().await?;
+    let mut client = TonClient::from_env().await?;
+    client.ready().await?;
 
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned();
     let hash = "752Szayka+Eh54Zvco5l84d6WL+zJFmyh1wqRxD08Uo=";
@@ -38,7 +39,8 @@ async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
 #[traced_test]
 #[serial]
 async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result<()> {
-    let client = TonClient::from_env().await?;
+    let mut client = TonClient::from_env().await?;
+    client.ready().await?;
 
     let address = "EQBO_mAVkaHxt6Ibz7wqIJ_UIDmxZBFcgkk7fvIzkh7l42wO".to_owned();
 
@@ -60,7 +62,9 @@ async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result
 #[traced_test]
 #[serial]
 async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
-    let client = TonClient::from_env().await?;
+    let mut client = TonClient::from_env().await?;
+    client.ready().await?;
+
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
     let len = client.get_block_tx_stream(&block, false)
@@ -76,7 +80,9 @@ async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
 #[traced_test]
 #[serial]
 async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
-    let client = TonClient::from_env().await?;
+    let mut client = TonClient::from_env().await?;
+    client.ready().await?;
+
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
     let len = client.get_block_tx_stream(&block, true)
@@ -93,7 +99,9 @@ async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
 #[traced_test]
 #[serial]
 async fn get_block_tx_stream_unordered_correct() -> anyhow::Result<()> {
-    let client = TonClient::from_env().await?;
+    let mut client = TonClient::from_env().await?;
+    client.ready().await?;
+
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
     let len = client.get_block_tx_stream_unordered(&block)
