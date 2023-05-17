@@ -9,6 +9,7 @@ use tracing::debug;
 use crate::block::GetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
+use crate::request::Callable;
 use crate::session::SessionClient;
 use crate::ton_config::TonConfig;
 
@@ -33,7 +34,6 @@ impl Service<TonConfig> for ClientFactory {
                 .build()
                 .await?;
 
-            // TODO[akostylev0]
             let _ = ServiceExt::<GetMasterchainInfo>::ready(&mut client)
                 .await?
                 .call(GetMasterchainInfo::default())

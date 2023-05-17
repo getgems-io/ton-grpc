@@ -164,6 +164,7 @@ impl<R : Callable<ConcurrencyLimit<SessionClient>>> Service<R> for CursorClient 
     fn call(&mut self, req: R) -> Self::Future {
         let mut client = self.client.clone();
 
+        // TODO[akostylev0] for now we call ready twice
         async move {
             req.call(&mut client).await
         }.boxed()

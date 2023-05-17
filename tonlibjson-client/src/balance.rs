@@ -145,6 +145,7 @@ impl<T: Routable + Callable<ConcurrencyLimit<SessionClient>>> Service<T> for Rou
     }
 }
 
+// TODO[akostylev0] remove clone req
 impl<R> Service<R> for Balance where R: Routable + Callable<ConcurrencyLimit<SessionClient>> + Clone {
     type Response = R::Response;
     type Error = anyhow::Error;
