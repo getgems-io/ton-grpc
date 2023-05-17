@@ -11,7 +11,7 @@ use crate::{client::Client};
 use crate::balance::Route;
 use crate::block::{AccountAddress, GetMasterchainInfo, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
 use crate::error::Error;
-use crate::request::{Requestable, Routable, TypedCallable};
+use crate::request::{Requestable, Routable, Callable};
 use crate::shared::{SharedLayer, SharedService};
 
 #[derive(new, Clone)]
@@ -22,7 +22,7 @@ pub struct RunGetMethod {
 }
 
 #[async_trait]
-impl<S, E: Into<Error> + Send> TypedCallable<S> for RunGetMethod
+impl<S, E: Into<Error> + Send> Callable<S> for RunGetMethod
     where S: Service<SmcLoad, Response=<SmcLoad as Requestable>::Response, Error=E>,
           <S as Service<SmcLoad>>::Future: Send,
           S: Service<SmcRunGetMethod, Response=<SmcRunGetMethod as Requestable>::Response, Error=E>,
@@ -30,7 +30,7 @@ impl<S, E: Into<Error> + Send> TypedCallable<S> for RunGetMethod
           S: Send {
     type Response = <SmcRunGetMethod as Requestable>::Response;
 
-    async fn typed_call(self, client: &mut S) -> anyhow::Result<Self::Response> {
+    async fn call(self, client: &mut S) -> anyhow::Result<Self::Response> {
         let info = ServiceExt::<SmcLoad>::ready(client)
             .map_err(Into::into)
             .await?
@@ -66,7 +66,7 @@ impl SessionClient {
     }
 }
 
-impl<T> Service<T> for SessionClient where T: TypedCallable<SharedService<PeakEwma<Client>>> {
+impl<T> Service<T> for SessionClient where T: Callable<SharedService<PeakEwma<Client>>> {
     type Response = T::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -79,7 +79,7 @@ impl<T> Service<T> for SessionClient where T: TypedCallable<SharedService<PeakEw
         let mut client = self.inner.clone();
 
         async move {
-            req.typed_call(&mut client).await
+            req.call(&mut client).await
         }.boxed()
     }
 }

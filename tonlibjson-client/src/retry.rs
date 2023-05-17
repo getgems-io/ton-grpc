@@ -29,11 +29,9 @@ impl<T: Clone + 'static, Res, E> Policy<T, Res, E> for RetryPolicy {
                 None
             }
             Err(_) => {
-                // TODO[akostylev0] rewrite to trait
+                // TODO[akostylev0] rewrite to trait fn
                 let type_of = TypeId::of::<T>();
-                if type_of == TypeId::of::<RawSendMessageReturnHash>() {
-                    None
-                } else if type_of == TypeId::of::<RawSendMessage>() {
+                if type_of == TypeId::of::<RawSendMessageReturnHash>() || type_of == TypeId::of::<RawSendMessage>() {
                     None
                 } else {
                     match self.budget.withdraw() {

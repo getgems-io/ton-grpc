@@ -15,7 +15,7 @@ use crate::block::{BlockHeader};
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 use crate::error::ErrorService;
-use crate::request::{Routable, TypedCallable};
+use crate::request::{Routable, Callable};
 use crate::session::{SessionClient};
 
 #[derive(Debug, Clone, Copy)]
@@ -117,7 +117,7 @@ impl Router {
 #[derive(new)]
 pub struct Balance { router: Router }
 
-impl<T: Routable + TypedCallable<ConcurrencyLimit<SessionClient>>> Service<T> for Router {
+impl<T: Routable + Callable<ConcurrencyLimit<SessionClient>>> Service<T> for Router {
     type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, T>>;
     type Error = anyhow::Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
@@ -145,7 +145,7 @@ impl<T: Routable + TypedCallable<ConcurrencyLimit<SessionClient>>> Service<T> fo
     }
 }
 
-impl<R> Service<R> for Balance where R: Routable + TypedCallable<ConcurrencyLimit<SessionClient>> + Clone {
+impl<R> Service<R> for Balance where R: Routable + Callable<ConcurrencyLimit<SessionClient>> + Clone {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;

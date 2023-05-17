@@ -15,7 +15,7 @@ use tracing::{instrument, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::session::{SessionClient};
-use crate::request::{TypedCallable};
+use crate::request::{Callable};
 
 #[derive(Clone)]
 pub struct CursorClient {
@@ -42,7 +42,7 @@ impl CursorClient {
                     timer.tick().await;
 
                     let masterchain_info = GetMasterchainInfo::default()
-                        .typed_call(&mut client)
+                        .call(&mut client)
                         .await;
 
                     match masterchain_info {
@@ -91,8 +91,8 @@ impl CursorClient {
                     if let Some((mfb, wfb)) = first_block.clone() {
                         let mut clone = client.clone();
                         if let Err(e) = try_join!(
-                            BlocksGetShards::new(mfb.id.clone()).typed_call(&mut clone),
-                            BlocksGetBlockHeader::new(wfb.id.clone()).typed_call(&mut client)
+                            BlocksGetShards::new(mfb.id.clone()).call(&mut clone),
+                            BlocksGetBlockHeader::new(wfb.id.clone()).call(&mut client)
                         ) {
                             trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
@@ -143,7 +143,7 @@ impl CursorClient {
     }
 }
 
-impl<R : TypedCallable<ConcurrencyLimit<SessionClient>>> Service<R> for CursorClient {
+impl<R : Callable<ConcurrencyLimit<SessionClient>>> Service<R> for CursorClient {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -165,7 +165,7 @@ impl<R : TypedCallable<ConcurrencyLimit<SessionClient>>> Service<R> for CursorCl
         let mut client = self.client.clone();
 
         async move {
-            req.typed_call(&mut client).await
+            req.call(&mut client).await
         }.boxed()
     }
 }
@@ -179,20 +179,20 @@ impl tower::load::Load for CursorClient {
 }
 
 async fn check_block_available(client: &mut ConcurrencyLimit<SessionClient>, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
-    let block_id = BlocksLookupBlock::seqno(block_id).typed_call(client).await?;
-    let shards = BlocksGetShards::new(block_id.clone()).typed_call(client).await?;
+    let block_id = BlocksLookupBlock::seqno(block_id).call(client).await?;
+    let shards = BlocksGetShards::new(block_id.clone()).call(client).await?;
 
     let mut clone = client.clone();
     try_join!(
-        BlocksGetBlockHeader::new(block_id).typed_call(&mut clone),
-        BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()).typed_call(client)
+        BlocksGetBlockHeader::new(block_id).call(&mut clone),
+        BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()).call(client)
     )
 }
 
 #[instrument(skip_all, err, level = "trace")]
 async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
     let start = GetMasterchainInfo::default()
-        .typed_call(client)
+        .call(client)
         .await?.last;
 
     let length = start.seqno;
@@ -234,11 +234,11 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Resu
 
 async fn fetch_last_headers(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
     let master_chain_last_block_id = Sync::default()
-        .typed_call(client)
+        .call(client)
         .await?;
 
     let shards = BlocksGetShards::new(master_chain_last_block_id.clone())
-        .typed_call(client)
+        .call(client)
         .await?.shards;
 
     let work_chain_last_block_id = shards.first()
@@ -247,7 +247,7 @@ async fn fetch_last_headers(client: &mut ConcurrencyLimit<SessionClient>) -> Res
 
     let mut clone = client.clone();
     let (master_chain_header, work_chain_header) = try_join!(
-        BlocksGetBlockHeader::new(master_chain_last_block_id).typed_call(&mut clone),
+        BlocksGetBlockHeader::new(master_chain_last_block_id).call(&mut clone),
         wait_for_block_header(work_chain_last_block_id, client)
     )?;
 
@@ -265,7 +265,7 @@ async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLim
         let mut client = client.clone();
 
         async move {
-            BlocksGetBlockHeader::new(block_id).typed_call(&mut client).await
+            BlocksGetBlockHeader::new(block_id).call(&mut client).await
         }
     }).await
 }

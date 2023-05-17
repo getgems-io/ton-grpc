@@ -11,21 +11,21 @@ use crate::balance::Route;
 use crate::error::Error;
 
 #[async_trait]
-pub trait TypedCallable<S> : Sized + Send + Clone + 'static {
+pub trait Callable<S> : Sized + Send + Clone + 'static {
     type Response : DeserializeOwned;
 
-    async fn typed_call(self, client: &mut S) -> anyhow::Result<Self::Response>;
+    async fn call(self, client: &mut S) -> anyhow::Result<Self::Response>;
 }
 
 #[async_trait]
-impl<S, T, E: Into<Error>> TypedCallable<S> for T
+impl<S, T, E: Into<Error>> Callable<S> for T
     where T : Requestable + 'static,
           S : Service<T, Response=T::Response, Error=E> + Send,
           S::Future : Send + 'static,
           S::Error: Send {
     type Response = T::Response;
 
-    async fn typed_call(self, client: &mut S) -> anyhow::Result<Self::Response> {
+    async fn call(self, client: &mut S) -> anyhow::Result<Self::Response> {
         Ok(client
             .ready()
             .map_err(Into::<Error>::into)
