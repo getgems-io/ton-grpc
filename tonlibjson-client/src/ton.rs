@@ -569,7 +569,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .call(RunGetMethod::new(address, method, stack))
+            .oneshot(RunGetMethod::new(address, method, stack))
             .await
     }
 
@@ -578,7 +578,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .call(GetShardAccountCell::new(address))
+            .oneshot(GetShardAccountCell::new(address))
             .await
     }
 
@@ -587,7 +587,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .call(WithBlock::new(block, GetShardAccountCell::new(address)))
+            .oneshot(WithBlock::new(block, GetShardAccountCell::new(address)))
             .await
     }
 
@@ -596,7 +596,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .call(GetShardAccountCellByTransaction::new(address, transaction))
+            .oneshot(GetShardAccountCellByTransaction::new(address, transaction))
             .await
     }
 
