@@ -38,12 +38,14 @@ impl<S, E: Into<Error> + Send> TypedCallable<S> for RunGetMethod
             .map_err(Into::into)
             .await?;
 
-        Ok(ServiceExt::<SmcRunGetMethod>::ready(client)
+        let result = ServiceExt::<SmcRunGetMethod>::ready(client)
             .map_err(Into::into)
             .await?
             .call(SmcRunGetMethod::new(info.id, self.method, self.stack))
             .map_err(Into::into)
-            .await?)
+            .await?;
+
+        Ok(result)
     }
 }
 

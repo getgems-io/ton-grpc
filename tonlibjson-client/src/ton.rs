@@ -11,7 +11,7 @@ use tokio_stream::StreamMap;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
-use tower::{Service, ServiceExt};
+use tower::ServiceExt;
 use tracing::{instrument, trace};
 use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
@@ -25,8 +25,7 @@ use crate::session::RunGetMethod;
 use crate::shared::SharedService;
 
 pub struct TonClient {
-    // TODO[akostylev0] Retry
-    client: SharedService<Balance>,
+    client: Retry<RetryPolicy, SharedService<Balance>>,
     first_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>,
     last_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>
 }
@@ -88,11 +87,11 @@ impl TonClient {
         let client = Balance::new(router);
 
         let client = SharedService::new(client);
-        // let client = Retry::new(RetryPolicy::new(Budget::new(
-        //     Duration::from_secs(10),
-        //     10,
-        //     0.1
-        // )), client);
+        let client = Retry::new(RetryPolicy::new(Budget::new(
+            Duration::from_secs(10),
+            10,
+            0.1
+        )), client);
 
         Ok(Self {
             client,
@@ -121,11 +120,11 @@ impl TonClient {
         let client = Balance::new(router);
 
         let client = SharedService::new(client);
-        // let client = Retry::new(RetryPolicy::new(Budget::new(
-        //     Duration::from_secs(10),
-        //     10,
-        //     0.1
-        // )), client);
+        let client = Retry::new(RetryPolicy::new(Budget::new(
+            Duration::from_secs(10),
+            10,
+            0.1
+        )), client);
 
         Ok(Self {
             client,

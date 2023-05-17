@@ -11,7 +11,7 @@ use crate::balance::Route;
 use crate::error::Error;
 
 #[async_trait]
-pub trait TypedCallable<S> : Sized + Send + 'static {
+pub trait TypedCallable<S> : Sized + Send + Clone + 'static {
     type Response : DeserializeOwned;
 
     async fn typed_call(self, client: &mut S) -> anyhow::Result<Self::Response>;
