@@ -1,10 +1,10 @@
-use std::future::ready;
 use std::pin::Pin;
 use futures::{Stream, StreamExt};
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error, span};
 use anyhow::anyhow;
 use tracing::Level;
+use async_stream::stream;
 use crate::ton::transaction_emulator_service_server::TransactionEmulatorService as BaseTransactionEmulatorService;
 use crate::ton::{TransactionEmulatorEmulateRequest, TransactionEmulatorEmulateResponse, TransactionEmulatorPrepareRequest, TransactionEmulatorPrepareResponse, TransactionEmulatorRequest, TransactionEmulatorResponse, TransactionEmulatorSetConfigRequest, TransactionEmulatorSetConfigResponse, TransactionEmulatorSetIgnoreChksigRequest, TransactionEmulatorSetIgnoreChksigResponse, TransactionEmulatorSetLibsRequest, TransactionEmulatorSetLibsResponse, TransactionEmulatorSetLtRequest, TransactionEmulatorSetLtResponse, TransactionEmulatorSetRandSeedRequest, TransactionEmulatorSetRandSeedResponse, TransactionEmulatorSetUnixtimeRequest, TransactionEmulatorSetUnixtimeResponse, TvmResult};
 use crate::ton::transaction_emulator_request::Request::*;
@@ -24,53 +24,56 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
 
     async fn process(&self, request: Request<Streaming<TransactionEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
         let stream = request.into_inner();
+        let mut state = State::default();
 
-        let output = stream.scan(State::default(), |state, msg| {
-            match msg {
-                Ok(TransactionEmulatorRequest { request_id, request: Some(req) }) => {
-                    let span = span!(Level::TRACE, "transaction emulator request", request_id=request_id, request = ?req);
-                    let _guard = span.enter();
+        let output = stream! {
+            for await msg in stream {
+                match msg {
+                    Ok(TransactionEmulatorRequest { request_id, request: Some(req) }) => {
+                        let span = span!(Level::TRACE, "transaction emulator request", request_id=request_id, request = ?req);
+                        let _guard = span.enter();
 
-                    let response = match req {
-                        Prepare(req) => prepare(state, req).map(PrepareResponse),
-                        _ => {
-                            if let Some(emu) = state.emulator.as_ref() {
-                                match req {
-                                    Emulate(req) => emulate(emu, req).map(EmulateResponse),
-                                    SetUnixtime(req) => set_unixtime(emu, req).map(SetUnixtimeResponse),
-                                    SetLt(req) => set_lt(emu, req).map(SetLtResponse),
-                                    SetRandSeed(req) => set_rand_seed(emu, req).map(SetRandSeedResponse),
-                                    SetIgnoreChksig(req) => set_ignore_chksig(emu, req).map(SetIgnoreChksigResponse),
-                                    SetConfig(req) => set_config(emu, req).map(SetConfigResponse),
-                                    SetLibs(req) => set_libs(emu, req).map(SetLibsResponse),
-                                    Prepare(_) => unreachable!()
+                        let response = match req {
+                            Prepare(req) => prepare(&mut state, req).map(PrepareResponse),
+                            _ => {
+                                if let Some(emu) = state.emulator.as_ref() {
+                                    match req {
+                                        Emulate(req) => emulate(emu, req).map(EmulateResponse),
+                                        SetUnixtime(req) => set_unixtime(emu, req).map(SetUnixtimeResponse),
+                                        SetLt(req) => set_lt(emu, req).map(SetLtResponse),
+                                        SetRandSeed(req) => set_rand_seed(emu, req).map(SetRandSeedResponse),
+                                        SetIgnoreChksig(req) => set_ignore_chksig(emu, req).map(SetIgnoreChksigResponse),
+                                        SetConfig(req) => set_config(emu, req).map(SetConfigResponse),
+                                        SetLibs(req) => set_libs(emu, req).map(SetLibsResponse),
+                                        Prepare(_) => unreachable!()
+                                    }
+                                } else {
+                                    Err(anyhow!("emulator not initialized"))
                                 }
-                            } else {
-                                Err(anyhow!("emulator not initialized"))
                             }
-                        }
-                    };
+                        };
 
-                    ready(Some(response
-                        .map(|r| TransactionEmulatorResponse { request_id, response: Some(r) })
-                        .map_err(|e| {
-                            error!(error = ?e);
+                        yield response
+                            .map(|r| TransactionEmulatorResponse { request_id, response: Some(r) })
+                            .map_err(|e| {
+                                error!(error = ?e);
 
-                            Status::internal(e.to_string())
-                        })))
-                },
-                Ok(TransactionEmulatorRequest { request_id, request: None }) => {
-                    error!(error = ?anyhow!("empty request"), request_id=request_id);
+                                Status::internal(e.to_string())
+                            })
+                    },
+                    Ok(TransactionEmulatorRequest { request_id, request: None }) => {
+                        error!(error = ?anyhow!("empty request"), request_id=request_id);
 
-                    ready(None)
-                },
-                Err(e) =>  {
-                    error!(error = ?e);
+                        break
+                    },
+                    Err(e) =>  {
+                        error!(error = ?e);
 
-                    ready(None)
+                        break
+                    }
                 }
             }
-        }).boxed();
+        }.boxed();
 
         Ok(Response::new(output))
     }
