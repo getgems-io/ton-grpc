@@ -19,3 +19,4 @@ base64 = "0.21"
 hex = "0.4"
 tokio-stream = { version = "0.1", features = ["sync"]}
 tracing-test = "0.2.4"
+async-stream = "0.3.5"
