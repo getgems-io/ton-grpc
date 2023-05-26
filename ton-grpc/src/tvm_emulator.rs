@@ -1,4 +1,5 @@
 use std::pin::Pin;
+use std::sync::{Arc, Mutex};
 use anyhow::anyhow;
 use async_stream::stream;
 use futures::{StreamExt, Stream};
@@ -23,24 +24,35 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
 
     async fn process(&self, request: Request<Streaming<TvmEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
         let stream = request.into_inner();
-        let mut state = State::default();
 
         let output = stream! {
+            let state = Arc::new(Mutex::new(State::default()));
+
             for await msg in stream {
                 match msg {
                     Ok(TvmEmulatorRequest { request_id, request: Some(req)}) => {
                         let span = span!(Level::TRACE, "tvm emulator request", request_id=request_id);
                         let _guard = span.enter();
+                        let state = Arc::clone(&state);
 
-                        let response = match req {
-                            Prepare(req) => prepare_emu(&mut state, req).map(PrepareResponse),
-                            RunGetMethod(req) => run_get_method(&mut state, req).map(RunGetMethodResponse),
-                            SendExternalMessage(req) => send_external_message(&mut state, req).map(SendExternalMessageResponse),
-                            SendInternalMessage(req) => send_internal_message(&mut state, req).map(SendInternalMessageResponse),
-                            SetLibraries(req) => set_libraries(&mut state, req).map(SetLibrariesResponse),
-                            SetGasLimit(req) => set_gas_limit(&mut state, req).map(SetGasLimitResponse),
-                            SetC7(req) => set_c7(&mut state, req).map(SetC7Response)
-                        };
+                        let response = tokio::task::spawn_blocking(move || {
+                            let mut state = state.lock()
+                                .map_err(|e| anyhow!(e.to_string()))?;
+
+                            match req {
+                                Prepare(req) => prepare_emu(&mut state, req).map(PrepareResponse),
+                                RunGetMethod(req) => run_get_method(&mut state, req).map(RunGetMethodResponse),
+                                SendExternalMessage(req) => send_external_message(&mut state, req).map(SendExternalMessageResponse),
+                                SendInternalMessage(req) => send_internal_message(&mut state, req).map(SendInternalMessageResponse),
+                                SetLibraries(req) => set_libraries(&mut state, req).map(SetLibrariesResponse),
+                                SetGasLimit(req) => set_gas_limit(&mut state, req).map(SetGasLimitResponse),
+                                SetC7(req) => set_c7(&mut state, req).map(SetC7Response)
+                        }}).await
+                             .map_err(|e| {
+                                error!(error = ?e);
+
+                                Status::internal(e.to_string())
+                            })?;
 
                         yield response
                             .map(|r| TvmEmulatorResponse { request_id, response: Some(r) })

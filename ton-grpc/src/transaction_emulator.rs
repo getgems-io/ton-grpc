@@ -1,4 +1,5 @@
 use std::pin::Pin;
+use std::sync::{Arc, Mutex};
 use futures::{Stream, StreamExt};
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error, span};
@@ -24,34 +25,45 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
 
     async fn process(&self, request: Request<Streaming<TransactionEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
         let stream = request.into_inner();
-        let mut state = State::default();
 
         let output = stream! {
+            let state = Arc::new(Mutex::new(State::default()));
+
             for await msg in stream {
                 match msg {
                     Ok(TransactionEmulatorRequest { request_id, request: Some(req) }) => {
                         let span = span!(Level::TRACE, "transaction emulator request", request_id=request_id, request = ?req);
                         let _guard = span.enter();
+                        let state = Arc::clone(&state);
 
-                        let response = match req {
-                            Prepare(req) => prepare(&mut state, req).map(PrepareResponse),
-                            _ => {
-                                if let Some(emu) = state.emulator.as_ref() {
-                                    match req {
-                                        Emulate(req) => emulate(emu, req).map(EmulateResponse),
-                                        SetUnixtime(req) => set_unixtime(emu, req).map(SetUnixtimeResponse),
-                                        SetLt(req) => set_lt(emu, req).map(SetLtResponse),
-                                        SetRandSeed(req) => set_rand_seed(emu, req).map(SetRandSeedResponse),
-                                        SetIgnoreChksig(req) => set_ignore_chksig(emu, req).map(SetIgnoreChksigResponse),
-                                        SetConfig(req) => set_config(emu, req).map(SetConfigResponse),
-                                        SetLibs(req) => set_libs(emu, req).map(SetLibsResponse),
-                                        Prepare(_) => unreachable!()
+                        let response = tokio::task::spawn_blocking(move || {
+                            let mut state = state.lock()
+                                .map_err(|e| anyhow!(e.to_string()))?;
+
+                            match req {
+                                Prepare(req) => prepare(&mut state, req).map(PrepareResponse),
+                                _ => {
+                                    if let Some(emu) = state.emulator.as_ref() {
+                                        match req {
+                                            Emulate(req) => emulate(emu, req).map(EmulateResponse),
+                                            SetUnixtime(req) => set_unixtime(emu, req).map(SetUnixtimeResponse),
+                                            SetLt(req) => set_lt(emu, req).map(SetLtResponse),
+                                            SetRandSeed(req) => set_rand_seed(emu, req).map(SetRandSeedResponse),
+                                            SetIgnoreChksig(req) => set_ignore_chksig(emu, req).map(SetIgnoreChksigResponse),
+                                            SetConfig(req) => set_config(emu, req).map(SetConfigResponse),
+                                            SetLibs(req) => set_libs(emu, req).map(SetLibsResponse),
+                                            Prepare(_) => unreachable!()
+                                        }
+                                    } else {
+                                        Err(anyhow!("emulator not initialized"))
                                     }
-                                } else {
-                                    Err(anyhow!("emulator not initialized"))
                                 }
-                            }
-                        };
+                        }}).await
+                             .map_err(|e| {
+                                error!(error = ?e);
+
+                                Status::internal(e.to_string())
+                            })?;
 
                         yield response
                             .map(|r| TransactionEmulatorResponse { request_id, response: Some(r) })
