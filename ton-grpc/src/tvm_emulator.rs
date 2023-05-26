@@ -1,6 +1,6 @@
-use std::future::ready;
 use std::pin::Pin;
 use anyhow::anyhow;
+use async_stream::stream;
 use futures::{StreamExt, Stream};
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error, Level, span};
@@ -12,6 +12,7 @@ use crate::ton::{TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmula
 #[derive(Debug, Default)]
 pub struct TvmEmulatorService;
 
+#[derive(Default)]
 struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
 }
@@ -22,43 +23,46 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
 
     async fn process(&self, request: Request<Streaming<TvmEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
         let stream = request.into_inner();
+        let mut state = State::default();
 
-        let output = stream.scan(State { emulator: None }, |state, msg| {
-            match msg {
-                Ok(TvmEmulatorRequest { request_id, request: Some(req)}) => {
-                    let span = span!(Level::TRACE, "tvm emulator request", request_id=request_id);
-                    let _guard = span.enter();
+        let output = stream! {
+            for await msg in stream {
+                match msg {
+                    Ok(TvmEmulatorRequest { request_id, request: Some(req)}) => {
+                        let span = span!(Level::TRACE, "tvm emulator request", request_id=request_id);
+                        let _guard = span.enter();
 
-                    let response = match req {
-                        Prepare(req) => prepare_emu(state, req).map(PrepareResponse),
-                        RunGetMethod(req) => run_get_method(state, req).map(RunGetMethodResponse),
-                        SendExternalMessage(req) => send_external_message(state, req).map(SendExternalMessageResponse),
-                        SendInternalMessage(req) => send_internal_message(state, req).map(SendInternalMessageResponse),
-                        SetLibraries(req) => set_libraries(state, req).map(SetLibrariesResponse),
-                        SetGasLimit(req) => set_gas_limit(state, req).map(SetGasLimitResponse),
-                        SetC7(req) => set_c7(state, req).map(SetC7Response)
-                    };
+                        let response = match req {
+                            Prepare(req) => prepare_emu(&mut state, req).map(PrepareResponse),
+                            RunGetMethod(req) => run_get_method(&mut state, req).map(RunGetMethodResponse),
+                            SendExternalMessage(req) => send_external_message(&mut state, req).map(SendExternalMessageResponse),
+                            SendInternalMessage(req) => send_internal_message(&mut state, req).map(SendInternalMessageResponse),
+                            SetLibraries(req) => set_libraries(&mut state, req).map(SetLibrariesResponse),
+                            SetGasLimit(req) => set_gas_limit(&mut state, req).map(SetGasLimitResponse),
+                            SetC7(req) => set_c7(&mut state, req).map(SetC7Response)
+                        };
 
-                    ready(Some(response
-                        .map(|r| TvmEmulatorResponse { request_id, response: Some(r) })
-                        .map_err(|e| {
-                            error!(error = ?e);
-                            Status::internal(e.to_string())
-                        })))
+                        yield response
+                            .map(|r| TvmEmulatorResponse { request_id, response: Some(r) })
+                            .map_err(|e| {
+                                error!(error = ?e);
+                                Status::internal(e.to_string())
+                            })
 
-                },
-                Ok(TvmEmulatorRequest{ request_id, request: None }) => {
-                    tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);
+                    },
+                    Ok(TvmEmulatorRequest{ request_id, request: None }) => {
+                        tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);
 
-                    ready(None)
-                },
-                Err(e) =>  {
-                    tracing::error!(error = ?e);
+                        break
+                    },
+                    Err(e) =>  {
+                        tracing::error!(error = ?e);
 
-                    ready(None)
+                        break
+                    }
                 }
             }
-        }).boxed();
+        }.boxed();
 
         Ok(Response::new(output))
     }
