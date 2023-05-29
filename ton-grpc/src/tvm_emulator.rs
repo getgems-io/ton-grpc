@@ -1,6 +1,7 @@
-use std::future::ready;
 use std::pin::Pin;
+use std::sync::{Arc, Mutex};
 use anyhow::anyhow;
+use async_stream::stream;
 use futures::{StreamExt, Stream};
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error, Level, span};
@@ -12,6 +13,7 @@ use crate::ton::{TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmula
 #[derive(Debug, Default)]
 pub struct TvmEmulatorService;
 
+#[derive(Default)]
 struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
 }
@@ -23,42 +25,56 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
     async fn process(&self, request: Request<Streaming<TvmEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
         let stream = request.into_inner();
 
-        let output = stream.scan(State { emulator: None }, |state, msg| {
-            match msg {
-                Ok(TvmEmulatorRequest { request_id, request: Some(req)}) => {
-                    let span = span!(Level::TRACE, "tvm emulator request", request_id=request_id);
-                    let _guard = span.enter();
+        let output = stream! {
+            let state = Arc::new(Mutex::new(State::default()));
 
-                    let response = match req {
-                        Prepare(req) => prepare_emu(state, req).map(PrepareResponse),
-                        RunGetMethod(req) => run_get_method(state, req).map(RunGetMethodResponse),
-                        SendExternalMessage(req) => send_external_message(state, req).map(SendExternalMessageResponse),
-                        SendInternalMessage(req) => send_internal_message(state, req).map(SendInternalMessageResponse),
-                        SetLibraries(req) => set_libraries(state, req).map(SetLibrariesResponse),
-                        SetGasLimit(req) => set_gas_limit(state, req).map(SetGasLimitResponse),
-                        SetC7(req) => set_c7(state, req).map(SetC7Response)
-                    };
+            for await msg in stream {
+                match msg {
+                    Ok(TvmEmulatorRequest { request_id, request: Some(req)}) => {
+                        let span = span!(Level::TRACE, "tvm emulator request", request_id=request_id);
+                        let _guard = span.enter();
+                        let state = Arc::clone(&state);
 
-                    ready(Some(response
-                        .map(|r| TvmEmulatorResponse { request_id, response: Some(r) })
-                        .map_err(|e| {
-                            error!(error = ?e);
-                            Status::internal(e.to_string())
-                        })))
+                        let response = tokio::task::spawn_blocking(move || {
+                            let mut state = state.lock()
+                                .map_err(|e| anyhow!(e.to_string()))?;
 
-                },
-                Ok(TvmEmulatorRequest{ request_id, request: None }) => {
-                    tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);
+                            match req {
+                                Prepare(req) => prepare_emu(&mut state, req).map(PrepareResponse),
+                                RunGetMethod(req) => run_get_method(&mut state, req).map(RunGetMethodResponse),
+                                SendExternalMessage(req) => send_external_message(&mut state, req).map(SendExternalMessageResponse),
+                                SendInternalMessage(req) => send_internal_message(&mut state, req).map(SendInternalMessageResponse),
+                                SetLibraries(req) => set_libraries(&mut state, req).map(SetLibrariesResponse),
+                                SetGasLimit(req) => set_gas_limit(&mut state, req).map(SetGasLimitResponse),
+                                SetC7(req) => set_c7(&mut state, req).map(SetC7Response)
+                        }}).await
+                             .map_err(|e| {
+                                error!(error = ?e);
 
-                    ready(None)
-                },
-                Err(e) =>  {
-                    tracing::error!(error = ?e);
+                                Status::internal(e.to_string())
+                            })?;
 
-                    ready(None)
+                        yield response
+                            .map(|r| TvmEmulatorResponse { request_id, response: Some(r) })
+                            .map_err(|e| {
+                                error!(error = ?e);
+                                Status::internal(e.to_string())
+                            })
+
+                    },
+                    Ok(TvmEmulatorRequest{ request_id, request: None }) => {
+                        tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);
+
+                        break
+                    },
+                    Err(e) =>  {
+                        tracing::error!(error = ?e);
+
+                        break
+                    }
                 }
             }
-        }).boxed();
+        }.boxed();
 
         Ok(Response::new(output))
     }
