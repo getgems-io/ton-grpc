@@ -1,6 +1,6 @@
 FROM rust:1.69.0-bullseye
 
-RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common unzip
+RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common unzip libsecp256k1-dev libsodium-dev
 
 RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 15 all
 RUN ln -sf $(which clang-15) /usr/bin/clang
