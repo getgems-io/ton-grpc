@@ -3,7 +3,8 @@ members = [
     "tonlibjson-sys",
     "tonlibjson-client",
     "tonlibjson-jsonrpc",
-    "ton-grpc"
+    "ton-grpc",
+    "tvm-grpc"
 ]
 
 [workspace.dependencies]
@@ -20,3 +21,8 @@ hex = "0.4"
 tokio-stream = { version = "0.1", features = ["sync"]}
 tracing-test = "0.2.4"
 async-stream = "0.3.5"
+tonic = "0.9"
+tonic-reflection = "0.9"
+tonic-health = "0.9"
+tonic-build = "0.9"
+prost = "0.11"
