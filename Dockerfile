@@ -1,4 +1,4 @@
-FROM ghcr.io/akostylev0/tonlibjson-builder:sha-61b1f171b212d611316edc4d8bb10eb99fe6b3ca AS builder
+FROM ghcr.io/akostylev0/tonlibjson-builder:sha-7d3ab4010de9541db0d313afa0c2f1bea1c62f66 AS builder
 
 ARG FEATURES
 ARG SCCACHE_GHA_ENABLED
@@ -15,6 +15,8 @@ COPY . .
 
 RUN cargo fetch --locked
 RUN cargo build -vv --release --target x86_64-unknown-linux-gnu --features "$FEATURES" && sccache --show-stats
+
+RUN ldd /app/target/x86_64-unknown-linux-gnu/release/ton-grpc
 
 
 FROM debian:bookworm-slim AS runner
