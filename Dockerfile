@@ -16,6 +16,8 @@ COPY . .
 RUN cargo fetch --locked
 RUN cargo build -vv --release --target x86_64-unknown-linux-gnu --features "$FEATURES" && sccache --show-stats
 
+RUN ldd /app/target/x86_64-unknown-linux-gnu/release/ton-grpc
+
 
 FROM debian:bullseye-slim AS runner
 
