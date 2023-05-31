@@ -1,5 +1,3 @@
-mod tvm_emulator;
-mod transaction_emulator;
 mod ton;
 mod account;
 mod helpers;
@@ -17,10 +15,6 @@ use crate::message::MessageService;
 use crate::ton::account_service_server::AccountServiceServer;
 use crate::ton::block_service_server::BlockServiceServer;
 use crate::ton::message_service_server::MessageServiceServer;
-use crate::ton::transaction_emulator_service_server::TransactionEmulatorServiceServer;
-use crate::ton::tvm_emulator_service_server::TvmEmulatorServiceServer;
-use crate::transaction_emulator::TransactionEmulatorService;
-use crate::tvm_emulator::TvmEmulatorService;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -28,8 +22,6 @@ async fn main() -> anyhow::Result<()> {
         .with_env_filter(EnvFilter::from_default_env())
         .with_span_events(FmtSpan::CLOSE)
         .init();
-
-    tonlibjson_sys::TvmEmulator::set_verbosity_level(0);
 
     let reflection = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
@@ -46,8 +38,6 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Ton Client is ready");
 
-    let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default());
-    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default());
     let account_service = AccountServiceServer::new(AccountService::new(client.clone()));
     let block_service = BlockServiceServer::new(BlockService::new(client.clone()));
     let message_service = MessageServiceServer::new(MessageService::new(client));
@@ -56,8 +46,6 @@ async fn main() -> anyhow::Result<()> {
         .tcp_keepalive(Some(Duration::from_secs(120)))
         .http2_keepalive_interval(Some(Duration::from_secs(90)))
         .add_service(reflection)
-        .add_service(tvm_emulator_service)
-        .add_service(transaction_emulator_service)
         .add_service(account_service)
         .add_service(block_service)
         .add_service(message_service)

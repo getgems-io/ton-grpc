@@ -1,0 +1,217 @@
+syntax = "proto3";
+
+package tvm;
+
+service TvmEmulatorService {
+  rpc Process(stream TvmEmulatorRequest) returns (stream TvmEmulatorResponse);
+}
+
+message TvmEmulatorRequest {
+  uint64 request_id = 1;
+  oneof Request {
+    TvmEmulatorPrepareRequest prepare = 2;
+    TvmEmulatorRunGetMethodRequest run_get_method = 3;
+    TvmEmulatorSendExternalMessageRequest send_external_message = 4;
+    TvmEmulatorSendInternalMessageRequest send_internal_message = 5;
+    TvmEmulatorSetLibrariesRequest set_libraries = 6;
+    TvmEmulatorSetGasLimitRequest set_gas_limit = 7;
+    TvmEmulatorSetC7Request set_c7 = 8;
+  }
+}
+
+message TvmEmulatorResponse {
+  uint64 request_id = 1;
+  oneof Response {
+    TvmEmulatorPrepareResponse prepare_response = 2;
+    TvmEmulatorRunGetMethodResponse run_get_method_response = 3;
+    TvmEmulatorSendExternalMessageResponse send_external_message_response = 4;
+    TvmEmulatorSendInternalMessageResponse send_internal_message_response = 5;
+    TvmEmulatorSetLibrariesResponse set_libraries_response = 6;
+    TvmEmulatorSetGasLimitResponse set_gas_limit_response = 7;
+    TvmEmulatorSetC7Response set_c7_response = 8;
+  }
+}
+
+message TvmEmulatorPrepareRequest {
+  int32 vm_log_verbosity = 1;
+  string code_boc = 2;
+  string data_boc = 3;
+}
+
+message TvmEmulatorPrepareResponse {
+  bool success = 1;
+}
+
+message TvmEmulatorRunGetMethodRequest {
+  int32 method_id = 1;
+  string stack_boc = 2;
+}
+
+message TvmEmulatorRunGetMethodResponse {
+  int32 vm_exit_code = 1;
+  string gas_used = 2;
+  string vm_log = 3;
+  string stack = 4;
+  optional string missing_library = 5;
+}
+
+message TvmEmulatorSendExternalMessageRequest {
+  string message_body_boc = 1;
+}
+
+message TvmEmulatorSendExternalMessageResponse {
+  int32 vm_exit_code = 1;
+  bool accepted = 2;
+  string gas_used = 3;
+  string vm_log = 4;
+  string new_code = 5;
+  string new_data = 6;
+  optional string missing_library = 7;
+  optional string actions = 8;
+}
+
+message TvmEmulatorSendInternalMessageRequest {
+  uint64 amount = 1;
+  string message_body_boc = 2;
+}
+
+message TvmEmulatorSendInternalMessageResponse {
+  int32 vm_exit_code = 1;
+  bool accepted = 2;
+  string gas_used = 3;
+  string vm_log = 4;
+  string new_code = 5;
+  string new_data = 6;
+  optional string missing_library = 7;
+  optional string actions = 8;
+}
+
+message TvmEmulatorSetLibrariesRequest {
+  string libs_boc = 1;
+}
+
+message TvmEmulatorSetLibrariesResponse {
+  bool success = 1;
+}
+
+message TvmEmulatorSetGasLimitRequest {
+  int64 gas_limit = 1;
+}
+
+message TvmEmulatorSetGasLimitResponse {
+  bool success = 1;
+}
+
+message TvmEmulatorSetC7Request {
+  uint32 unixtime = 1;
+  uint64 balance = 2;
+  string address = 3;
+  string rand_seed_hex = 4;
+  string config = 5;
+}
+
+message TvmEmulatorSetC7Response {
+  bool success = 1;
+}
+
+service TransactionEmulatorService {
+  rpc Process(stream TransactionEmulatorRequest) returns (stream TransactionEmulatorResponse);
+}
+
+message TransactionEmulatorRequest {
+  uint64 request_id = 1;
+  oneof Request {
+    TransactionEmulatorPrepareRequest prepare = 2;
+    TransactionEmulatorEmulateRequest emulate = 3;
+    TransactionEmulatorSetUnixtimeRequest set_unixtime = 4;
+    TransactionEmulatorSetLtRequest set_lt = 5;
+    TransactionEmulatorSetRandSeedRequest set_rand_seed = 6;
+    TransactionEmulatorSetIgnoreChksigRequest set_ignore_chksig = 7;
+    TransactionEmulatorSetConfigRequest set_config = 8;
+    TransactionEmulatorSetLibsRequest set_libs = 9;
+
+  }
+}
+
+message TransactionEmulatorResponse {
+  uint64 request_id = 1;
+  oneof Response {
+    TransactionEmulatorPrepareResponse prepare_response = 2;
+    TransactionEmulatorEmulateResponse emulate_response = 3;
+    TransactionEmulatorSetUnixtimeResponse set_unixtime_response = 4;
+    TransactionEmulatorSetLtResponse set_lt_response = 5;
+    TransactionEmulatorSetRandSeedResponse set_rand_seed_response = 6;
+    TransactionEmulatorSetIgnoreChksigResponse set_ignore_chksig_response = 7;
+    TransactionEmulatorSetConfigResponse set_config_response = 8;
+    TransactionEmulatorSetLibsResponse set_libs_response = 9;
+  }
+}
+
+message TransactionEmulatorPrepareRequest {
+  int32 vm_log_level = 1;
+  string config_boc = 2;
+}
+
+message TransactionEmulatorPrepareResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorEmulateRequest {
+  string shard_account_boc = 1;
+  string message_boc = 2;
+}
+
+message TransactionEmulatorEmulateResponse {
+  string transaction = 1;
+  string shard_account = 2;
+  string vm_log = 3;
+  optional string actions = 4;
+}
+
+message TransactionEmulatorSetUnixtimeRequest {
+  uint32 unixtime = 1;
+}
+
+message TransactionEmulatorSetUnixtimeResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetLtRequest {
+  uint64 lt = 1;
+}
+
+message TransactionEmulatorSetLtResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetRandSeedRequest {
+  string rand_seed = 1;
+}
+
+message TransactionEmulatorSetRandSeedResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetIgnoreChksigRequest {
+  bool ignore_chksig = 1;
+}
+
+message TransactionEmulatorSetIgnoreChksigResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetConfigRequest {
+  string config = 1;
+}
+
+message TransactionEmulatorSetConfigResponse {
+  bool success = 1;
+}
+
+message TransactionEmulatorSetLibsRequest {
+  string libs = 1;
+}
+
+message TransactionEmulatorSetLibsResponse {
+  bool success = 1;
+}

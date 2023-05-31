@@ -1514,7 +1514,6 @@ name = "ton-grpc"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "async-stream",
  "derive-new",
  "either",
  "futures",
@@ -1527,7 +1526,6 @@ dependencies = [
  "tonic-health",
  "tonic-reflection",
  "tonlibjson-client",
- "tonlibjson-sys",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1831,6 +1829,26 @@ name = "try-lock"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
+
+[[package]]
+name = "tvm-grpc"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "futures",
+ "prost",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tonic",
+ "tonic-build",
+ "tonic-health",
+ "tonic-reflection",
+ "tonlibjson-sys",
+ "tracing",
+ "tracing-subscriber",
+]
 
 [[package]]
 name = "unicode-bidi"

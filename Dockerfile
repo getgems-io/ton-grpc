@@ -25,5 +25,6 @@ RUN apt update && apt install --yes ca-certificates
 
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/tonlibjson-jsonrpc /app/tonlibjson-jsonrpc
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/ton-grpc /app/ton-grpc
+COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/tvm-grpc /app/tvm-grpc
 
-CMD ["/app/tonlibjson-jsonrpc"]
+CMD ["/app/ton-grpc"]
