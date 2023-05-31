@@ -17,7 +17,7 @@ RUN cargo fetch --locked
 RUN cargo build -vv --release --target x86_64-unknown-linux-gnu --features "$FEATURES" && sccache --show-stats
 
 
-FROM debian:bullseye-slim AS runner
+FROM debian:bookworm-slim AS runner
 
 RUN apt update && apt install --yes ca-certificates
 
