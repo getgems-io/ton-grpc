@@ -35,21 +35,14 @@ fn main() {
     if is_testnet {
         println!("cargo:rustc-link-lib=static=sodium");
         println!("cargo:rustc-link-lib=static=secp256k1");
-        println!("cargo:rustc-link-lib=static=gmp");
-        println!("cargo:rustc-link-lib=static=gmpxx");
     }
 
     let target_arch = "x86-64";
-    // CMAKE_SYSTEM_NAME will trigger CMAKE_CROSSCOMPILING
-    // so it will not compile the "fift" target
-    // TODO[akostylev0]
-    let target_system_name = "Linux";
 
     if build_tonlibjson {
         let dst= if !is_darwin && is_release {
             Config::new(ton_dir)
                 .define("TON_ONLY_TONLIB", "ON")
-                .define("CMAKE_SYSTEM_NAME", target_system_name)
                 .define("CMAKE_C_COMPILER", "clang")
                 .define("CMAKE_CXX_COMPILER", "clang++")
                 .define("CMAKE_CXX_STANDARD", "14")
@@ -68,7 +61,6 @@ fn main() {
             Config::new(ton_dir)
                 .uses_cxx11()
                 .define("TON_ONLY_TONLIB", "ON")
-                .define("CMAKE_SYSTEM_NAME", target_system_name)
                 .define("CMAKE_C_COMPILER", "clang")
                 .define("CMAKE_CXX_COMPILER", "clang++")
                 .define("CMAKE_CXX_STANDARD", "14")
@@ -136,7 +128,6 @@ fn main() {
         let dst = if !is_darwin && is_release {
             Config::new(ton_dir)
                 .define("TON_ONLY_TONLIB", "ON")
-                .define("CMAKE_SYSTEM_NAME", target_system_name)
                 .define("CMAKE_C_COMPILER", "clang")
                 .define("CMAKE_CXX_COMPILER", "clang++")
                 .define("CMAKE_CXX_STANDARD", "14")
@@ -155,7 +146,6 @@ fn main() {
             Config::new(ton_dir)
                 .uses_cxx11()
                 .define("TON_ONLY_TONLIB", "ON")
-                .define("CMAKE_SYSTEM_NAME", target_system_name)
                 .define("CMAKE_C_COMPILER", "clang")
                 .define("CMAKE_CXX_COMPILER", "clang++")
                 .define("CMAKE_CXX_STANDARD", "14")
