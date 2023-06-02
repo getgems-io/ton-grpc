@@ -11,6 +11,7 @@ pub struct MessageService {
 
 #[async_trait]
 impl BaseMessageService for MessageService {
+    #[tracing::instrument(skip_all, err)]
     async fn send_message(&self, request: Request<SendRequest>) -> Result<Response<SendResponse>, Status> {
         let msg = request.into_inner();
 
