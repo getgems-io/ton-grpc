@@ -1,4 +1,4 @@
-use std::{ffi::{c_void, CStr, CString}, time::Duration};
+use std::{ffi::{c_void, CStr, CString}, time::Duration, ptr::NonNull};
 use libc::{c_char, c_double, c_int};
 use anyhow::{anyhow, Result};
 
@@ -55,14 +55,14 @@ extern {
 
 #[derive(Debug)]
 pub struct Client {
-    pointer: *mut c_void,
+    pointer: NonNull<c_void>
 }
 
 impl Client {
     pub fn new() -> Self {
-        Self {
-            pointer: unsafe { tonlib_client_json_create() }
-        }
+        let pointer = unsafe { NonNull::new_unchecked(tonlib_client_json_create()) };
+
+        Self { pointer }
     }
 
     pub fn set_verbosity_level(level: i32) {
@@ -70,18 +70,20 @@ impl Client {
     }
 
     pub fn send(&self, request: &str) -> Result<()> {
+        tracing::trace!(request = request);
+
         let req = CString::new(request)?;
 
-        unsafe { tonlib_client_json_send(self.pointer, req.as_ptr()); }
+        unsafe { tonlib_client_json_send(self.pointer.as_ptr(), req.as_ptr()); }
 
         Ok(())
     }
 
     pub fn receive(&self, timeout: Duration) -> Result<&str> {
         let response = unsafe {
-            let ptr = tonlib_client_json_receive(self.pointer, timeout.as_secs_f64());
+            let ptr = tonlib_client_json_receive(self.pointer.as_ptr(), timeout.as_secs_f64());
             if ptr.is_null() {
-                return Err(anyhow!("timeout reached"));
+                return Err(anyhow!("null received"));
             }
 
             CStr::from_ptr(ptr)
@@ -94,9 +96,9 @@ impl Client {
         let req = CString::new(request)?;
 
         let response = unsafe {
-            let ptr = tonlib_client_json_execute(self.pointer, req.into_raw());
+            let ptr = tonlib_client_json_execute(self.pointer.as_ptr(), req.into_raw());
             if ptr.is_null() {
-                return Err(anyhow!("timeout reached"));
+                return Err(anyhow!("null received"));
             }
 
             CStr::from_ptr(ptr)
@@ -116,7 +118,7 @@ impl Default for Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        unsafe { tonlib_client_json_destroy(self.pointer) }
+        unsafe { tonlib_client_json_destroy(self.pointer.as_ptr()) }
     }
 }
 

@@ -7,6 +7,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 [dependencies]
 libc = "0.2"
 anyhow = { workspace = true }
+tracing = { workspace = true }
 
 [build-dependencies]
 cmake = "0.1"

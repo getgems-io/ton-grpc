@@ -1722,6 +1722,7 @@ dependencies = [
  "libc",
  "pkg-config",
  "procinfo",
+ "tracing",
 ]
 
 [[package]]
