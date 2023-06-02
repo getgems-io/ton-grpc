@@ -18,6 +18,7 @@ pub struct BlockService {
 impl BaseBlockService for BlockService {
     type SubscribeLastBlockStream = BoxStream<'static, Result<SubscribeLastBlockEvent, Status>>;
 
+    #[tracing::instrument(skip_all, err)]
     async fn subscribe_last_block(&self, _: Request<SubscribeLastBlockRequest>) -> Result<Response<Self::SubscribeLastBlockStream>, Status> {
         let stream = self.client.last_block_stream()
             .map(|(m, w)| Ok(SubscribeLastBlockEvent {
@@ -29,6 +30,7 @@ impl BaseBlockService for BlockService {
         Ok(Response::new(stream))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_last_block(&self, _request: Request<GetLastBlockRequest>) -> Result<Response<BlockIdExt>, Status> {
         let block = self.client.get_masterchain_info().await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?.last;
@@ -36,6 +38,7 @@ impl BaseBlockService for BlockService {
         Ok(Response::new(block.into()))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_block(&self, request: Request<BlockId>) -> Result<Response<BlockIdExt>, Status> {
         let block_id = extend_block_id(&self.client, &request.into_inner()).await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
@@ -43,6 +46,7 @@ impl BaseBlockService for BlockService {
         Ok(Response::new(block_id.into()))
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_shards(&self, request: Request<BlockId>) -> Result<Response<GetShardsResponse>, Status> {
         let block_id = extend_block_id(&self.client, &request.into_inner()).await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
@@ -57,6 +61,7 @@ impl BaseBlockService for BlockService {
 
     type GetTransactionIdsStream = BoxStream<'static, Result<TransactionId, Status>>;
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_transaction_ids(&self, request: Request<GetTransactionIdsRequest>) -> Result<Response<Self::GetTransactionIdsStream>, Status> {
         let msg = request.into_inner();
 
@@ -84,6 +89,7 @@ impl BaseBlockService for BlockService {
 
     type GetAccountAddressesStream = BoxStream<'static, Result<AccountAddress, Status>>;
 
+    #[tracing::instrument(skip_all, err)]
     async fn get_account_addresses(&self, request: Request<BlockId>) -> Result<Response<Self::GetAccountAddressesStream>, Status> {
         let msg = request.into_inner();
         let block_id = extend_block_id(&self.client, &msg).await
