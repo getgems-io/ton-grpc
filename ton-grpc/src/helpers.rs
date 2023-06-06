@@ -53,11 +53,9 @@ pub async fn extend_from_tx_id(client: &TonClient, address: &str, from: Option<t
                     }
                 },
                 Some(TransactionId(tx_id)) => {
-                    let state = client.raw_get_account_state_by_transaction(address, tx_id.into()).await?;
-
                     match typ {
-                        Type::Included => Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?),
-                        Type::Excluded => Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                        Type::Included => Included(tx_id.into()),
+                        Type::Excluded => Excluded(tx_id.into())
                     }
                 }
             }
@@ -90,11 +88,9 @@ pub async fn extend_to_tx_id(client: &TonClient, address: &str, to: Option<ton::
                     }
                 },
                 Some(TransactionId(tx_id)) => {
-                    let state = client.raw_get_account_state_by_transaction(address, tx_id.into()).await?;
-
                     match typ {
-                        Type::Included => Included(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?),
-                        Type::Excluded => Excluded(state.last_transaction_id.ok_or(anyhow!("to_tx not found"))?)
+                        Type::Included => Included(tx_id.into()),
+                        Type::Excluded => Excluded(tx_id.into())
                     }
                 }
             }
