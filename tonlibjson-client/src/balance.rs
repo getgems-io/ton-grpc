@@ -11,12 +11,14 @@ use anyhow::anyhow;
 use derive_new::new;
 use itertools::Itertools;
 use tower::limit::ConcurrencyLimit;
+use tower::load::PeakEwma;
 use crate::block::{BlockHeader};
+use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 use crate::error::ErrorService;
 use crate::request::{Routable, Callable};
-use crate::session::{SessionClient};
+use crate::shared::SharedService;
 
 #[derive(Debug, Clone, Copy)]
 pub enum BlockCriteria {
@@ -117,7 +119,7 @@ impl Router {
 #[derive(new)]
 pub struct Balance { router: Router }
 
-impl<T: Routable + Callable<ConcurrencyLimit<SessionClient>>> Service<&T> for Router {
+impl<T: Routable + Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> Service<&T> for Router {
     type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, T>>;
     type Error = anyhow::Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
@@ -145,7 +147,7 @@ impl<T: Routable + Callable<ConcurrencyLimit<SessionClient>>> Service<&T> for Ro
     }
 }
 
-impl<R> Service<R> for Balance where R: Routable + Callable<ConcurrencyLimit<SessionClient>> + Clone {
+impl<R> Service<R> for Balance where R: Routable + Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>> + Clone {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;

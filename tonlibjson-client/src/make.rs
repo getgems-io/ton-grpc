@@ -10,7 +10,7 @@ use crate::block::GetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::request::Callable;
-use crate::session::SessionClient;
+use crate::shared::SharedLayer;
 use crate::ton_config::TonConfig;
 
 #[derive(Default, Debug)]
@@ -52,8 +52,8 @@ pub struct CursorClientFactory;
 impl CursorClientFactory {
     pub fn create(client: PeakEwma<Client>) -> CursorClient {
         debug!("make new cursor client");
-        let client = SessionClient::new(client);
-
+        let client = SharedLayer::default()
+            .layer(client);
         let client = ConcurrencyLimitLayer::new(100)
             .layer(client);
 

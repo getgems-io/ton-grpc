@@ -11,15 +11,17 @@ use tokio_retry::Retry;
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
+use tower::load::PeakEwma;
 use tracing::{instrument, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
-use crate::session::{SessionClient};
+use crate::client::Client;
 use crate::request::{Callable};
+use crate::shared::SharedService;
 
 #[derive(Clone)]
 pub struct CursorClient {
-    client: ConcurrencyLimit<SessionClient>,
+    client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>,
 
     pub first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
     pub last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
@@ -28,7 +30,7 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
-    pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
+    pub fn new(client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
         let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
         tokio::spawn({
@@ -143,7 +145,7 @@ impl CursorClient {
     }
 }
 
-impl<R : Callable<ConcurrencyLimit<SessionClient>>> Service<R> for CursorClient {
+impl<R : Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> Service<R> for CursorClient {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -179,7 +181,7 @@ impl tower::load::Load for CursorClient {
     }
 }
 
-async fn check_block_available(client: &mut ConcurrencyLimit<SessionClient>, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
+async fn check_block_available(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
     let block_id = BlocksLookupBlock::seqno(block_id).call(client).await?;
     let shards = BlocksGetShards::new(block_id.clone()).call(client).await?;
 
@@ -191,7 +193,7 @@ async fn check_block_available(client: &mut ConcurrencyLimit<SessionClient>, blo
 }
 
 #[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
+async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<(BlockHeader, BlockHeader)> {
     let start = GetMasterchainInfo::default()
         .call(client)
         .await?.last;
@@ -233,7 +235,7 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Resu
 }
 
 
-async fn fetch_last_headers(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
+async fn fetch_last_headers(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<(BlockHeader, BlockHeader)> {
     let master_chain_last_block_id = Sync::default()
         .call(client)
         .await?;
@@ -255,7 +257,7 @@ async fn fetch_last_headers(client: &mut ConcurrencyLimit<SessionClient>) -> Res
     Ok((master_chain_header, work_chain_header))
 }
 
-async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLimit<SessionClient>) -> Result<BlockHeader> {
+async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<BlockHeader> {
     let retry = ExponentialBackoff::from_millis(4)
         .max_delay(Duration::from_secs(1))
         .map(jitter)
