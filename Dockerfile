@@ -1,4 +1,4 @@
-FROM ghcr.io/akostylev0/tonlibjson-builder:sha-c7d20f8f41735b6c66fbcb6730f4723f317a132d AS builder
+FROM ghcr.io/akostylev0/tonlibjson-builder:sha-eba0f84fccae48d3da8ae71d22a7d344ac784004 AS builder
 
 ARG FEATURES
 ARG SCCACHE_GHA_ENABLED
