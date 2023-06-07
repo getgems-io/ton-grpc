@@ -3,13 +3,13 @@ FROM rust:1.70.0-bookworm
 RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common unzip libsecp256k1-dev libsodium-dev
 
 # TODO[akostylev0]
-RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 15 all || true
+RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 16 all || true
 RUN apt-get update
-RUN /tmp/llvm.sh 15 all
+RUN /tmp/llvm.sh 16 all
 
-RUN ln -sf $(which clang-15) /usr/bin/clang
-RUN ln -sf $(which clang++-15) /usr/bin/clang++
-RUN ln -sf /usr/bin/ld.lld-15 /usr/bin/ld.lld
+RUN ln -sf $(which clang-16) /usr/bin/clang
+RUN ln -sf $(which clang++-16) /usr/bin/clang++
+RUN ln -sf /usr/bin/ld.lld-16 /usr/bin/ld.lld
 
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
