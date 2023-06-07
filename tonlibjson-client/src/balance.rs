@@ -117,7 +117,7 @@ impl Router {
 #[derive(new)]
 pub struct Balance { router: Router }
 
-impl<T: Routable + Callable<ConcurrencyLimit<SessionClient>>> Service<T> for Router {
+impl<T: Routable + Callable<ConcurrencyLimit<SessionClient>>> Service<&T> for Router {
     type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, T>>;
     type Error = anyhow::Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
@@ -134,7 +134,7 @@ impl<T: Routable + Callable<ConcurrencyLimit<SessionClient>>> Service<T> for Rou
         }
     }
 
-    fn call(&mut self, req: T) -> Self::Future {
+    fn call(&mut self, req: &T) -> Self::Future {
         let services = req.route().choose(&self.services);
 
         std::future::ready(if services.is_empty() {
@@ -145,19 +145,18 @@ impl<T: Routable + Callable<ConcurrencyLimit<SessionClient>>> Service<T> for Rou
     }
 }
 
-// TODO[akostylev0] remove clone req
 impl<R> Service<R> for Balance where R: Routable + Callable<ConcurrencyLimit<SessionClient>> + Clone {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Service::<R>::poll_ready(&mut self.router, cx)
+        Service::<&R>::poll_ready(&mut self.router, cx)
     }
 
     fn call(&mut self, req: R) -> Self::Future {
         self.router
-            .call(req.clone())
+            .call(&req)
             .and_then(|svc| svc.oneshot(req))
             .boxed()
     }
