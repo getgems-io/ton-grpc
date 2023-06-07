@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tower::Service;
+use tower::{Service, ServiceExt};
 use anyhow::{anyhow, Result};
 use futures::{FutureExt, try_join};
 use tokio::sync::watch::Receiver;
@@ -182,21 +182,18 @@ impl tower::load::Load for CursorClient {
 }
 
 async fn check_block_available(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
-    let block_id = BlocksLookupBlock::seqno(block_id).call(client).await?;
-    let shards = BlocksGetShards::new(block_id.clone()).call(client).await?;
+    let block_id = client.oneshot(BlocksLookupBlock::seqno(block_id)).await?;
+    let shards = client.oneshot(BlocksGetShards::new(block_id.clone())).await?;
 
-    let mut clone = client.clone();
     try_join!(
-        BlocksGetBlockHeader::new(block_id).call(&mut clone),
-        BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()).call(client)
+        client.clone().oneshot(BlocksGetBlockHeader::new(block_id)),
+        client.oneshot(BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()))
     )
 }
 
 #[instrument(skip_all, err, level = "trace")]
 async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<(BlockHeader, BlockHeader)> {
-    let start = GetMasterchainInfo::default()
-        .call(client)
-        .await?.last;
+    let start = client.oneshot(GetMasterchainInfo::default()).await?.last;
 
     let length = start.seqno;
     let mut rhs = length;
@@ -236,21 +233,17 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<
 
 
 async fn fetch_last_headers(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<(BlockHeader, BlockHeader)> {
-    let master_chain_last_block_id = Sync::default()
-        .call(client)
-        .await?;
+    let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
-    let shards = BlocksGetShards::new(master_chain_last_block_id.clone())
-        .call(client)
+    let shards = client.oneshot(BlocksGetShards::new(master_chain_last_block_id.clone()))
         .await?.shards;
 
     let work_chain_last_block_id = shards.first()
         .ok_or_else(|| anyhow!("last block for work chain not found"))?
         .clone();
 
-    let mut clone = client.clone();
     let (master_chain_header, work_chain_header) = try_join!(
-        BlocksGetBlockHeader::new(master_chain_last_block_id).call(&mut clone),
+        client.clone().oneshot(BlocksGetBlockHeader::new(master_chain_last_block_id)),
         wait_for_block_header(work_chain_last_block_id, client)
     )?;
 
@@ -265,10 +258,8 @@ async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLim
 
     Retry::spawn(retry, || {
         let block_id = block_id.clone();
-        let mut client = client.clone();
+        let client = client.clone();
 
-        async move {
-            BlocksGetBlockHeader::new(block_id).call(&mut client).await
-        }
+        client.oneshot(BlocksGetBlockHeader::new(block_id))
     }).await
 }
