@@ -1,42 +1,36 @@
+use std::future::Future;
 use std::time::Duration;
-use async_trait::async_trait;
 use derive_new::new;
-use futures::TryFutureExt;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tower::{Service, ServiceExt};
+use tower::{Service};
 use crate::balance::Route;
 use crate::error::Error;
 
-#[async_trait]
 pub trait Callable<S> : Sized + Send + Clone + 'static {
     type Response : DeserializeOwned;
+    type Error: Into<Error>;
+    type Future : Future<Output=Result<Self::Response, Self::Error>> + Send;
 
-    async fn call(self, client: &mut S) -> anyhow::Result<Self::Response>;
+    fn call(self, client: &mut S) -> Self::Future;
 }
 
-#[async_trait]
 impl<S, T, E: Into<Error>> Callable<S> for T
     where T : Requestable + 'static,
           S : Service<T, Response=T::Response, Error=E> + Send,
           S::Future : Send + 'static,
           S::Error: Send {
     type Response = T::Response;
+    type Error = S::Error;
+    type Future = S::Future;
 
-    async fn call(self, client: &mut S) -> anyhow::Result<Self::Response> {
-        Ok(client
-            .ready()
-            .map_err(Into::<Error>::into)
-            .await?
-            .call(self)
-            .map_err(Into::<Error>::into)
-            .await?)
+    fn call(self, client: &mut S) -> Self::Future {
+        client.call(self)
     }
 }
 
-#[async_trait]
 pub trait Requestable where Self : Serialize + Sized + Clone + Send + Sync {
     type Response : DeserializeOwned + Send + Sync + 'static;
 

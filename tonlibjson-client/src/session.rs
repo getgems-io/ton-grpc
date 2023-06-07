@@ -1,6 +1,7 @@
-use async_trait::async_trait;
 use derive_new::new;
+use futures::future::BoxFuture;
 use futures::TryFutureExt;
+use futures::FutureExt;
 use tower::{Service, ServiceExt};
 use crate::balance::Route;
 use crate::block::{AccountAddress, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
@@ -14,31 +15,26 @@ pub struct RunGetMethod {
     stack: SmcStack
 }
 
-#[async_trait]
-impl<S, E: Into<Error> + Send> Callable<S> for RunGetMethod
+impl<S, E: Into<Error> + Send + 'static> Callable<S> for RunGetMethod
     where S: Service<SmcLoad, Response=<SmcLoad as Requestable>::Response, Error=E>,
           <S as Service<SmcLoad>>::Future: Send,
           S: Service<SmcRunGetMethod, Response=<SmcRunGetMethod as Requestable>::Response, Error=E>,
           <S as Service<SmcRunGetMethod>>::Future: Send,
-          S: Send {
+          S: Send + Clone + 'static {
     type Response = <SmcRunGetMethod as Requestable>::Response;
+    type Error = Error;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    async fn call(self, client: &mut S) -> anyhow::Result<Self::Response> {
-        let info = ServiceExt::<SmcLoad>::ready(client)
-            .map_err(Into::into)
-            .await?
-            .call(SmcLoad::new(self.address))
-            .map_err(Into::into)
-            .await?;
+    fn call(self, client: &mut S) -> Self::Future {
+        let clone = client.clone();
 
-        let result = ServiceExt::<SmcRunGetMethod>::ready(client)
+        client.call(SmcLoad::new(self.address))
             .map_err(Into::into)
-            .await?
-            .call(SmcRunGetMethod::new(info.id, self.method, self.stack))
-            .map_err(Into::into)
-            .await?;
-
-        Ok(result)
+            .and_then(move |info| {
+            clone
+                .oneshot(SmcRunGetMethod::new(info.id, self.method, self.stack))
+                .map_err(Into::into)
+        }).boxed()
     }
 }
 

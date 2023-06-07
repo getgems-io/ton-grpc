@@ -54,7 +54,7 @@ impl CursorClientFactory {
         debug!("make new cursor client");
         let client = SharedLayer::default()
             .layer(client);
-        let client = ConcurrencyLimitLayer::new(100)
+        let client = ConcurrencyLimitLayer::new(256)
             .layer(client);
 
         let client = CursorClient::new(client);

@@ -36,6 +36,7 @@ impl CursorClient {
         tokio::spawn({
             let mut client = client.clone();
             async move {
+                let client = &mut client;
                 let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
                 timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -43,9 +44,7 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    let masterchain_info = GetMasterchainInfo::default()
-                        .call(&mut client)
-                        .await;
+                    let masterchain_info = client.oneshot(GetMasterchainInfo::default()).await;
 
                     match masterchain_info {
                         Ok(mut masterchain_info) => {
@@ -59,7 +58,7 @@ impl CursorClient {
                                 }
                             }
 
-                            match fetch_last_headers(&mut client).await {
+                            match fetch_last_headers(client).await {
                                 Ok((last_master_chain_header, last_work_chain_header)) => {
                                     masterchain_info.last = last_master_chain_header.id.clone();
                                     trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
@@ -85,16 +84,16 @@ impl CursorClient {
             let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
 
             async move {
+                let client = &mut client;
                 let mut timer = interval(Duration::from_secs(30));
                 timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
                 loop {
                     timer.tick().await;
 
                     if let Some((mfb, wfb)) = first_block.clone() {
-                        let mut clone = client.clone();
                         if let Err(e) = try_join!(
-                            BlocksGetShards::new(mfb.id.clone()).call(&mut clone),
-                            BlocksGetBlockHeader::new(wfb.id.clone()).call(&mut client)
+                            client.clone().oneshot(BlocksGetShards::new(mfb.id.clone())),
+                            client.oneshot(BlocksGetBlockHeader::new(wfb.id.clone()))
                         ) {
                             trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
@@ -103,7 +102,7 @@ impl CursorClient {
                         }
                     }
                     if first_block.is_none() {
-                        let fb = find_first_blocks(&mut client).await;
+                        let fb = find_first_blocks(client).await;
 
                         match fb {
                             Ok((mfb, wfb)) => {
@@ -154,7 +153,6 @@ impl<R : Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> Service<R>
         if self.last_block_rx.borrow().is_some()
             && self.first_block_rx.borrow().is_some()
             && self.masterchain_info_rx.borrow().is_some() {
-            // TODO[akostylev0]
             return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx)
         }
 
@@ -164,12 +162,9 @@ impl<R : Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> Service<R>
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        let mut client = self.client.clone();
+        use futures::TryFutureExt;
 
-        // TODO[akostylev0] for now we call ready twice
-        async move {
-            req.call(&mut client).await
-        }.boxed()
+        req.call(&mut self.client).map_err(|e| e.into().into()).boxed()
     }
 }
 
