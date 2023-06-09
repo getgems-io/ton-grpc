@@ -4,10 +4,13 @@ mod helpers;
 mod block;
 mod message;
 
+use std::env;
 use std::time::Duration;
 use tonic::transport::Server;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use tonlibjson_client::ton::TonClient;
 use crate::account::AccountService;
 use crate::block::BlockService;
@@ -16,12 +19,15 @@ use crate::ton::account_service_server::AccountServiceServer;
 use crate::ton::block_service_server::BlockServiceServer;
 use crate::ton::message_service_server::MessageServiceServer;
 
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::from_default_env())
-        .with_span_events(FmtSpan::CLOSE)
-        .init();
+    let otlp = env::var("OTLP").unwrap_or_default()
+        .parse::<bool>().unwrap_or(false);
+
+    if otlp { init_tracing_otlp()? } else { init_tracing()? }
+
+    tracing::info!(otlp = ?otlp, "tracing initialized");
 
     let reflection = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
@@ -51,6 +57,38 @@ async fn main() -> anyhow::Result<()> {
         .add_service(message_service)
         .serve_with_shutdown(addr, async move { tokio::signal::ctrl_c().await.unwrap(); })
         .await?;
+
+    Ok(())
+}
+
+fn init_tracing() -> anyhow::Result<()> {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::from_default_env())
+        .with_span_events(FmtSpan::CLOSE)
+        .init();
+
+    Ok(())
+}
+
+fn init_tracing_otlp() -> anyhow::Result<()> {
+    use opentelemetry_otlp::WithExportConfig;
+
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_span_events(FmtSpan::CLOSE);
+
+    let tracer = opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_env())
+        .install_batch(opentelemetry::runtime::Tokio)?;
+
+    let telemetry_layer = tracing_opentelemetry::layer()
+        .with_tracer(tracer);
+
+    tracing_subscriber::registry()
+        .with(telemetry_layer)
+        .with(EnvFilter::from_default_env())
+        .with(fmt_layer)
+        .init();
 
     Ok(())
 }

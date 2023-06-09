@@ -80,7 +80,7 @@ impl Service<PeakEwma<Client>> for CursorClientFactory {
 
 struct ClientBuilder {
     config: Value,
-    disable_logging: Option<Value>,
+    logging: Option<i32>,
 }
 
 impl ClientBuilder {
@@ -104,24 +104,22 @@ impl ClientBuilder {
 
         Self {
             config: full_config,
-            disable_logging: None,
+            logging: None,
         }
     }
 
     fn disable_logging(&mut self) -> &mut Self {
-        self.disable_logging = Some(json!({
-            "@type": "setLogVerbosityLevel",
-            "new_verbosity_level": 0
-        }));
+        self.logging = Some(0);
 
         self
     }
 
     async fn build(&self) -> anyhow::Result<Client> {
-        let mut client = Client::new();
-        if let Some(ref disable_logging) = self.disable_logging {
-            disable_logging.clone().call(&mut client).await?;
+        if let Some(level) = self.logging {
+            Client::set_logging(level);
         }
+
+        let mut client = Client::new();
 
         self.config.clone().call(&mut client).await?;
 
