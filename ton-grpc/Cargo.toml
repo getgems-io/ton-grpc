@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
+[features]
+default = []
+testnet = ["tonlibjson-client/testnet"]
+
 [dependencies]
 tonlibjson-client = { path = "../tonlibjson-client" }
 tokio = { workspace = true }
@@ -17,6 +21,10 @@ tonic = { workspace = true }
 tonic-reflection = { workspace = true }
 tonic-health = { workspace = true }
 prost = { workspace = true }
+opentelemetry = { workspace = true }
+opentelemetry-otlp = { workspace = true }
+tracing-opentelemetry = { workspace = true }
+clap = { version = "4.3.2", features = ["derive"] }
 either = "1.8"
 derive-new = "0.5.9"
 

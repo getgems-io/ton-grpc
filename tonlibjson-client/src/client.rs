@@ -20,6 +20,10 @@ pub struct Client {
 }
 
 impl Client {
+    pub fn set_logging(level: i32) {
+        tonlibjson_sys::Client::set_verbosity_level(level);
+    }
+
     pub fn new() -> Self {
         let client = Arc::new(tonlibjson_sys::Client::new());
         let client_recv = client.clone();
