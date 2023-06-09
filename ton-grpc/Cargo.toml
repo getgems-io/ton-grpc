@@ -24,7 +24,6 @@ prost = { workspace = true }
 opentelemetry = { workspace = true }
 opentelemetry-otlp = { workspace = true }
 tracing-opentelemetry = { workspace = true }
-clap = { version = "4.3.2", features = ["derive"] }
 either = "1.8"
 derive-new = "0.5.9"
 

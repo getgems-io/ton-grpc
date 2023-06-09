@@ -21,6 +21,8 @@ RUN ldd /app/target/x86_64-unknown-linux-gnu/release/ton-grpc
 
 FROM debian:bookworm-slim AS runner
 
+ENV OTLP=true
+
 RUN apt update && apt install --yes ca-certificates
 
 COPY --from=builder /app/target/x86_64-unknown-linux-gnu/release/tonlibjson-jsonrpc /app/tonlibjson-jsonrpc

@@ -4,6 +4,7 @@ mod helpers;
 mod block;
 mod message;
 
+use std::env;
 use std::time::Duration;
 use tonic::transport::Server;
 use tracing_subscriber::EnvFilter;
@@ -11,7 +12,6 @@ use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tonlibjson_client::ton::TonClient;
-use clap::Parser;
 use crate::account::AccountService;
 use crate::block::BlockService;
 use crate::message::MessageService;
@@ -19,21 +19,15 @@ use crate::ton::account_service_server::AccountServiceServer;
 use crate::ton::block_service_server::BlockServiceServer;
 use crate::ton::message_service_server::MessageServiceServer;
 
-#[derive(Parser, Debug)]
-#[command()]
-struct Args {
-    #[arg(long, help = "Enable OpenTelemetry exporter")]
-    otlp: bool
-}
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
-    if args.otlp {
-        init_tracing_otlp()?
-    } else {
-        init_tracing()?
-    }
+    let otlp = env::var("OTLP").unwrap_or_default()
+        .parse::<bool>().unwrap_or(false);
+
+    if otlp { init_tracing_otlp()? } else { init_tracing()? }
+
+    tracing::info!(otlp = ?otlp, "tracing initialized");
 
     let reflection = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
