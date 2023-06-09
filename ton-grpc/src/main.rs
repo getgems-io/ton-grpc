@@ -7,6 +7,7 @@ mod message;
 use std::env;
 use std::time::Duration;
 use tonic::transport::Server;
+use tower_http::trace::{DefaultMakeSpan, TraceLayer};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
@@ -49,6 +50,10 @@ async fn main() -> anyhow::Result<()> {
     let message_service = MessageServiceServer::new(MessageService::new(client));
 
     Server::builder()
+        .layer(TraceLayer::new_for_grpc()
+            .make_span_with(DefaultMakeSpan::new()
+                .level(tracing::Level::INFO)
+                .include_headers(true)))
         .tcp_keepalive(Some(Duration::from_secs(120)))
         .http2_keepalive_interval(Some(Duration::from_secs(90)))
         .add_service(reflection)
