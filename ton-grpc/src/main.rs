@@ -8,6 +8,7 @@ use std::env;
 use std::time::Duration;
 use opentelemetry::global::get_text_map_propagator;
 use opentelemetry::propagation::Extractor;
+use opentelemetry::sdk::propagation::TraceContextPropagator;
 use opentelemetry::sdk::Resource;
 use opentelemetry_otlp::WithExportConfig;
 use tonic::codegen::http::{HeaderMap, Request};
@@ -59,7 +60,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(TraceLayer::new_for_grpc()
             .make_span_with(move |req : &Request<Body>| {
                 let parent_cx = get_text_map_propagator(|propagator| {
-                    propagator.extract(&HttpHeaderMapCarrier(req.headers()))
+                    propagator.extract(&HttpHeaderMapExtractor(req.headers()))
                 });
 
                 let tracing_span = tracing::info_span!("request",
@@ -95,6 +96,8 @@ fn init_tracing() -> anyhow::Result<()> {
 }
 
 fn init_tracing_otlp() -> anyhow::Result<()> {
+    opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
+
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_span_events(FmtSpan::CLOSE);
 
@@ -116,8 +119,8 @@ fn init_tracing_otlp() -> anyhow::Result<()> {
     Ok(())
 }
 
-struct HttpHeaderMapCarrier<'a>(&'a HeaderMap);
-impl<'a> Extractor for HttpHeaderMapCarrier<'a> {
+struct HttpHeaderMapExtractor<'a>(&'a HeaderMap);
+impl<'a> Extractor for HttpHeaderMapExtractor<'a> {
     fn get(&self, key: &str) -> Option<&str> {
         self.0
             .get(key.to_lowercase().as_str())
