@@ -8,6 +8,8 @@ use derive_new::new;
 use tracing::info_span;
 use tracing_futures::Instrument;
 use tonlibjson_client::address::AccountAddressData;
+use opentelemetry::trace::FutureExt as OpenTelemetryFutureExt;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_service_server::AccountService as BaseAccountService;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
@@ -119,13 +121,18 @@ impl BaseAccountService for AccountService {
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let (from_tx, to_tx) = try_join!(
-            extend_from_tx_id(&client, &msg.account_address, msg.from.clone()).instrument(span.clone()),
-            extend_to_tx_id(&client, &msg.account_address, msg.to.clone()).instrument(span.clone())
+            extend_from_tx_id(&client, &msg.account_address, msg.from.clone())
+                .with_context(span.context())
+                .instrument(span.clone()),
+            extend_to_tx_id(&client, &msg.account_address, msg.to.clone())
+                .with_context(span.context())
+                .instrument(span.clone())
         ).map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
         let stream = match msg.order() {
             Order::Unordered => {
                 client.get_account_tx_range_unordered(&msg.account_address, (from_tx, to_tx))
+                    .with_context(span.context())
                     .instrument(span.clone())
                     .await
                     .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?
@@ -134,13 +141,15 @@ impl BaseAccountService for AccountService {
             },
             Order::FromNewToOld => {
                 client.get_account_tx_range(&msg.account_address, (from_tx, to_tx))
+                    .with_context(span.context())
                     .instrument(span.clone())
                     .boxed()
             }
         }
             .map_ok(move |t| (&address, t).into())
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
-            .instrument(span)
+            .with_context(span.context())
+            .instrument(span.clone())
             .boxed();
 
         Ok(Response::new(stream))
