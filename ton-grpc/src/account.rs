@@ -5,7 +5,6 @@ use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
 use futures::{Stream, StreamExt, try_join, TryStreamExt};
 use derive_new::new;
-use tracing::info_span;
 use tracing_futures::Instrument;
 use tonlibjson_client::address::AccountAddressData;
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
@@ -124,7 +123,8 @@ impl BaseAccountService for AccountService {
 
         let stream = match msg.order() {
             Order::Unordered => {
-                client.get_account_tx_range_unordered(&msg.account_address, (from_tx, to_tx)).await
+                client.get_account_tx_range_unordered(&msg.account_address, (from_tx, to_tx))
+                    .await
                     .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?
                     .boxed()
             },
@@ -134,7 +134,7 @@ impl BaseAccountService for AccountService {
         }
             .map_ok(move |t| (&address, t).into())
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
-            .instrument(info_span!("get_account_transactions stream"))
+            .in_current_span()
             .boxed();
 
         Ok(Response::new(stream))

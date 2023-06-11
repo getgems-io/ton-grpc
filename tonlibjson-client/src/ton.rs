@@ -154,6 +154,7 @@ impl TonClient {
             .await
     }
 
+    #[instrument(skip_all, err)]
     pub async fn look_up_block_by_seqno(
         &self,
         chain: i32,
@@ -232,6 +233,7 @@ impl TonClient {
             .await
     }
 
+    #[instrument(skip_all, err)]
     pub async fn raw_get_account_state_on_block(&self, address: &str, block_id: BlockIdExt) -> anyhow::Result<RawFullAccountState> {
         let mut client = self.client.clone();
 
@@ -263,6 +265,7 @@ impl TonClient {
             .await
     }
 
+    #[instrument(skip_all, err)]
     pub async fn raw_get_transactions(
         &self,
         address: &str,
