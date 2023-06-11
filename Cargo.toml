@@ -14,7 +14,7 @@ tokio = { version = "1.28", features = ["full"] }
 futures = "0.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing-futures = { version = "0.2.5", features = ["tokio", "std-future", "futures-03", "std"]}
+tracing-futures = { version = "0.2.5", features = ["std", "std-future", "futures-03"]}
 serde_json = "1.0"
 serde = { version = "1.0", features = ["serde_derive"] }
 base64 = "0.21"
