@@ -98,9 +98,6 @@ fn init_tracing() -> anyhow::Result<()> {
 fn init_tracing_otlp() -> anyhow::Result<()> {
     opentelemetry::global::set_text_map_propagator(TraceContextPropagator::new());
 
-    let fmt_layer = tracing_subscriber::fmt::layer()
-        .with_span_events(FmtSpan::CLOSE);
-
     let tracer = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_env())
@@ -113,7 +110,7 @@ fn init_tracing_otlp() -> anyhow::Result<()> {
     tracing_subscriber::registry()
         .with(telemetry_layer)
         .with(EnvFilter::from_default_env())
-        .with(fmt_layer)
+        .with(tracing_subscriber::fmt::layer())
         .init();
 
     Ok(())
