@@ -6,8 +6,13 @@ mod message;
 
 use std::env;
 use std::time::Duration;
+use opentelemetry::global::get_text_map_propagator;
+use opentelemetry::propagation::Extractor;
+use opentelemetry_otlp::WithExportConfig;
+use tonic::codegen::http::HeaderMap;
 use tonic::transport::Server;
 use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::layer::SubscriberExt;
@@ -50,6 +55,16 @@ async fn main() -> anyhow::Result<()> {
     let message_service = MessageServiceServer::new(MessageService::new(client));
 
     Server::builder()
+        .trace_fn(move |req| {
+            let parent_cx = get_text_map_propagator(|propagator| {
+                propagator.extract(&HttpHeaderMapCarrier(req.headers()))
+            });
+
+            let tracing_span = tracing::info_span!("received request");
+            tracing_span.set_parent(parent_cx);
+
+            tracing_span
+        })
         .layer(TraceLayer::new_for_grpc()
             .make_span_with(DefaultMakeSpan::new()
                 .level(tracing::Level::INFO)
@@ -76,8 +91,6 @@ fn init_tracing() -> anyhow::Result<()> {
 }
 
 fn init_tracing_otlp() -> anyhow::Result<()> {
-    use opentelemetry_otlp::WithExportConfig;
-
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_span_events(FmtSpan::CLOSE);
 
@@ -96,4 +109,17 @@ fn init_tracing_otlp() -> anyhow::Result<()> {
         .init();
 
     Ok(())
+}
+
+struct HttpHeaderMapCarrier<'a>(&'a HeaderMap);
+impl<'a> Extractor for HttpHeaderMapCarrier<'a> {
+    fn get(&self, key: &str) -> Option<&str> {
+        self.0
+            .get(key.to_lowercase().as_str())
+            .and_then(|value| value.to_str().ok())
+    }
+
+    fn keys(&self) -> Vec<&str> {
+        self.0.keys().map(|k| k.as_str()).collect()
+    }
 }
