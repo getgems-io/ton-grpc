@@ -8,10 +8,11 @@ use std::env;
 use std::time::Duration;
 use opentelemetry::global::get_text_map_propagator;
 use opentelemetry::propagation::Extractor;
+use opentelemetry::sdk::Resource;
 use opentelemetry_otlp::WithExportConfig;
-use tonic::codegen::http::HeaderMap;
-use tonic::transport::Server;
-use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tonic::codegen::http::{HeaderMap, Request};
+use tonic::transport::{Body, Server};
+use tower_http::trace::{TraceLayer};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
@@ -55,20 +56,23 @@ async fn main() -> anyhow::Result<()> {
     let message_service = MessageServiceServer::new(MessageService::new(client));
 
     Server::builder()
-        .trace_fn(move |req| {
-            let parent_cx = get_text_map_propagator(|propagator| {
-                propagator.extract(&HttpHeaderMapCarrier(req.headers()))
-            });
-
-            let tracing_span = tracing::info_span!("received request");
-            tracing_span.set_parent(parent_cx);
-
-            tracing_span
-        })
         .layer(TraceLayer::new_for_grpc()
-            .make_span_with(DefaultMakeSpan::new()
-                .level(tracing::Level::INFO)
-                .include_headers(true)))
+            .make_span_with(move |req : &Request<Body>| {
+                let parent_cx = get_text_map_propagator(|propagator| {
+                    propagator.extract(&HttpHeaderMapCarrier(req.headers()))
+                });
+
+                let tracing_span = tracing::info_span!("request",
+                    method = %req.method(),
+                    uri = %req.uri(),
+                    version = ?req.version(),
+                    headers = ?req.headers(),
+                );
+
+                tracing_span.set_parent(parent_cx);
+
+                tracing_span
+            }))
         .tcp_keepalive(Some(Duration::from_secs(120)))
         .http2_keepalive_interval(Some(Duration::from_secs(90)))
         .add_service(reflection)
@@ -97,6 +101,7 @@ fn init_tracing_otlp() -> anyhow::Result<()> {
     let tracer = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(opentelemetry_otlp::new_exporter().tonic().with_env())
+        .with_trace_config(opentelemetry::sdk::trace::config().with_resource(Resource::default()))
         .install_batch(opentelemetry::runtime::Tokio)?;
 
     let telemetry_layer = tracing_opentelemetry::layer()
