@@ -407,6 +407,7 @@ impl TonClient {
     }
 
     // TODO[akostylev0] run search of first tx in parallel with `range` stream
+    #[instrument(skip_all, err)]
     pub async fn get_account_tx_range_unordered<R : RangeBounds<InternalTransactionId> + 'static>(
         &self,
         address: &str,
@@ -474,6 +475,7 @@ impl TonClient {
         Ok(stream::iter(streams).flatten_unordered(32))
     }
 
+    #[instrument(skip_all)]
     pub fn get_account_tx_range<R : RangeBounds<InternalTransactionId> + 'static>(
         &self,
         address: &str,
@@ -519,6 +521,7 @@ impl TonClient {
         })))
     }
 
+    #[instrument(skip_all)]
     pub fn get_account_tx_stream_from(
         &self,
         address: &str,
