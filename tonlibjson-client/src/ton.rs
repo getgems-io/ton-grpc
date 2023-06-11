@@ -637,6 +637,7 @@ impl TonClient {
         stream.map_ok(move |a: ShardContextAccountAddress| a.into_internal(chain))
     }
 
+    #[instrument(skip_all, err)]
     async fn find_first_tx(&self, account: &str) -> anyhow::Result<InternalTransactionId> {
         let start = self.get_masterchain_info().await?.last;
 

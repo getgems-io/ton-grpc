@@ -5,6 +5,8 @@ use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
 use futures::{Stream, StreamExt, try_join, TryStreamExt};
 use derive_new::new;
+use tracing::info_span;
+use tracing_futures::Instrument;
 use tonlibjson_client::address::AccountAddressData;
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_service_server::AccountService as BaseAccountService;
@@ -132,6 +134,7 @@ impl BaseAccountService for AccountService {
         }
             .map_ok(move |t| (&address, t).into())
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
+            .instrument(info_span!("get_account_transactions stream"))
             .boxed();
 
         Ok(Response::new(stream))
