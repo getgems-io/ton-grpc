@@ -147,7 +147,10 @@ impl BaseAccountService for AccountService {
             }
         }
             .map_ok(move |t| (&address, t).into())
-            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))
+            .map_err(|e: anyhow::Error| {
+                tracing::error!(error = %e, "get_account_transactions failed");
+                Status::internal(e.to_string())
+            })
             .with_context(span.context())
             .instrument(span.clone())
             .boxed();
