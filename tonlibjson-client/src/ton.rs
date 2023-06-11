@@ -544,8 +544,11 @@ impl TonClient {
 
             let next_id = if let Some(id) = state.next_id { id } else {
                 let state = state.this.raw_get_account_state(&state.address).await?;
+                let Some(tx_id) = state.last_transaction_id else {
+                    return anyhow::Ok(None);
+                };
 
-                state.last_transaction_id.ok_or(anyhow!("transaction_id invalid"))?
+                tx_id
             };
 
             let txs = state.this
