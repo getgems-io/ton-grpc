@@ -100,10 +100,11 @@ impl<R : Requestable> Service<R> for Client {
         requests.insert(req.id, tx);
 
         let sent = self.client.send(&query);
+        if let Err(e) = sent {
+            return Box::pin(futures::future::ready(Err(e)));
+        }
 
         Box::pin(async move {
-            sent?;
-
             let result = tokio::time::timeout(req.timeout, rx).await;
             requests.remove(&req.id);
 

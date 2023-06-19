@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::{anyhow, Result};
-use futures::{FutureExt, try_join};
+use futures::{FutureExt, try_join, TryFutureExt};
 use tokio::sync::watch::Receiver;
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::Retry;
@@ -36,7 +36,6 @@ impl CursorClient {
         tokio::spawn({
             let mut client = client.clone();
             async move {
-                let client = &mut client;
                 let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
                 timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -44,7 +43,7 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    let masterchain_info = client.oneshot(GetMasterchainInfo::default()).await;
+                    let masterchain_info = (&mut client).oneshot(GetMasterchainInfo::default()).await;
 
                     match masterchain_info {
                         Ok(mut masterchain_info) => {
@@ -58,7 +57,7 @@ impl CursorClient {
                                 }
                             }
 
-                            match fetch_last_headers(client).await {
+                            match fetch_last_headers(&mut client).await {
                                 Ok((last_master_chain_header, last_work_chain_header)) => {
                                     masterchain_info.last = last_master_chain_header.id.clone();
                                     trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
@@ -84,7 +83,6 @@ impl CursorClient {
             let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
 
             async move {
-                let client = &mut client;
                 let mut timer = interval(Duration::from_secs(30));
                 timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
                 loop {
@@ -93,7 +91,7 @@ impl CursorClient {
                     if let Some((mfb, wfb)) = first_block.clone() {
                         if let Err(e) = try_join!(
                             client.clone().oneshot(BlocksGetShards::new(mfb.id.clone())),
-                            client.oneshot(BlocksGetBlockHeader::new(wfb.id.clone()))
+                            (&mut client).oneshot(BlocksGetBlockHeader::new(wfb.id.clone()))
                         ) {
                             trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
@@ -102,7 +100,7 @@ impl CursorClient {
                         }
                     }
                     if first_block.is_none() {
-                        let fb = find_first_blocks(client).await;
+                        let fb = find_first_blocks(&mut client).await;
 
                         match fb {
                             Ok((mfb, wfb)) => {
@@ -162,8 +160,6 @@ impl<R : Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> Service<R>
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        use futures::TryFutureExt;
-
         req.call(&mut self.client).map_err(|e| e.into().into()).boxed()
     }
 }

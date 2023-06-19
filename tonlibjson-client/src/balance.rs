@@ -139,11 +139,13 @@ impl<T: Routable + Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> 
     fn call(&mut self, req: &T) -> Self::Future {
         let services = req.route().choose(&self.services);
 
-        std::future::ready(if services.is_empty() {
+        let response = if services.is_empty() {
             Err(anyhow!("no services available for {:?}", req.route()))
         } else {
             Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new::<T>(services))))
-        })
+        };
+
+        std::future::ready(response)
     }
 }
 

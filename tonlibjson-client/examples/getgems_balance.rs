@@ -19,8 +19,6 @@ async fn main() -> anyhow::Result<()> {
     let total_value: i64 = ton.get_account_tx_range_unordered(address, ..).await?
         .filter_map(|tx| async {
             let tx: RawTransaction = tx.unwrap();
-
-            tracing::info!(lt = tx.transaction_id.lt);
             if let Some(msg) = tx.out_msgs.first() {
                 Some(-msg.value - tx.fee)
             } else {
