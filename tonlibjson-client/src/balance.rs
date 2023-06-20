@@ -34,11 +34,11 @@ pub enum Route {
 }
 
 impl Route {
-    pub fn choose(&self, services: &HashMap<String, CursorClient>) -> Vec<CursorClient> {
+    pub fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
         return match self {
-            Route::Any => { services.values().cloned().collect() },
+            Route::Any => { services.cloned().collect() },
             Route::Block { chain, criteria} => {
-                services.values()
+                services
                     .filter_map(|s| s.headers(*chain).map(|m| (s, m)))
                     .filter(|(_, (first_block, last_block))| { match criteria {
                         BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
@@ -53,7 +53,7 @@ impl Route {
                     client.headers(*chain).map(|(_, l)| l.id.seqno)
                 }
 
-                let groups = services.values()
+                let groups = services
                     .filter_map(|s| last_seqno(s, chain).map(|seqno| (s, seqno)))
                     .sorted_unstable_by_key(|(_, seqno)| -seqno)
                     .group_by(|(_, seqno)| seqno.clone());
@@ -137,7 +137,7 @@ impl<T: Routable + Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> 
     }
 
     fn call(&mut self, req: &T) -> Self::Future {
-        let services = req.route().choose(&self.services);
+        let services = req.route().choose(self.services.values());
 
         let response = if services.is_empty() {
             Err(anyhow!("no services available for {:?}", req.route()))
