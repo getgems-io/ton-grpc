@@ -1,8 +1,7 @@
 use std::future::Future;
 use std::time::Duration;
-use derive_new::new;
 use uuid::Uuid;
-use serde::{Serialize, Deserialize, Serializer};
+use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service};
@@ -31,7 +30,7 @@ impl<S, T, E: Into<Error>> Callable<S> for T
     }
 }
 
-pub trait Requestable where Self : Serialize + Sized + Clone + Send + Sync {
+pub trait Requestable where Self : Serialize + Clone + Send + Sync {
     type Response : DeserializeOwned + Send + Sync + 'static;
 
     fn timeout(&self) -> Duration {
@@ -41,30 +40,6 @@ pub trait Requestable where Self : Serialize + Sized + Clone + Send + Sync {
 
 pub trait Routable {
     fn route(&self) -> Route;
-}
-
-#[derive(new, Debug, Clone)]
-pub struct Forward<Req : Requestable + Clone> {
-    req: Req,
-    route: Route
-}
-
-impl<Req> Serialize for Forward<Req> where Req : Requestable {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        self.req.serialize(serializer)
-    }
-}
-
-impl<Req> Requestable for Forward<Req> where Req : Requestable {
-    type Response = Req::Response;
-
-    fn timeout(&self) -> Duration {
-        self.req.timeout()
-    }
-}
-
-impl<Req> Routable for Forward<Req> where Req : Requestable {
-    fn route(&self) -> Route { self.route }
 }
 
 impl Requestable for Value {
@@ -85,6 +60,8 @@ pub struct Request<T : Serialize + Clone> {
     pub body: T
 }
 
+
+// TODO[akostylev0] generic over request type
 #[derive(Deserialize, Debug)]
 pub struct Response {
     #[serde(rename="@extra")]
