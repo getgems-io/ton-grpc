@@ -11,7 +11,7 @@ use crate::shared::ResponseState::Locking;
 #[derive(Default)]
 pub struct SharedLayer;
 
-impl<S> Layer<S> for SharedLayer {
+impl<S: Send> Layer<S> for SharedLayer {
     type Service = SharedService<S>;
 
     fn layer(&self, inner: S) -> Self::Service {
@@ -19,11 +19,11 @@ impl<S> Layer<S> for SharedLayer {
     }
 }
 
-pub struct SharedService<S> {
+pub struct SharedService<S: Send> {
     inner: Arc<RwLock<S>>
 }
 
-impl<S> Clone for SharedService<S> {
+impl<S: Send> Clone for SharedService<S> {
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone()
@@ -31,14 +31,14 @@ impl<S> Clone for SharedService<S> {
     }
 }
 
-impl<S> SharedService<S> {
+impl<S: Send> SharedService<S> {
     pub fn new(inner: S) -> Self {
         Self { inner: Arc::new(RwLock::new(inner)) }
     }
 }
 
 impl<S, Req> Service<Req> for SharedService<S>
-    where S : Service<Req> + Send + Sync + 'static,
+    where S : Service<Req> + Send + 'static,
           S::Future : Send,
           S::Error: Send + Sync + 'static,
           S::Response: Send,
@@ -65,7 +65,7 @@ impl<S, Req> Service<Req> for SharedService<S>
     }
 }
 
-impl<S> Load for SharedService<S> where S : Load {
+impl<S> Load for SharedService<S> where S : Load + Send {
     type Metric = S::Metric;
 
     fn load(&self) -> Self::Metric {
@@ -88,7 +88,7 @@ enum ResponseState<S, Req> where S : Service<Req> {
 }
 
 impl<S: Service<Req>, Req> ResponseFuture<S, Req> where
-    S: Service<Req> + Send + Sync + 'static,
+    S: Service<Req> + Send + 'static,
     S::Error: Send + Sync + 'static,
     S::Response: Send + 'static,
     S::Future: Send + 'static,
@@ -103,7 +103,7 @@ impl<S: Service<Req>, Req> ResponseFuture<S, Req> where
 }
 
 impl<S: Service<Req>, Req> Future for ResponseFuture<S, Req> where
-    S: Service<Req> + Send + Sync + 'static,
+    S: Service<Req> + Send + 'static,
     S::Error: Send + Sync + 'static,
     S::Response: Send + 'static,
     S::Future: Send + 'static,

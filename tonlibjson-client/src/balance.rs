@@ -10,11 +10,15 @@ use tower::discover::{Change, Discover, ServiceList};
 use anyhow::anyhow;
 use derive_new::new;
 use itertools::Itertools;
+use tower::limit::ConcurrencyLimit;
+use tower::load::PeakEwma;
 use crate::block::{BlockHeader};
+use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 use crate::error::ErrorService;
-use crate::session::SessionRequest;
+use crate::request::{Routable, Callable};
+use crate::shared::SharedService;
 
 #[derive(Debug, Clone, Copy)]
 pub enum BlockCriteria {
@@ -30,11 +34,11 @@ pub enum Route {
 }
 
 impl Route {
-    pub fn choose(&self, services: &HashMap<String, CursorClient>) -> Vec<CursorClient> {
+    pub fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
         return match self {
-            Route::Any => { services.values().cloned().collect() },
+            Route::Any => { services.cloned().collect() },
             Route::Block { chain, criteria} => {
-                services.values()
+                services
                     .filter_map(|s| s.headers(*chain).map(|m| (s, m)))
                     .filter(|(_, (first_block, last_block))| { match criteria {
                         BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
@@ -49,7 +53,7 @@ impl Route {
                     client.headers(*chain).map(|(_, l)| l.id.seqno)
                 }
 
-                let groups = services.values()
+                let groups = services
                     .filter_map(|s| last_seqno(s, chain).map(|seqno| (s, seqno)))
                     .sorted_unstable_by_key(|(_, seqno)| -seqno)
                     .group_by(|(_, seqno)| seqno.clone());
@@ -112,8 +116,11 @@ impl Router {
     }
 }
 
-impl Service<Route> for Router {
-    type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, SessionRequest>>;
+#[derive(new)]
+pub struct Balance { router: Router }
+
+impl<T: Routable + Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> Service<&T> for Router {
+    type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, T>>;
     type Error = anyhow::Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
@@ -129,44 +136,32 @@ impl Service<Route> for Router {
         }
     }
 
-    fn call(&mut self, req: Route) -> Self::Future {
-        let services = req.choose(&self.services);
+    fn call(&mut self, req: &T) -> Self::Future {
+        let services = req.route().choose(self.services.values());
 
-        std::future::ready(if services.is_empty() {
-            Err(anyhow!("no services available for {:?}", req))
+        let response = if services.is_empty() {
+            Err(anyhow!("no services available for {:?}", req.route()))
         } else {
-            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new(services))))
-        })
+            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new::<T>(services))))
+        };
+
+        std::future::ready(response)
     }
 }
 
-
-
-#[derive(new)]
-pub struct BalanceRequest {
-    pub route: Route,
-    pub request: SessionRequest
-}
-
-#[derive(new)]
-pub struct Balance { router: Router }
-
-impl Service<BalanceRequest> for Balance {
-    type Response = <<CursorClientDiscover as Discover>::Service as Service<SessionRequest>>::Response;
+impl<R> Service<R> for Balance where R: Routable + Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>> + Clone {
+    type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.router.poll_ready(cx)
+        Service::<&R>::poll_ready(&mut self.router, cx)
     }
 
-    fn call(&mut self, request: BalanceRequest) -> Self::Future {
-        let (route, request) = (request.route, request.request);
-
+    fn call(&mut self, req: R) -> Self::Future {
         self.router
-            .call(route)
-            .and_then(|svc|
-                svc.oneshot(request))
+            .call(&req)
+            .and_then(|svc| svc.oneshot(req))
             .boxed()
     }
 }

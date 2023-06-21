@@ -1,10 +1,9 @@
+use std::any::TypeId;
+use std::future;
 use std::sync::Arc;
-use futures::future;
 use tower::retry::budget::Budget;
 use tower::retry::Policy;
-use crate::balance::BalanceRequest;
-use crate::request::{Request, RequestBody};
-use crate::session::SessionRequest;
+use crate::block::{RawSendMessage, RawSendMessageReturnHash};
 
 #[derive(Clone)]
 pub struct RetryPolicy {
@@ -19,10 +18,10 @@ impl RetryPolicy {
     }
 }
 
-impl<E, Res> Policy<BalanceRequest, Res, E> for RetryPolicy {
+impl<T: Clone + 'static, Res, E> Policy<T, Res, E> for RetryPolicy {
     type Future = future::Ready<Self>;
 
-    fn retry(&self, req: &BalanceRequest, result: Result<&Res, &E>) -> Option<Self::Future> {
+    fn retry(&self, _: &T, result: Result<&Res, &E>) -> Option<Self::Future> {
         match result {
             Ok(_) => {
                 self.budget.deposit();
@@ -30,10 +29,12 @@ impl<E, Res> Policy<BalanceRequest, Res, E> for RetryPolicy {
                 None
             }
             Err(_) => {
-                match req.request {
-                    SessionRequest::Atomic(Request { body: RequestBody::RawSendMessageReturnHash(_), .. }) => None,
-                    SessionRequest::Atomic(Request { body: RequestBody::RawSendMessage(_), .. }) => None,
-                    _ => match self.budget.withdraw() {
+                // TODO[akostylev0] rewrite to trait fn
+                let type_of = TypeId::of::<T>();
+                if type_of == TypeId::of::<RawSendMessageReturnHash>() || type_of == TypeId::of::<RawSendMessage>() {
+                    None
+                } else {
+                    match self.budget.withdraw() {
                         Ok(_) => Some(future::ready(self.clone())),
                         Err(_) => None
                     }
@@ -42,12 +43,7 @@ impl<E, Res> Policy<BalanceRequest, Res, E> for RetryPolicy {
         }
     }
 
-    fn clone_request(&self, req: &BalanceRequest) -> Option<BalanceRequest> {
-        let inner = match req.request {
-            SessionRequest::Atomic(ref req) => SessionRequest::new_atomic(req.with_new_id()),
-            _ => req.request.clone()
-        };
-
-        Some(BalanceRequest::new(req.route, inner))
+    fn clone_request(&self, req: &T) -> Option<T> {
+        Some(req.clone())
     }
 }

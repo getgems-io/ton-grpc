@@ -8,26 +8,24 @@ use anyhow::anyhow;
 use itertools::Itertools;
 use serde_json::Value;
 use tokio_stream::StreamMap;
-use tower::Layer;
-use tower::buffer::Buffer;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
+use tower::ServiceExt;
 use tracing::{instrument, trace};
 use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
-use crate::balance::{Balance, BalanceRequest, Router};
+use crate::balance::{Balance, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
-use crate::error::{ErrorLayer, ErrorService};
 use crate::helper::Side;
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
-use crate::request::Callable;
+use crate::shared::SharedService;
 
 pub struct TonClient {
-    client: ErrorService<Retry<RetryPolicy, Buffer<Balance, BalanceRequest>>>,
+    client: Retry<RetryPolicy, SharedService<Balance>>,
     first_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>,
     last_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>
 }
@@ -75,7 +73,7 @@ impl TonClient {
 
     pub async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
         let client_discover = ClientDiscover::from_path(path).await?;
-        let ewma_discover = PeakEwmaDiscover::new(
+        let ewma_discover = PeakEwmaDiscover::new::<Value>(
             client_discover,
             Duration::from_secs(15),
             Duration::from_secs(60),
@@ -88,13 +86,12 @@ impl TonClient {
         let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
-        let client = Buffer::new(client, 200000);
+        let client = SharedService::new(client);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
             10,
             0.1
         )), client);
-        let client = ErrorLayer::default().layer(client);
 
         Ok(Self {
             client,
@@ -109,7 +106,7 @@ impl TonClient {
             Duration::from_secs(60),
             fallback_path
         ).await?;
-        let ewma_discover = PeakEwmaDiscover::new(
+        let ewma_discover = PeakEwmaDiscover::new::<Value>(
             client_discover,
             Duration::from_secs(15),
             Duration::from_secs(60),
@@ -122,13 +119,12 @@ impl TonClient {
         let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
-        let client = Buffer::new(client, 200000);
+        let client = SharedService::new(client);
         let client = Retry::new(RetryPolicy::new(Budget::new(
             Duration::from_secs(10),
             10,
             0.1
         )), client);
-        let client = ErrorLayer::default().layer(client);
 
         Ok(Self {
             client,
@@ -147,10 +143,9 @@ impl TonClient {
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
-        let mut client = self.client.clone();
-
-        GetMasterchainInfo::default()
-            .call(&mut client)
+        self.client
+            .clone()
+            .oneshot(GetMasterchainInfo::default())
             .await
     }
 
@@ -165,10 +160,9 @@ impl TonClient {
             return Err(anyhow!("seqno must be greater than 0"));
         }
 
-        let mut client = self.client.clone();
-
-        BlocksLookupBlock::seqno(BlockId::new(chain, shard, seqno))
-            .call(&mut client)
+        self.client
+            .clone()
+            .oneshot(BlocksLookupBlock::seqno(BlockId::new(chain, shard, seqno)))
             .await
     }
 
@@ -182,10 +176,9 @@ impl TonClient {
             return Err(anyhow!("lt must be greater than 0"));
         }
 
-        let mut client = self.client.clone();
-
-        BlocksLookupBlock::logical_time(BlockId::new(chain, shard, 0), lt)
-            .call(&mut client)
+        self.client
+            .clone()
+            .oneshot(BlocksLookupBlock::logical_time(BlockId::new(chain, shard, 0), lt))
             .await
     }
 
@@ -194,9 +187,10 @@ impl TonClient {
             .look_up_block_by_seqno(MAIN_CHAIN, MAIN_SHARD, master_seqno)
             .await?;
 
-        let mut client = self.client.clone();
-
-        BlocksGetShards::new(block).call(&mut client).await
+        self.client
+            .clone()
+            .oneshot(BlocksGetShards::new(block))
+            .await
     }
 
     pub async fn get_shards_by_block_id(&self, block_id: BlockIdExt) -> anyhow::Result<Vec<BlockIdExt>> {
@@ -204,9 +198,11 @@ impl TonClient {
             return Err(anyhow!("workchain must be -1"))
         }
 
-        let mut client = self.client.clone();
-
-        Ok(BlocksGetShards::new(block_id).call(&mut client).await?.shards)
+        self.client
+            .clone()
+            .oneshot(BlocksGetShards::new(block_id))
+            .map_ok(|res| res.shards)
+            .await
     }
 
     pub async fn get_block_header(
@@ -217,51 +213,48 @@ impl TonClient {
     ) -> anyhow::Result<BlockHeader> {
         let id = self.look_up_block_by_seqno(chain, shard, seqno).await?;
 
-        let mut client = self.client.clone();
-
-        BlocksGetBlockHeader::new(id).call(&mut client).await
+        self.client
+            .clone()
+            .oneshot(BlocksGetBlockHeader::new(id))
+            .await
     }
 
     #[instrument(skip_all, err)]
     pub async fn raw_get_account_state(&self, address: &str) -> anyhow::Result<RawFullAccountState> {
-        let mut client = self.client.clone();
-
         let account_address = AccountAddress::new(address)?;
 
-        RawGetAccountState::new(account_address)
-            .call(&mut client)
+        self.client
+            .clone()
+            .oneshot(RawGetAccountState::new(account_address))
             .await
     }
 
     #[instrument(skip_all, err)]
     pub async fn raw_get_account_state_on_block(&self, address: &str, block_id: BlockIdExt) -> anyhow::Result<RawFullAccountState> {
-        let mut client = self.client.clone();
-
         let account_address = AccountAddress::new(address)?;
 
-        WithBlock::new(block_id, RawGetAccountState::new(account_address))
-            .call(&mut client)
+        self.client
+            .clone()
+            .oneshot(WithBlock::new(block_id, RawGetAccountState::new(account_address)))
             .await
     }
 
     #[instrument(skip_all, err)]
     pub async fn raw_get_account_state_by_transaction(&self, address: &str, transaction_id: InternalTransactionId) -> anyhow::Result<RawFullAccountState> {
-        let mut client = self.client.clone();
-
         let account_address = AccountAddress::new(address)?;
 
-        RawGetAccountStateByTransaction::new(account_address, transaction_id)
-            .call(&mut client)
+        self.client
+            .clone()
+            .oneshot(RawGetAccountStateByTransaction::new(account_address, transaction_id))
             .await
     }
 
     pub async fn get_account_state(&self, address: &str) -> anyhow::Result<Value> {
-        let mut client = self.client.clone();
-
         let account_address = AccountAddress::new(address)?;
 
-        GetAccountState::new(account_address)
-            .call(&mut client)
+        self.client
+            .clone()
+            .oneshot(GetAccountState::new(account_address))
             .await
     }
 
@@ -271,15 +264,12 @@ impl TonClient {
         address: &str,
         from_tx: &InternalTransactionId
     ) -> anyhow::Result<RawTransactions> {
-        let mut client = self.client.clone();
-
         let address = AccountAddress::new(address)?;
-        let request = RawGetTransactionsV2::new(
-            address,
-            from_tx.clone()
-        );
 
-        request.call(&mut client).await
+        self.client
+            .clone()
+            .oneshot(RawGetTransactionsV2::new(address, from_tx.clone()))
+            .await
     }
 
     pub async fn blocks_get_transactions(
@@ -289,14 +279,15 @@ impl TonClient {
         reverse: bool,
         count: i32
     ) -> anyhow::Result<BlocksTransactions> {
-        let mut client = self.client.clone();
-
-        BlocksGetTransactions::unverified(
-            block.to_owned(),
-            tx,
-            reverse,
-            count
-        ).call(&mut client).await
+        self.client
+            .clone()
+            .oneshot(BlocksGetTransactions::unverified(
+                block.to_owned(),
+                tx,
+                reverse,
+                count
+            ))
+            .await
     }
 
     pub async fn blocks_get_transactions_verified(
@@ -306,28 +297,29 @@ impl TonClient {
         reverse: bool,
         count: i32
     ) -> anyhow::Result<BlocksTransactions> {
-        let mut client = self.client.clone();
-
-        BlocksGetTransactions::verified(
-            block.to_owned(),
-            tx,
-            reverse,
-            count
-        ).call(&mut client).await
+        self.client
+            .clone()
+            .oneshot(BlocksGetTransactions::verified(
+                block.to_owned(),
+                tx,
+                reverse,
+                count
+            ))
+            .await
     }
 
     pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
-        let mut client = self.client.clone();
-
-        RawSendMessage::new(message.to_string()).call(&mut client).await
+        self.client
+            .clone()
+            .oneshot(RawSendMessage::new(message.to_string()))
+            .await
     }
 
     pub async fn send_message_returning_hash(&self, message: &str) -> anyhow::Result<String> {
-        let mut client = self.client.clone();
-
-        RawSendMessageReturnHash::new(message.to_string())
-            .call(&mut client)
-            .map_ok(|r| r.hash)
+        self.client
+            .clone()
+            .oneshot(RawSendMessageReturnHash::new(message.to_string()))
+            .map_ok(|res| res.hash)
             .await
     }
 
@@ -573,34 +565,37 @@ impl TonClient {
     pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {
         let address = AccountAddress::new(&address)?;
         let method = SmcMethodId::new_name(method);
-        let mut client = self.client.clone();
 
-        RunGetMethod::new(address, method, stack)
-            .call(&mut client)
+        self.client
+            .clone()
+            .oneshot(RunGetMethod::new(address, method, stack))
             .await
     }
 
     pub async fn get_shard_account_cell(&self, address: &str) -> anyhow::Result<Cell> {
         let address = AccountAddress::new(address)?;
 
-        GetShardAccountCell::new(address)
-            .call(&mut self.client.clone())
+        self.client
+            .clone()
+            .oneshot(GetShardAccountCell::new(address))
             .await
     }
 
     pub async fn get_shard_account_cell_on_block(&self, address: &str, block: BlockIdExt) -> anyhow::Result<Cell> {
         let address = AccountAddress::new(address)?;
 
-        WithBlock::new(block, GetShardAccountCell::new(address))
-            .call(&mut self.client.clone())
+        self.client
+            .clone()
+            .oneshot(WithBlock::new(block, GetShardAccountCell::new(address)))
             .await
     }
 
     pub async fn get_shard_account_cell_by_transaction(&self, address: &str, transaction: InternalTransactionId) -> anyhow::Result<Cell> {
         let address = AccountAddress::new(address)?;
 
-        GetShardAccountCellByTransaction::new(address, transaction)
-            .call(&mut self.client.clone())
+        self.client
+            .clone()
+            .oneshot(GetShardAccountCellByTransaction::new(address, transaction))
             .await
     }
 

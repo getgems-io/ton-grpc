@@ -2,16 +2,15 @@ use std::future::{Future, ready, Ready};
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use serde_json::{json, Value};
-use tower::limit::{ConcurrencyLimitLayer};
-use tower::{Layer, Service};
-use tower::load::{PeakEwma};
-use tracing::{debug};
+use tower::limit::ConcurrencyLimitLayer;
+use tower::{Layer, Service, ServiceExt};
+use tower::load::PeakEwma;
+use tracing::debug;
 use crate::block::GetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
-use crate::session::SessionClient;
+use crate::shared::SharedLayer;
 use crate::ton_config::TonConfig;
-use crate::request::Callable;
 
 #[derive(Default, Debug)]
 pub struct ClientFactory;
@@ -19,7 +18,7 @@ pub struct ClientFactory;
 impl Service<TonConfig> for ClientFactory {
     type Response = Client;
     type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -27,18 +26,12 @@ impl Service<TonConfig> for ClientFactory {
 
     fn call(&mut self, req: TonConfig) -> Self::Future {
         Box::pin(async move {
-            debug!("make new client");
-
             let mut client = ClientBuilder::from_config(&req.to_string())
                 .disable_logging()
                 .build()
                 .await?;
 
-            let _ = GetMasterchainInfo::default()
-                .call(&mut client)
-                .await?;
-
-            debug!("successfully made new client");
+            let _ = (&mut client).oneshot(GetMasterchainInfo::default()).await?;
 
             Ok(client)
         })
@@ -51,9 +44,9 @@ pub struct CursorClientFactory;
 impl CursorClientFactory {
     pub fn create(client: PeakEwma<Client>) -> CursorClient {
         debug!("make new cursor client");
-        let client = SessionClient::new(client);
-
-        let client = ConcurrencyLimitLayer::new(100)
+        let client = SharedLayer::default()
+            .layer(client);
+        let client = ConcurrencyLimitLayer::new(256)
             .layer(client);
 
         let client = CursorClient::new(client);
@@ -108,20 +101,19 @@ impl ClientBuilder {
         }
     }
 
-    fn disable_logging(&mut self) -> &mut Self {
+    fn disable_logging(mut self) -> Self {
         self.logging = Some(0);
 
         self
     }
 
-    async fn build(&self) -> anyhow::Result<Client> {
+    async fn build(self) -> anyhow::Result<Client> {
         if let Some(level) = self.logging {
             Client::set_logging(level);
         }
 
         let mut client = Client::new();
-
-        self.config.clone().call(&mut client).await?;
+        let _ = (&mut client).oneshot(self.config).await?;
 
         Ok(client)
     }

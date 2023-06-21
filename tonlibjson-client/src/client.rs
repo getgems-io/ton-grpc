@@ -4,13 +4,12 @@ use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::TryRecvError;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use anyhow::anyhow;
-use serde_json::Value;
+use anyhow::{anyhow, bail};
 use dashmap::DashMap;
 use tower::{Service};
 use tracing::trace;
 use crate::block::TonError;
-use crate::request::{Request, RequestId, Response};
+use crate::request::{Requestable, RequestId, Response, Request};
 
 #[derive(Debug)]
 pub struct Client {
@@ -75,16 +74,22 @@ impl Default for Client {
     }
 }
 
-impl Service<Request> for Client {
-    type Response = Value;
+impl<R : Requestable> Service<R> for Client {
+    type Response = R::Response;
     type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send + Sync>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Request) -> Self::Future {
+    fn call(&mut self, req: R) -> Self::Future {
+        let req = Request {
+            id: RequestId::new_v4(),
+            timeout: req.timeout(),
+            body: req,
+        };
+
         let to_string = serde_json::to_string(&req);
         let Ok(query) = to_string else {
             return Box::pin(futures::future::ready(Err(anyhow!(to_string.unwrap_err()))));
@@ -95,24 +100,27 @@ impl Service<Request> for Client {
         requests.insert(req.id, tx);
 
         let sent = self.client.send(&query);
+        if let Err(e) = sent {
+            return Box::pin(futures::future::ready(Err(e)));
+        }
 
         Box::pin(async move {
-            sent?;
-
             let result = tokio::time::timeout(req.timeout, rx).await;
             requests.remove(&req.id);
 
             let response = result??;
 
-            // TODO[akostylev0] refac
+            // TODO[akostylev0] refac!!
             if response.data["@type"] == "error" {
                 trace!("Error occurred: {:?}", &response.data);
                 let error = serde_json::from_value::<TonError>(response.data)?;
 
-                return Err(anyhow!(error))
-            }
+                bail!(error)
+            } else {
+                let response = serde_json::from_value::<R::Response>(response.data)?;
 
-            Ok(response.data)
+                Ok(response)
+            }
         })
     }
 }

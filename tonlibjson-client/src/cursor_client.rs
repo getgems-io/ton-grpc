@@ -1,23 +1,27 @@
+use std::future::Future;
+use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tower::Service;
+use tower::{Service, ServiceExt};
 use anyhow::{anyhow, Result};
-use futures::{FutureExt, try_join};
+use futures::{FutureExt, try_join, TryFutureExt};
 use tokio::sync::watch::Receiver;
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
+use tower::load::PeakEwma;
 use tracing::{instrument, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
-use crate::session::{SessionClient, SessionRequest};
-use crate::request::{Callable, Request, RequestBody};
+use crate::client::Client;
+use crate::request::{Callable};
+use crate::shared::SharedService;
 
 #[derive(Clone)]
 pub struct CursorClient {
-    client: ConcurrencyLimit<SessionClient>,
+    client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>,
 
     pub first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
     pub last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
@@ -26,7 +30,7 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
-    pub fn new(client: ConcurrencyLimit<SessionClient>) -> Self {
+    pub fn new(client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
         let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
         tokio::spawn({
@@ -39,9 +43,7 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    let masterchain_info = GetMasterchainInfo::default()
-                        .call(&mut client)
-                        .await;
+                    let masterchain_info = (&mut client).oneshot(GetMasterchainInfo::default()).await;
 
                     match masterchain_info {
                         Ok(mut masterchain_info) => {
@@ -87,10 +89,9 @@ impl CursorClient {
                     timer.tick().await;
 
                     if let Some((mfb, wfb)) = first_block.clone() {
-                        let mut clone = client.clone();
                         if let Err(e) = try_join!(
-                            BlocksGetShards::new(mfb.id.clone()).call(&mut clone),
-                            BlocksGetBlockHeader::new(wfb.id.clone()).call(&mut client)
+                            client.clone().oneshot(BlocksGetShards::new(mfb.id.clone())),
+                            (&mut client).oneshot(BlocksGetBlockHeader::new(wfb.id.clone()))
                         ) {
                             trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
@@ -141,16 +142,16 @@ impl CursorClient {
     }
 }
 
-impl Service<SessionRequest> for CursorClient {
-    type Response = <SessionClient as Service<SessionRequest>>::Response;
-    type Error = <SessionClient as Service<SessionRequest>>::Error;
-    type Future = <SessionClient as Service<SessionRequest>>::Future;
+impl<R : Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> Service<R> for CursorClient {
+    type Response = R::Response;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
         if self.last_block_rx.borrow().is_some()
             && self.first_block_rx.borrow().is_some()
             && self.masterchain_info_rx.borrow().is_some() {
-            return self.client.poll_ready(cx)
+            return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx)
         }
 
         cx.waker().wake_by_ref();
@@ -158,14 +159,8 @@ impl Service<SessionRequest> for CursorClient {
         Poll::Pending
     }
 
-    fn call(&mut self, req: SessionRequest) -> Self::Future {
-        match req {
-            SessionRequest::Atomic(Request { body: RequestBody::GetMasterchainInfo(_), .. }) => {
-                let masterchain_info = self.masterchain_info_rx.borrow().as_ref().unwrap().clone();
-                async { Ok(serde_json::to_value(masterchain_info)?) }.boxed()
-            },
-            _ => self.client.call(req).boxed()
-        }
+    fn call(&mut self, req: R) -> Self::Future {
+        req.call(&mut self.client).map_err(|e| e.into().into()).boxed()
     }
 }
 
@@ -177,22 +172,19 @@ impl tower::load::Load for CursorClient {
     }
 }
 
-async fn check_block_available(client: &mut ConcurrencyLimit<SessionClient>, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
-    let block_id = BlocksLookupBlock::seqno(block_id).call(client).await?;
-    let shards = BlocksGetShards::new(block_id.clone()).call(client).await?;
+async fn check_block_available(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
+    let block_id = client.oneshot(BlocksLookupBlock::seqno(block_id)).await?;
+    let shards = client.oneshot(BlocksGetShards::new(block_id.clone())).await?;
 
-    let mut clone = client.clone();
     try_join!(
-        BlocksGetBlockHeader::new(block_id).call(&mut clone),
-        BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()).call(client)
+        client.clone().oneshot(BlocksGetBlockHeader::new(block_id)),
+        client.oneshot(BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()))
     )
 }
 
 #[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
-    let start = GetMasterchainInfo::default()
-        .call(client)
-        .await?.last;
+async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<(BlockHeader, BlockHeader)> {
+    let start = client.oneshot(GetMasterchainInfo::default()).await?.last;
 
     let length = start.seqno;
     let mut rhs = length;
@@ -231,29 +223,25 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SessionClient>) -> Resu
 }
 
 
-async fn fetch_last_headers(client: &mut ConcurrencyLimit<SessionClient>) -> Result<(BlockHeader, BlockHeader)> {
-    let master_chain_last_block_id = Sync::default()
-        .call(client)
-        .await?;
+async fn fetch_last_headers(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<(BlockHeader, BlockHeader)> {
+    let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
-    let shards = BlocksGetShards::new(master_chain_last_block_id.clone())
-        .call(client)
+    let shards = client.oneshot(BlocksGetShards::new(master_chain_last_block_id.clone()))
         .await?.shards;
 
     let work_chain_last_block_id = shards.first()
         .ok_or_else(|| anyhow!("last block for work chain not found"))?
         .clone();
 
-    let mut clone = client.clone();
     let (master_chain_header, work_chain_header) = try_join!(
-        BlocksGetBlockHeader::new(master_chain_last_block_id).call(&mut clone),
+        client.clone().oneshot(BlocksGetBlockHeader::new(master_chain_last_block_id)),
         wait_for_block_header(work_chain_last_block_id, client)
     )?;
 
     Ok((master_chain_header, work_chain_header))
 }
 
-async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLimit<SessionClient>) -> Result<BlockHeader> {
+async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<BlockHeader> {
     let retry = ExponentialBackoff::from_millis(4)
         .max_delay(Duration::from_secs(1))
         .map(jitter)
@@ -261,10 +249,8 @@ async fn wait_for_block_header(block_id: BlockIdExt, client: &mut ConcurrencyLim
 
     Retry::spawn(retry, || {
         let block_id = block_id.clone();
-        let mut client = client.clone();
+        let client = client.clone();
 
-        async move {
-            BlocksGetBlockHeader::new(block_id).call(&mut client).await
-        }
+        client.oneshot(BlocksGetBlockHeader::new(block_id))
     }).await
 }

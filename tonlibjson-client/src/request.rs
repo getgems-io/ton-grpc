@@ -1,155 +1,55 @@
+use std::future::Future;
 use std::time::Duration;
-use async_trait::async_trait;
-use derive_new::new;
 use uuid::Uuid;
-use serde::{Serialize, Deserialize, Serializer};
+use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tower::{Service, ServiceExt};
-use crate::balance::{BalanceRequest, Route};
-use crate::block::{BlocksGetBlockHeader, BlocksGetShards, BlocksGetTransactions, BlocksLookupBlock, GetAccountState, GetMasterchainInfo, GetShardAccountCell, GetShardAccountCellByTransaction, RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage, RawSendMessageReturnHash, SmcLoad, SmcRunGetMethod, Sync};
-use crate::session::SessionRequest;
+use tower::{Service};
+use crate::balance::Route;
+use crate::error::Error;
 
-#[async_trait]
-pub trait Callable : Sized {
+pub trait Callable<S> : Sized + Send + Clone + 'static {
     type Response : DeserializeOwned;
+    type Error: Into<Error>;
+    type Future : Future<Output=Result<Self::Response, Self::Error>> + Send;
 
-    async fn call<Req, S : Service<Req, Response = Value, Error = anyhow::Error>>(self, client: &mut S) -> Result<Self::Response, S::Error>
-        where Req: Send,
-              S : Send,
-              S::Future : Send,
-              CallableWrapper<Self> : Into<Req>
-    {
-        let request = CallableWrapper::new(self).into();
+    fn call(self, client: &mut S) -> Self::Future;
+}
 
-        let json = client
-            .ready()
-            .await?
-            .call(request)
-            .await?;
+impl<S, T, E: Into<Error>> Callable<S> for T
+    where T : Requestable + 'static,
+          S : Service<T, Response=T::Response, Error=E> + Send,
+          S::Future : Send + 'static,
+          S::Error: Send {
+    type Response = T::Response;
+    type Error = S::Error;
+    type Future = S::Future;
 
-        let response = serde_json::from_value::<Self::Response>(json)?;
-
-        Ok(response)
+    fn call(self, client: &mut S) -> Self::Future {
+        client.call(self)
     }
 }
 
-#[async_trait]
-pub trait Requestable where Self : Serialize + Sized {
-    type Response : DeserializeOwned;
+pub trait Requestable where Self : Serialize + Clone + Send + Sync {
+    type Response : DeserializeOwned + Send + Sync + 'static;
 
     fn timeout(&self) -> Duration {
         Duration::from_secs(3)
     }
-
-    fn into_request_body(self) -> RequestBody;
-}
-
-impl<T> Callable for T where T : Requestable {
-    type Response = T::Response;
 }
 
 pub trait Routable {
     fn route(&self) -> Route;
 }
 
-#[derive(new, Debug)]
-pub struct Forward<Req : Requestable> {
-    req: Req,
-    route: Route
-}
-
-impl<Req> Serialize for Forward<Req> where Req : Requestable {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
-        self.req.serialize(serializer)
-    }
-}
-
-impl<Req> Requestable for Forward<Req> where Req : Requestable {
-    type Response = Req::Response;
-
-    fn timeout(&self) -> Duration {
-        self.req.timeout()
-    }
-
-    fn into_request_body(self) -> RequestBody {
-        self.req.into_request_body()
-    }
-}
-
-impl<Req> Routable for Forward<Req> where Req : Requestable {
-    fn route(&self) -> Route { self.route }
-}
-
-#[derive(new)]
-pub struct CallableWrapper<T> {
-    pub inner: T
-}
-
-impl<T> From<CallableWrapper<T>> for Request where T : Requestable {
-    fn from(req: CallableWrapper<T>) -> Self {
-        let timeout = req.inner.timeout();
-        let body = req.inner.into_request_body();
-
-        Request::new(body, timeout)
-    }
-}
-
-impl<T> From<CallableWrapper<T>> for SessionRequest where T : Requestable {
-    fn from(req: CallableWrapper<T>) -> Self {
-        SessionRequest::new_atomic(req.into())
-    }
-}
-
-impl<T> From<CallableWrapper<T>> for BalanceRequest where T : Routable, CallableWrapper<T> : Into<SessionRequest> {
-    fn from(req: CallableWrapper<T>) -> Self {
-        let route = req.inner.route();
-
-        BalanceRequest::new(route, req.into())
-    }
-}
-
 impl Requestable for Value {
     type Response = Value;
-
-    fn into_request_body(self) -> RequestBody {
-        RequestBody::Value(self)
-    }
 }
 
 pub type RequestId = Uuid;
 
-#[derive(Clone, Serialize)]
-#[serde(untagged)]
-pub enum RequestBody {
-    Sync(Sync),
-
-    GetMasterchainInfo(GetMasterchainInfo),
-
-    GetAccountState(GetAccountState),
-    GetShardAccountCell(GetShardAccountCell),
-    GetShardAccountCellByTransaction(GetShardAccountCellByTransaction),
-
-    BlocksGetShards(BlocksGetShards),
-    BlocksGetBlockHeader(BlocksGetBlockHeader),
-    BlocksLookupBlock(BlocksLookupBlock),
-    BlocksGetTransactions(BlocksGetTransactions),
-
-    RawSendMessage(RawSendMessage),
-    RawSendMessageReturnHash(RawSendMessageReturnHash),
-    RawGetAccountState(RawGetAccountState),
-    RawGetAccountStateByTransaction(RawGetAccountStateByTransaction),
-    RawGetTransactionsV2(RawGetTransactionsV2),
-
-    SmcLoad(SmcLoad),
-    SmcRunGetMethod(SmcRunGetMethod),
-
-    Value(Value)
-}
-
-
 #[derive(Serialize, Clone)]
-pub struct Request {
+pub struct Request<T : Serialize + Clone> {
     #[serde(rename="@extra")]
     pub id: RequestId,
 
@@ -157,9 +57,11 @@ pub struct Request {
     pub timeout: Duration,
 
     #[serde(flatten)]
-    pub body: RequestBody
+    pub body: T
 }
 
+
+// TODO[akostylev0] generic over request type
 #[derive(Deserialize, Debug)]
 pub struct Response {
     #[serde(rename="@extra")]
@@ -169,40 +71,22 @@ pub struct Response {
     pub data: Value
 }
 
-impl Request {
-    pub fn new(body: RequestBody, timeout: Duration) -> Self {
-        Self {
-            id: RequestId::new_v4(),
-            timeout,
-            body
-        }
-    }
-
-    pub fn with_new_id(&self) -> Self {
-        Self {
-            id: RequestId::new_v4(),
-            timeout: self.timeout,
-            body: self.body.clone()
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
     use std::time::Duration;
     use serde_json::json;
     use uuid::Uuid;
-    use crate::request::{Request, RequestBody};
+    use crate::request::Request;
 
     #[test]
     fn data_is_flatten() {
         let request = Request {
             id: Uuid::from_str("7431f198-7514-40ff-876c-3e8ee0a311ba").unwrap(),
             timeout: Duration::from_secs(3),
-            body: RequestBody::Value(json!({
+            body: json!({
                 "data": "is flatten"
-            }))
+            })
         };
 
         assert_eq!(serde_json::to_string(&request).unwrap(), "{\"@extra\":\"7431f198-7514-40ff-876c-3e8ee0a311ba\",\"data\":\"is flatten\"}")
