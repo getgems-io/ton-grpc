@@ -13,7 +13,7 @@ use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
-use tracing::{instrument, trace};
+use tracing::{info, instrument, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
@@ -219,6 +219,8 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<
 
     let mut block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
 
+    let mut hops = 0;
+
     while lhs < rhs {
         // TODO[akostylev0] specify error
         if block.is_err() {
@@ -236,11 +238,14 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<
         trace!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
 
         block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
+
+        hops += 1;
     }
 
     let (master, work) = block?;
 
     trace!(seqno = master.id.seqno, "first seqno");
+    info!(hops = hops, "hops to first seqno");
 
     Ok((master, work))
 }
