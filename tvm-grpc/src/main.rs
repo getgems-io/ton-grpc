@@ -6,6 +6,7 @@ use std::time::Duration;
 use tonic::transport::Server;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
+use tonlibjson_sys::TvmEmulator;
 use crate::tvm::transaction_emulator_service_server::TransactionEmulatorServiceServer;
 use crate::tvm::tvm_emulator_service_server::TvmEmulatorServiceServer;
 use crate::transaction_emulator::TransactionEmulatorService;
@@ -26,6 +27,8 @@ async fn main() -> anyhow::Result<()> {
 
     // TODO[akostylev0] env
     let addr = "0.0.0.0:50052".parse().unwrap();
+
+    TvmEmulator::set_verbosity_level(0);
 
     let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default());
     let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default());
