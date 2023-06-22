@@ -20,6 +20,7 @@ use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, Maste
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::helper::Side;
+use crate::request::Specialized;
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::shared::SharedService;
@@ -145,7 +146,7 @@ impl TonClient {
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
         self.client
             .clone()
-            .oneshot(GetMasterchainInfo::default())
+            .oneshot(Specialized::new(GetMasterchainInfo::default()))
             .await
     }
 

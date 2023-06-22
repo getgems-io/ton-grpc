@@ -5,6 +5,7 @@ use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::{anyhow, Result};
 use futures::{FutureExt, try_join, TryFutureExt};
+use futures::future::ready;
 use tokio::sync::watch::Receiver;
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::Retry;
@@ -16,7 +17,7 @@ use tracing::{instrument, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
-use crate::request::{Callable};
+use crate::request::{Specialized, Callable};
 use crate::shared::SharedService;
 
 #[derive(Clone)]
@@ -139,6 +140,28 @@ impl CursorClient {
             -1 => Some((first_block.0, last_block.0)),
             _ => Some((first_block.1, last_block.1))
         }
+    }
+}
+
+impl Service<Specialized<GetMasterchainInfo>> for CursorClient {
+    type Response = MasterchainInfo;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+        if self.masterchain_info_rx.borrow().is_some() {
+            Poll::Ready(Ok(()))
+        } else {
+            cx.waker().wake_by_ref();
+
+            Poll::Pending
+        }
+    }
+
+    fn call(&mut self, _: Specialized<GetMasterchainInfo>) -> Self::Future {
+        let response = self.masterchain_info_rx.borrow().as_ref().unwrap().clone();
+
+        return ready(Ok(response)).boxed()
     }
 }
 
