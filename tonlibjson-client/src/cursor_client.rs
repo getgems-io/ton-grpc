@@ -220,6 +220,7 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<
     let shard = start.shard;
 
     let mut block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
+    let mut success = None;
 
     let mut hops = 0;
 
@@ -232,19 +233,26 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<
         }
 
         cur = (lhs + rhs) / 2;
-
-        if cur == 0 {
-            break;
-        }
-
-        trace!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
+        if cur == 0 { break; }
 
         block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
+        if block.is_ok() {
+            success = Some(block.as_ref().unwrap().clone());
+        }
 
         hops += 1;
     }
 
-    let (master, work) = block?;
+    let delta = 4;
+    let (master, work) = match block {
+        Ok(b) => { b },
+        Err(e) => {
+            match success {
+                Some(b) if b.0.id.seqno - cur <= delta => { b },
+                _ => { return Err(e) },
+            }
+        }
+    };
 
     trace!(seqno = master.id.seqno, "first seqno");
     info!(hops = hops, "hops to first seqno");
