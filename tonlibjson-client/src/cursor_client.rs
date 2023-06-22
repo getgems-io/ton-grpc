@@ -212,7 +212,7 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<
     let length = start.seqno;
     let mut rhs = length;
     let mut lhs = 1;
-    let mut cur = (lhs + rhs) / 2;
+    let mut cur = start.seqno - 200000;
 
     let workchain = start.workchain;
     let shard = start.shard;
