@@ -82,6 +82,7 @@ impl CursorClient {
         tokio::spawn({
             let mut client = client.clone();
             let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
+            let mut first_block_seqno = None;
 
             async move {
                 let mut timer = interval(Duration::from_secs(30));
@@ -101,7 +102,7 @@ impl CursorClient {
                         }
                     }
                     if first_block.is_none() {
-                        let fb = find_first_blocks(&mut client).await;
+                        let fb = find_first_blocks(&mut client, first_block_seqno.map(|n| n + 1), first_block_seqno.map(|n| n + 32)).await;
 
                         match fb {
                             Ok((mfb, wfb)) => {
@@ -109,6 +110,7 @@ impl CursorClient {
                                 trace!(seqno = wfb.id.seqno, "work chain first block");
 
                                 first_block = Some((mfb.clone(), wfb.clone()));
+                                first_block_seqno = Some(mfb.id.seqno);
 
                                 let _ = ftx.send(Some((mfb, wfb)));
                             },
@@ -206,18 +208,21 @@ async fn check_block_available(client: &mut ConcurrencyLimit<SharedService<PeakE
 }
 
 #[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Result<(BlockHeader, BlockHeader)> {
+async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<Client>>>, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, BlockHeader)> {
     let start = client.oneshot(GetMasterchainInfo::default()).await?.last;
 
     let length = start.seqno;
     let mut rhs = length;
-    let mut lhs = 1;
-    let mut cur = (lhs + rhs) / 2;
+    let mut lhs = lhs.unwrap_or(1);
+    let mut cur = cur.unwrap_or(start.seqno - 200000);
 
     let workchain = start.workchain;
     let shard = start.shard;
 
     let mut block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
+    let mut success = None;
+
+    let mut hops = 0;
 
     while lhs < rhs {
         // TODO[akostylev0] specify error
@@ -228,19 +233,28 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<
         }
 
         cur = (lhs + rhs) / 2;
-
-        if cur == 0 {
-            break;
-        }
-
-        trace!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
+        if cur == 0 { break; }
 
         block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
+        if block.is_ok() {
+            success = Some(block.as_ref().unwrap().clone());
+        }
+
+        hops += 1;
     }
 
-    let (master, work) = block?;
+    let delta = 4;
+    let (master, work) = match block {
+        Ok(b) => { b },
+        Err(e) => {
+            match success {
+                Some(b) if b.0.id.seqno - cur <= delta => { b },
+                _ => { return Err(e) },
+            }
+        }
+    };
 
-    trace!(seqno = master.id.seqno, "first seqno");
+    trace!(hops = hops, seqno = master.id.seqno, "first seqno");
 
     Ok((master, work))
 }
