@@ -254,8 +254,7 @@ async fn find_first_blocks(client: &mut ConcurrencyLimit<SharedService<PeakEwma<
         }
     };
 
-    trace!(seqno = master.id.seqno, "first seqno");
-    info!(hops = hops, "hops to first seqno");
+    trace!(hops = hops, seqno = master.id.seqno, "first seqno");
 
     Ok((master, work))
 }
