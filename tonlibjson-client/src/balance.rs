@@ -12,12 +12,12 @@ use derive_new::new;
 use itertools::Itertools;
 use tower::limit::ConcurrencyLimit;
 use tower::load::PeakEwma;
-use crate::block::{BlockHeader};
+use crate::block::{BlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 use crate::error::ErrorService;
-use crate::request::{Routable, Callable};
+use crate::request::{Routable, Callable, Specialized};
 use crate::shared::SharedService;
 
 #[derive(Debug, Clone, Copy)]
@@ -119,8 +119,8 @@ impl Router {
 #[derive(new)]
 pub struct Balance { router: Router }
 
-impl<T: Routable + Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> Service<&T> for Router {
-    type Response = ErrorService<tower::balance::p2c::Balance<ServiceList<Vec<CursorClient>>, T>>;
+impl Service<&Route> for Router {
+    type Response = Vec<CursorClient>;
     type Error = anyhow::Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
@@ -136,13 +136,13 @@ impl<T: Routable + Callable<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>> 
         }
     }
 
-    fn call(&mut self, req: &T) -> Self::Future {
-        let services = req.route().choose(self.services.values());
+    fn call(&mut self, req: &Route) -> Self::Future {
+        let services = req.choose(self.services.values());
 
         let response = if services.is_empty() {
-            Err(anyhow!("no services available for {:?}", req.route()))
+            Err(anyhow!("no services available for {:?}", req))
         } else {
-            Ok(ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new::<T>(services))))
+            Ok(services)
         };
 
         std::future::ready(response)
@@ -155,13 +155,32 @@ impl<R> Service<R> for Balance where R: Routable + Callable<ConcurrencyLimit<Sha
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Service::<&R>::poll_ready(&mut self.router, cx)
+        self.router.poll_ready(cx)
     }
 
     fn call(&mut self, req: R) -> Self::Future {
         self.router
-            .call(&req)
-            .and_then(|svc| svc.oneshot(req))
+            .call(&req.route())
+            .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new::<R>(svc)))
+                .oneshot(req))
+            .boxed()
+    }
+}
+
+impl Service<Specialized<GetMasterchainInfo>> for Balance {
+    type Response = MasterchainInfo;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.router.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Specialized<GetMasterchainInfo>) -> Self::Future {
+        self.router
+            .call(&req.route())
+            .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
+                ServiceList::new::<Specialized<GetMasterchainInfo>>(svc))).oneshot(req))
             .boxed()
     }
 }

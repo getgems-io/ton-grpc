@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::time::Duration;
+use derive_new::new;
 use uuid::Uuid;
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
@@ -69,6 +70,18 @@ pub struct Response {
 
     #[serde(flatten)]
     pub data: Value
+}
+
+// TODO[akostylev0] reinvent that layer
+#[derive(new, Clone)]
+pub struct Specialized<T> {
+    inner: T
+}
+
+impl<T> Routable for Specialized<T> where T : Routable {
+    fn route(&self) -> Route {
+        self.inner.route()
+    }
 }
 
 #[cfg(test)]
