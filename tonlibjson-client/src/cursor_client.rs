@@ -13,7 +13,7 @@ use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
-use tracing::{info, instrument, trace};
+use tracing::{instrument, trace};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
