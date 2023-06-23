@@ -14,6 +14,8 @@ use crate::tvm_emulator::TvmEmulatorService;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    TvmEmulator::set_verbosity_level(0);
+
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_span_events(FmtSpan::CLOSE)
@@ -28,7 +30,9 @@ async fn main() -> anyhow::Result<()> {
     // TODO[akostylev0] env
     let addr = "0.0.0.0:50052".parse().unwrap();
 
-    TvmEmulator::set_verbosity_level(0);
+    let (mut health_reporter, health_server) = tonic_health::server::health_reporter();
+    health_reporter.set_serving::<TvmEmulatorServiceServer<TvmEmulatorService>>().await;
+    health_reporter.set_serving::<TransactionEmulatorServiceServer<TransactionEmulatorService>>().await;
 
     let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default());
     let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default());
@@ -37,6 +41,7 @@ async fn main() -> anyhow::Result<()> {
         .tcp_keepalive(Some(Duration::from_secs(120)))
         .http2_keepalive_interval(Some(Duration::from_secs(90)))
         .add_service(reflection)
+        .add_service(health_server)
         .add_service(tvm_emulator_service)
         .add_service(transaction_emulator_service)
         .serve_with_shutdown(addr, async move { tokio::signal::ctrl_c().await.unwrap(); })

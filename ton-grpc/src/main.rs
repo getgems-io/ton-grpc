@@ -56,6 +56,11 @@ async fn main() -> anyhow::Result<()> {
     let block_service = BlockServiceServer::new(BlockService::new(client.clone()));
     let message_service = MessageServiceServer::new(MessageService::new(client));
 
+    let (mut health_reporter, health_server) = tonic_health::server::health_reporter();
+    health_reporter.set_serving::<AccountServiceServer<AccountService>>().await;
+    health_reporter.set_serving::<BlockServiceServer<BlockService>>().await;
+    health_reporter.set_serving::<MessageServiceServer<MessageService>>().await;
+
     Server::builder()
         .layer(TraceLayer::new_for_grpc()
             .make_span_with(move |req : &Request<Body>| {
@@ -77,6 +82,7 @@ async fn main() -> anyhow::Result<()> {
         .tcp_keepalive(Some(Duration::from_secs(120)))
         .http2_keepalive_interval(Some(Duration::from_secs(90)))
         .add_service(reflection)
+        .add_service(health_server)
         .add_service(account_service)
         .add_service(block_service)
         .add_service(message_service)
