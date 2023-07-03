@@ -27,7 +27,7 @@ url = { version = "2.4", features = ["serde"] }
 rand = "0.8"
 itertools = "0.11"
 derive-new = "0.5.9"
-async-trait = "0.1.68"
+async-trait = "0.1.69"
 tokio-retry = "0.3"
 bytes = "1.4"
 crc = "3.0.1"
