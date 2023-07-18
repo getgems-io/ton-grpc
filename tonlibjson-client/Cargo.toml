@@ -18,7 +18,7 @@ tokio-stream = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
 async-stream = { workspace = true }
-dashmap = "5.4"
+dashmap = "5.5"
 uuid = { version = "1.4", features = ["v4", "fast-rng", "serde"] }
 pin-project = "1.1"
 reqwest = { version = "0.11", features = ["rustls-tls", "trust-dns"], default-features = false }
