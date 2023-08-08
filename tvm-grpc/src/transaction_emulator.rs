@@ -103,7 +103,7 @@ fn emulate(emu: &tonlibjson_sys::TransactionEmulator, req: TransactionEmulatorEm
     let response = emu.emulate(&req.shard_account_boc, &req.message_boc)?;
     tracing::trace!(method="emulate", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TransactionEmulatorEmulateResponse>>(response)?;
+    let response = serde_json::from_str::<TvmResult<TransactionEmulatorEmulateResponse>>(&response)?;
 
     response.into()
 }

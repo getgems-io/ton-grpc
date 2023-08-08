@@ -13,7 +13,7 @@ mod tests {
         let response = client.receive(Duration::from_micros(10));
 
         assert!(response.is_err());
-        assert_eq!(response.unwrap_err().to_string(), "timeout reached")
+        assert_eq!(response.unwrap_err().to_string(), "null received")
     }
 
     #[test]

@@ -94,7 +94,7 @@ fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> any
     let response = emu.run_get_method(req.method_id, &req.stack_boc)?;
     tracing::trace!(method="run_get_method", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TvmEmulatorRunGetMethodResponse>>(response)?;
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorRunGetMethodResponse>>(&response)?;
 
     response.into()
 }
@@ -107,7 +107,7 @@ fn send_external_message(state: &mut State, req: TvmEmulatorSendExternalMessageR
     let response = emu.send_external_message(&req.message_body_boc)?;
     tracing::trace!(method="send_external_message", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendExternalMessageResponse>>(response)?;
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendExternalMessageResponse>>(&response)?;
 
     response.into()
 }
@@ -120,7 +120,7 @@ fn send_internal_message(state: &mut State, req: TvmEmulatorSendInternalMessageR
     let response = emu.send_internal_message(&req.message_body_boc, req.amount)?;
     tracing::trace!(method="send_internal_message", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendInternalMessageResponse>>(response)?;
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendInternalMessageResponse>>(&response)?;
 
     response.into()
 }
