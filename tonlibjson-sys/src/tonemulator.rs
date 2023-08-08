@@ -118,6 +118,8 @@ impl TransactionEmulator {
 impl Drop for TransactionEmulator {
     fn drop(&mut self) {
         unsafe { transaction_emulator_destroy(*self.pointer.lock().unwrap()) };
+
+        tracing::debug!("TransactionEmulator dropped");
     }
 }
 
@@ -225,6 +227,8 @@ impl Drop for TvmEmulator {
         unsafe {
             tvm_emulator_destroy(*self.pointer.lock().unwrap())
         }
+
+        tracing::debug!("TvmEmulator dropped");
     }
 }
 
