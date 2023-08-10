@@ -4,6 +4,7 @@ mod tvm_emulator;
 
 use std::time::Duration;
 use tonic::transport::Server;
+use tonic::codec::CompressionEncoding::Gzip;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tonlibjson_sys::TvmEmulator;
@@ -34,8 +35,12 @@ async fn main() -> anyhow::Result<()> {
     health_reporter.set_serving::<TvmEmulatorServiceServer<TvmEmulatorService>>().await;
     health_reporter.set_serving::<TransactionEmulatorServiceServer<TransactionEmulatorService>>().await;
 
-    let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default());
-    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default());
+    let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default())
+        .accept_compressed(Gzip)
+        .send_compressed(Gzip);
+    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default())
+        .accept_compressed(Gzip)
+        .send_compressed(Gzip);
 
     Server::builder()
         .tcp_keepalive(Some(Duration::from_secs(120)))

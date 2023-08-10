@@ -13,6 +13,7 @@ use opentelemetry::sdk::Resource;
 use opentelemetry_otlp::WithExportConfig;
 use tonic::codegen::http::{HeaderMap, Request};
 use tonic::transport::{Body, Server};
+use tonic::codec::CompressionEncoding::Gzip;
 use tower_http::trace::{TraceLayer};
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 use tracing_subscriber::EnvFilter;
@@ -52,9 +53,15 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Ton Client is ready");
 
-    let account_service = AccountServiceServer::new(AccountService::new(client.clone()));
-    let block_service = BlockServiceServer::new(BlockService::new(client.clone()));
-    let message_service = MessageServiceServer::new(MessageService::new(client));
+    let account_service = AccountServiceServer::new(AccountService::new(client.clone()))
+        .accept_compressed(Gzip)
+        .send_compressed(Gzip);
+    let block_service = BlockServiceServer::new(BlockService::new(client.clone()))
+        .accept_compressed(Gzip)
+        .send_compressed(Gzip);
+    let message_service = MessageServiceServer::new(MessageService::new(client))
+        .accept_compressed(Gzip)
+        .send_compressed(Gzip);
 
     let (mut health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter.set_serving::<AccountServiceServer<AccountService>>().await;
