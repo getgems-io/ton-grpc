@@ -1,5 +1,4 @@
 use std::ffi::{c_void, CStr, CString};
-use std::sync::Mutex;
 use libc::{c_int, c_char, c_uint, c_ulong, c_long};
 use anyhow::{anyhow, Result};
 
@@ -45,7 +44,7 @@ extern {
 
 #[derive(Debug)]
 pub struct TransactionEmulator {
-    pointer: Mutex<*mut c_void>
+    pointer: *mut c_void
 }
 
 impl TransactionEmulator {
@@ -59,9 +58,7 @@ impl TransactionEmulator {
             return Err(anyhow!("pointer is null"));
         }
 
-        Ok(Self {
-            pointer: Mutex::new(pointer)
-        })
+        Ok(Self { pointer })
     }
 
     pub fn emulate(&self, shard_account_boc: &str, message_boc: &str) -> Result<String> {
@@ -70,7 +67,7 @@ impl TransactionEmulator {
 
         unsafe {
             let ptr = transaction_emulator_emulate_transaction(
-                *self.pointer.lock().unwrap(),
+                self.pointer,
                 shard_account_boc.as_ptr(),
                 message_boc.as_ptr()
             );
@@ -86,39 +83,39 @@ impl TransactionEmulator {
     }
 
     pub fn set_unixtime(&self, unixtime: u32) -> bool {
-        unsafe { transaction_emulator_set_unixtime(*self.pointer.lock().unwrap(), unixtime) }
+        unsafe { transaction_emulator_set_unixtime(self.pointer, unixtime) }
     }
 
     pub fn set_lt(&self, lt: u64) -> bool {
-        unsafe { transaction_emulator_set_lt(*self.pointer.lock().unwrap(), lt)}
+        unsafe { transaction_emulator_set_lt(self.pointer, lt)}
     }
 
     pub fn set_rand_seed(&self, seed: &str) -> Result<bool> {
         let seed = CString::new(seed)?;
 
-        Ok(unsafe { transaction_emulator_set_rand_seed(*self.pointer.lock().unwrap(), seed.as_ptr()) })
+        Ok(unsafe { transaction_emulator_set_rand_seed(self.pointer, seed.as_ptr()) })
     }
 
     pub fn set_ignore_chksig(&self, ignore_chksig: bool) -> bool {
-        unsafe { transaction_emulator_set_ignore_chksig(*self.pointer.lock().unwrap(), ignore_chksig) }
+        unsafe { transaction_emulator_set_ignore_chksig(self.pointer, ignore_chksig) }
     }
 
     pub fn set_config(&self, config: &str) -> Result<bool> {
         let config = CString::new(config)?;
 
-        Ok(unsafe { transaction_emulator_set_config(*self.pointer.lock().unwrap(), config.as_ptr()) })
+        Ok(unsafe { transaction_emulator_set_config(self.pointer, config.as_ptr()) })
     }
 
     pub fn set_libs(&self, libs: &str) -> Result<bool> {
         let libs = CString::new(libs)?;
 
-        Ok(unsafe { transaction_emulator_set_libs(*self.pointer.lock().unwrap(), libs.as_ptr()) })
+        Ok(unsafe { transaction_emulator_set_libs(self.pointer, libs.as_ptr()) })
     }
 }
 
 impl Drop for TransactionEmulator {
     fn drop(&mut self) {
-        unsafe { transaction_emulator_destroy(*self.pointer.lock().unwrap()) };
+        unsafe { transaction_emulator_destroy(self.pointer) };
 
         tracing::debug!("TransactionEmulator dropped");
     }
@@ -128,7 +125,7 @@ unsafe impl Send for TransactionEmulator {}
 
 #[derive(Debug)]
 pub struct TvmEmulator {
-    pointer: Mutex<*mut c_void>,
+    pointer: *mut c_void,
 }
 
 impl TvmEmulator {
@@ -147,19 +144,17 @@ impl TvmEmulator {
             return Err(anyhow!("pointer is null"));
         }
 
-        Ok(Self {
-            pointer: Mutex::new(pointer)
-        })
+        Ok(Self { pointer })
     }
 
     pub fn set_libraries(&self, libs_boc: &str) -> Result<bool> {
         let req = CString::new(libs_boc)?;
 
-        Ok(unsafe { tvm_emulator_set_libraries(*self.pointer.lock().unwrap(), req.as_ptr()) })
+        Ok(unsafe { tvm_emulator_set_libraries(self.pointer, req.as_ptr()) })
     }
 
     pub fn set_gas_limit(&self, gas_limit: i64) -> bool {
-        unsafe { tvm_emulator_set_gas_limit(*self.pointer.lock().unwrap(), gas_limit) }
+        unsafe { tvm_emulator_set_gas_limit(self.pointer, gas_limit) }
     }
 
     pub fn set_c7(&self, address: &str, unixtime: u32, balance: u64, rand_seed_hex: &str, config: &str) -> Result<bool> {
@@ -168,7 +163,7 @@ impl TvmEmulator {
         let config = CString::new(config)?;
 
         Ok(unsafe { tvm_emulator_set_c7(
-            *self.pointer.lock().unwrap(),
+            self.pointer,
             address.as_ptr(),
             unixtime,
             balance,
@@ -181,7 +176,7 @@ impl TvmEmulator {
         let stack_boc = CString::new(stack_boc)?;
 
         unsafe {
-            let ptr = tvm_emulator_run_get_method(*self.pointer.lock().unwrap(), method_id, stack_boc.as_ptr());
+            let ptr = tvm_emulator_run_get_method(self.pointer, method_id, stack_boc.as_ptr());
             if ptr.is_null() {
                 return Err(anyhow!("pointer is null"));
             }
@@ -197,7 +192,7 @@ impl TvmEmulator {
         let message_body_boc = CString::new(message_body_boc)?;
 
         unsafe {
-            let ptr = tvm_emulator_send_external_message(*self.pointer.lock().unwrap(), message_body_boc.as_ptr());
+            let ptr = tvm_emulator_send_external_message(self.pointer, message_body_boc.as_ptr());
             if ptr.is_null() {
                 return Err(anyhow!("pointer is null"));
             }
@@ -213,7 +208,7 @@ impl TvmEmulator {
         let message_body_boc = CString::new(message_body_boc)?;
 
         unsafe {
-            let ptr = tvm_emulator_send_internal_message(*self.pointer.lock().unwrap(), message_body_boc.as_ptr(), amount);
+            let ptr = tvm_emulator_send_internal_message(self.pointer, message_body_boc.as_ptr(), amount);
             if ptr.is_null() {
                 return Err(anyhow!("pointer is null"));
             }
@@ -229,14 +224,10 @@ impl TvmEmulator {
 impl Drop for TvmEmulator {
     fn drop(&mut self) {
         unsafe {
-            tvm_emulator_destroy(*self.pointer.lock().unwrap())
+            tvm_emulator_destroy(self.pointer)
         }
-
-        tracing::debug!("TvmEmulator dropped");
     }
 }
-
-unsafe impl Send for TvmEmulator {}
 
 
 #[cfg(test)]
