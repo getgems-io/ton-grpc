@@ -226,12 +226,8 @@ impl Drop for TvmEmulator {
         unsafe {
             tvm_emulator_destroy(self.pointer)
         }
-
-        tracing::debug!("TvmEmulator dropped");
     }
 }
-
-unsafe impl Send for TvmEmulator {}
 
 
 #[cfg(test)]
