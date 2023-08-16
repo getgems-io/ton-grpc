@@ -13,9 +13,9 @@ RUN ln -sf /usr/bin/ld.lld-16 /usr/bin/ld.lld
 
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
-RUN wget https://github.com/mozilla/sccache/releases/download/v0.4.1/sccache-v0.4.1-x86_64-unknown-linux-musl.tar.gz
-RUN tar xzf sccache-v0.4.1-x86_64-unknown-linux-musl.tar.gz \
-    && mv sccache-v0.4.1-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache \
+RUN wget https://github.com/mozilla/sccache/releases/download/v0.5.4/sccache-v0.5.4-x86_64-unknown-linux-musl.tar.gz
+RUN tar xzf sccache-v0.5.4-x86_64-unknown-linux-musl.tar.gz \
+    && mv sccache-v0.5.4-x86_64-unknown-linux-musl/sccache /usr/local/bin/sccache \
     && chmod +x /usr/local/bin/sccache
 
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache
