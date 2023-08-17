@@ -4,26 +4,11 @@ use async_stream::stream;
 use futures::{StreamExt, Stream};
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error};
+use crate::threaded::{Command, Stop};
 use crate::tvm::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::tvm::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
 use crate::tvm::tvm_emulator_service_server::TvmEmulatorService as BaseTvmEmulatorService;
 use crate::tvm::{tvm_emulator_request, tvm_emulator_response, TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetC7Request, TvmEmulatorSetC7Response, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse, TvmResult};
-
-enum Command {
-    Request { request: tvm_emulator_request::Request, response: tokio::sync::oneshot::Sender<anyhow::Result<tvm_emulator_response::Response>> },
-    Drop
-}
-
-#[derive(Debug)]
-struct Stop { sender: tokio::sync::mpsc::UnboundedSender<Command> }
-
-impl Stop {
-    fn new(sender: tokio::sync::mpsc::UnboundedSender<Command>) -> Self { Self { sender } }
-}
-
-impl Drop for Stop {
-    fn drop(&mut self) { let _ = self.sender.send(Command::Drop); }
-}
 
 #[derive(Debug, Default)]
 pub struct TvmEmulatorService;
@@ -40,7 +25,7 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
     async fn process(&self, request: Request<Streaming<TvmEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
         let stream = request.into_inner();
 
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Command>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Command<tvm_emulator_request::Request, tvm_emulator_response::Response>>();
         let stop = Stop::new(tx.clone());
 
         rayon::spawn(move || {
@@ -80,7 +65,6 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
                                 error!(error = ?e);
                                 Status::internal(e.to_string())
                             })
-
                     },
                     Ok(TvmEmulatorRequest{ request_id, request: None }) => {
                         tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);
