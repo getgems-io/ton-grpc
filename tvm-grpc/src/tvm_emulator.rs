@@ -65,7 +65,6 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
                                 error!(error = ?e);
                                 Status::internal(e.to_string())
                             })
-
                     },
                     Ok(TvmEmulatorRequest{ request_id, request: None }) => {
                         tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);
