@@ -1,9 +1,11 @@
 use std::pin::Pin;
-use futures::{Stream, StreamExt};
+use std::time::Duration;
+use futures::Stream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error};
 use anyhow::anyhow;
 use async_stream::stream;
+use tokio_stream::StreamExt;
 use crate::threaded::{Command, Stop};
 use crate::tvm::transaction_emulator_service_server::TransactionEmulatorService as BaseTransactionEmulatorService;
 use crate::tvm::{transaction_emulator_request, transaction_emulator_response, TransactionEmulatorEmulateRequest, TransactionEmulatorEmulateResponse, TransactionEmulatorPrepareRequest, TransactionEmulatorPrepareResponse, TransactionEmulatorRequest, TransactionEmulatorResponse, TransactionEmulatorSetConfigRequest, TransactionEmulatorSetConfigResponse, TransactionEmulatorSetIgnoreChksigRequest, TransactionEmulatorSetIgnoreChksigResponse, TransactionEmulatorSetLibsRequest, TransactionEmulatorSetLibsResponse, TransactionEmulatorSetLtRequest, TransactionEmulatorSetLtResponse, TransactionEmulatorSetRandSeedRequest, TransactionEmulatorSetRandSeedResponse, TransactionEmulatorSetUnixtimeRequest, TransactionEmulatorSetUnixtimeResponse, TvmResult};
@@ -52,10 +54,11 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
             }
         });
 
+        let stream = stream.timeout(Duration::from_secs(3));
         let output = stream! {
             for await msg in stream {
                 match msg {
-                    Ok(TransactionEmulatorRequest { request_id, request: Some(req) }) => {
+                    Ok(Ok(TransactionEmulatorRequest { request_id, request: Some(req) })) => {
                         let (to, ro) = tokio::sync::oneshot::channel();
 
                         let _ = tx.send(Command::Request { request: req, response: to });
@@ -68,11 +71,16 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
                                 Status::internal(e.to_string())
                             })
                     },
-                    Ok(TransactionEmulatorRequest { request_id, request: None }) => {
+                    Ok(Ok(TransactionEmulatorRequest { request_id, request: None })) => {
                         error!(error = ?anyhow!("empty request"), request_id=request_id);
 
                         break
                     },
+                    Ok(Err(e)) => {
+                        error!(error = ?e);
+
+                        break
+                    }
                     Err(e) =>  {
                         error!(error = ?e);
 
@@ -82,9 +90,9 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
             }
 
             drop(stop);
-        }.boxed();
+        };
 
-        Ok(Response::new(output))
+        Ok(Response::new(Box::pin(output)))
     }
 }
 

@@ -1,7 +1,9 @@
 use std::pin::Pin;
+use std::time::Duration;
 use anyhow::anyhow;
 use async_stream::stream;
-use futures::{StreamExt, Stream};
+use futures::Stream;
+use tokio_stream::StreamExt;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error};
 use crate::threaded::{Command, Stop};
@@ -50,10 +52,11 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
             }
         });
 
+        let stream = stream.timeout(Duration::from_secs(3));
         let output = stream! {
             for await msg in stream {
                 match msg {
-                    Ok(TvmEmulatorRequest { request_id, request: Some(req)}) => {
+                    Ok(Ok(TvmEmulatorRequest { request_id, request: Some(req)})) => {
                         let (to, ro) = tokio::sync::oneshot::channel();
 
                         let _ = tx.send(Command::Request { request: req, response: to });
@@ -66,8 +69,13 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
                                 Status::internal(e.to_string())
                             })
                     },
-                    Ok(TvmEmulatorRequest{ request_id, request: None }) => {
+                    Ok(Ok(TvmEmulatorRequest{ request_id, request: None })) => {
                         tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);
+
+                        break
+                    },
+                    Ok(Err(e)) =>  {
+                        tracing::error!(error = ?e);
 
                         break
                     },
@@ -80,9 +88,9 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
             }
 
             drop(stop);
-        }.boxed();
+        };
 
-        Ok(Response::new(output))
+        Ok(Response::new(Box::pin(output)))
     }
 }
 
