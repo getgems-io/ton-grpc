@@ -45,7 +45,8 @@ async fn main() -> anyhow::Result<()> {
 
     Server::builder()
         .tcp_keepalive(Some(Duration::from_secs(120)))
-        .http2_keepalive_interval(Some(Duration::from_secs(90)))
+        .http2_keepalive_interval(Some(Duration::from_secs(5)))
+        .timeout(Duration::from_secs(30))
         .add_service(reflection)
         .add_service(health_server)
         .add_service(tvm_emulator_service)
