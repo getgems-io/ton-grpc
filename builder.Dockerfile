@@ -19,7 +19,7 @@ RUN tar xzf sccache-v0.5.4-x86_64-unknown-linux-musl.tar.gz \
     && chmod +x /usr/local/bin/sccache
 
 ENV RUSTC_WRAPPER=/usr/local/bin/sccache
-ENV CMAKE_CC_COMPILER_LAUNCHER=/usr/local/bin/sccache
+ENV CMAKE_C_COMPILER_LAUNCHER=/usr/local/bin/sccache
 ENV CMAKE_CXX_COMPILER_LAUNCHER=/usr/local/bin/sccache
 
 RUN wget https://github.com/protocolbuffers/protobuf/releases/download/v22.2/protoc-22.2-linux-x86_64.zip
