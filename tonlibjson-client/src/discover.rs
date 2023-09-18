@@ -29,7 +29,7 @@ pub struct ClientDiscover {
 impl ClientDiscover {
     pub(crate) async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
         let config = read_ton_config(path).await?;
-        let mut factory = ClientFactory::default();
+        let mut factory = ClientFactory;
 
         let stream = try_stream! {
             for ls in config.liteservers.iter() {
@@ -46,7 +46,7 @@ impl ClientDiscover {
 
     pub(crate) async fn new(url: Url, period: Duration, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
         let mut config = config(url.clone(), fallback_path).await?;
-        let mut factory = ClientFactory::default();
+        let mut factory = ClientFactory;
         let mut interval = tokio::time::interval(period);
 
         let stream = try_stream! {

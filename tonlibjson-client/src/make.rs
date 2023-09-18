@@ -44,7 +44,7 @@ pub struct CursorClientFactory;
 impl CursorClientFactory {
     pub fn create(client: PeakEwma<Client>) -> CursorClient {
         debug!("make new cursor client");
-        let client = SharedLayer::default()
+        let client = SharedLayer
             .layer(client);
         let client = ConcurrencyLimitLayer::new(256)
             .layer(client);
