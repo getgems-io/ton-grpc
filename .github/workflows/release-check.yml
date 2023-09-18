@@ -11,7 +11,8 @@ concurrency:
   cancel-in-progress: true
 jobs:
   experiment:
-    runs-on: "CPUBound"
+    runs-on:
+      group: "CPUBound"
     steps:
       - uses: actions/checkout@v3
         with:
