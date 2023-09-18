@@ -7,7 +7,8 @@ on:
 jobs:
   rust-clippy-analyze:
     name: Run rust-clippy analyzing
-    runs-on: ubuntu-latest
+    runs-on:
+      group: "CPUBoundRunner"
     permissions:
       contents: read
       checks: write
@@ -41,7 +42,16 @@ jobs:
           components: clippy
           override: true
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features --target x86_64-unknown-linux-gnu
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+
+      - name: Run sccache stat for check
+        shell: bash
+        run: ${SCCACHE_PATH} --show-stats
