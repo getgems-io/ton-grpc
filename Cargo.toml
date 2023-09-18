@@ -2,7 +2,6 @@
 members = [
     "tonlibjson-sys",
     "tonlibjson-client",
-    "tonlibjson-jsonrpc",
     "ton-grpc",
     "tvm-grpc"
 ]

@@ -10,25 +10,10 @@ A Rust client for The Open Network with p2c ewma balancer, automatic configurati
 
 See examples in `tonlibjson-client/examples`.
 
-### tonlibjson-jsonrpc
-Developed as a drop-in replacement for Toncenter for Getgems needs. Supports only jsonrpc interface and only a subset of methods from original Toncenter.
-
-
-```bash
-docker pull ghcr.io/akostylev0/tonlibjson:master
-docker run --rm -p 3030:3030 ghcr.io/akostylev0/tonlibjson:master
-
-curl --request POST 'http://localhost:3030/' \
---header 'Content-Type: application/json' \
---data-raw '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "getMasterchainInfo"
-}'
-```
-
 ### ton-grpc
+
 ```bash
 docker pull ghcr.io/akostylev0/tonlibjson:master
-docker run --rm -p 50052:50052 ghcr.io/akostylev0/tonlibjson:master /app/ton-grpc
+docker run --rm -p 50052:50052 ghcr.io/akostylev0/tonlibjson:master
+
 ```
