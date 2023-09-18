@@ -18,7 +18,8 @@ jobs:
             features: ''
           - suffix: '-testnet'
             features: 'testnet'
-    runs-on: ubuntu-latest
+    runs-on:
+      group: "CPUBound"
     steps:
       - uses: actions/checkout@v3
         with:
