@@ -11,6 +11,9 @@ jobs:
     container:
       image: ghcr.io/getgems-io/tonlibjson-builder:sha-d257d742dd04632cc209d8cb96fedaa45a877f6b
     steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
