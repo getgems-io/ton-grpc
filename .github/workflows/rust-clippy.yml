@@ -1,7 +1,0 @@
-name: rust-clippy analyze
-
-on:
-  pull_request:
-    branches: [ "master" ]
-
-jobs:
