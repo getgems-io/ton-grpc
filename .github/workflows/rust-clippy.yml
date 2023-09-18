@@ -20,6 +20,9 @@ jobs:
 
       - uses: arduino/setup-protoc@v2
 
+      - name: Install libc++-16
+        run: sudo apt-get install -y libsecp256k1-dev libsodium-dev
+
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
