@@ -18,6 +18,8 @@ jobs:
           - suffix: '-testnet'
             features: 'testnet'
     runs-on: ubuntu-latest
+    permissions:
+      checks: write
     steps:
       - uses: actions/checkout@v3
         with:
