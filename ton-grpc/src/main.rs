@@ -1,4 +1,4 @@
-mod ton;
+#[allow(clippy::enum_variant_names)] mod ton;
 mod account;
 mod helpers;
 mod block;

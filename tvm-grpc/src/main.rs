@@ -1,4 +1,4 @@
-mod tvm;
+#[allow(clippy::enum_variant_names)] mod tvm;
 mod transaction_emulator;
 mod tvm_emulator;
 mod threaded;
