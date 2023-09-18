@@ -1,4 +1,4 @@
-FROM rust:1.71.1-bookworm
+FROM rust:1.72.0-bookworm
 
 RUN apt update && apt install --yes --no-install-recommends cmake lsb-release software-properties-common unzip libsecp256k1-dev libsodium-dev
 
