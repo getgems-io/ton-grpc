@@ -87,11 +87,7 @@ dependencies = [
  "pin-project-lite",
  "rustversion",
  "serde",
- "serde_json",
- "serde_path_to_error",
- "serde_urlencoded",
  "sync_wrapper",
- "tokio",
  "tower",
  "tower-layer",
  "tower-service",
@@ -1528,15 +1524,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_path_to_error"
-version = "0.1.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "184c643044780f7ceb59104cef98a5a6f12cb2288a7bc701ab93a362b49fd47d"
-dependencies = [
- "serde",
-]
-
-[[package]]
 name = "serde_urlencoded"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1962,25 +1949,6 @@ dependencies = [
  "tracing-test",
  "url",
  "uuid",
-]
-
-[[package]]
-name = "tonlibjson-jsonrpc"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "base64 0.21.4",
- "cmake",
- "futures",
- "hex",
- "serde",
- "serde_json",
- "tokio",
- "tokio-stream",
- "tonlibjson-client",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]
