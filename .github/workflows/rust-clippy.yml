@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      checks: write
       security-events: write
     steps:
       - uses: actions/checkout@v3
@@ -33,7 +34,7 @@ jobs:
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 101
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@16499b5e05bf2e26879000db0c1d13f7e13fa3af #@v1
+        uses: actions-rs/toolchain@v1.0.7
         with:
           profile: minimal
           toolchain: stable
