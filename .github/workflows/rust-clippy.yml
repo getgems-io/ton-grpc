@@ -18,7 +18,7 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install libc++-16
+      - name: Install deps
         run: sudo apt-get install -y libsecp256k1-dev libsodium-dev protobuf-compiler
 
       - name: Install Rust toolchain
