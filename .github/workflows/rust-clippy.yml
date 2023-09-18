@@ -8,7 +8,7 @@ jobs:
   rust-clippy-analyze:
     name: Run rust-clippy analyzing
     runs-on:
-      group: "CPUBoundRunner"
+      group: "CPUBound"
     permissions:
       contents: read
       checks: write
