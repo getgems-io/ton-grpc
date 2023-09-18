@@ -10,6 +10,40 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  experiment:
+    runs-on: "CPUBound"
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+      - name: Cache LLVM and Clang
+        id: cache-llvm
+        uses: actions/cache@v3
+        with:
+          path: ./llvm
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: "16"
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+      - uses: arduino/setup-protoc@v2
+      - name: Install deps
+        run: sudo apt-get install -y libsecp256k1-dev libsodium-dev
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: clippy
+          override: true
+
+      - run: cargo build -vv --release --target x86_64-unknown-linux-gnu
+
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features --target x86_64-unknown-linux-gnu
   rust-clippy-analyze:
     name: Run rust-clippy analyzing
     runs-on:
