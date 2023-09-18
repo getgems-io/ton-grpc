@@ -26,7 +26,7 @@ jobs:
           sudo ./llvm.sh 15
 
       - name: Install libc++-15
-        run: sudo apt-get install -y libc++-15-dev libc++abi-15-dev
+        run: sudo apt-get install -y libc++-15-dev libc++abi-15-dev libsecp256k1-dev libsodium-dev
 
       - name: Switch clang version to 15
         run: |
@@ -34,7 +34,7 @@ jobs:
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-15 101
 
       - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1.0.7
+        uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
