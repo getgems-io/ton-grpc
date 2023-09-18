@@ -1,4 +1,4 @@
-mod tvm;
+#[allow(clippy::enum_variant_names)] mod tvm;
 mod transaction_emulator;
 mod tvm_emulator;
 mod threaded;
@@ -36,10 +36,10 @@ async fn main() -> anyhow::Result<()> {
     health_reporter.set_serving::<TvmEmulatorServiceServer<TvmEmulatorService>>().await;
     health_reporter.set_serving::<TransactionEmulatorServiceServer<TransactionEmulatorService>>().await;
 
-    let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default())
+    let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService)
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
-    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default())
+    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService)
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
 

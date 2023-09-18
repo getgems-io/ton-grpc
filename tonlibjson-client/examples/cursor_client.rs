@@ -20,7 +20,7 @@ async fn main() -> anyhow::Result<()> {
     let mut dead = 0;
 
     for ls in ton_config.liteservers.clone() {
-        let Ok(client) = ClientFactory::default()
+        let Ok(client) = ClientFactory
             .ready()
             .await?
             .call(ton_config.clone().with_liteserver(&ls))

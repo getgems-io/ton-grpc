@@ -809,11 +809,11 @@ mod tests {
         let number = SmcMethodId::Number { number: 123 };
         let name = SmcMethodId::Name { name: "getOwner".to_owned() };
 
-        assert_eq!(serde_json::to_value(&number).unwrap(), json!({
+        assert_eq!(serde_json::to_value(number).unwrap(), json!({
             "@type": "smc.methodIdNumber",
             "number": 123
         }));
-        assert_eq!(serde_json::to_value(&name).unwrap(), json!({
+        assert_eq!(serde_json::to_value(name).unwrap(), json!({
             "@type": "smc.methodIdName",
             "name": "getOwner"
         }));

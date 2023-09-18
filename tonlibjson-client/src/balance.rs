@@ -35,7 +35,7 @@ pub enum Route {
 
 impl Route {
     pub fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
-        return match self {
+        match self {
             Route::Any => { services.cloned().collect() },
             Route::Block { chain, criteria} => {
                 services
@@ -56,7 +56,7 @@ impl Route {
                 let groups = services
                     .filter_map(|s| last_seqno(s, chain).map(|seqno| (s, seqno)))
                     .sorted_unstable_by_key(|(_, seqno)| -seqno)
-                    .group_by(|(_, seqno)| seqno.clone());
+                    .group_by(|(_, seqno)| *seqno);
 
                 let mut idxs = vec![];
                 for (_, group) in &groups {
@@ -237,7 +237,7 @@ impl BlockChannel {
     }
 
     pub fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<BlockChannelItem>>) {
-        let _ = self.changes.send(BlockChannelChange::Insert { key: key, watcher });
+        let _ = self.changes.send(BlockChannelChange::Insert { key, watcher });
     }
 
     pub fn remove(&self, key: &str) {

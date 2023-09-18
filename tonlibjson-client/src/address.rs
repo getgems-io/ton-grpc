@@ -1,5 +1,5 @@
 use std::fmt;
-use std::fmt::Debug;
+use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 use anyhow::{anyhow, Context};
 use base64::Engine;
@@ -87,6 +87,15 @@ const CRC16: Crc<u16> = Crc::<u16>::new(&crc::CRC_16_XMODEM);
 const BOUNCABLE: u8 = 0x11;
 const NON_BOUNCABLE: u8 = 0x51;
 
+impl Display for AccountAddressData {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.flags {
+            Some(_) => f.write_str(&self.to_flagged_string()),
+            None => f.write_str(&self.to_raw_string())
+        }
+    }
+}
+
 impl AccountAddressData {
     pub fn bounceable(&self) -> Self {
         Self {
@@ -101,13 +110,6 @@ impl AccountAddressData {
             flags: Some(NON_BOUNCABLE),
             chain_id: self.chain_id,
             bytes: self.bytes
-        }
-    }
-
-    pub fn to_string(&self) -> String {
-        match self.flags {
-            Some(_) => self.to_flagged_string(),
-            None => self.to_raw_string()
         }
     }
 
