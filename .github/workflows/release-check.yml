@@ -6,7 +6,7 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  BUILDER_IMAGE_NAME: ${{ github.repository }}--builder
+  BUILDER_IMAGE_NAME: ${{ github.repository }}-builder
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -79,6 +79,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features --target x86_64-unknown-linux-gnu
   build-docker-image:
+    needs:
+      - builder
     strategy:
       matrix:
         include:
