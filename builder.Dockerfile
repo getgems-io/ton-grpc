@@ -1,10 +1,11 @@
 FROM rust:1.72.0-bookworm
 
+RUN apt-get update && apt-get install --yes --no-install-recommends cmake lsb-release software-properties-common unzip libsecp256k1-dev libsodium-dev
+
 # TODO[akostylev0]
 RUN wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && /tmp/llvm.sh 16 all || true
+RUN #apt-get update
 RUN /tmp/llvm.sh 16 all
-
-RUN apt-get install --yes --no-install-recommends cmake lsb-release software-properties-common unzip libsecp256k1-dev libsodium-dev
 
 RUN ln -sf $(which clang-16) /usr/bin/clang
 RUN ln -sf $(which clang++-16) /usr/bin/clang++
