@@ -52,7 +52,7 @@ jobs:
     runs-on:
       group: "CPUBound"
     container:
-      ${{ env.IMAGE_NAME }}:${{ github.sha }}
+      ${{ github.repository }}-builder:${{ github.sha }}
     steps:
       - run: cargo clippy
   build-docker-image:
