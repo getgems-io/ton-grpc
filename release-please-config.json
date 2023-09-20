@@ -1,0 +1,19 @@
+{
+  "bootstrap-sha": "55e2f119e3aeaf55d9f8c38bb131732a7037c9de",
+  "plugins": ["cargo-workspace"],
+  "separate-pull-requests": true,
+  "packages": {
+    "charts/ton-grpc": {
+      "release-type": "helm"
+    },
+    "charts/tvm-grpc": {
+      "release-type": "helm"
+    },
+    "tvm-grpc": {
+      "release-type": "rust"
+    },
+    "ton-grpc": {
+      "release-type": "rust"
+    }
+  }
+}
