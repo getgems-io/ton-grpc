@@ -55,6 +55,9 @@ jobs:
       group: "CPUBound"
     container: ghcr.io/${{ github.repository }}-builder:sha-${{ github.sha }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - run: cargo clippy
   build-docker-image:
     needs:
