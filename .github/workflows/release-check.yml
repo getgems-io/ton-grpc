@@ -6,6 +6,8 @@ on:
     paths-ignore:
       - .github/workflows/charts-*
       - charts/**
+      - .release-please-manifest.json
+      - release-please-config.json
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
