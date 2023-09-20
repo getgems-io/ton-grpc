@@ -45,13 +45,14 @@ jobs:
           file: builder.Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.BUILDER_IMAGE_NAME }}:master
+          cache-to: type=inline
   rust-clippy-analyze:
     needs:
       - builder
     runs-on:
       group: "CPUBound"
-    container:
-      ${{ github.repository }}-builder:sha-${{ github.sha }}
+    container: ghcr.io/${{ github.repository }}-builder:sha-${{ github.sha }}
     steps:
       - run: cargo clippy
   build-docker-image:
