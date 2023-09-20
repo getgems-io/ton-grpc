@@ -1,0 +1,49 @@
+{{- if .Values.linkerd.enabled }}
+apiVersion: linkerd.io/v1alpha2
+kind: ServiceProfile
+metadata:
+  name: {{ include "ton-grpc.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local
+spec:
+  routes:
+  - condition:
+      method: POST
+      pathRegex: /ton\.AccountService/GetAccountState
+    name: GetAccountState
+  - condition:
+      method: POST
+      pathRegex: /ton\.AccountService/GetShardAccountCell
+    name: GetShardAccountCell
+  - condition:
+      method: POST
+      pathRegex: /ton\.AccountService/GetAccountTransactions
+    name: GetAccountTransactions
+  - condition:
+      method: POST
+      pathRegex: /ton\.BlockService/SubscribeLastBlock
+    name: SubscribeLastBlock
+  - condition:
+      method: POST
+      pathRegex: /ton\.BlockService/GetLastBlock
+    name: GetLastBlock
+  - condition:
+      method: POST
+      pathRegex: /ton\.BlockService/GetBlock
+    name: GetBlock
+  - condition:
+      method: POST
+      pathRegex: /ton\.BlockService/GetShards
+    name: GetShards
+  - condition:
+      method: POST
+      pathRegex: /ton\.BlockService/GetTransactionIds
+    name: GetTransactionIds
+  - condition:
+      method: POST
+      pathRegex: /ton\.BlockService/GetAccountAddresses
+    name: GetAccountAddresses
+  - condition:
+      method: POST
+      pathRegex: /ton\.MessageService/SendMessage
+    name: SendMessage
+    isRetryable: false
+{{- end }}

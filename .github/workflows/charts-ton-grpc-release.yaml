@@ -1,0 +1,25 @@
+name: Helm chart ton-grpc release
+on:
+  push:
+    tags:
+      - 'charts/ton-grpc-v*'
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repo
+        uses: actions/checkout@v4
+      - name: Parse version from tag
+        id: version
+        uses: release-kit/semver@v2
+        with:
+          pattern: '^charts/ton-grpc-v(.*)$'
+      - name: Publish Helm Chart
+        uses: appany/helm-oci-chart-releaser@v0.4.1
+        with:
+          name: ton-grpc
+          repository: ${{ github.repository_owner }}/charts
+          tag: ${{ steps.version.outputs.full }}
+          registry: ghcr.io
+          registry_username: __token__
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
