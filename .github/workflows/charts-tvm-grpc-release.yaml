@@ -14,15 +14,12 @@ jobs:
         uses: release-kit/semver@v2
         with:
           pattern: '^charts/tvm-grpc-(.*)$'
-
-      - run: echo ${{ steps.version.outputs.full }}
-
-#      - name: Publish Helm Chart
-#        uses: appany/helm-oci-chart-releaser@v0.4.1
-#        with:
-#          name: tvm-grpc
-#          repository: ${{ github.repository_owner }}/charts
-#          tag: ${{ github.event.inputs.tag }}
-#          registry: ghcr.io
-#          registry_username: __token__
-#          registry_password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish Helm Chart
+        uses: appany/helm-oci-chart-releaser@v0.4.1
+        with:
+          name: tvm-grpc
+          repository: ${{ github.repository_owner }}/charts
+          tag: ${{ steps.version.outputs.full }}
+          registry: ghcr.io
+          registry_username: __token__
+          registry_password: ${{ secrets.GITHUB_TOKEN }}
