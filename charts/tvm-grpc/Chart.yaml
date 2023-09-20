@@ -1,0 +1,7 @@
+apiVersion: v2
+name: tvm-grpc
+description: A Helm chart for tvm-grpc
+home: https://github.com/akostylev0/tonlibjson
+type: application
+version: 0.1.10
+appVersion: "1.0.0"
