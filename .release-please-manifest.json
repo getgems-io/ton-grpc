@@ -1,1 +1,4 @@
-{"charts/ton-grpc":"0.1.0"}
+{
+  "charts/ton-grpc": "0.1.0",
+  "charts/tvm-grpc": "0.1.0"
+}
