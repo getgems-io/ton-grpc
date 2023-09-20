@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.1.0...ton-grpc-v0.1.1) (2023-09-20)
+
+
+### Bug Fixes
+
+* trigger build ([f22a850](https://github.com/getgems-io/tonlibjson/commit/f22a85087e89002c8eccdb069f6237dcff502d03))
+
 ## 0.1.0 (2023-09-20)
 
 
