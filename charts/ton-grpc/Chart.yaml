@@ -1,4 +1,4 @@
 apiVersion: v2
 name: ton-grpc
 home: https://github.com/akostylev0/tonlibjson
-version: 0.1.0
+version: 0.1.1
