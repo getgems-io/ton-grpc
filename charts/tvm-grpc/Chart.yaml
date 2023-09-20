@@ -1,4 +1,4 @@
 apiVersion: v2
 name: tvm-grpc
 home: https://github.com/getgems-io/tonlibjson
-version: 0.1.0
+version: 0.1.1
