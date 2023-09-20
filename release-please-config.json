@@ -4,10 +4,12 @@
   "separate-pull-requests": true,
   "packages": {
     "charts/ton-grpc": {
-      "release-type": "helm"
+      "release-type": "helm",
+      "package-name": "charts/ton-grpc"
     },
     "charts/tvm-grpc": {
-      "release-type": "helm"
+      "release-type": "helm",
+      "package-name": "charts/tvm-grpc"
     },
     "tvm-grpc": {
       "release-type": "rust"
