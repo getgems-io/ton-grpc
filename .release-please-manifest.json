@@ -1,4 +1,5 @@
 {
   "charts/ton-grpc": "0.1.3",
-  "charts/tvm-grpc": "0.1.1"
+  "charts/tvm-grpc": "0.1.1",
+  "ton-grpc": "0.1.0"
 }
