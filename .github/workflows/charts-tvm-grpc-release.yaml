@@ -13,7 +13,7 @@ jobs:
         id: version
         uses: release-kit/semver@v2
         with:
-          pattern: '^charts/tvm-grpc-(.*)$'
+          pattern: '^charts/tvm-grpc-v(.*)$'
       - name: Publish Helm Chart
         uses: appany/helm-oci-chart-releaser@v0.4.1
         with:
