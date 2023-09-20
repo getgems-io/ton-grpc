@@ -3,16 +3,16 @@
   "plugins": ["cargo-workspace"],
   "separate-pull-requests": true,
   "packages": {
-    "charts/ton-grpc": {
+    "./charts/ton-grpc": {
       "release-type": "helm"
     },
-    "charts/tvm-grpc": {
+    "./charts/tvm-grpc": {
       "release-type": "helm"
     },
-    "tvm-grpc": {
+    "./tvm-grpc": {
       "release-type": "rust"
     },
-    "ton-grpc": {
+    "./ton-grpc": {
       "release-type": "rust"
     }
   }
