@@ -42,6 +42,7 @@ jobs:
         with:
           push: true
           pull: true
+          context: .
           file: builder.Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

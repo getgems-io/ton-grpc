@@ -30,4 +30,5 @@ RUN unzip protoc-22.2-linux-x86_64.zip \
 RUN sccache --show-stats
 RUN protoc --version
 
+RUN rustup component add clippy
 RUN cargo install clippy-sarif sarif-fmt
