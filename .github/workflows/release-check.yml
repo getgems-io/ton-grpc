@@ -34,8 +34,10 @@ jobs:
             type=sha
             type=sha,format=long
             type=ref,event=branch
+            type=ref,event=branch
 
       - name: Build and push Docker image
+        id: build
         uses: docker/build-push-action@v5
         with:
           push: true
@@ -44,39 +46,15 @@ jobs:
           file: builder.Dockerfile
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-
   rust-clippy-analyze:
     needs:
       - builder
-    name: Run rust-clippy analyzing
     runs-on:
       group: "CPUBound"
-    permissions:
-      contents: read
-      checks: write
-      security-events: write
+    container:
+      ${{ env.IMAGE_NAME }}:${{ github.sha }}
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - uses: arduino/setup-protoc@v2
-
-      - name: Install deps
-        run: sudo apt-get install -y libsecp256k1-dev libsodium-dev
-
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          components: clippy
-          override: true
-
-      - uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features --target x86_64-unknown-linux-gnu
+      - run: cargo clippy
   build-docker-image:
     needs:
       - builder
