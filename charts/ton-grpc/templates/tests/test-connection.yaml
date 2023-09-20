@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "ton-grpc.fullname" . }}-test-connection"
+  labels:
+    {{- include "ton-grpc.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "ton-grpc.fullname" . }}:{{ .Values.service.port }}']
+  restartPolicy: Never
