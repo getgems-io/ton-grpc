@@ -28,7 +28,6 @@ use crate::ton::account_service_server::AccountServiceServer;
 use crate::ton::block_service_server::BlockServiceServer;
 use crate::ton::message_service_server::MessageServiceServer;
 
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let otlp = env::var("OTLP").unwrap_or_default()
