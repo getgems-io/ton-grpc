@@ -1,15 +1,10 @@
-name: Publish Helm Chart
+name: Helm chart tvm-grpc release
 on:
   push:
     tags:
       - 'charts/tvm-grpc-v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: Helm Chart Version
-        required: true
 jobs:
-  helm-publish:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repo
