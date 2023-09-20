@@ -1,7 +1,7 @@
 {
   "bootstrap-sha": "55e2f119e3aeaf55d9f8c38bb131732a7037c9de",
   "plugins": ["cargo-workspace"],
-  "separate-pull-requests": true,
+  "separate-pull-requests": false,
   "packages": {
     "charts/ton-grpc": {
       "release-type": "helm",
