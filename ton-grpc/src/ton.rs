@@ -1,6 +1,5 @@
 use tonlibjson_client::address::AccountAddressData;
 use tonlibjson_client::block;
-use tonlibjson_client::block::{RawMessage, ShortTxId};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;
 
@@ -33,7 +32,7 @@ impl From<BlockIdExt> for block::BlockIdExt {
 }
 
 impl From<(i32, block::ShortTxId)> for TransactionId {
-    fn from((chain_id, value): (i32, ShortTxId)) -> Self {
+    fn from((chain_id, value): (i32, block::ShortTxId)) -> Self {
         let address = value.account.into_internal(chain_id).to_string();
 
         Self {
@@ -109,7 +108,7 @@ impl From<block::MessageData> for MsgData {
 }
 
 impl From<block::RawMessage> for Message {
-    fn from(value: RawMessage) -> Self {
+    fn from(value: block::RawMessage) -> Self {
         Self {
             source: value.source.account_address.map(|s| s.to_string()),
             destination: value.destination.account_address.map(|s| s.to_string()),
