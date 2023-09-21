@@ -9,8 +9,14 @@ runs:
     - name: Install LLVM and Clang
       shell: bash
       run: |
-        wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && sudo /tmp/llvm.sh 16
-        sudo apt-get install --yes --no-install-recommends libsecp256k1-dev libsodium-dev libc++-16-dev libc++abi-16-dev
+        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
+        sudo add-apt-repository "deb http://apt.llvm.org/jammy/  llvm-toolchain-jammy-16 main"
+        sudo apt-get update
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: libsecp256k1-dev libsodium-dev clang-16 lldb-16 lld-16 clangd-16 libc++-16-dev libc++abi-16-dev
+    - shell: bash
+      run: | 
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 101
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 101
     - name: Run sccache-cache
