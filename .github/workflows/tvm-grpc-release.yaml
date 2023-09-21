@@ -31,10 +31,20 @@ jobs:
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.3
 
-      - run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release
+      - name: Build mainnet version
+        run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release
         env:
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
           CMAKE_C_COMPILER_LAUNCHER: "sccache"
           CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
-      - run: ${SCCACHE_PATH} --show-stats
+      - run: ldd ./target/x86_64-unknown-linux-gnu/release/tvm-grpc
+        
+      - name: Build testnet version
+        run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release --features testnet
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
+          CMAKE_C_COMPILER_LAUNCHER: "sccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
+      - run: ldd ./target/x86_64-unknown-linux-gnu/release/tvm-grpc
