@@ -25,7 +25,7 @@ jobs:
       - name: Install LLVM and Clang
         run: |
           wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && sudo /tmp/llvm.sh 16
-          sudo apt-get install --yes --no-install-recommends libsecp256k1-dev libsodium-dev
+          sudo apt-get install --yes --no-install-recommends libsecp256k1-dev libsodium-dev libc++-16-dev libc++abi-16-dev
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 101
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 101
 
