@@ -12,6 +12,11 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build-bin:
+    strategy:
+      matrix:
+        include:
+          - features: ''
+          - features: 'testnet'
     runs-on:
       group: "CPUBound"
     steps:
@@ -33,16 +38,7 @@ jobs:
         uses: mozilla-actions/sccache-action@v0.0.3
 
       - name: Build mainnet version
-        run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release
-        env:
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
-          CMAKE_C_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
-      - run: ldd ./target/x86_64-unknown-linux-gnu/release/tvm-grpc
-
-      - name: Build testnet version
-        run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release --features testnet
+        run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release --features "${{ matrix.features }}"
         env:
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
