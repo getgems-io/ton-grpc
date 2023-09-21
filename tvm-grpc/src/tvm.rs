@@ -4,8 +4,7 @@ use serde::{Deserialize};
 
 include_proto!("tvm");
 
-pub(crate) const FILE_DESCRIPTOR_SET: &[u8] =
-    tonic::include_file_descriptor_set!("tvm_descriptor");
+pub(crate) const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("tvm_descriptor");
 
 #[derive(Deserialize)]
 pub struct TvmResult<T> {
