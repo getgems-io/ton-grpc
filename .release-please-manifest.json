@@ -1,8 +1,1 @@
-{
-  "charts/ton-grpc": "0.1.0",
-  "charts/tvm-grpc": "0.1.0",
-  "ton-grpc": "0.1.0",
-  "tvm-grpc": "0.1.0",
-  "tonlibjson-client": "0.1.0",
-  "tonlibjson-sys": "0.1.0"
-}
+{}
