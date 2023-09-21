@@ -16,6 +16,12 @@
     },
     "ton-grpc": {
       "release-type": "rust"
+    },
+    "tonlibjson-sys": {
+      "release-type": "rust"
+    },
+    "tonlibjson-client": {
+      "release-type": "rust"
     }
   }
 }
