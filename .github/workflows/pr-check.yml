@@ -1,0 +1,36 @@
+name: Check PR
+on:
+  pull_request:
+    branches:
+      - "master"
+    paths-ignore:
+      - .github/workflows/charts-*
+      - charts/**
+      - .release-please-manifest.json
+      - release-please-config.json
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pr-check:
+    name: Run rust-clippy analyzing
+    runs-on:
+      group: "CPUBound"
+    permissions:
+      contents: read
+      checks: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/prepare
+      - run: cargo build -v --target x86_64-unknown-linux-gnu
+      - run: cargo build -v --target x86_64-unknown-linux-gnu --features testnet
+      - uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features --target x86_64-unknown-linux-gnu
