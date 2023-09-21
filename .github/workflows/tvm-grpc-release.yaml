@@ -1,9 +1,9 @@
 name: tvm-grpc release
 on:
   workflow_dispatch:
-#  push:
-#    tags:
-#      - 'tvm-grpc-v*'
+  push:
+    tags:
+      - 'tvm-grpc-v*'
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner}}/tvm-grpc

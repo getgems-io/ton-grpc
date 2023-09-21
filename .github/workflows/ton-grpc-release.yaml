@@ -1,9 +1,9 @@
 name: ton-grpc release
 on:
   workflow_dispatch:
-#  push:
-#    tags:
-#      - 'ton-grpc-v*'
+  push:
+    tags:
+      - 'ton-grpc-v*'
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner}}/ton-grpc
