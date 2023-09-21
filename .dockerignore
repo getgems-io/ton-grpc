@@ -1,4 +1,4 @@
-Dockerfile
-target/
-**/.git
-**/.github
+**
+
+!target/x86_64-unknown-linux-gnu/release/tvm-grpc
+!target/x86_64-unknown-linux-gnu/release/ton-grpc
