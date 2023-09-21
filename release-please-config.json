@@ -1,5 +1,5 @@
 {
-  "bootstrap-sha": "55e2f119e3aeaf55d9f8c38bb131732a7037c9de",
+  "bootstrap-sha": "f2df351789bfb8969591b8731d53708a38492d23",
   "plugins": ["cargo-workspace"],
   "separate-pull-requests": false,
   "packages": {
