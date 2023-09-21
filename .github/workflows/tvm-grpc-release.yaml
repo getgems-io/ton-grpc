@@ -27,3 +27,4 @@ jobs:
         with:
           version: 16
       - run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu
+      - run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release
