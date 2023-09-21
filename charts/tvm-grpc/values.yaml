@@ -5,8 +5,8 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/getgems-io/tonlibjson
-  pullPolicy: Always
+  repository: ghcr.io/getgems-io/ton-grpc
+  pullPolicy: IfNotPresent
   tag: "master"
 
 imagePullSecrets: []
