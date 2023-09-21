@@ -6,7 +6,7 @@ on:
 #      - 'tvm-grpc-v*'
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: tvm-grpc
+  IMAGE_NAME: ${{ github.repository_owner}}/tvm-grpc
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
