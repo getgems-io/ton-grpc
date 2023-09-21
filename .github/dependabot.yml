@@ -6,18 +6,30 @@ updates:
       interval: "daily"
     pull-request-branch-name:
       separator: "_"
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
   - package-ecosystem: gitsubmodule
     directory: "/"
     schedule:
       interval: "daily"
     pull-request-branch-name:
       separator: "_"
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "daily"
     pull-request-branch-name:
       separator: "_"
+    commit-message:
+      prefix: fix
+      prefix-development: chore
+      include: scope
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
