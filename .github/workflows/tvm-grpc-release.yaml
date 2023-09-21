@@ -24,7 +24,8 @@ jobs:
           targets: x86_64-unknown-linux-gnu
       - name: Install LLVM and Clang
         run: |
-          wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && sudo /tmp/llvm.sh 16 all
+          wget https://apt.llvm.org/llvm.sh -O /tmp/llvm.sh && chmod +x /tmp/llvm.sh && sudo /tmp/llvm.sh 16
+          sudo apt-get install --yes --no-install-recommends libsecp256k1-dev libsodium-dev
           sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 101
           sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 101
 
@@ -39,7 +40,7 @@ jobs:
           CMAKE_C_COMPILER_LAUNCHER: "sccache"
           CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
       - run: ldd ./target/x86_64-unknown-linux-gnu/release/tvm-grpc
-        
+
       - name: Build testnet version
         run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release --features testnet
         env:
