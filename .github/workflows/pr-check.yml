@@ -31,10 +31,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
-#      - name: Run sccache-cache
-#        uses: mozilla-actions/sccache-action@v0.0.3
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
       - run: cargo build -v --target x86_64-unknown-linux-gnu
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
+          CMAKE_C_COMPILER_LAUNCHER: "sccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
       - run: cargo build -v --target x86_64-unknown-linux-gnu --features testnet
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
+          CMAKE_C_COMPILER_LAUNCHER: "sccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
       - uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
