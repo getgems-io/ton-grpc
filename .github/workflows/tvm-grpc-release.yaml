@@ -1,0 +1,21 @@
+name: tvm-grpc release
+on:
+  workflow_dispatch:
+#  push:
+#    tags:
+#      - 'tvm-grpc-v*'
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-bin:
+    runs-on:
+      group: "CPUBound"
+    steps:
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v1
+        with:
+          version: 16
