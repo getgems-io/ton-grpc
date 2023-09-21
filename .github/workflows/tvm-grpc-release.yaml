@@ -22,9 +22,12 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
+      - run: |
+          LLVM_VERSION_LINE=$(rustc --version --verbose | grep LLVM);
+          echo "LLVM_VERSION=${LLVM_VERSION_LINE#LLVM version: }" >> $GITHUB_ENV;
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: 16
+          version: ${{ env.LLVM_VERSION }}
       - run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu
       - run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release
