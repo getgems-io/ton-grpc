@@ -47,7 +47,6 @@ async fn main() -> anyhow::Result<()> {
     let addr = "0.0.0.0:50052".parse().unwrap();
 
     let mut client = TonClient::from_env().await?;
-
     client.ready().await?;
 
     tracing::info!("Ton Client is ready");
