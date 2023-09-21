@@ -1,0 +1,64 @@
+name: ton-grpc release
+on:
+  workflow_dispatch:
+#  push:
+#    tags:
+#      - 'ton-grpc-v*'
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner}}/ton-grpc
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build-bin:
+    strategy:
+      matrix:
+        include:
+          - features: ''
+            suffix: ''
+          - features: 'testnet'
+            suffix: '-testnet'
+    runs-on:
+      group: "CPUBound"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: ./.github/actions/prepare
+      - run: cargo build -v --bin ton-grpc --target x86_64-unknown-linux-gnu --release --features "${{ matrix.features }}"
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
+          CMAKE_C_COMPILER_LAUNCHER: "sccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
+      - run: ldd ./target/x86_64-unknown-linux-gnu/release/ton-grpc
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set sha-short
+        run: echo "GITHUB_SHA_SHORT=$(echo $GITHUB_SHA | cut -c 1-7)" >> $GITHUB_ENV
+
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}${{ matrix.suffix }}
+          tags: |
+            type=sha
+            type=sha,format=long
+            type=ref,event=branch
+            
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          file: ton-grpc/Dockerfile
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
