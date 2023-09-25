@@ -107,18 +107,18 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
 
 fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> anyhow::Result<TransactionEmulatorPrepareResponse> {
     let config = if let Some(cache_key) = &req.config_cache_key {
-        if req.config_boc.len() > 0 {
-            if let Ok(mut guard) = lru_cache().try_lock() {
-                guard.put(cache_key.clone(), req.config_boc.clone());
-            };
-
-            req.config_boc
-        } else {
+        if req.config_boc.is_empty() {
             if let Ok(mut guard) = lru_cache().try_lock() {
                 guard.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
             } else {
                 bail!("config cache miss")
             }
+        } else {
+            if let Ok(mut guard) = lru_cache().try_lock() {
+                guard.put(cache_key.clone(), req.config_boc.clone());
+            };
+
+            req.config_boc
         }
     } else {
         req.config_boc

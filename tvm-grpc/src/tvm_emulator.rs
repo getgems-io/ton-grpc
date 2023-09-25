@@ -176,18 +176,18 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> anyhow::Result<Tvm
     };
 
     let config = if let Some(cache_key) = &req.config_cache_key {
-        if req.config.len() > 0 {
-            if let Ok(mut guard) = lru_cache().try_lock() {
-                guard.put(cache_key.clone(), req.config.clone());
-            };
-
-            req.config
-        } else {
+        if req.config.is_empty() {
             if let Ok(mut guard) = lru_cache().try_lock() {
                 guard.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
             } else {
                 bail!("config cache miss")
             }
+        } else {
+            if let Ok(mut guard) = lru_cache().try_lock() {
+                guard.put(cache_key.clone(), req.config.clone());
+            };
+
+            req.config
         }
     } else {
         req.config
