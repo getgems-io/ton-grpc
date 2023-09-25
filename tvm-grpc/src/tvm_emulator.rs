@@ -1,5 +1,6 @@
 use std::num::NonZeroUsize;
 use std::pin::Pin;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use anyhow::anyhow;
 use async_stream::stream;
@@ -17,15 +18,15 @@ use crate::tvm::{tvm_emulator_request, tvm_emulator_response, TvmEmulatorPrepare
 #[derive(Debug, Default)]
 pub struct TvmEmulatorService;
 
+#[derive(Default)]
 struct State {
-    emulator: Option<tonlibjson_sys::TvmEmulator>,
-    lru: LruCache<String, String>
+    emulator: Option<tonlibjson_sys::TvmEmulator>
 }
 
-impl State {
-    fn new(size: NonZeroUsize) -> Self {
-        Self { emulator: None, lru: LruCache::new(size)}
-    }
+fn lru_cache() -> &'static Mutex<LruCache<String, String>> {
+    static LRU_CACHE: OnceLock<Mutex<LruCache<String, String>>> = OnceLock::new();
+
+    LRU_CACHE.get_or_init(|| Mutex::new(LruCache::new(NonZeroUsize::new(32).unwrap())))
 }
 
 #[async_trait]
@@ -39,7 +40,7 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
         let stop = Stop::new(tx.clone());
 
         rayon::spawn(move || {
-            let mut state = State::new(NonZeroUsize::new(32).unwrap());
+            let mut state = State::default();
             while let Some(command) = rx.blocking_recv() {
                 match command {
                     Command::Request { request, response: oneshot } => {
@@ -176,11 +177,11 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> anyhow::Result<Tvm
 
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config.len() > 0 {
-            state.lru.put(cache_key.clone(), req.config.clone());
+            lru_cache().lock().map_err(|_| anyhow!("lock failed"))?.put(cache_key.clone(), req.config.clone());
 
             req.config
         } else {
-            state.lru.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
+            lru_cache().lock().map_err(|_| anyhow!("lock failed"))?.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
         }
     } else {
         req.config

@@ -107,7 +107,7 @@ message TvmEmulatorSetC7Request {
   uint64 balance = 2;
   string address = 3;
   string rand_seed_hex = 4;
-  string config = 5; // CONFIG
+  string config = 5;
   optional string config_cache_key = 6;
 }
 
