@@ -2,7 +2,7 @@ use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use async_stream::stream;
 use futures::Stream;
 use lru::LruCache;
@@ -177,11 +177,17 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> anyhow::Result<Tvm
 
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config.len() > 0 {
-            lru_cache().lock().map_err(|_| anyhow!("lock failed"))?.put(cache_key.clone(), req.config.clone());
+            if let Ok(mut guard) = lru_cache().try_lock() {
+                guard.put(cache_key.clone(), req.config.clone());
+            };
 
             req.config
         } else {
-            lru_cache().lock().map_err(|_| anyhow!("lock failed"))?.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
+            if let Ok(mut guard) = lru_cache().try_lock() {
+                guard.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
+            } else {
+                bail!("config cache miss")
+            }
         }
     } else {
         req.config
