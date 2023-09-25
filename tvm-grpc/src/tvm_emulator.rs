@@ -51,10 +51,10 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
                             SendInternalMessage(req) => send_internal_message(&mut state, req).map(SendInternalMessageResponse),
                             SetLibraries(req) => set_libraries(&mut state, req).map(SetLibrariesResponse),
                             SetGasLimit(req) => set_gas_limit(&mut state, req).map(SetGasLimitResponse),
-                            SetC7(req) => set_c7(&mut state, req).map(SetC7Response).map_err(|s| anyhow!(s.to_string())),
+                            SetC7(req) => set_c7(&mut state, req).map(SetC7Response),
                         };
 
-                        oneshot.send(response).expect("failed to send response");
+                        oneshot.send(response.map_err(|s| anyhow!(s.to_string()))).expect("failed to send response");
                     },
                     Command::Drop => { break; }
                 }
@@ -103,65 +103,75 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
     }
 }
 
-fn prepare_emu(state: &mut State, req: TvmEmulatorPrepareRequest) -> anyhow::Result<TvmEmulatorPrepareResponse> {
-    state.emulator.replace(tonlibjson_sys::TvmEmulator::new(&req.code_boc, &req.data_boc, req.vm_log_verbosity)?);
+fn prepare_emu(state: &mut State, req: TvmEmulatorPrepareRequest) -> Result<TvmEmulatorPrepareResponse, Status> {
+    let emulator = tonlibjson_sys::TvmEmulator::new(&req.code_boc, &req.data_boc, req.vm_log_verbosity)
+        .map_err(|e| Status::internal(e.to_string()))?;
+
+    state.emulator.replace(emulator);
 
     Ok(TvmEmulatorPrepareResponse { success: true })
 }
 
-fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> anyhow::Result<TvmEmulatorRunGetMethodResponse> {
+fn run_get_method(state: &mut State, req: TvmEmulatorRunGetMethodRequest) -> Result<TvmEmulatorRunGetMethodResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
-        return Err(anyhow!("emulator not initialized"));
+        return Err(Status::internal("emulator not initialized"));
     };
 
-    let response = emu.run_get_method(req.method_id, &req.stack_boc)?;
+    let response = emu.run_get_method(req.method_id, &req.stack_boc)
+        .map_err(|e| Status::internal(e.to_string()))?;
     tracing::trace!(method="run_get_method", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TvmEmulatorRunGetMethodResponse>>(&response)?;
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorRunGetMethodResponse>>(&response)
+        .map_err(|e| Status::internal(e.to_string()))?;
 
     response.into()
 }
 
-fn send_external_message(state: &mut State, req: TvmEmulatorSendExternalMessageRequest) -> anyhow::Result<TvmEmulatorSendExternalMessageResponse> {
+fn send_external_message(state: &mut State, req: TvmEmulatorSendExternalMessageRequest) -> Result<TvmEmulatorSendExternalMessageResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
-        return Err(anyhow!("emulator not initialized"));
+        return Err(Status::internal("emulator not initialized"));
     };
 
-    let response = emu.send_external_message(&req.message_body_boc)?;
+    let response = emu.send_external_message(&req.message_body_boc)
+        .map_err(|e| Status::internal(e.to_string()))?;
     tracing::trace!(method="send_external_message", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendExternalMessageResponse>>(&response)?;
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendExternalMessageResponse>>(&response)
+        .map_err(|e| Status::internal(e.to_string()))?;
 
     response.into()
 }
 
-fn send_internal_message(state: &mut State, req: TvmEmulatorSendInternalMessageRequest) -> anyhow::Result<TvmEmulatorSendInternalMessageResponse> {
+fn send_internal_message(state: &mut State, req: TvmEmulatorSendInternalMessageRequest) -> Result<TvmEmulatorSendInternalMessageResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
-        return Err(anyhow!("emulator not initialized"));
+        return Err(Status::internal("emulator not initialized"));
     };
 
-    let response = emu.send_internal_message(&req.message_body_boc, req.amount)?;
+    let response = emu.send_internal_message(&req.message_body_boc, req.amount)
+        .map_err(|e| Status::internal(e.to_string()))?;
     tracing::trace!(method="send_internal_message", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendInternalMessageResponse>>(&response)?;
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorSendInternalMessageResponse>>(&response)
+        .map_err(|e| Status::internal(e.to_string()))?;
 
     response.into()
 }
 
-fn set_libraries(state: &mut State, req: TvmEmulatorSetLibrariesRequest) -> anyhow::Result<TvmEmulatorSetLibrariesResponse> {
+fn set_libraries(state: &mut State, req: TvmEmulatorSetLibrariesRequest) -> Result<TvmEmulatorSetLibrariesResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
-        return Err(anyhow!("emulator not initialized"));
+        return Err(Status::internal("emulator not initialized"));
     };
 
-    let response = emu.set_libraries(&req.libs_boc)?;
+    let response = emu.set_libraries(&req.libs_boc)
+        .map_err(|e| Status::internal(e.to_string()))?;
     tracing::trace!(method="set_libraries", "{}", response);
 
     Ok(TvmEmulatorSetLibrariesResponse { success: response })
 }
 
-fn set_gas_limit(state: &mut State, req: TvmEmulatorSetGasLimitRequest) -> anyhow::Result<TvmEmulatorSetGasLimitResponse> {
+fn set_gas_limit(state: &mut State, req: TvmEmulatorSetGasLimitRequest) -> Result<TvmEmulatorSetGasLimitResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
-        return Err(anyhow!("emulator not initialized"));
+        return Err(Status::internal("emulator not initialized"));
     };
 
     let response = emu.set_gas_limit(req.gas_limit);
