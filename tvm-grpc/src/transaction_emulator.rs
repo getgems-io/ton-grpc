@@ -5,7 +5,7 @@ use std::time::Duration;
 use futures::Stream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error};
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use async_stream::stream;
 use lru::LruCache;
 use tokio_stream::StreamExt;
@@ -46,7 +46,7 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
                 match command {
                     Command::Request { request, response: oneshot } => {
                         let response = match request {
-                            Prepare(req) => prepare(&mut state, req).map(PrepareResponse),
+                            Prepare(req) => prepare(&mut state, req).map(PrepareResponse).map_err(|s| anyhow!(s.to_string())),
                             Emulate(req) => emulate(&mut state, req).map(EmulateResponse),
                             SetUnixtime(req) => set_unixtime(&mut state, req).map(SetUnixtimeResponse),
                             SetLt(req) => set_lt(&mut state, req).map(SetLtResponse),
@@ -105,13 +105,13 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
     }
 }
 
-fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> anyhow::Result<TransactionEmulatorPrepareResponse> {
+fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> Result<TransactionEmulatorPrepareResponse, Status> {
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config_boc.is_empty() {
             if let Ok(mut guard) = lru_cache().try_lock() {
-                guard.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
+                guard.get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
             } else {
-                bail!("config cache miss")
+                return Err(Status::failed_precondition("config cache miss"))
             }
         } else {
             if let Ok(mut guard) = lru_cache().try_lock() {
@@ -124,7 +124,8 @@ fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> anyhow:
         req.config_boc
     };
 
-    let emulator = tonlibjson_sys::TransactionEmulator::new(&config, req.vm_log_level)?;
+    let emulator = tonlibjson_sys::TransactionEmulator::new(&config, req.vm_log_level)
+        .map_err(|e| Status::internal(e.to_string()))?;
 
     let _ = state.emulator.replace(emulator);
 
