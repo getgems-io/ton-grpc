@@ -1,10 +1,13 @@
+use std::num::NonZeroUsize;
 use std::pin::Pin;
+use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use futures::Stream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error};
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
 use async_stream::stream;
+use lru::LruCache;
 use tokio_stream::StreamExt;
 use crate::threaded::{Command, Stop};
 use crate::tvm::transaction_emulator_service_server::TransactionEmulatorService as BaseTransactionEmulatorService;
@@ -18,6 +21,12 @@ pub struct TransactionEmulatorService;
 #[derive(Default)]
 struct State {
     emulator: Option<tonlibjson_sys::TransactionEmulator>
+}
+
+fn lru_cache() -> &'static Mutex<LruCache<String, String>> {
+    static LRU_CACHE: OnceLock<Mutex<LruCache<String, String>>> = OnceLock::new();
+
+    LRU_CACHE.get_or_init(|| Mutex::new(LruCache::new(NonZeroUsize::new(32).unwrap())))
 }
 
 #[async_trait]
@@ -97,11 +106,29 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
 }
 
 fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> anyhow::Result<TransactionEmulatorPrepareResponse> {
-    let emulator = tonlibjson_sys::TransactionEmulator::new(&req.config_boc, req.vm_log_level)?;
+    let config = if let Some(cache_key) = &req.config_cache_key {
+        if req.config_boc.len() > 0 {
+            if let Ok(mut guard) = lru_cache().try_lock() {
+                guard.put(cache_key.clone(), req.config_boc.clone());
+            };
+
+            req.config_boc
+        } else {
+            if let Ok(mut guard) = lru_cache().try_lock() {
+                guard.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
+            } else {
+                bail!("config cache miss")
+            }
+        }
+    } else {
+        req.config_boc
+    };
+
+    let emulator = tonlibjson_sys::TransactionEmulator::new(&config, req.vm_log_level)?;
 
     let _ = state.emulator.replace(emulator);
 
-    Ok(TransactionEmulatorPrepareResponse { success: true })
+    Ok(TransactionEmulatorPrepareResponse { success: true, config_cache_key: req.config_cache_key })
 }
 
 fn emulate(state: &mut State, req: TransactionEmulatorEmulateRequest) -> anyhow::Result<TransactionEmulatorEmulateResponse> {
