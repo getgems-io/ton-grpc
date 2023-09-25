@@ -2,7 +2,7 @@ use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use async_stream::stream;
 use futures::Stream;
 use lru::LruCache;
@@ -51,7 +51,7 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
                             SendInternalMessage(req) => send_internal_message(&mut state, req).map(SendInternalMessageResponse),
                             SetLibraries(req) => set_libraries(&mut state, req).map(SetLibrariesResponse),
                             SetGasLimit(req) => set_gas_limit(&mut state, req).map(SetGasLimitResponse),
-                            SetC7(req) => set_c7(&mut state, req).map(SetC7Response),
+                            SetC7(req) => set_c7(&mut state, req).map(SetC7Response).map_err(|s| anyhow!(s.to_string())),
                         };
 
                         oneshot.send(response).expect("failed to send response");
@@ -170,17 +170,17 @@ fn set_gas_limit(state: &mut State, req: TvmEmulatorSetGasLimitRequest) -> anyho
     Ok(TvmEmulatorSetGasLimitResponse { success: response })
 }
 
-fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> anyhow::Result<TvmEmulatorSetC7Response> {
+fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> Result<TvmEmulatorSetC7Response, Status> {
     let Some(emu) = state.emulator.as_ref() else {
-        return Err(anyhow!("emulator not initialized"));
+        return Err(Status::internal("emulator not initialized"));
     };
 
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config.is_empty() {
             if let Ok(mut guard) = lru_cache().try_lock() {
-                guard.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
+                guard.get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
             } else {
-                bail!("config cache miss")
+                return Err(Status::failed_precondition("config cache miss"));
             }
         } else {
             if let Ok(mut guard) = lru_cache().try_lock() {
@@ -193,7 +193,8 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> anyhow::Result<Tvm
         req.config
     };
 
-    let response = emu.set_c7(&req.address, req.unixtime, req.balance, &req.rand_seed_hex, &config)?;
+    let response = emu.set_c7(&req.address, req.unixtime, req.balance, &req.rand_seed_hex, &config)
+        .map_err(|e| Status::internal(e.to_string()))?;
     tracing::trace!(method="set_c7", "{}", response);
 
     Ok(TvmEmulatorSetC7Response { success: response, config_cache_key: req.config_cache_key })
