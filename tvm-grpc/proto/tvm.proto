@@ -107,11 +107,13 @@ message TvmEmulatorSetC7Request {
   uint64 balance = 2;
   string address = 3;
   string rand_seed_hex = 4;
-  string config = 5;
+  string config = 5; // CONFIG
+  optional string config_cache_key = 6;
 }
 
 message TvmEmulatorSetC7Response {
   bool success = 1;
+  optional string config_cache_key = 2;
 }
 
 service TransactionEmulatorService {
@@ -149,7 +151,7 @@ message TransactionEmulatorResponse {
 
 message TransactionEmulatorPrepareRequest {
   int32 vm_log_level = 1;
-  string config_boc = 2;
+  string config_boc = 2; // CACHE
 }
 
 message TransactionEmulatorPrepareResponse {

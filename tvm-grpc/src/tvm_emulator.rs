@@ -1,8 +1,10 @@
+use std::num::NonZeroUsize;
 use std::pin::Pin;
 use std::time::Duration;
 use anyhow::anyhow;
 use async_stream::stream;
 use futures::Stream;
+use lru::LruCache;
 use tokio_stream::StreamExt;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error};
@@ -15,9 +17,15 @@ use crate::tvm::{tvm_emulator_request, tvm_emulator_response, TvmEmulatorPrepare
 #[derive(Debug, Default)]
 pub struct TvmEmulatorService;
 
-#[derive(Default)]
 struct State {
-    emulator: Option<tonlibjson_sys::TvmEmulator>
+    emulator: Option<tonlibjson_sys::TvmEmulator>,
+    lru: LruCache<String, String>
+}
+
+impl State {
+    fn new(size: NonZeroUsize) -> Self {
+        Self { emulator: None, lru: LruCache::new(size)}
+    }
 }
 
 #[async_trait]
@@ -31,7 +39,7 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
         let stop = Stop::new(tx.clone());
 
         rayon::spawn(move || {
-            let mut state = State::default();
+            let mut state = State::new(NonZeroUsize::new(32).unwrap());
             while let Some(command) = rx.blocking_recv() {
                 match command {
                     Command::Request { request, response: oneshot } => {
@@ -166,8 +174,20 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> anyhow::Result<Tvm
         return Err(anyhow!("emulator not initialized"));
     };
 
-    let response = emu.set_c7(&req.address, req.unixtime, req.balance, &req.rand_seed_hex, &req.config)?;
+    let config = if let Some(cache_key) = &req.config_cache_key {
+        if req.config.len() > 0 {
+            state.lru.put(cache_key.clone(), req.config.clone());
+
+            req.config
+        } else {
+            state.lru.get(cache_key).ok_or(anyhow!("config cache miss"))?.clone()
+        }
+    } else {
+        req.config
+    };
+
+    let response = emu.set_c7(&req.address, req.unixtime, req.balance, &req.rand_seed_hex, &config)?;
     tracing::trace!(method="set_c7", "{}", response);
 
-    Ok(TvmEmulatorSetC7Response { success: response })
+    Ok(TvmEmulatorSetC7Response { success: response, config_cache_key: req.config_cache_key })
 }
