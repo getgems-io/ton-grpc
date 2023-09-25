@@ -1,5 +1,7 @@
+use tonic::Status;
+
 pub enum Command<T, R> {
-    Request { request: T, response: tokio::sync::oneshot::Sender<anyhow::Result<R>> },
+    Request { request: T, response: tokio::sync::oneshot::Sender<Result<R, Status>> },
     Drop
 }
 

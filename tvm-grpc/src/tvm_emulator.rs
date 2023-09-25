@@ -8,7 +8,6 @@ use futures::Stream;
 use lru::LruCache;
 use tokio_stream::StreamExt;
 use tonic::{async_trait, Request, Response, Status, Streaming};
-use tracing::{error};
 use crate::threaded::{Command, Stop};
 use crate::tvm::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::tvm::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
@@ -54,7 +53,7 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
                             SetC7(req) => set_c7(&mut state, req).map(SetC7Response),
                         };
 
-                        oneshot.send(response.map_err(|s| anyhow!(s.to_string()))).expect("failed to send response");
+                        oneshot.send(response).expect("failed to send response");
                     },
                     Command::Drop => { break; }
                 }
@@ -71,12 +70,7 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
                         let _ = tx.send(Command::Request { request: req, response: to });
                         let response = ro.await.expect("failed to receive response");
 
-                        yield response
-                            .map(|r| TvmEmulatorResponse { request_id, response: Some(r) })
-                            .map_err(|e| {
-                                error!(error = ?e);
-                                Status::internal(e.to_string())
-                            })
+                        yield response.map(|r| TvmEmulatorResponse { request_id, response: Some(r) })
                     },
                     Ok(Ok(TvmEmulatorRequest{ request_id, request: None })) => {
                         tracing::error!(error = ?anyhow!("empty request"), request_id=request_id);

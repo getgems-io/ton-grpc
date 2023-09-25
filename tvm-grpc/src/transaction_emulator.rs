@@ -4,7 +4,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use futures::Stream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
-use tracing::{error};
+use tracing::error;
 use anyhow::anyhow;
 use async_stream::stream;
 use lru::LruCache;
@@ -56,7 +56,7 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
                             SetLibs(req) => set_libs(&mut state, req).map(SetLibsResponse),
                         };
 
-                        oneshot.send(response.map_err(|s| anyhow!(s.to_string()))).expect("failed to send response");
+                        oneshot.send(response).expect("failed to send response");
                     }
                     Command::Drop => { break; }
                 }
@@ -73,12 +73,7 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
                         let _ = tx.send(Command::Request { request: req, response: to });
                         let response = ro.await.expect("failed to receive response");
 
-                        yield response
-                            .map(|r| TransactionEmulatorResponse { request_id, response: Some(r) })
-                            .map_err(|e| {
-                                error!(error = ?e);
-                                Status::internal(e.to_string())
-                            })
+                        yield response.map(|r| TransactionEmulatorResponse { request_id, response: Some(r) })
                     },
                     Ok(Ok(TransactionEmulatorRequest { request_id, request: None })) => {
                         error!(error = ?anyhow!("empty request"), request_id=request_id);
