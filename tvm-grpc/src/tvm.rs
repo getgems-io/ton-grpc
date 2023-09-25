@@ -1,5 +1,5 @@
 use anyhow::anyhow;
-use tonic::include_proto;
+use tonic::{include_proto, Status};
 use serde::{Deserialize};
 
 include_proto!("tvm");
@@ -20,6 +20,16 @@ impl<T> From<TvmResult<T>> for anyhow::Result<T> where T: Default {
             Ok(value.data.unwrap_or_default())
         } else {
             Err(anyhow!(value.error.unwrap_or("ambiguous response".to_owned())))
+        }
+    }
+}
+
+impl<T> From<TvmResult<T>> for Result<T, Status> where T: Default {
+    fn from(value: TvmResult<T>) -> Self {
+        if value.success {
+            Ok(value.data.unwrap_or_default())
+        } else {
+            Err(Status::internal(value.error.unwrap_or("ambiguous response".to_owned())))
         }
     }
 }
