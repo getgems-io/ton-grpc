@@ -53,7 +53,7 @@ jobs:
             type=sha
             type=sha,format=long
             type=ref,event=branch
-            type=match,match=ton-grpc-v(.*),group=1
+            type=match,pattern=ton-grpc-v(.*),group=1
             
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
