@@ -201,5 +201,5 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> Result<TvmEmulator
         .map_err(|e| Status::internal(e.to_string()))?;
     tracing::trace!(method="set_c7", "{}", response);
 
-    Ok(TvmEmulatorSetC7Response { success: response, config_cache_key: req.config_cache_key })
+    Ok(TvmEmulatorSetC7Response { success: response })
 }

@@ -113,7 +113,6 @@ message TvmEmulatorSetC7Request {
 
 message TvmEmulatorSetC7Response {
   bool success = 1;
-  optional string config_cache_key = 2;
 }
 
 service TransactionEmulatorService {
@@ -157,7 +156,6 @@ message TransactionEmulatorPrepareRequest {
 
 message TransactionEmulatorPrepareResponse {
   bool success = 1;
-  optional string config_cache_key = 2;
 }
 
 message TransactionEmulatorEmulateRequest {

@@ -124,7 +124,7 @@ fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> Result<
 
     let _ = state.emulator.replace(emulator);
 
-    Ok(TransactionEmulatorPrepareResponse { success: true, config_cache_key: req.config_cache_key })
+    Ok(TransactionEmulatorPrepareResponse { success: true })
 }
 
 fn emulate(state: &mut State, req: TransactionEmulatorEmulateRequest) -> Result<TransactionEmulatorEmulateResponse, Status> {
