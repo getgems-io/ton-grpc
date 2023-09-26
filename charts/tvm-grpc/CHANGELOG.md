@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.1.2...charts/tvm-grpc-v0.2.0) (2023-09-26)
+
+
+### Features
+
+* trigger build ([56ac077](https://github.com/getgems-io/tonlibjson/commit/56ac0773f43969cf4d386d531f6d7db4f5ca58a9))
+
 ## [0.1.2](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.1.1...charts/tvm-grpc-v0.1.2) (2023-09-26)
 
 
