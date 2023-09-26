@@ -53,6 +53,7 @@ jobs:
             type=sha
             type=sha,format=long
             type=ref,event=branch
+            type=semver,pattern={{version}}
             
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
