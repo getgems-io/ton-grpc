@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.1.1...charts/tvm-grpc-v0.1.2) (2023-09-26)
+
+
+### Bug Fixes
+
+* use default command for image ([c73c456](https://github.com/getgems-io/tonlibjson/commit/c73c4562f402ea2a684478f6306350ccc14a6804))
+
 ## [0.1.1](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.1.0...charts/tvm-grpc-v0.1.1) (2023-09-21)
 
 
