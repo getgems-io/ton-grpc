@@ -4,7 +4,7 @@ use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use futures::Stream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
-use tracing::error;
+use tracing::{error, instrument};
 use anyhow::anyhow;
 use async_stream::stream;
 use lru::LruCache;
@@ -100,16 +100,17 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
     }
 }
 
+#[instrument(skip_all, err)]
 fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> Result<TransactionEmulatorPrepareResponse, Status> {
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config_boc.is_empty() {
-            if let Ok(mut guard) = lru_cache().try_lock() {
+            if let Ok(mut guard) = lru_cache().lock() {
                 guard.get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
             } else {
-                return Err(Status::failed_precondition("config cache miss"))
+                return Err(Status::failed_precondition("config cache poisoned lock"))
             }
         } else {
-            if let Ok(mut guard) = lru_cache().try_lock() {
+            if let Ok(mut guard) = lru_cache().lock() {
                 guard.put(cache_key.clone(), req.config_boc.clone());
             };
 
