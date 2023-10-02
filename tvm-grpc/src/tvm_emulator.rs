@@ -1,5 +1,5 @@
 use std::pin::Pin;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use anyhow::anyhow;
 use async_stream::stream;
@@ -22,8 +22,8 @@ struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
 }
 
-fn lru_cache() -> &'static Cache<String, String> {
-    static LRU_CACHE: OnceLock<Cache<String, String>> = OnceLock::new();
+fn lru_cache() -> &'static Cache<String, Arc<String>> {
+    static LRU_CACHE: OnceLock<Cache<String, Arc<String>>> = OnceLock::new();
 
     LRU_CACHE.get_or_init(|| Cache::new(32))
 }
@@ -182,14 +182,15 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> Result<TvmEmulator
 
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config.is_empty() {
-            lru_cache().get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
+            lru_cache().get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?
         } else {
-            lru_cache().insert(cache_key.clone(), req.config.clone());
+            let config = Arc::new(req.config);
+            lru_cache().insert(cache_key.clone(), config.clone());
 
-            req.config
+            config
         }
     } else {
-        req.config
+        Arc::new(req.config)
     };
 
     let response = emu.set_c7(&req.address, req.unixtime, req.balance, &req.rand_seed_hex, &config)
