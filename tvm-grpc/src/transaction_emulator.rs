@@ -1,5 +1,5 @@
 use std::pin::Pin;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use futures::Stream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
@@ -22,8 +22,8 @@ struct State {
     emulator: Option<tonlibjson_sys::TransactionEmulator>
 }
 
-fn lru_cache() -> &'static Cache<String, String> {
-    static LRU_CACHE: OnceLock<Cache<String, String>> = OnceLock::new();
+fn lru_cache() -> &'static Cache<String, Arc<String>> {
+    static LRU_CACHE: OnceLock<Cache<String, Arc<String>>> = OnceLock::new();
 
     LRU_CACHE.get_or_init(|| Cache::new(32))
 }
@@ -103,14 +103,16 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
 fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> Result<TransactionEmulatorPrepareResponse, Status> {
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config_boc.is_empty() {
-            lru_cache().get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
+            lru_cache().get(cache_key)
+                .ok_or(Status::failed_precondition("config cache miss"))?
         } else {
-            lru_cache().insert(cache_key.clone(), req.config_boc.clone());
+            let config = Arc::new(req.config_boc.clone());
+            lru_cache().insert(cache_key.clone(), config.clone());
 
-            req.config_boc
+            config
         }
     } else {
-        req.config_boc
+        Arc::new(req.config_boc)
     };
 
     let emulator = tonlibjson_sys::TransactionEmulator::new(&config, req.vm_log_level)
