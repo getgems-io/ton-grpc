@@ -8,6 +8,7 @@ use futures::Stream;
 use lru::LruCache;
 use tokio_stream::StreamExt;
 use tonic::{async_trait, Request, Response, Status, Streaming};
+use tracing::instrument;
 use crate::threaded::{Command, Stop};
 use crate::tvm::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::tvm::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
@@ -174,6 +175,7 @@ fn set_gas_limit(state: &mut State, req: TvmEmulatorSetGasLimitRequest) -> Resul
     Ok(TvmEmulatorSetGasLimitResponse { success: response })
 }
 
+#[instrument(skip_all, err)]
 fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> Result<TvmEmulatorSetC7Response, Status> {
     let Some(emu) = state.emulator.as_ref() else {
         return Err(Status::internal("emulator not initialized"));
@@ -181,13 +183,13 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> Result<TvmEmulator
 
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config.is_empty() {
-            if let Ok(mut guard) = lru_cache().try_lock() {
+            if let Ok(mut guard) = lru_cache().lock() {
                 guard.get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
             } else {
-                return Err(Status::failed_precondition("config cache miss"));
+                return Err(Status::failed_precondition("config cache poisoned lock"));
             }
         } else {
-            if let Ok(mut guard) = lru_cache().try_lock() {
+            if let Ok(mut guard) = lru_cache().lock() {
                 guard.put(cache_key.clone(), req.config.clone());
             };
 
