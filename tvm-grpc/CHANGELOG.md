@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.0...tvm-grpc-v0.3.1) (2023-10-02)
+
+
+### Bug Fixes
+
+* block on lock ([#462](https://github.com/getgems-io/tonlibjson/issues/462)) ([88aa108](https://github.com/getgems-io/tonlibjson/commit/88aa108265852502393cdec6dfdc21389c38b269))
+
 ## [0.3.0](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.2.0...tvm-grpc-v0.3.0) (2023-09-26)
 
 
