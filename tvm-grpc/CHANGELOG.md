@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.3](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.2...tvm-grpc-v0.3.3) (2023-10-02)
+
+
+### Bug Fixes
+
+* avoid to clone config cache ([#466](https://github.com/getgems-io/tonlibjson/issues/466)) ([ff13969](https://github.com/getgems-io/tonlibjson/commit/ff13969e77ed798f4231ea1c1573410b86983c73))
+
 ## [0.3.2](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.1...tvm-grpc-v0.3.2) (2023-10-02)
 
 
