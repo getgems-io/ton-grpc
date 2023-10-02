@@ -1,14 +1,13 @@
-use std::num::NonZeroUsize;
 use std::pin::Pin;
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 use futures::Stream;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::{error, instrument};
 use anyhow::anyhow;
 use async_stream::stream;
-use lru::LruCache;
 use tokio_stream::StreamExt;
+use quick_cache::sync::Cache;
 use crate::threaded::{Command, Stop};
 use crate::tvm::transaction_emulator_service_server::TransactionEmulatorService as BaseTransactionEmulatorService;
 use crate::tvm::{transaction_emulator_request, transaction_emulator_response, TransactionEmulatorEmulateRequest, TransactionEmulatorEmulateResponse, TransactionEmulatorPrepareRequest, TransactionEmulatorPrepareResponse, TransactionEmulatorRequest, TransactionEmulatorResponse, TransactionEmulatorSetConfigRequest, TransactionEmulatorSetConfigResponse, TransactionEmulatorSetIgnoreChksigRequest, TransactionEmulatorSetIgnoreChksigResponse, TransactionEmulatorSetLibsRequest, TransactionEmulatorSetLibsResponse, TransactionEmulatorSetLtRequest, TransactionEmulatorSetLtResponse, TransactionEmulatorSetRandSeedRequest, TransactionEmulatorSetRandSeedResponse, TransactionEmulatorSetUnixtimeRequest, TransactionEmulatorSetUnixtimeResponse, TvmResult};
@@ -23,10 +22,10 @@ struct State {
     emulator: Option<tonlibjson_sys::TransactionEmulator>
 }
 
-fn lru_cache() -> &'static Mutex<LruCache<String, String>> {
-    static LRU_CACHE: OnceLock<Mutex<LruCache<String, String>>> = OnceLock::new();
+fn lru_cache() -> &'static Cache<String, String> {
+    static LRU_CACHE: OnceLock<Cache<String, String>> = OnceLock::new();
 
-    LRU_CACHE.get_or_init(|| Mutex::new(LruCache::new(NonZeroUsize::new(32).unwrap())))
+    LRU_CACHE.get_or_init(|| Cache::new(32))
 }
 
 #[async_trait]
@@ -104,15 +103,9 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
 fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> Result<TransactionEmulatorPrepareResponse, Status> {
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config_boc.is_empty() {
-            if let Ok(mut guard) = lru_cache().lock() {
-                guard.get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
-            } else {
-                return Err(Status::failed_precondition("config cache poisoned lock"))
-            }
+            lru_cache().get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
         } else {
-            if let Ok(mut guard) = lru_cache().lock() {
-                guard.put(cache_key.clone(), req.config_boc.clone());
-            };
+            lru_cache().insert(cache_key.clone(), req.config_boc.clone());
 
             req.config_boc
         }

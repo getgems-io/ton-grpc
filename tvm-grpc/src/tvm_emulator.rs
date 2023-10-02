@@ -1,14 +1,13 @@
-use std::num::NonZeroUsize;
 use std::pin::Pin;
-use std::sync::{Mutex, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 use anyhow::anyhow;
 use async_stream::stream;
 use futures::Stream;
-use lru::LruCache;
 use tokio_stream::StreamExt;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::instrument;
+use quick_cache::sync::Cache;
 use crate::threaded::{Command, Stop};
 use crate::tvm::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::tvm::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
@@ -23,10 +22,10 @@ struct State {
     emulator: Option<tonlibjson_sys::TvmEmulator>
 }
 
-fn lru_cache() -> &'static Mutex<LruCache<String, String>> {
-    static LRU_CACHE: OnceLock<Mutex<LruCache<String, String>>> = OnceLock::new();
+fn lru_cache() -> &'static Cache<String, String> {
+    static LRU_CACHE: OnceLock<Cache<String, String>> = OnceLock::new();
 
-    LRU_CACHE.get_or_init(|| Mutex::new(LruCache::new(NonZeroUsize::new(32).unwrap())))
+    LRU_CACHE.get_or_init(|| Cache::new(32))
 }
 
 #[async_trait]
@@ -183,15 +182,9 @@ fn set_c7(state: &mut State, req: TvmEmulatorSetC7Request) -> Result<TvmEmulator
 
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config.is_empty() {
-            if let Ok(mut guard) = lru_cache().lock() {
-                guard.get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
-            } else {
-                return Err(Status::failed_precondition("config cache poisoned lock"));
-            }
+            lru_cache().get(cache_key).ok_or(Status::failed_precondition("config cache miss"))?.clone()
         } else {
-            if let Ok(mut guard) = lru_cache().lock() {
-                guard.put(cache_key.clone(), req.config.clone());
-            };
+            lru_cache().insert(cache_key.clone(), req.config.clone());
 
             req.config
         }
