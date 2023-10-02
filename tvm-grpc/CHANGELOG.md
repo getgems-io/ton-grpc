@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.1...tvm-grpc-v0.3.2) (2023-10-02)
+
+
+### Bug Fixes
+
+* use quick_cache ([#464](https://github.com/getgems-io/tonlibjson/issues/464)) ([babb0b5](https://github.com/getgems-io/tonlibjson/commit/babb0b5c5f0e6bb156ef4947afd1b3fc9d85de03))
+
 ## [0.3.1](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.0...tvm-grpc-v0.3.1) (2023-10-02)
 
 
