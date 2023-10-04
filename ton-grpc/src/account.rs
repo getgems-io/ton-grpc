@@ -5,9 +5,7 @@ use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
 use futures::{Stream, StreamExt, try_join, TryStreamExt};
 use derive_new::new;
-use tracing_futures::Instrument;
 use tonlibjson_client::address::AccountAddressData;
-use opentelemetry::trace::FutureExt;
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_service_server::AccountService as BaseAccountService;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
@@ -139,8 +137,6 @@ impl BaseAccountService for AccountService {
                 tracing::error!(error = %e, "get_account_transactions failed");
                 Status::internal(e.to_string())
             })
-            .with_current_context()
-            .in_current_span()
             .boxed();
 
         Ok(Response::new(stream))
