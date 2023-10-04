@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.1.1...charts/ton-grpc-v0.1.2) (2023-10-04)
+
+
+### Bug Fixes
+
+* ton-grpc helm chart fix invalid deployment command ([4ab5e69](https://github.com/getgems-io/tonlibjson/commit/4ab5e69d49bd7f04aeba286d446979c8d838aad0))
+
 ## [0.1.1](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.1.0...charts/ton-grpc-v0.1.1) (2023-09-21)
 
 
