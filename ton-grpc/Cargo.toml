@@ -22,10 +22,6 @@ tonic = { workspace = true }
 tonic-reflection = { workspace = true }
 tonic-health = { workspace = true }
 prost = { workspace = true }
-opentelemetry = { workspace = true }
-opentelemetry-otlp = { workspace = true }
-tracing-opentelemetry = { workspace = true }
-tower-http = { version = "0.4.4", features = ["trace", "propagate-header"] }
 either = "1.9"
 derive-new = "0.5.9"
 
