@@ -37,6 +37,11 @@ spec:
             - name: http
               containerPort: 50052
               protocol: TCP
+            {{- if .Values.metrics.enabled }}
+            - name: metrics
+              containerPort: 9000
+              protocol: TCP
+            {{- end }}
           env:
             - name: TON_CONFIG_URL
               value: {{ .Values.tonConfigUrl }}
