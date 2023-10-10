@@ -14,6 +14,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tracing::{instrument, trace};
+use metrics::{absolute_counter, describe_counter};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
@@ -31,7 +32,10 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
-    pub fn new(client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
+    pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
+        let labels = [("liteserver_id", format!("{}!", id))];
+        describe_counter!("ton_liteserver_last_seqno", "The seqno of the last block to which liteserver is synced");
+
         let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
         tokio::spawn({
@@ -54,7 +58,8 @@ impl CursorClient {
 
                                     continue;
                                 } else {
-                                    trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered")
+                                    trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered");
+                                    absolute_counter!("ton_liteserver_last_seqno", cur.last.seqno as u64, &labels);
                                 }
                             }
 
