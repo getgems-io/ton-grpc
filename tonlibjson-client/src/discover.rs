@@ -146,7 +146,7 @@ impl Stream for CursorClientDiscover {
         match Pin::new(&mut *c).poll_next(cx) {
             Poll::Ready(Some(Ok(change))) => match change {
                 Change::Insert(k, client) => Poll::Ready(Some(Ok(
-                    Change::Insert(k, CursorClientFactory::create(client))
+                    Change::Insert(k.clone(), CursorClientFactory::create(k, client))
                 ))),
                 Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
             },

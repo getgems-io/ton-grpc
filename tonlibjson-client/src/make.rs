@@ -1,4 +1,4 @@
-use std::future::{Future, ready, Ready};
+use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use serde_json::{json, Value};
@@ -42,32 +42,18 @@ impl Service<TonConfig> for ClientFactory {
 pub struct CursorClientFactory;
 
 impl CursorClientFactory {
-    pub fn create(client: PeakEwma<Client>) -> CursorClient {
+    pub fn create(id: String, client: PeakEwma<Client>) -> CursorClient {
         debug!("make new cursor client");
         let client = SharedLayer
             .layer(client);
         let client = ConcurrencyLimitLayer::new(256)
             .layer(client);
 
-        let client = CursorClient::new(client);
+        let client = CursorClient::new(id, client);
 
         debug!("successfully made new cursor client");
 
         client
-    }
-}
-
-impl Service<PeakEwma<Client>> for CursorClientFactory {
-    type Response = CursorClient;
-    type Error = anyhow::Error;
-    type Future = Ready<Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&mut self, client: PeakEwma<Client>) -> Self::Future {
-        ready(Ok(Self::create(client)))
     }
 }
 

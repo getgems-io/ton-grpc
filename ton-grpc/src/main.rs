@@ -5,6 +5,7 @@ mod block;
 mod message;
 
 use std::time::Duration;
+use metrics_exporter_prometheus::PrometheusBuilder;
 use tonic::transport::Server;
 use tonic::codec::CompressionEncoding::Gzip;
 use tracing_subscriber::EnvFilter;
@@ -19,6 +20,8 @@ use crate::ton::message_service_server::MessageServiceServer;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    PrometheusBuilder::new().install().expect("failed to install Prometheus recorder");
+
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_span_events(FmtSpan::CLOSE)
