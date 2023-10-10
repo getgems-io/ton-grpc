@@ -86,3 +86,17 @@ extraEnvs: []
 
 linkerd:
   enabled: false
+
+metrics:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    interval: ""
+    scrapeTimeout: ""
+    selector: {}
+    labels: {}
+    annotations: {}
+    jobLabel: ""
+    relabelings: []
+    metricRelabelings: []
