@@ -8,6 +8,7 @@ runs:
         targets: x86_64-unknown-linux-gnu
     - run: |
         echo "LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+')" >> "$GITHUB_OUTPUT"
+      shell: bash
     - name: Install LLVM and Clang
       shell: bash
       run: |
