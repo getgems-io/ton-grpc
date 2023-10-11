@@ -27,11 +27,11 @@ jobs:
           submodules: recursive
       - uses: ./.github/actions/prepare
       - run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release --features "${{ matrix.features }}"
-        env:
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
-          CMAKE_C_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
+#        env:
+#          SCCACHE_GHA_ENABLED: "true"
+#          RUSTC_WRAPPER: "sccache"
+#          CMAKE_C_COMPILER_LAUNCHER: "sccache"
+#          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
       - run: ldd ./target/x86_64-unknown-linux-gnu/release/tvm-grpc
 
       - name: Log in to the Container registry
