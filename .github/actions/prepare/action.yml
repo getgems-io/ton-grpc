@@ -6,18 +6,20 @@ runs:
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: x86_64-unknown-linux-gnu
+    - run: |
+        echo "LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+')" >> "$GITHUB_OUTPUT"
     - name: Install LLVM and Clang
       shell: bash
       run: |
         wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-        sudo add-apt-repository "deb http://apt.llvm.org/jammy/  llvm-toolchain-jammy-16 main"
+        sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main"
         sudo apt-get update
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: libsecp256k1-dev libsodium-dev clang-16 lldb-16 lld-16 clangd-16 libc++-16-dev libc++abi-16-dev
+        packages: libsecp256k1-dev libsodium-dev clang-$LLVM_VERSION lldb-$LLVM_VERSION lld-$LLVM_VERSION clangd-$LLVM_VERSION libc++-$LLVM_VERSION-dev libc++abi-$LLVM_VERSION-dev
     - shell: bash
       run: | 
-        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 101
-        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 101
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 101
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 101
     - name: Run sccache-cache
       uses: mozilla-actions/sccache-action@v0.0.3
