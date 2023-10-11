@@ -2,22 +2,22 @@ name: "Prepare env"
 runs:
   using: "composite"
   steps:
-    - uses: arduino/setup-protoc@v2
     - uses: dtolnay/rust-toolchain@stable
       with:
         targets: x86_64-unknown-linux-gnu
-    - run: |
-        echo "LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+')" >> "$GITHUB_OUTPUT"
-      shell: bash
     - name: Install LLVM and Clang
+      id: llvm_setup
       shell: bash
       run: |
+        LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+')
         wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
         sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main"
         sudo apt-get update
+        echo "LLVM_VERSION=$LLVM_VERSION" >> $GITHUB_OUTPUT
+    - uses: arduino/setup-protoc@v2
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: libsecp256k1-dev libsodium-dev clang-$LLVM_VERSION lldb-$LLVM_VERSION lld-$LLVM_VERSION clangd-$LLVM_VERSION libc++-$LLVM_VERSION-dev libc++abi-$LLVM_VERSION-dev
+        packages: libsecp256k1-dev libsodium-dev clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_VERSION }} clangd-${{ steps.llvm_setup.outputs.LLVM_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
     - shell: bash
       run: | 
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 101
