@@ -11,6 +11,7 @@ use tonic::codec::CompressionEncoding::Gzip;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tonlibjson_client::ton::TonClient;
+use clap::Parser;
 use crate::account::AccountService;
 use crate::block::BlockService;
 use crate::message::MessageService;
@@ -18,14 +19,28 @@ use crate::ton::account_service_server::AccountServiceServer;
 use crate::ton::block_service_server::BlockServiceServer;
 use crate::ton::message_service_server::MessageServiceServer;
 
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[clap(long, action)]
+    enable_metrics: bool
+}
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    PrometheusBuilder::new().install().expect("failed to install Prometheus recorder");
+    let args = Args::parse();
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
         .with_span_events(FmtSpan::CLOSE)
         .init();
+
+    if args.enable_metrics {
+        PrometheusBuilder::new()
+            .install()
+            .expect("failed to install Prometheus recorder");
+    }
 
     let reflection = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
