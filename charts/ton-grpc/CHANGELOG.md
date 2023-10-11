@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.1.2...charts/ton-grpc-v0.2.0) (2023-10-11)
+
+
+### Features
+
+* ton-grpc servicemonitor ([e4ec2dc](https://github.com/getgems-io/tonlibjson/commit/e4ec2dcc189c380fa2df560c20aa7fcb7fcd1bd3))
+
+
+### Bug Fixes
+
+* ton-grpc helm chart metrics arg ([04dbced](https://github.com/getgems-io/tonlibjson/commit/04dbcede350a32dccbd529e180f242343cabb1d8))
+
 ## [0.1.2](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.1.1...charts/ton-grpc-v0.1.2) (2023-10-04)
 
 
