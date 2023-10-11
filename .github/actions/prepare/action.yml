@@ -20,7 +20,7 @@ runs:
         packages: libsecp256k1-dev libsodium-dev clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_VERSION }} clangd-${{ steps.llvm_setup.outputs.LLVM_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
     - shell: bash
       run: | 
-        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-$LLVM_VERSION 101
-        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-$LLVM_VERSION 101
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
     - name: Run sccache-cache
       uses: mozilla-actions/sccache-action@v0.0.3
