@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.2.0...charts/ton-grpc-v0.2.1) (2023-10-11)
+
+
+### Bug Fixes
+
+* fix pod args ([f641147](https://github.com/getgems-io/tonlibjson/commit/f641147d7cd1897bf4485ca530ffbd4ed118d8cd))
+
 ## [0.2.0](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.1.2...charts/ton-grpc-v0.2.0) (2023-10-11)
 
 
