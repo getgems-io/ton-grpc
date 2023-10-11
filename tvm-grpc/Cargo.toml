@@ -1,3 +1,5 @@
+# trigger build: rust 1.73
+
 [package]
 name = "tvm-grpc"
 version = "0.3.4"

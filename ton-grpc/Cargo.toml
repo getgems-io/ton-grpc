@@ -1,3 +1,5 @@
+# trigger build: rust 1.73
+
 [package]
 name = "ton-grpc"
 version = "0.2.0"
