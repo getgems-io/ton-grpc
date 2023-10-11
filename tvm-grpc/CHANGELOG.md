@@ -2,6 +2,13 @@
 
 
 
+## [0.3.5](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.4...tvm-grpc-v0.3.5) (2023-10-11)
+
+
+### Bug Fixes
+
+* use proper llvm version for build ([334d623](https://github.com/getgems-io/tonlibjson/commit/334d6235c2f93bcbab01ac447acdd7f0f1043187))
+
 ## [0.3.3](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.2...tvm-grpc-v0.3.3) (2023-10-02)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.0...ton-grpc-v0.2.1) (2023-10-11)
+
+
+### Bug Fixes
+
+* use proper llvm version for build ([334d623](https://github.com/getgems-io/tonlibjson/commit/334d6235c2f93bcbab01ac447acdd7f0f1043187))
+
 ## [0.2.0](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.1.2...ton-grpc-v0.2.0) (2023-10-11)
 
 
