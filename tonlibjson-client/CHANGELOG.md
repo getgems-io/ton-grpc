@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.1.0...tonlibjson-client-v0.2.0) (2023-10-12)
+
+
+### Features
+
+* add some metrics to cursor client ([d6eb358](https://github.com/getgems-io/tonlibjson/commit/d6eb3583482414e040852ed2f20de92a81c4c9ae))
+
 ## 0.1.0 (2023-10-11)
 
 
