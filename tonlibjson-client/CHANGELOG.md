@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.3.0...tonlibjson-client-v0.3.1) (2023-10-13)
+
+
+### Bug Fixes
+
+* fix requests metric ([f0a0aab](https://github.com/getgems-io/tonlibjson/commit/f0a0aabf32064da744185987e31284b3c7d4dd3e))
+
 ## [0.3.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.2.0...tonlibjson-client-v0.3.0) (2023-10-13)
 
 
