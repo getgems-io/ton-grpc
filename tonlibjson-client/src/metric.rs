@@ -12,21 +12,21 @@ type Counter = Arc<std::sync::atomic::AtomicI32>;
 pub struct ResponseFuture<T> {
     #[pin]
     inner: T,
-    counter: Counter
+    inflight: Counter
 }
 
 impl<T> ResponseFuture<T> {
-    pub fn new(inner: T, counter: Counter) -> ResponseFuture<T> {
-        counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    pub fn new(inner: T, inflight: Counter) -> ResponseFuture<T> {
+        inflight.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        Self { inner, counter }
+        Self { inner, inflight  }
     }
 }
 
 #[pinned_drop]
 impl<T> PinnedDrop for ResponseFuture<T> {
     fn drop(self: Pin<&mut Self>) {
-        self.counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.inflight.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -45,12 +45,12 @@ impl<F, T, E> Future for ResponseFuture<F>
 #[derive(Clone, Debug)]
 pub struct ConcurrencyMetric<S> {
     inner: S,
-    counter: Counter
+    inflight: Counter
 }
 
 impl<S> ConcurrencyMetric<S> {
     pub fn new(inner: S) -> Self {
-        Self { inner, counter: Counter::default() }
+        Self { inner, inflight: Counter::default() }
     }
 
     pub fn get_ref(&self) -> &S {
@@ -79,7 +79,7 @@ impl<S, Request> Service<Request> for ConcurrencyMetric<S>
     fn call(&mut self, req: Request) -> Self::Future {
         let future = self.inner.call(req);
 
-        ResponseFuture::new(future, Arc::clone(&self.counter))
+        ResponseFuture::new(future, Arc::clone(&self.inflight))
     }
 }
 
@@ -87,6 +87,6 @@ impl<T> Load for ConcurrencyMetric<T> {
     type Metric = i32;
 
     fn load(&self) -> Self::Metric {
-        self.counter.load(std::sync::atomic::Ordering::Relaxed)
+        self.inflight.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
