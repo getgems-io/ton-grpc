@@ -3,12 +3,12 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tower::Service;
-use pin_project::pin_project;
+use pin_project::{pin_project, pinned_drop};
 use tower::load::Load;
 
 type Counter = Arc<std::sync::atomic::AtomicI32>;
 
-#[pin_project]
+#[pin_project(PinnedDrop)]
 pub struct ResponseFuture<T> {
     #[pin]
     inner: T,
@@ -23,6 +23,13 @@ impl<T> ResponseFuture<T> {
     }
 }
 
+#[pinned_drop]
+impl<T> PinnedDrop for ResponseFuture<T> {
+    fn drop(self: Pin<&mut Self>) {
+        self.counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 impl<F, T, E> Future for ResponseFuture<F>
     where
         F: Future<Output = Result<T, E>>,
@@ -30,16 +37,7 @@ impl<F, T, E> Future for ResponseFuture<F>
     type Output = Result<T, E>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-
-        match this.inner.poll(cx) {
-            Poll::Ready(t) => {
-                this.counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
-
-                Poll::Ready(t)
-            }
-            Poll::Pending => { Poll::Pending }
-        }
+        self.project().inner.poll(cx)
     }
 }
 
