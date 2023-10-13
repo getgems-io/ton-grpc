@@ -13,8 +13,9 @@ use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
+use tower::load::Load;
 use tracing::{instrument, trace};
-use metrics::{absolute_counter, describe_counter};
+use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use crate::block::{BlockIdExt, BlocksGetShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
@@ -41,6 +42,7 @@ impl CursorClient {
         describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
         describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
         describe_counter!("ton_liteserver_first_seqno", "The seqno of the first block that is available for the liteserver to request");
+        describe_gauge!("ton_liteserver_requests", "Number of concurrent requests");
 
         let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
@@ -54,6 +56,8 @@ impl CursorClient {
                 let mut current: Option<MasterchainInfo> = None;
                 loop {
                     timer.tick().await;
+
+                    gauge!("ton_liteserver_requests", client.load() as f64, &labels);
 
                     let masterchain_info = (&mut client).oneshot(GetMasterchainInfo::default()).await;
 

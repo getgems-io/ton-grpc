@@ -6,7 +6,7 @@ use tower::Service;
 use pin_project::pin_project;
 use tower::load::Load;
 
-type Counter = Arc<std::sync::atomic::AtomicU32>;
+type Counter = Arc<std::sync::atomic::AtomicI32>;
 
 #[pin_project]
 pub struct ResponseFuture<T> {
@@ -17,7 +17,7 @@ pub struct ResponseFuture<T> {
 
 impl<T> ResponseFuture<T> {
     pub fn new(inner: T, counter: Counter) -> ResponseFuture<T> {
-        counter.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        counter.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
         Self { inner, counter }
     }
@@ -86,7 +86,7 @@ impl<S, Request> Service<Request> for ConcurrencyMetric<S>
 }
 
 impl<T> Load for ConcurrencyMetric<T> {
-    type Metric = u32;
+    type Metric = i32;
 
     fn load(&self) -> Self::Metric {
         self.counter.load(std::sync::atomic::Ordering::Relaxed)
