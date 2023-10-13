@@ -21,17 +21,6 @@ impl<T> ResponseFuture<T> {
 
         Self { inner, counter }
     }
-
-    pub fn get_ref(&self) -> &T {
-        &self.inner
-    }
-
-    pub fn get_mut(&mut self) -> &mut T {
-        &mut self.inner
-    }
-    pub fn into_inner(self) -> T {
-        self.inner
-    }
 }
 
 impl<F, T, E> Future for ResponseFuture<F>
@@ -55,7 +44,8 @@ impl<F, T, E> Future for ResponseFuture<F>
 }
 
 
-struct ConcurrencyMetric<S> {
+#[derive(Clone, Debug)]
+pub struct ConcurrencyMetric<S> {
     inner: S,
     counter: Counter
 }
@@ -63,6 +53,17 @@ struct ConcurrencyMetric<S> {
 impl<S> ConcurrencyMetric<S> {
     pub fn new(inner: S) -> Self {
         Self { inner, counter: Counter::default() }
+    }
+
+    pub fn get_ref(&self) -> &S {
+        &self.inner
+    }
+
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.inner
+    }
+    pub fn into_inner(self) -> S {
+        self.inner
     }
 }
 
