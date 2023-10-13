@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.2.0...tonlibjson-client-v0.3.0) (2023-10-13)
+
+
+### Features
+
+* liteserver requests ([a69b2b8](https://github.com/getgems-io/tonlibjson/commit/a69b2b86c73862f1ad4ee66d5511e73921de6801))
+
 ## [0.2.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.1.0...tonlibjson-client-v0.2.0) (2023-10-12)
 
 
