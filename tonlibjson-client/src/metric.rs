@@ -52,8 +52,8 @@ pub struct ConcurrencyMetric<S> {
 }
 
 impl<S> ConcurrencyMetric<S> {
-    pub fn new(inner: S, liteserver_id: String) -> Self {
-        Self { inner, liteserver_id: Cow::from(liteserver_id), inflight: Counter::default() }
+    pub fn new(inner: S, liteserver_id: Cow<'static, str>) -> Self {
+        Self { inner, liteserver_id, inflight: Counter::default() }
     }
 
     pub fn get_ref(&self) -> &S {
