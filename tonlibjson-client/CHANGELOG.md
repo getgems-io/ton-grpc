@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.0...tonlibjson-client-v0.4.1) (2023-10-16)
+
+
+### Bug Fixes
+
+* use internal cache for get_shards ([96095c7](https://github.com/getgems-io/tonlibjson/commit/96095c746468379cfd3f886a1ccdcbb51dd1e1ce))
+
 ## [0.4.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.3.1...tonlibjson-client-v0.4.0) (2023-10-16)
 
 
