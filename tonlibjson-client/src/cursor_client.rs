@@ -326,11 +326,6 @@ fn shards_cache() -> &'static Cache<BlockIdExt, Vec<BlockIdExt>> {
     LRU_CACHE.get_or_init(|| Cache::new(1024))
 }
 async fn cached_get_shards(block_id: &BlockIdExt, client: &mut InnerClient) -> Result<Vec<BlockIdExt>> {
-    let hits = shards_cache().hits();
-    let misses = shards_cache().misses();
-    let ratio = ((hits as f64)/((hits + misses) as f64)) * 100.0;
-    warn!(hits = hits, misses = misses, ratio = ratio);
-
     shards_cache().get_or_insert_async(block_id, async {
         Ok(client.oneshot(BlocksGetShards::new(block_id.clone())).await?.shards)
     }).await
