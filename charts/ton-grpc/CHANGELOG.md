@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.2.1...charts/ton-grpc-v0.2.2) (2023-10-16)
+
+
+### Bug Fixes
+
+* disable ingress by default ([1144792](https://github.com/getgems-io/tonlibjson/commit/1144792a5058a4a5b6bee0e4f0265aa082ad082a))
+
 ## [0.2.1](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.2.0...charts/ton-grpc-v0.2.1) (2023-10-11)
 
 
