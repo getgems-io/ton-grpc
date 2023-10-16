@@ -219,8 +219,8 @@ impl tower::load::Load for CursorClient {
 }
 
 async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
-    let block_id = client.oneshot(BlocksLookupBlock::seqno(block_id)).await?;
-    let shards = client.oneshot(BlocksGetShards::new(block_id.clone())).await?;
+    let block_id = client.oneshot(BlocksLookupBlock::seqno(block_id)).await?; // TODO[akostylev0] optimize
+    let shards = client.oneshot(BlocksGetShards::new(block_id.clone())).await?; // TODO[akostylev0] optimize
 
     try_join!(
         client.clone().oneshot(BlocksGetBlockHeader::new(block_id)),
@@ -230,7 +230,7 @@ async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> R
 
 #[instrument(skip_all, err, level = "trace")]
 async fn find_first_blocks(client: &mut InnerClient, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, BlockHeader)> {
-    let start = client.oneshot(GetMasterchainInfo::default()).await?.last;
+    let start = client.oneshot(GetMasterchainInfo::default()).await?.last; // TODO[akostylev0] optimize
 
     let length = start.seqno;
     let mut rhs = length;
@@ -287,6 +287,7 @@ async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Bl
     let shards = client.oneshot(BlocksGetShards::new(master_chain_last_block_id.clone()))
         .await?.shards;
 
+    // TODO[akostylev0] handle case when there are multiple shards
     let work_chain_last_block_id = shards.first()
         .ok_or_else(|| anyhow!("last block for work chain not found"))?
         .clone();
@@ -299,6 +300,7 @@ async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Bl
     Ok((master_chain_header, work_chain_header))
 }
 
+// TODO[akostylev0] track time
 async fn wait_for_block_header(block_id: BlockIdExt, client: &mut InnerClient) -> Result<BlockHeader> {
     let retry = ExponentialBackoff::from_millis(4)
         .max_delay(Duration::from_secs(1))
