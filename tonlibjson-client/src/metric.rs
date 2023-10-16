@@ -1,7 +1,9 @@
+use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
+use metrics::counter;
 use tower::Service;
 use pin_project::{pin_project, pinned_drop};
 use tower::load::Load;
@@ -45,12 +47,13 @@ impl<F, T, E> Future for ResponseFuture<F>
 #[derive(Clone, Debug)]
 pub struct ConcurrencyMetric<S> {
     inner: S,
-    inflight: Counter
+    liteserver_id: Cow<'static, str>,
+    inflight: Counter,
 }
 
 impl<S> ConcurrencyMetric<S> {
-    pub fn new(inner: S) -> Self {
-        Self { inner, inflight: Counter::default() }
+    pub fn new(inner: S, liteserver_id: String) -> Self {
+        Self { inner, liteserver_id: Cow::from(liteserver_id), inflight: Counter::default() }
     }
 
     pub fn get_ref(&self) -> &S {
@@ -77,6 +80,10 @@ impl<S, Request> Service<Request> for ConcurrencyMetric<S>
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
+        let req_type = std::any::type_name::<Request>();
+
+        counter!("ton_liteserver_requests_total", 1, "liteserver_id" => self.liteserver_id.clone(), r"request_type" => req_type);
+
         let future = self.inner.call(req);
 
         ResponseFuture::new(future, Arc::clone(&self.inflight))

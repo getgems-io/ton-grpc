@@ -37,11 +37,13 @@ pub struct CursorClient {
 
 impl CursorClient {
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
-        let client = ConcurrencyMetric::new(client);
         let labels = [("liteserver_id", format!("{}!", id))];
+
+        let client = ConcurrencyMetric::new(client, id.clone());
         describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
         describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
         describe_counter!("ton_liteserver_first_seqno", "The seqno of the first block that is available for the liteserver to request");
+        describe_gauge!("ton_liteserver_requests_total", "Total count of requests");
         describe_gauge!("ton_liteserver_requests", "Number of concurrent requests");
 
         let (ctx, crx) = tokio::sync::watch::channel(None);
