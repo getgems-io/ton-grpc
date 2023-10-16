@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::OnceLock;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
@@ -15,9 +16,10 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{instrument, trace};
+use tracing::{instrument, trace, warn};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
-use crate::block::{BlockIdExt, BlocksGetShards, Sync};
+use quick_cache::sync::Cache;
+use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
@@ -112,7 +114,7 @@ impl CursorClient {
 
                     if let Some((mfb, wfb)) = first_block.clone() {
                         if let Err(e) = try_join!(
-                            client.clone().oneshot(BlocksGetShards::new(mfb.id.clone())),
+                            client.clone().oneshot(BlocksGetShards::new(mfb.id.clone())), // TODO[akostylev]
                             (&mut client).oneshot(BlocksGetBlockHeader::new(wfb.id.clone()))
                         ) {
                             trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
@@ -188,6 +190,24 @@ impl Service<Specialized<GetMasterchainInfo>> for CursorClient {
     }
 }
 
+impl Service<Specialized<BlocksGetShards>> for CursorClient {
+    type Response = BlocksShards;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+        return Service::<BlocksGetShards>::poll_ready(self, cx)
+    }
+
+    fn call(&mut self, req: Specialized<BlocksGetShards>) -> Self::Future {
+        if let Some(shards) = shards_cache().get(&req.inner().id) {
+            return ready(Ok(BlocksShards { shards })).boxed();
+        }
+
+        return Service::<BlocksGetShards>::call(self, req.into_inner())
+    }
+}
+
 impl<R : Callable<InnerClient>> Service<R> for CursorClient {
     type Response = R::Response;
     type Error = anyhow::Error;
@@ -210,7 +230,7 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
     }
 }
 
-impl tower::load::Load for CursorClient {
+impl Load for CursorClient {
     type Metric = Cost;
 
     fn load(&self) -> Self::Metric {
@@ -220,11 +240,11 @@ impl tower::load::Load for CursorClient {
 
 async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
     let block_id = client.oneshot(BlocksLookupBlock::seqno(block_id)).await?; // TODO[akostylev0] optimize
-    let shards = client.oneshot(BlocksGetShards::new(block_id.clone())).await?; // TODO[akostylev0] optimize
+    let shards = cached_get_shards(&block_id, client).await?;
 
     try_join!(
         client.clone().oneshot(BlocksGetBlockHeader::new(block_id)),
-        client.oneshot(BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()))
+        client.oneshot(BlocksGetBlockHeader::new(shards.first().expect("must be exist").clone()))
     )
 }
 
@@ -284,8 +304,7 @@ async fn find_first_blocks(client: &mut InnerClient, lhs: Option<i32>, cur: Opti
 async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, BlockHeader)> {
     let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
-    let shards = client.oneshot(BlocksGetShards::new(master_chain_last_block_id.clone()))
-        .await?.shards;
+    let shards = cached_get_shards(&master_chain_last_block_id, client).await?;
 
     // TODO[akostylev0] handle case when there are multiple shards
     let work_chain_last_block_id = shards.first()
@@ -298,6 +317,23 @@ async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Bl
     )?;
 
     Ok((master_chain_header, work_chain_header))
+}
+
+
+fn shards_cache() -> &'static Cache<BlockIdExt, Vec<BlockIdExt>> {
+    static LRU_CACHE: OnceLock<Cache<BlockIdExt, Vec<BlockIdExt>>> = OnceLock::new();
+
+    LRU_CACHE.get_or_init(|| Cache::new(1024))
+}
+async fn cached_get_shards(block_id: &BlockIdExt, client: &mut InnerClient) -> Result<Vec<BlockIdExt>> {
+    let hits = shards_cache().hits();
+    let misses = shards_cache().misses();
+    let ratio = ((hits as f64)/((hits + misses) as f64)) * 100.0;
+    warn!(hits = hits, misses = misses, ratio = ratio);
+
+    shards_cache().get_or_insert_async(block_id, async {
+        Ok(client.oneshot(BlocksGetShards::new(block_id.clone())).await?.shards)
+    }).await
 }
 
 // TODO[akostylev0] track time

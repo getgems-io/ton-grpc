@@ -18,6 +18,7 @@ tokio-stream = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
 async-stream = { workspace = true }
+quick_cache = { workspace = true }
 dashmap = "5.5"
 uuid = { version = "1.4", features = ["v4", "fast-rng", "serde"] }
 pin-project = "1.1"
