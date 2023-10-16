@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.3.1...tonlibjson-client-v0.4.0) (2023-10-16)
+
+
+### Features
+
+* total count of reqs ([#490](https://github.com/getgems-io/tonlibjson/issues/490)) ([ed91cba](https://github.com/getgems-io/tonlibjson/commit/ed91cbaeff66a75ffa75729019cdbbb60adbe60a))
+
+
+### Bug Fixes
+
+* **deps:** bump async-trait from 0.1.73 to 0.1.74 ([be6dac7](https://github.com/getgems-io/tonlibjson/commit/be6dac75b6db9aa727f9877b6bd682744c3d7746))
+
 ## [0.3.1](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.3.0...tonlibjson-client-v0.3.1) (2023-10-13)
 
 
