@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -37,17 +38,19 @@ pub struct CursorClient {
 
 impl CursorClient {
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
-        let client = ConcurrencyMetric::new(client);
-        let labels = [("liteserver_id", format!("{}!", id))];
         describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
         describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
         describe_counter!("ton_liteserver_first_seqno", "The seqno of the first block that is available for the liteserver to request");
+        describe_gauge!("ton_liteserver_requests_total", "Total count of requests");
         describe_gauge!("ton_liteserver_requests", "Number of concurrent requests");
+
+        let id = Cow::from(id);
+        let client = ConcurrencyMetric::new(client, id.clone());
 
         let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
         tokio::spawn({
-            let labels = labels.clone();
+            let id = id.clone();
             let mut client = client.clone();
             async move {
                 let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
@@ -57,7 +60,7 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    gauge!("ton_liteserver_requests", client.load() as f64, &labels);
+                    gauge!("ton_liteserver_requests", client.load() as f64, "liteserver_id" => id.clone());
 
                     let masterchain_info = (&mut client).oneshot(GetMasterchainInfo::default()).await;
 
@@ -70,14 +73,14 @@ impl CursorClient {
                                     continue;
                                 } else {
                                     trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered");
-                                    absolute_counter!("ton_liteserver_last_seqno", cur.last.seqno as u64, &labels);
+                                    absolute_counter!("ton_liteserver_last_seqno", cur.last.seqno as u64, "liteserver_id" => id.clone());
                                 }
                             }
 
                             match fetch_last_headers(&mut client).await {
                                 Ok((last_master_chain_header, last_work_chain_header)) => {
                                     masterchain_info.last = last_master_chain_header.id.clone();
-                                    absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, &labels);
+                                    absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => id.clone());
                                     trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
                                     trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
 
@@ -97,7 +100,6 @@ impl CursorClient {
 
         let (ftx, frx) = tokio::sync::watch::channel(None);
         tokio::spawn({
-            let labels = labels.clone();
             let mut client = client.clone();
             let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
             let mut first_block_seqno = None;
@@ -124,7 +126,7 @@ impl CursorClient {
 
                         match fb {
                             Ok((mfb, wfb)) => {
-                                absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, &labels);
+                                absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => id.clone());
                                 trace!(seqno = mfb.id.seqno, "master chain first block");
                                 trace!(seqno = wfb.id.seqno, "work chain first block");
 
