@@ -190,7 +190,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(BlocksGetShards::new(block))
+            .oneshot(Specialized::new(BlocksGetShards::new(block)))
             .await
     }
 
@@ -201,7 +201,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(BlocksGetShards::new(block_id))
+            .oneshot(Specialized::new(BlocksGetShards::new(block_id)))
             .map_ok(|res| res.shards)
             .await
     }

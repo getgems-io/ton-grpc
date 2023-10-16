@@ -78,6 +78,16 @@ pub struct Specialized<T> {
     inner: T
 }
 
+impl<T> Specialized<T> {
+    pub fn inner(&self) -> &T {
+        &self.inner
+    }
+
+    pub fn into_inner(self) -> T {
+        self.inner
+    }
+}
+
 impl<T> Routable for Specialized<T> where T : Routable {
     fn route(&self) -> Route {
         self.inner.route()

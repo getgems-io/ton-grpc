@@ -46,7 +46,7 @@ impl BlocksGetBlockHeader {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
+#[derive(Debug, Hash, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
 #[serde(tag = "@type", rename = "ton.blockIdExt")]
 pub struct BlockIdExt {
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -406,7 +406,7 @@ impl BlocksLookupBlock {
 #[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.getShards")]
 pub struct BlocksGetShards {
-    id: BlockIdExt
+    pub id: BlockIdExt
 }
 
 impl Requestable for BlocksGetShards {
