@@ -1945,7 +1945,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "anyhow",
  "clap",
@@ -2267,7 +2267,7 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tvm-grpc"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "anyhow",
  "async-stream",

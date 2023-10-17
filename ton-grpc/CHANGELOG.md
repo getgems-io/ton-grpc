@@ -12,6 +12,13 @@
 
 
 
+## [0.2.8](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.7...ton-grpc-v0.2.8) (2023-10-17)
+
+
+### Bug Fixes
+
+* pass github token to prepare action ([562ad9c](https://github.com/getgems-io/tonlibjson/commit/562ad9c7ab638128c7e8242f4ae53cb360f9faf2))
+
 ## [0.2.1](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.0...ton-grpc-v0.2.1) (2023-10-11)
 
 
