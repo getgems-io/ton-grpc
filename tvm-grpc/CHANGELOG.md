@@ -4,6 +4,13 @@
 
 
 
+## [0.3.8](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.7...tvm-grpc-v0.3.8) (2023-10-17)
+
+
+### Bug Fixes
+
+* github action prep ([df5c383](https://github.com/getgems-io/tonlibjson/commit/df5c383efac42714459cb5744ea37933581b05d2))
+
 ## [0.3.7](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.6...tvm-grpc-v0.3.7) (2023-10-17)
 
 

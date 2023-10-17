@@ -12,6 +12,13 @@
 
 
 
+## [0.2.9](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.8...ton-grpc-v0.2.9) (2023-10-17)
+
+
+### Bug Fixes
+
+* github action prep ([df5c383](https://github.com/getgems-io/tonlibjson/commit/df5c383efac42714459cb5744ea37933581b05d2))
+
 ## [0.2.8](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.7...ton-grpc-v0.2.8) (2023-10-17)
 
 
