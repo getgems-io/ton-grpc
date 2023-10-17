@@ -1,8 +1,10 @@
 name: "Prepare env"
+description: "Prepare rust environment"
+inputs:
+  token:
+    description: "Token for setup-protoc"
+    required: true
 runs:
-  inputs:
-    token:
-      required: true
   using: "composite"
   steps:
     - uses: dtolnay/rust-toolchain@stable
