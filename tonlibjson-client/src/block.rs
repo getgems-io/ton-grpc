@@ -59,7 +59,7 @@ pub struct BlockIdExt {
     pub file_hash: String,
 }
 
-#[derive(new, Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Hash, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
 #[serde(tag = "@type", rename = "ton.blockId")]
 pub struct BlockId {
     #[serde(deserialize_with = "deserialize_number_from_string")]
@@ -351,16 +351,13 @@ impl Routable for GetMasterchainInfo {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Hash, Eq, PartialEq)]
 #[serde(tag = "@type", rename = "blocks.lookupBlock")]
 pub struct BlocksLookupBlock {
     pub mode: i32,
     pub id: BlockId,
     pub lt: i64,
-    pub utime: i32,
-
-    #[serde(skip)]
-    _criteria: BlockCriteria
+    pub utime: i32
 }
 
 impl Requestable for BlocksLookupBlock {
@@ -369,7 +366,13 @@ impl Requestable for BlocksLookupBlock {
 
 impl Routable for BlocksLookupBlock {
     fn route(&self) -> Route {
-        Route::Block { chain: self.id.workchain, criteria: self._criteria }
+        let criteria = match self.mode {
+            1 => BlockCriteria::Seqno(self.id.seqno),
+            2 => BlockCriteria::LogicalTime(self.lt),
+            _ => BlockCriteria::Seqno(self.id.seqno)
+        };
+
+        Route::Block { chain: self.id.workchain, criteria }
     }
 }
 
@@ -377,15 +380,11 @@ impl BlocksLookupBlock {
     pub fn seqno(id: BlockId) -> Self {
         let mode = 1;
 
-        let seqno = id.seqno;
-
         Self {
             mode,
             id,
             lt: 0,
-            utime: 0,
-
-            _criteria: BlockCriteria::Seqno(seqno)
+            utime: 0
         }
     }
 
@@ -396,9 +395,7 @@ impl BlocksLookupBlock {
             mode,
             id,
             lt,
-            utime: 0,
-
-            _criteria: BlockCriteria::LogicalTime(lt)
+            utime: 0
         }
     }
 }
@@ -419,7 +416,7 @@ impl Routable for BlocksGetShards {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.shards")]
 pub struct BlocksShards {
     pub shards: Vec<BlockIdExt>,
