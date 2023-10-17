@@ -196,14 +196,13 @@ impl Service<Specialized<BlocksGetShards>> for CursorClient {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
-        return Service::<BlocksGetShards>::poll_ready(self, cx)
+        Service::<BlocksGetShards>::poll_ready(self, cx)
     }
 
     fn call(&mut self, req: Specialized<BlocksGetShards>) -> Self::Future {
-        let id = req.into_inner().id;
         let mut client = self.client.clone();
 
-        async move { cached_get_shards(&id, &mut client).await }.boxed()
+        async move { cached_get_shards(req.inner(), &mut client).await }.boxed()
     }
 }
 
@@ -239,7 +238,7 @@ impl Load for CursorClient {
 
 async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
     let block_id = cached_block_id_ext(block_id, client).await?;
-    let shards = cached_get_shards(&block_id, client).await?;
+    let shards = cached_get_shards(&BlocksGetShards::new(block_id.clone()), client).await?;
 
     try_join!(
         client.clone().oneshot(BlocksGetBlockHeader::new(block_id)),
@@ -303,7 +302,7 @@ async fn find_first_blocks(client: &mut InnerClient, lhs: Option<i32>, cur: Opti
 async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, BlockHeader)> {
     let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
-    let shards = cached_get_shards(&master_chain_last_block_id, client).await?;
+    let shards = cached_get_shards(&BlocksGetShards::new(master_chain_last_block_id.clone()), client).await?;
 
     // TODO[akostylev0] handle case when there are multiple shards
     let work_chain_last_block_id = shards.shards.first()
@@ -324,10 +323,10 @@ fn shards_cache() -> &'static Cache<BlockIdExt, BlocksShards> {
 
     CACHE.get_or_init(|| Cache::new(1024))
 }
-async fn cached_get_shards(block_id: &BlockIdExt, client: &mut InnerClient) -> Result<BlocksShards> {
-    shards_cache().get_or_insert_async(block_id, async {
-        Ok(client.oneshot(BlocksGetShards::new(block_id.clone())).await?)
-    }).await
+async fn cached_get_shards(req: &BlocksGetShards, client: &mut InnerClient) -> Result<BlocksShards> {
+    let key = req.id.clone();
+
+    shards_cache().get_or_insert_async(&key, client.oneshot(req.clone())).await
 }
 
 fn block_cache() -> &'static Cache<BlocksLookupBlock, BlockIdExt> {
@@ -339,14 +338,7 @@ fn block_cache() -> &'static Cache<BlocksLookupBlock, BlockIdExt> {
 async fn cached_block_id_ext(block_id: BlockId, client: &mut InnerClient) -> Result<BlockIdExt> {
     let req = BlocksLookupBlock::seqno(block_id);
 
-    let misses = block_cache().misses();
-    let hits = block_cache().hits();
-    let ratio = hits as f64 / (hits + misses) as f64;
-    warn!(misses = misses, hits = hits, ratio = ratio * 100.0);
-
-    block_cache().get_or_insert_async(&req, async {
-        Ok(client.oneshot(req.clone()).await?)
-    }).await
+    block_cache().get_or_insert_async(&req, client.oneshot(req.clone())).await
 }
 
 // TODO[akostylev0] track time
