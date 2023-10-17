@@ -419,7 +419,7 @@ impl Routable for BlocksGetShards {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.shards")]
 pub struct BlocksShards {
     pub shards: Vec<BlockIdExt>,

@@ -200,11 +200,10 @@ impl Service<Specialized<BlocksGetShards>> for CursorClient {
     }
 
     fn call(&mut self, req: Specialized<BlocksGetShards>) -> Self::Future {
-        if let Some(shards) = shards_cache().get(&req.inner().id) {
-            return ready(Ok(BlocksShards { shards })).boxed();
-        }
+        let id = req.into_inner().id;
+        let mut client = self.client.clone();
 
-        return Service::<BlocksGetShards>::call(self, req.into_inner())
+        async move { cached_get_shards(&id, &mut client).await }.boxed()
     }
 }
 
@@ -244,7 +243,7 @@ async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> R
 
     try_join!(
         client.clone().oneshot(BlocksGetBlockHeader::new(block_id)),
-        client.oneshot(BlocksGetBlockHeader::new(shards.first().expect("must be exist").clone()))
+        client.oneshot(BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()))
     )
 }
 
@@ -307,7 +306,7 @@ async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Bl
     let shards = cached_get_shards(&master_chain_last_block_id, client).await?;
 
     // TODO[akostylev0] handle case when there are multiple shards
-    let work_chain_last_block_id = shards.first()
+    let work_chain_last_block_id = shards.shards.first()
         .ok_or_else(|| anyhow!("last block for work chain not found"))?
         .clone();
 
@@ -320,14 +319,14 @@ async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Bl
 }
 
 
-fn shards_cache() -> &'static Cache<BlockIdExt, Vec<BlockIdExt>> {
-    static LRU_CACHE: OnceLock<Cache<BlockIdExt, Vec<BlockIdExt>>> = OnceLock::new();
+fn shards_cache() -> &'static Cache<BlockIdExt, BlocksShards> {
+    static LRU_CACHE: OnceLock<Cache<BlockIdExt, BlocksShards>> = OnceLock::new();
 
     LRU_CACHE.get_or_init(|| Cache::new(1024))
 }
-async fn cached_get_shards(block_id: &BlockIdExt, client: &mut InnerClient) -> Result<Vec<BlockIdExt>> {
+async fn cached_get_shards(block_id: &BlockIdExt, client: &mut InnerClient) -> Result<BlocksShards> {
     shards_cache().get_or_insert_async(block_id, async {
-        Ok(client.oneshot(BlocksGetShards::new(block_id.clone())).await?.shards)
+        Ok(client.oneshot(BlocksGetShards::new(block_id.clone())).await?)
     }).await
 }
 
