@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.1...tonlibjson-client-v0.4.2) (2023-10-17)
+
+
+### Performance Improvements
+
+* lookup block cache ([e3fc268](https://github.com/getgems-io/tonlibjson/commit/e3fc268b104476c18edb5073346cbc04602fdd1d))
+
 ## [0.4.1](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.0...tonlibjson-client-v0.4.1) (2023-10-16)
 
 
