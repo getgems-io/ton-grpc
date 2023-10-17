@@ -16,7 +16,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{instrument, trace};
+use tracing::{instrument, trace, warn};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
@@ -238,7 +238,7 @@ impl Load for CursorClient {
 }
 
 async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
-    let block_id = client.oneshot(BlocksLookupBlock::seqno(block_id)).await?; // TODO[akostylev0] optimize
+    let block_id = cached_block_id_ext(block_id, client).await?;
     let shards = cached_get_shards(&block_id, client).await?;
 
     try_join!(
@@ -320,13 +320,32 @@ async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Bl
 
 
 fn shards_cache() -> &'static Cache<BlockIdExt, BlocksShards> {
-    static LRU_CACHE: OnceLock<Cache<BlockIdExt, BlocksShards>> = OnceLock::new();
+    static CACHE: OnceLock<Cache<BlockIdExt, BlocksShards>> = OnceLock::new();
 
-    LRU_CACHE.get_or_init(|| Cache::new(1024))
+    CACHE.get_or_init(|| Cache::new(1024))
 }
 async fn cached_get_shards(block_id: &BlockIdExt, client: &mut InnerClient) -> Result<BlocksShards> {
     shards_cache().get_or_insert_async(block_id, async {
         Ok(client.oneshot(BlocksGetShards::new(block_id.clone())).await?)
+    }).await
+}
+
+fn block_cache() -> &'static Cache<BlocksLookupBlock, BlockIdExt> {
+    static CACHE: OnceLock<Cache<BlocksLookupBlock, BlockIdExt>> = OnceLock::new();
+
+    CACHE.get_or_init(|| Cache::new(1024))
+}
+
+async fn cached_block_id_ext(block_id: BlockId, client: &mut InnerClient) -> Result<BlockIdExt> {
+    let req = BlocksLookupBlock::seqno(block_id);
+
+    let misses = block_cache().misses();
+    let hits = block_cache().hits();
+    let ratio = hits as f64 / (hits + misses) as f64;
+    warn!(misses = misses, hits = hits, ratio = ratio * 100.0);
+
+    block_cache().get_or_insert_async(&req, async {
+        Ok(client.oneshot(req.clone()).await?)
     }).await
 }
 
