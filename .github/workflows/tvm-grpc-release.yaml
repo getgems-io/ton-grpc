@@ -26,6 +26,8 @@ jobs:
         with:
           submodules: recursive
       - uses: ./.github/actions/prepare
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
       - run: cargo build -v --bin tvm-grpc --target x86_64-unknown-linux-gnu --release --features "${{ matrix.features }}"
         env:
           SCCACHE_GHA_ENABLED: "true"
