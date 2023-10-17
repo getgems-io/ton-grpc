@@ -163,7 +163,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(BlocksLookupBlock::seqno(BlockId::new(chain, shard, seqno)))
+            .oneshot(Specialized::new(BlocksLookupBlock::seqno(BlockId::new(chain, shard, seqno))))
             .await
     }
 
@@ -179,7 +179,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(BlocksLookupBlock::logical_time(BlockId::new(chain, shard, 0), lt))
+            .oneshot(Specialized::new(BlocksLookupBlock::logical_time(BlockId::new(chain, shard, 0), lt)))
             .await
     }
 

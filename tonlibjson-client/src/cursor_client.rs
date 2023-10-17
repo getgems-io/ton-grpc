@@ -16,7 +16,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{instrument, trace, warn};
+use tracing::{instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
@@ -190,6 +190,7 @@ impl Service<Specialized<GetMasterchainInfo>> for CursorClient {
     }
 }
 
+// TODO[akostylev0] generics
 impl Service<Specialized<BlocksGetShards>> for CursorClient {
     type Response = BlocksShards;
     type Error = anyhow::Error;
@@ -203,6 +204,23 @@ impl Service<Specialized<BlocksGetShards>> for CursorClient {
         let mut client = self.client.clone();
 
         async move { cached_get_shards(req.inner(), &mut client).await }.boxed()
+    }
+}
+
+// TODO[akostylev0] generics
+impl Service<Specialized<BlocksLookupBlock>> for CursorClient {
+    type Response = BlockIdExt;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+        Service::<BlocksLookupBlock>::poll_ready(self, cx)
+    }
+
+    fn call(&mut self, req: Specialized<BlocksLookupBlock>) -> Self::Future {
+        let mut client = self.client.clone();
+
+        async move { cached_lookup_block(req.inner(), &mut client).await }.boxed()
     }
 }
 
@@ -326,7 +344,7 @@ fn shards_cache() -> &'static Cache<BlockIdExt, BlocksShards> {
 async fn cached_get_shards(req: &BlocksGetShards, client: &mut InnerClient) -> Result<BlocksShards> {
     let key = req.id.clone();
 
-    shards_cache().get_or_insert_async(&key, client.oneshot(req.clone())).await
+    shards_cache().get_or_insert_async(&key, async { client.oneshot(req.clone()).await }).await
 }
 
 fn block_cache() -> &'static Cache<BlocksLookupBlock, BlockIdExt> {
@@ -338,7 +356,11 @@ fn block_cache() -> &'static Cache<BlocksLookupBlock, BlockIdExt> {
 async fn cached_block_id_ext(block_id: BlockId, client: &mut InnerClient) -> Result<BlockIdExt> {
     let req = BlocksLookupBlock::seqno(block_id);
 
-    block_cache().get_or_insert_async(&req, client.oneshot(req.clone())).await
+    cached_lookup_block(&req, client).await
+}
+
+async fn cached_lookup_block(req: &BlocksLookupBlock, client: &mut InnerClient) -> Result<BlockIdExt> {
+    block_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
 }
 
 // TODO[akostylev0] track time

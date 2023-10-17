@@ -10,7 +10,7 @@ use tower::discover::{Change, Discover, ServiceList};
 use anyhow::anyhow;
 use derive_new::new;
 use itertools::Itertools;
-use crate::block::{BlockHeader, BlocksGetShards, BlocksShards, GetMasterchainInfo, MasterchainInfo};
+use crate::block::{BlockHeader, BlockIdExt, BlocksGetShards, BlocksLookupBlock, BlocksShards, GetMasterchainInfo, MasterchainInfo};
 use crate::cursor_client::{CursorClient, InnerClient};
 use crate::discover::CursorClientDiscover;
 use crate::error::ErrorService;
@@ -196,6 +196,25 @@ impl Service<Specialized<BlocksGetShards>> for Balance {
             .call(&req.route())
             .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
                 ServiceList::new::<Specialized<BlocksGetShards>>(svc))).oneshot(req))
+            .boxed()
+    }
+}
+
+// TODO[akostylev0] generics
+impl Service<Specialized<BlocksLookupBlock>> for Balance {
+    type Response = BlockIdExt;
+    type Error = anyhow::Error;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.router.poll_ready(cx)
+    }
+
+    fn call(&mut self, req: Specialized<BlocksLookupBlock>) -> Self::Future {
+        self.router
+            .call(&req.route())
+            .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
+                ServiceList::new::<Specialized<BlocksLookupBlock>>(svc))).oneshot(req))
             .boxed()
     }
 }
