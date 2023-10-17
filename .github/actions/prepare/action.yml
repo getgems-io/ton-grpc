@@ -1,5 +1,8 @@
 name: "Prepare env"
 runs:
+  inputs:
+    token:
+      required: true
   using: "composite"
   steps:
     - uses: dtolnay/rust-toolchain@stable
@@ -16,7 +19,7 @@ runs:
         echo "LLVM_VERSION=$LLVM_VERSION" >> $GITHUB_OUTPUT
     - uses: arduino/setup-protoc@v2
       with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        repo-token: ${{ inputs.token }}
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: libsecp256k1-dev libsodium-dev clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_VERSION }} clangd-${{ steps.llvm_setup.outputs.LLVM_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
