@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.3...tonlibjson-client-v0.4.4) (2023-10-18)
+
+
+### Performance Improvements
+
+* optimize fething headers of last block ([9d235eb](https://github.com/getgems-io/tonlibjson/commit/9d235eb60aa983838fe33fddfe928c35f06cb1f8))
+
 ## [0.4.3](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.2...tonlibjson-client-v0.4.3) (2023-10-18)
 
 
