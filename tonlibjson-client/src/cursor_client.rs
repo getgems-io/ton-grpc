@@ -112,11 +112,8 @@ impl CursorClient {
                 loop {
                     timer.tick().await;
 
-                    if let Some((mfb, wfb)) = first_block.clone() {
-                        if let Err(e) = try_join!(
-                            client.clone().oneshot(BlocksGetShards::new(mfb.id.clone())), // TODO[akostylev]
-                            (&mut client).oneshot(BlocksGetBlockHeader::new(wfb.id.clone()))
-                        ) {
+                    if let Some((mfb, _)) = &first_block {
+                        if let Err(e) = client.clone().oneshot(BlocksGetShards::new(mfb.id.clone())).await {
                             trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
                         } else {
