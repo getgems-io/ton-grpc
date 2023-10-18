@@ -11,7 +11,7 @@ use futures::future::ready;
 use tokio::sync::watch::Receiver;
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::Retry;
-use tokio_retry::strategy::{ExponentialBackoff, jitter};
+use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
@@ -113,7 +113,7 @@ impl CursorClient {
                     timer.tick().await;
 
                     if let Some((mfb, _)) = &first_block {
-                        if let Err(e) = client.clone().oneshot(BlocksGetShards::new(mfb.id.clone())).await {
+                        if let Err(e) = (&mut client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
                             trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
                             first_block = None;
                         } else {
@@ -313,23 +313,22 @@ async fn find_first_blocks(client: &mut InnerClient, lhs: Option<i32>, cur: Opti
     Ok((master, work))
 }
 
-
 async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, BlockHeader)> {
     let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
     let shards = cached_get_shards(&BlocksGetShards::new(master_chain_last_block_id.clone()), client).await?;
-
     // TODO[akostylev0] handle case when there are multiple shards
     let work_chain_last_block_id = shards.shards.first()
         .ok_or_else(|| anyhow!("last block for work chain not found"))?
         .clone();
 
-    let (master_chain_header, work_chain_header) = try_join!(
-        client.clone().oneshot(BlocksGetBlockHeader::new(master_chain_last_block_id)),
-        wait_for_block_header(work_chain_last_block_id, client)
-    )?;
+    let mut clone = client.clone();
+    let masterchain_header = BlocksGetBlockHeader::new(master_chain_last_block_id);
 
-    Ok((master_chain_header, work_chain_header))
+    Ok(try_join!(
+        cached_block_header(&masterchain_header, &mut clone),
+        wait_for_block_header(work_chain_last_block_id, client)
+    )?)
 }
 
 
@@ -360,10 +359,19 @@ async fn cached_lookup_block(req: &BlocksLookupBlock, client: &mut InnerClient) 
     block_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
 }
 
-// TODO[akostylev0] track time
+fn block_header_cache() -> &'static Cache<BlocksGetBlockHeader, BlockHeader> {
+    static CACHE: OnceLock<Cache<BlocksGetBlockHeader, BlockHeader>> = OnceLock::new();
+
+    CACHE.get_or_init(|| Cache::new(1024))
+}
+
+async fn cached_block_header(req: &BlocksGetBlockHeader, client: &mut InnerClient) -> Result<BlockHeader> {
+    block_header_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
+}
+
 async fn wait_for_block_header(block_id: BlockIdExt, client: &mut InnerClient) -> Result<BlockHeader> {
-    let retry = ExponentialBackoff::from_millis(4)
-        .max_delay(Duration::from_secs(1))
+    let retry = FibonacciBackoff::from_millis(512)
+        .max_delay(Duration::from_millis(4096))
         .map(jitter)
         .take(16);
 

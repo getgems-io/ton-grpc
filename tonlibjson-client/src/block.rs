@@ -22,10 +22,10 @@ impl Requestable for Sync {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Clone, Hash, PartialEq, Eq)]
 #[serde(tag = "@type", rename = "blocks.getBlockHeader")]
 pub struct BlocksGetBlockHeader {
-    id: BlockIdExt
+    pub id: BlockIdExt
 }
 
 impl Requestable for BlocksGetBlockHeader {
