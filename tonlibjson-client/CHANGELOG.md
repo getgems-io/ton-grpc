@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.2...tonlibjson-client-v0.4.3) (2023-10-18)
+
+
+### Performance Improvements
+
+* more optimal way to check first block expires ([aa045b0](https://github.com/getgems-io/tonlibjson/commit/aa045b0b3a20911ece3e0a4dd1c2442e886aba7c))
+
 ## [0.4.2](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.1...tonlibjson-client-v0.4.2) (2023-10-17)
 
 
