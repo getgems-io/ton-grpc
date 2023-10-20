@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::OnceLock;
@@ -8,7 +9,8 @@ use tower::{Service, ServiceExt};
 use anyhow::{anyhow, Result};
 use futures::{FutureExt, try_join, TryFutureExt};
 use futures::future::ready;
-use tokio::sync::watch::Receiver;
+use futures::never::Never;
+use tokio::sync::watch::{Receiver, Sender};
 use tokio::time::{Instant, interval, MissedTickBehavior};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
@@ -39,53 +41,66 @@ pub struct CursorClient {
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
 
-impl CursorClient {
-    fn last_block_loop(&self, mtx: tokio::sync::watch::Sender<Option<MasterchainInfo>>, ctx: tokio::sync::watch::Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Result<()>> {
-        let id = self.id.clone();
-        let mut client = self.client.clone();
+struct LastBlockDiscover {
+    id: Cow<'static, str>,
+    client: InnerClient,
+    current: Option<MasterchainInfo>,
+    mtx: Sender<Option<MasterchainInfo>>,
+    ctx: Sender<Option<(BlockHeader, BlockHeader)>>
+}
 
-        async move {
-            let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
-            timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+impl LastBlockDiscover {
+    async fn discover(&mut self) -> Never {
+        let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
+        timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-            let mut current: Option<MasterchainInfo> = None;
-            loop {
-                timer.tick().await;
+        let mut current: Option<MasterchainInfo> = None;
+        loop {
+            timer.tick().await;
 
-                gauge!("ton_liteserver_requests", client.load() as f64, "liteserver_id" => id.clone());
+            gauge!("ton_liteserver_requests", self.client.load() as f64, "liteserver_id" => self.id.clone());
 
-                let masterchain_info = (&mut client).oneshot(GetMasterchainInfo::default()).await;
-                match masterchain_info {
-                    Ok(mut masterchain_info) => {
-                        if let Some(ref cur) = current {
-                            if cur == &masterchain_info {
-                                trace!(cursor = cur.last.seqno, "block actual");
-
-                                continue;
-                            } else {
-                                trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered");
-                                absolute_counter!("ton_liteserver_last_seqno", cur.last.seqno as u64, "liteserver_id" => id.clone());
-                            }
-                        }
-
-                        match fetch_last_headers(&mut client).await {
-                            Ok((last_master_chain_header, last_work_chain_header)) => {
-                                masterchain_info.last = last_master_chain_header.id.clone();
-                                absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => id.clone());
-                                trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
-                                trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
-
-                                current.replace(masterchain_info.clone());
-
-                                let _ = mtx.send(Some(masterchain_info));
-                                let _ = ctx.send(Some((last_master_chain_header, last_work_chain_header)));
-                            },
-                            Err(e) => trace!(e = ?e, "unable to fetch last headers")
-                        }
-                    },
-                    Err(e) => trace!(e = ?e, "unable to get master chain info")
-                }
+            match self.last_block_op().await {
+                Ok(Some(masterchain_info)) => { current.replace(masterchain_info); },
+                Ok(None) | Err(_) => {}
             }
+        }
+    }
+
+    #[instrument(skip_all, err)]
+    async fn last_block_op(&mut self) -> Result<Option<MasterchainInfo>> {
+        let mut masterchain_info = (&mut self.client).oneshot(GetMasterchainInfo::default()).await?;
+        if let Some(ref current) = self.current {
+            if current == &masterchain_info {
+                return Ok(None);
+            }
+        }
+
+        absolute_counter!("ton_liteserver_last_seqno", masterchain_info.last.seqno as u64, "liteserver_id" => self.id.clone());
+        trace!(seqno = masterchain_info.last.seqno, "block discovered");
+
+        let (last_master_chain_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
+
+        masterchain_info.last = last_master_chain_header.id.clone();
+        absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => self.id.clone());
+        trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
+        trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
+
+        let _ = self.mtx.send(Some(masterchain_info.clone()));
+        let _ = self.ctx.send(Some((last_master_chain_header, last_work_chain_header)));
+
+        Ok(Some(masterchain_info))
+    }
+}
+
+impl CursorClient {
+    pub fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
+        let id = self.id.clone();
+        let client = self.client.clone();
+
+        let mut discover = LastBlockDiscover { id, client, current: None, mtx, ctx };
+        async move {
+            discover.discover().await
         }
     }
 
