@@ -9,7 +9,7 @@ use anyhow::{anyhow, Result};
 use futures::{FutureExt, try_join, TryFutureExt};
 use futures::future::ready;
 use tokio::sync::watch::Receiver;
-use tokio::time::{interval, MissedTickBehavior};
+use tokio::time::{Instant, interval, MissedTickBehavior};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
@@ -109,20 +109,28 @@ impl CursorClient {
             async move {
                 let mut timer = interval(Duration::from_secs(30));
                 timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
                 loop {
-                    timer.tick().await;
+                    let Ok(start) = (&mut client).oneshot(GetMasterchainInfo::default()).await else {
+                        timer.tick().await;
+                        continue;
+                    };
 
-                    if let Some((mfb, _)) = &first_block {
-                        if let Err(e) = (&mut client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
-                            trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
-                            first_block = None;
-                        } else {
-                            trace!("first block still available");
+                    let start_time = Instant::now();
+                    while start_time.elapsed() < Duration::from_secs(60 * 60 * 4) { // Every 4 hours reset starting point
+                        timer.tick().await;
+
+                        if let Some((mfb, _)) = &first_block {
+                            if let Err(e) = (&mut client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
+                                trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
+                                first_block = None;
+                            } else {
+                                trace!("first block still available");
+                                continue;
+                            }
                         }
-                    }
-                    if first_block.is_none() {
-                        let fb = find_first_blocks(&mut client, first_block_seqno.map(|n| n + 1), first_block_seqno.map(|n| n + 32)).await;
 
+                        let fb = find_first_blocks(&mut client, &start.last, first_block_seqno.map(|n| n + 1), first_block_seqno.map(|n| n + 32)).await;
                         match fb {
                             Ok((mfb, wfb)) => {
                                 absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => id.clone());
@@ -262,9 +270,7 @@ async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> R
 }
 
 #[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks(client: &mut InnerClient, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, BlockHeader)> {
-    let start = client.oneshot(GetMasterchainInfo::default()).await?.last; // TODO[akostylev0] optimize
-
+async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, BlockHeader)> {
     let length = start.seqno;
     let mut rhs = length;
     let mut lhs = lhs.unwrap_or(1);
