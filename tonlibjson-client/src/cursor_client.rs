@@ -41,6 +41,59 @@ pub struct CursorClient {
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
 
+struct FirstBlockDiscover {
+    id: Cow<'static, str>,
+    client: InnerClient,
+    ftx: Sender<Option<(BlockHeader, BlockHeader)>>
+}
+
+impl FirstBlockDiscover {
+    async fn discover(&mut self) -> Never {
+        let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
+        let mut first_block_seqno = None;
+
+        let mut timer = interval(Duration::from_secs(30));
+        timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+        loop {
+            let Ok(start) = (&mut self.client).oneshot(GetMasterchainInfo::default()).await else {
+                timer.tick().await;
+                continue;
+            };
+
+            let start_time = Instant::now();
+            while start_time.elapsed() < Duration::from_secs(60 * 60 * 4) { // Every 4 hours reset starting point
+                timer.tick().await;
+
+                if let Some((mfb, _)) = &first_block {
+                    if let Err(e) = (&mut self.client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
+                        trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
+                        first_block = None;
+                    } else {
+                        trace!("first block still available");
+                        continue;
+                    }
+                }
+
+                let fb = find_first_blocks(&mut self.client, &start.last, first_block_seqno.map(|n| n + 1), first_block_seqno.map(|n| n + 32)).await;
+                match fb {
+                    Ok((mfb, wfb)) => {
+                        absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
+                        trace!(seqno = mfb.id.seqno, "master chain first block");
+                        trace!(seqno = wfb.id.seqno, "work chain first block");
+
+                        first_block = Some((mfb.clone(), wfb.clone()));
+                        first_block_seqno = Some(mfb.id.seqno);
+
+                        let _ = self.ftx.send(Some((mfb, wfb)));
+                    },
+                    Err(e) => trace!(e = ?e, "unable to fetch first headers")
+                };
+            }
+        }
+    }
+}
+
 struct LastBlockDiscover {
     id: Cow<'static, str>,
     client: InnerClient,
@@ -60,7 +113,7 @@ impl LastBlockDiscover {
 
             gauge!("ton_liteserver_requests", self.client.load() as f64, "liteserver_id" => self.id.clone());
 
-            match self.last_block_op().await {
+            match self.next().await {
                 Ok(Some(masterchain_info)) => { current.replace(masterchain_info); },
                 Ok(None) | Err(_) => {}
             }
@@ -68,7 +121,7 @@ impl LastBlockDiscover {
     }
 
     #[instrument(skip_all, err)]
-    async fn last_block_op(&mut self) -> Result<Option<MasterchainInfo>> {
+    async fn next(&mut self) -> Result<Option<MasterchainInfo>> {
         let mut masterchain_info = (&mut self.client).oneshot(GetMasterchainInfo::default()).await?;
         if let Some(ref current) = self.current {
             if current == &masterchain_info {
@@ -94,14 +147,22 @@ impl LastBlockDiscover {
 }
 
 impl CursorClient {
-    pub fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
+    fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
         let id = self.id.clone();
         let client = self.client.clone();
 
         let mut discover = LastBlockDiscover { id, client, current: None, mtx, ctx };
-        async move {
-            discover.discover().await
-        }
+
+        async move { discover.discover().await }
+    }
+
+    fn first_block_loop(&self, ftx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
+        let id = self.id.clone();
+        let client = self.client.clone();
+
+        let mut discover = FirstBlockDiscover { id, client, ftx };
+
+        async move { discover.discover().await }
     }
 
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
@@ -113,59 +174,9 @@ impl CursorClient {
 
         let id = Cow::from(id);
         let client = ConcurrencyMetric::new(client, id.clone());
-
         let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
-
         let (ftx, frx) = tokio::sync::watch::channel(None);
-        tokio::spawn({
-            let id = id.clone();
-            let mut client = client.clone();
-            let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
-            let mut first_block_seqno = None;
-
-            async move {
-                let mut timer = interval(Duration::from_secs(30));
-                timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-                loop {
-                    let Ok(start) = (&mut client).oneshot(GetMasterchainInfo::default()).await else {
-                        timer.tick().await;
-                        continue;
-                    };
-
-                    let start_time = Instant::now();
-                    while start_time.elapsed() < Duration::from_secs(60 * 60 * 4) { // Every 4 hours reset starting point
-                        timer.tick().await;
-
-                        if let Some((mfb, _)) = &first_block {
-                            if let Err(e) = (&mut client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
-                                trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
-                                first_block = None;
-                            } else {
-                                trace!("first block still available");
-                                continue;
-                            }
-                        }
-
-                        let fb = find_first_blocks(&mut client, &start.last, first_block_seqno.map(|n| n + 1), first_block_seqno.map(|n| n + 32)).await;
-                        match fb {
-                            Ok((mfb, wfb)) => {
-                                absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => id.clone());
-                                trace!(seqno = mfb.id.seqno, "master chain first block");
-                                trace!(seqno = wfb.id.seqno, "work chain first block");
-
-                                first_block = Some((mfb.clone(), wfb.clone()));
-                                first_block_seqno = Some(mfb.id.seqno);
-
-                                let _ = ftx.send(Some((mfb, wfb)));
-                            },
-                            Err(e) => trace!(e = ?e, "unable to fetch first headers")
-                        }
-                    }
-                }
-            }
-        });
 
         let _self = Self {
             id,
@@ -177,6 +188,7 @@ impl CursorClient {
         };
 
         tokio::spawn(_self.last_block_loop(mtx, ctx));
+        tokio::spawn(_self.first_block_loop(ftx));
 
         _self
     }
