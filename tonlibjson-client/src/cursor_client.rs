@@ -65,11 +65,10 @@ impl CursorClient {
                     gauge!("ton_liteserver_requests", client.load() as f64, "liteserver_id" => id.clone());
 
                     let masterchain_info = (&mut client).oneshot(GetMasterchainInfo::default()).await;
-
                     match masterchain_info {
                         Ok(mut masterchain_info) => {
-                            if let Some(cur) = current.clone() {
-                                if cur == masterchain_info {
+                            if let Some(ref cur) = current {
+                                if cur == &masterchain_info {
                                     trace!(cursor = cur.last.seqno, "block actual");
 
                                     continue;
