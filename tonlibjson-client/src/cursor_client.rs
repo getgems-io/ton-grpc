@@ -30,6 +30,7 @@ pub type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma
 
 #[derive(Clone)]
 pub struct CursorClient {
+    id: Cow<'static, str>,
     client: InnerClient,
 
     pub first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
@@ -39,6 +40,55 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
+    fn last_block_loop(&self, mtx: tokio::sync::watch::Sender<Option<MasterchainInfo>>, ctx: tokio::sync::watch::Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Result<()>> {
+        let id = self.id.clone();
+        let mut client = self.client.clone();
+
+        async move {
+            let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
+            timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            let mut current: Option<MasterchainInfo> = None;
+            loop {
+                timer.tick().await;
+
+                gauge!("ton_liteserver_requests", client.load() as f64, "liteserver_id" => id.clone());
+
+                let masterchain_info = (&mut client).oneshot(GetMasterchainInfo::default()).await;
+                match masterchain_info {
+                    Ok(mut masterchain_info) => {
+                        if let Some(ref cur) = current {
+                            if cur == &masterchain_info {
+                                trace!(cursor = cur.last.seqno, "block actual");
+
+                                continue;
+                            } else {
+                                trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered");
+                                absolute_counter!("ton_liteserver_last_seqno", cur.last.seqno as u64, "liteserver_id" => id.clone());
+                            }
+                        }
+
+                        match fetch_last_headers(&mut client).await {
+                            Ok((last_master_chain_header, last_work_chain_header)) => {
+                                masterchain_info.last = last_master_chain_header.id.clone();
+                                absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => id.clone());
+                                trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
+                                trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
+
+                                current.replace(masterchain_info.clone());
+
+                                let _ = mtx.send(Some(masterchain_info));
+                                let _ = ctx.send(Some((last_master_chain_header, last_work_chain_header)));
+                            },
+                            Err(e) => trace!(e = ?e, "unable to fetch last headers")
+                        }
+                    },
+                    Err(e) => trace!(e = ?e, "unable to get master chain info")
+                }
+            }
+        }
+    }
+
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
         describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
         describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
@@ -51,56 +101,10 @@ impl CursorClient {
 
         let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
-        tokio::spawn({
-            let id = id.clone();
-            let mut client = client.clone();
-            async move {
-                let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
-                timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-                let mut current: Option<MasterchainInfo> = None;
-                loop {
-                    timer.tick().await;
-
-                    gauge!("ton_liteserver_requests", client.load() as f64, "liteserver_id" => id.clone());
-
-                    let masterchain_info = (&mut client).oneshot(GetMasterchainInfo::default()).await;
-                    match masterchain_info {
-                        Ok(mut masterchain_info) => {
-                            if let Some(ref cur) = current {
-                                if cur == &masterchain_info {
-                                    trace!(cursor = cur.last.seqno, "block actual");
-
-                                    continue;
-                                } else {
-                                    trace!(cursor = cur.last.seqno, actual = masterchain_info.last.seqno, "block discovered");
-                                    absolute_counter!("ton_liteserver_last_seqno", cur.last.seqno as u64, "liteserver_id" => id.clone());
-                                }
-                            }
-
-                            match fetch_last_headers(&mut client).await {
-                                Ok((last_master_chain_header, last_work_chain_header)) => {
-                                    masterchain_info.last = last_master_chain_header.id.clone();
-                                    absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => id.clone());
-                                    trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
-                                    trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
-
-                                    current.replace(masterchain_info.clone());
-
-                                    let _ = mtx.send(Some(masterchain_info));
-                                    let _ = ctx.send(Some((last_master_chain_header, last_work_chain_header)));
-                                },
-                                Err(e) => trace!(e = ?e, "unable to fetch last headers")
-                            }
-                        },
-                        Err(e) => trace!(e = ?e, "unable to get master chain info")
-                    }
-                }
-            }
-        });
 
         let (ftx, frx) = tokio::sync::watch::channel(None);
         tokio::spawn({
+            let id = id.clone();
             let mut client = client.clone();
             let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
             let mut first_block_seqno = None;
@@ -148,13 +152,18 @@ impl CursorClient {
             }
         });
 
-        Self {
+        let _self = Self {
+            id,
             client,
 
             first_block_rx: frx,
             last_block_rx: crx,
             masterchain_info_rx: mrx
-        }
+        };
+
+        tokio::spawn(_self.last_block_loop(mtx, ctx));
+
+        _self
     }
 
     pub fn headers(&self, chain_id: i32) -> Option<(BlockHeader, BlockHeader)> {
