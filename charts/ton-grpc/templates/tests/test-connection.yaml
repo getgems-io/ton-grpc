@@ -9,7 +9,7 @@ metadata:
 spec:
   containers:
     - name: wget
-      image: busybox
-      command: ['wget']
-      args: ['{{ include "ton-grpc.fullname" . }}:{{ .Values.service.port }}']
+      image: fullstorydev/grpcurl
+      command: ['grpcurl']
+      args: ['{{ include "ton-grpc.fullname" . }}:{{ .Values.service.port }}', 'ton.BlockService/GetLastBlock']
   restartPolicy: Never
