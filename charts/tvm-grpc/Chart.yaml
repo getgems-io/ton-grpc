@@ -2,3 +2,6 @@ apiVersion: v2
 name: tvm-grpc
 home: https://github.com/getgems-io/tonlibjson
 version: 0.2.1
+maintainers:
+  - name: akostylev0
+    email: a.kostylev@pm.me
