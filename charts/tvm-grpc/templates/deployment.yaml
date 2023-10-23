@@ -39,20 +39,18 @@ spec:
               protocol: TCP
           env:
             - name: RUST_LOG
-              value: error,ton_grpc=info
+              value: error,tvm_grpc=info
             - name: RAYON_NUM_THREADS
               value: "{{ .Values.max_threads }}"
           livenessProbe:
-            tcpSocket:
-              port: http
+            grpc:
+              port: 50052
           readinessProbe:
-            tcpSocket:
-              port: http
+            grpc:
+              port: 50052
           startupProbe:
             tcpSocket:
               port: http
-            failureThreshold: 30
-            periodSeconds: 10
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
