@@ -43,7 +43,7 @@ ingress:
   enabled: false
   className: ""
   annotations:
-     nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
   hosts:
     - host: chart-example.local
       paths:
