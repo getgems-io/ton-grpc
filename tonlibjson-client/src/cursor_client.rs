@@ -363,7 +363,7 @@ impl FirstBlockDiscover {
 
         let lhs = self.current.as_ref().map(|n| n.id.seqno + 1);
         let cur = self.current.as_ref().map(|n| n.id.seqno + 32);
-        let (mfb, wfb) = find_first_blocks(&mut self.client, &start, lhs, cur).await?;
+        let (mfb, wfb) = find_first_blocks(&mut self.client, start, lhs, cur).await?;
 
         absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
         info!(seqno = mfb.id.seqno, "master chain first block");

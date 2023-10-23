@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
         alive += 1;
 
-        let mut client: CursorClient = CursorClientFactory::create(PeakEwma::new(client, Duration::from_secs(5), 500000.0, tower::load::CompleteOnResponse::default()));
+        let mut client: CursorClient = CursorClientFactory::create(ls.id(),PeakEwma::new(client, Duration::from_secs(5), 500000.0, tower::load::CompleteOnResponse::default()));
 
         ServiceExt::<GetMasterchainInfo>::ready(&mut client).await?;
 
