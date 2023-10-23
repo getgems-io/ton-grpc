@@ -60,14 +60,14 @@ spec:
               {{- toYaml .Values.extraEnvs | nindent 12 }}
             {{- end }}
           livenessProbe:
-            grpc:
-              port: 50052
+            tcpSocket:
+              port: http
           readinessProbe:
-            grpc:
-              port: 50052
+            tcpSocket:
+              port: http
           startupProbe:
-            grpc:
-              port: 50052
+            tcpSocket:
+              port: http
             initialDelaySeconds: 15
             failureThreshold: 30
             periodSeconds: 10
