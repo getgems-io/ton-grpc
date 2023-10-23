@@ -10,8 +10,7 @@ jobs:
   lint-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
           fetch-depth: "0"
 
@@ -25,6 +24,9 @@ jobs:
 
       - name: Set up chart-testing
         uses: helm/chart-testing-action@main
+
+      - name: just check
+        run: git fetch --all
 
       - name: Run chart-testing (list-changed)
         id: list-changed
