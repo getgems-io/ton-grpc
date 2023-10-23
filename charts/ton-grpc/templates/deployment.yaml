@@ -62,7 +62,7 @@ spec:
               port: http
           readinessProbe:
             grpc:
-              port: http
+              port: 50052
           startupProbe:
             tcpSocket:
               port: http
