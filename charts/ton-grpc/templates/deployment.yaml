@@ -61,7 +61,7 @@ spec:
             tcpSocket:
               port: http
           readinessProbe:
-            tcpSocket:
+            grpc:
               port: http
           startupProbe:
             tcpSocket:
