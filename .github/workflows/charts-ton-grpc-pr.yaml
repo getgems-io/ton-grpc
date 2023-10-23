@@ -38,7 +38,7 @@ jobs:
 
       - name: Run chart-testing (lint)
         if: steps.list-changed.outputs.changed == 'true'
-        run: ct lint --target-branch ${{ github.event.repository.default_branch }} --check-version-increment=false
+        run: ct lint --target-branch ${{ github.event.repository.default_branch }} --check-version-increment=false  --helm-extra-set-args="--set=image.repository=ghcr.io/getgems-io/ton-grpc-testnet"
 
       - name: Create kind cluster
         if: steps.list-changed.outputs.changed == 'true'
