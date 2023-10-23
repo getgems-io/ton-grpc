@@ -3,5 +3,5 @@ name: ton-grpc
 home: https://github.com/getgems-io/tonlibjson
 version: 0.2.2
 maintainers:
-  - name: Andrei Kostylev
+  - name: akostylev0
     email: a.kostylev@pm.me
