@@ -8,7 +8,8 @@ on:
 
 jobs:
   lint-test:
-    runs-on: ubuntu-latest
+    runs-on:
+      group: "CPUBound"
     steps:
       - uses: actions/checkout@v4
         with:
