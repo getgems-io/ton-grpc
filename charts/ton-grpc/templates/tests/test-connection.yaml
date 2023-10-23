@@ -11,5 +11,5 @@ spec:
     - name: grpcurl
       image: fullstorydev/grpcurl
       command: ['grpcurl']
-      args: ['-insecure', '{{ include "ton-grpc.fullname" . }}:{{ .Values.service.port }}', 'ton.BlockService/GetLastBlock']
+      args: ['-plaintext', '{{ include "ton-grpc.fullname" . }}:{{ .Values.service.port }}', 'ton.BlockService/GetLastBlock']
   restartPolicy: Never
