@@ -18,7 +18,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{instrument, trace};
+use tracing::{info, instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
@@ -41,117 +41,12 @@ pub struct CursorClient {
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
 
-struct FirstBlockDiscover {
-    id: Cow<'static, str>,
-    client: InnerClient,
-    ftx: Sender<Option<(BlockHeader, BlockHeader)>>
-}
-
-impl FirstBlockDiscover {
-    async fn discover(&mut self) -> Never {
-        let mut first_block: Option<(BlockHeader, BlockHeader)> = None;
-        let mut first_block_seqno = None;
-
-        let mut timer = interval(Duration::from_secs(30));
-        timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-        loop {
-            let Ok(start) = (&mut self.client).oneshot(GetMasterchainInfo::default()).await else {
-                timer.tick().await;
-                continue;
-            };
-
-            let start_time = Instant::now();
-            while start_time.elapsed() < Duration::from_secs(60 * 60 * 4) { // Every 4 hours reset starting point
-                timer.tick().await;
-
-                if let Some((mfb, _)) = &first_block {
-                    if let Err(e) = (&mut self.client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
-                        trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
-                        first_block = None;
-                    } else {
-                        trace!("first block still available");
-                        continue;
-                    }
-                }
-
-                let fb = find_first_blocks(&mut self.client, &start.last, first_block_seqno.map(|n| n + 1), first_block_seqno.map(|n| n + 32)).await;
-                match fb {
-                    Ok((mfb, wfb)) => {
-                        absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
-                        trace!(seqno = mfb.id.seqno, "master chain first block");
-                        trace!(seqno = wfb.id.seqno, "work chain first block");
-
-                        first_block = Some((mfb.clone(), wfb.clone()));
-                        first_block_seqno = Some(mfb.id.seqno);
-
-                        let _ = self.ftx.send(Some((mfb, wfb)));
-                    },
-                    Err(e) => trace!(e = ?e, "unable to fetch first headers")
-                };
-            }
-        }
-    }
-}
-
-struct LastBlockDiscover {
-    id: Cow<'static, str>,
-    client: InnerClient,
-    current: Option<MasterchainInfo>,
-    mtx: Sender<Option<MasterchainInfo>>,
-    ctx: Sender<Option<(BlockHeader, BlockHeader)>>
-}
-
-impl LastBlockDiscover {
-    async fn discover(&mut self) -> Never {
-        let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
-        timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-        let mut current: Option<MasterchainInfo> = None;
-        loop {
-            timer.tick().await;
-
-            gauge!("ton_liteserver_requests", self.client.load() as f64, "liteserver_id" => self.id.clone());
-
-            match self.next().await {
-                Ok(Some(masterchain_info)) => { current.replace(masterchain_info); },
-                Ok(None) | Err(_) => {}
-            }
-        }
-    }
-
-    #[instrument(skip_all, err)]
-    async fn next(&mut self) -> Result<Option<MasterchainInfo>> {
-        let mut masterchain_info = (&mut self.client).oneshot(GetMasterchainInfo::default()).await?;
-        if let Some(ref current) = self.current {
-            if current == &masterchain_info {
-                return Ok(None);
-            }
-        }
-
-        absolute_counter!("ton_liteserver_last_seqno", masterchain_info.last.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = masterchain_info.last.seqno, "block discovered");
-
-        let (last_master_chain_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
-
-        masterchain_info.last = last_master_chain_header.id.clone();
-        absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
-        trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
-
-        let _ = self.mtx.send(Some(masterchain_info.clone()));
-        let _ = self.ctx.send(Some((last_master_chain_header, last_work_chain_header)));
-
-        Ok(Some(masterchain_info))
-    }
-}
-
 impl CursorClient {
     fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
         let id = self.id.clone();
         let client = self.client.clone();
 
-        let mut discover = LastBlockDiscover { id, client, current: None, mtx, ctx };
+        let mut discover = LastBlockDiscover { id, client, mtx, ctx, current: None };
 
         async move { discover.discover().await }
     }
@@ -160,7 +55,7 @@ impl CursorClient {
         let id = self.id.clone();
         let client = self.client.clone();
 
-        let mut discover = FirstBlockDiscover { id, client, ftx };
+        let mut discover = FirstBlockDiscover { id, client, ftx, current: None };
 
         async move { discover.discover().await }
     }
@@ -422,4 +317,111 @@ async fn wait_for_block_header(block_id: BlockIdExt, client: &mut InnerClient) -
 
         client.oneshot(BlocksGetBlockHeader::new(block_id))
     }).await
+}
+
+struct FirstBlockDiscover {
+    id: Cow<'static, str>,
+    client: InnerClient,
+    current: Option<BlockHeader>,
+    ftx: Sender<Option<(BlockHeader, BlockHeader)>>
+}
+
+impl FirstBlockDiscover {
+    async fn discover(&mut self) -> Never {
+        let mut timer = interval(Duration::from_secs(30));
+        timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+        loop {
+            let Ok(start) = (&mut self.client).oneshot(GetMasterchainInfo::default()).await else {
+                timer.tick().await;
+
+                continue;
+            };
+
+            let start_time = Instant::now();
+            while start_time.elapsed() < Duration::from_secs(60 * 60 * 4) { // Every 4 hours reset starting point
+                timer.tick().await;
+
+                match self.next(&start.last).await {
+                    Ok(Some(mfb)) => { self.current.replace(mfb); }
+                    Err(_) | Ok(None) => {}
+                }
+            }
+        }
+    }
+
+    async fn next(&mut self, start: &BlockIdExt) -> Result<Option<BlockHeader>> {
+        if let Some(ref mfb) = self.current {
+            if let Err(e) = (&mut self.client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
+                trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
+            } else {
+                info!("first block still available");
+
+                return Ok(None);
+            }
+        }
+
+        let lhs = self.current.as_ref().map(|n| n.id.seqno + 1);
+        let cur = self.current.as_ref().map(|n| n.id.seqno + 32);
+        let (mfb, wfb) = find_first_blocks(&mut self.client, &start, lhs, cur).await?;
+
+        absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
+        info!(seqno = mfb.id.seqno, "master chain first block");
+        trace!(seqno = wfb.id.seqno, "work chain first block");
+
+        let _ = self.ftx.send(Some((mfb.clone(), wfb)));
+
+        Ok(Some(mfb))
+    }
+}
+
+struct LastBlockDiscover {
+    id: Cow<'static, str>,
+    client: InnerClient,
+    current: Option<MasterchainInfo>,
+    mtx: Sender<Option<MasterchainInfo>>,
+    ctx: Sender<Option<(BlockHeader, BlockHeader)>>
+}
+
+impl LastBlockDiscover {
+    async fn discover(&mut self) -> Never {
+        let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
+        timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+        let mut current: Option<MasterchainInfo> = None;
+        loop {
+            timer.tick().await;
+
+            gauge!("ton_liteserver_requests", self.client.load() as f64, "liteserver_id" => self.id.clone());
+
+            match self.next().await {
+                Ok(Some(masterchain_info)) => { current.replace(masterchain_info); },
+                Ok(None) | Err(_) => {}
+            }
+        }
+    }
+
+    async fn next(&mut self) -> Result<Option<MasterchainInfo>> {
+        let mut masterchain_info = (&mut self.client).oneshot(GetMasterchainInfo::default()).await?;
+        if let Some(ref current) = self.current {
+            if current == &masterchain_info {
+                return Ok(None);
+            }
+        }
+
+        absolute_counter!("ton_liteserver_last_seqno", masterchain_info.last.seqno as u64, "liteserver_id" => self.id.clone());
+        trace!(seqno = masterchain_info.last.seqno, "block discovered");
+
+        let (last_master_chain_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
+
+        masterchain_info.last = last_master_chain_header.id.clone();
+        absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => self.id.clone());
+        trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
+        trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
+
+        let _ = self.mtx.send(Some(masterchain_info.clone()));
+        let _ = self.ctx.send(Some((last_master_chain_header, last_work_chain_header)));
+
+        Ok(Some(masterchain_info))
+    }
 }
