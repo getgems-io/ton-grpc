@@ -48,8 +48,10 @@ spec:
               protocol: TCP
             {{- end }}
           env:
+            {{- if .Values.tonConfigUrl }}
             - name: TON_CONFIG_URL
               value: {{ .Values.tonConfigUrl }}
+            {{- end }}
             - name: RUST_LOG
               value: error,ton_grpc=info
             - name: RUST_BACKTRACE
