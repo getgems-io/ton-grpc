@@ -6,7 +6,7 @@ on:
     branches:
       - "master"
     paths:
-      - charts/
+      - charts/**
 
 jobs:
   lint-test:
