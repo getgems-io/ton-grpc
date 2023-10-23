@@ -53,7 +53,7 @@ spec:
               value: {{ .Values.tonConfigUrl }}
             {{- end }}
             - name: RUST_LOG
-              value: error,ton_grpc=info
+              value: info
             - name: RUST_BACKTRACE
               value: "1"
             {{- if .Values.extraEnvs }}
