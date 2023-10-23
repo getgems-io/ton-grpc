@@ -46,18 +46,18 @@ impl CursorClient {
         let id = self.id.clone();
         let client = self.client.clone();
 
-        let mut discover = LastBlockDiscover { id, client, mtx, ctx, current: None };
+        let discover = LastBlockDiscover { id, client, mtx, ctx, current: None };
 
-        async move { discover.discover().await }
+        discover.discover()
     }
 
     fn first_block_loop(&self, ftx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
         let id = self.id.clone();
         let client = self.client.clone();
 
-        let mut discover = FirstBlockDiscover { id, client, ftx, current: None };
+        let discover = FirstBlockDiscover { id, client, ftx, current: None };
 
-        async move { discover.discover().await }
+        discover.discover()
     }
 
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
@@ -327,7 +327,7 @@ struct FirstBlockDiscover {
 }
 
 impl FirstBlockDiscover {
-    async fn discover(&mut self) -> Never {
+    async fn discover(mut self) -> Never {
         let mut timer = interval(Duration::from_secs(30));
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -384,7 +384,7 @@ struct LastBlockDiscover {
 }
 
 impl LastBlockDiscover {
-    async fn discover(&mut self) -> Never {
+    async fn discover(mut self) -> Never {
         let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
