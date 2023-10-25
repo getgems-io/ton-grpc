@@ -5,6 +5,12 @@ image:
   pullPolicy: IfNotPresent
   tag: "master"
 
+testnet:
+  enabled: false
+  image:
+    repository: ghcr.io/getgems-io/tvm-grpc-testnet
+    tag: "master"
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
