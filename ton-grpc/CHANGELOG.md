@@ -16,6 +16,13 @@
 
 
 
+## [0.2.12](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.11...ton-grpc-v0.2.12) (2023-10-25)
+
+
+### Bug Fixes
+
+* **deps:** bump clap from 4.4.6 to 4.4.7 ([bb88f52](https://github.com/getgems-io/tonlibjson/commit/bb88f522c7ea77ddf6dd1d7dd7e005155934ac39))
+
 ## [0.2.9](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.8...ton-grpc-v0.2.9) (2023-10-17)
 
 
