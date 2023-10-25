@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.5](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.4...tonlibjson-client-v0.4.5) (2023-10-25)
+
+
+### Bug Fixes
+
+* **deps:** bump uuid from 1.4.1 to 1.5.0 ([f1b5cd6](https://github.com/getgems-io/tonlibjson/commit/f1b5cd670241eaf9fb1178aabd338977f2d73f53))
+
+
+### Performance Improvements
+
+* request masterchain info only one time per 4 hour ([6eaa33d](https://github.com/getgems-io/tonlibjson/commit/6eaa33dd4e0bd64c42eca1315d95864a563e565b))
+
 ## [0.4.4](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.3...tonlibjson-client-v0.4.4) (2023-10-18)
 
 

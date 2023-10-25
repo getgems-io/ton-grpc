@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-sys-v0.1.2...tonlibjson-sys-v0.1.3) (2023-10-25)
+
+
+### Bug Fixes
+
+* **deps:** bump tonlibjson-sys/ton from `01e0d7d` to `a1d2d7c` ([324922e](https://github.com/getgems-io/tonlibjson/commit/324922eb80b0cb331e1f07ac130610ccc0c1e9dd))
+* **deps:** bump tonlibjson-sys/ton from `65d22c4` to `01e0d7d` ([ba74599](https://github.com/getgems-io/tonlibjson/commit/ba745994e50c241c5150c5296e4e82fa4851ce0b))
+* **deps:** bump tonlibjson-sys/ton-testnet from `7f815fc` to `2bfa624` ([993c8bf](https://github.com/getgems-io/tonlibjson/commit/993c8bf9acda79fe448b233b8f035f8b6d7b1d77))
+
 ## [0.1.2](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-sys-v0.1.1...tonlibjson-sys-v0.1.2) (2023-10-18)
 
 

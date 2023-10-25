@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.2.1...charts/tvm-grpc-v0.3.0) (2023-10-25)
+
+
+### Features
+
+* testnet flag, helm tests ([#511](https://github.com/getgems-io/tonlibjson/issues/511)) ([75d1e36](https://github.com/getgems-io/tonlibjson/commit/75d1e36a2e08a89f626b5704e2c3b8856286597d))
+
 ## [0.2.1](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.2.0...charts/tvm-grpc-v0.2.1) (2023-10-16)
 
 
