@@ -31,8 +31,13 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.testnet.enabled }}
+          image: "{{ .Values.testnet.image.repository }}:{{ .Values.testnet.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.testnet.image.pullPolicy }}
+          {{- else -}}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- end }}
           args:
             - /bin/ton-grpc
             {{- if .Values.metrics.enabled }}

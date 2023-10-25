@@ -9,6 +9,13 @@ image:
   pullPolicy: IfNotPresent
   tag: "master"
 
+testnet:
+  enabled: false
+  image:
+    repository: ghcr.io/getgems-io/ton-grpc-testnet
+    pullPolicy: IfNotPresent
+    tag: "master"
+
 tonConfigUrl: ~
 
 imagePullSecrets: []
