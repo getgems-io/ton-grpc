@@ -9,6 +9,8 @@ image:
   pullPolicy: IfNotPresent
   tag: "master"
 
+tonConfigUrl: ~
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
@@ -78,8 +80,6 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-
-tonConfigUrl: ""
 
 extraEnvs: []
 
