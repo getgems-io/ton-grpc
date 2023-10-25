@@ -26,7 +26,7 @@ tonic-health = { workspace = true }
 prost = { workspace = true }
 either = "1.9"
 derive-new = "0.5.9"
-clap = { version = "4.4.4", features = ["derive"] }
+clap = { version = "4.4.7", features = ["derive"] }
 metrics-exporter-prometheus = "0.12.1"
 
 [build-dependencies]
