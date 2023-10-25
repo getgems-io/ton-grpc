@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.3.0...charts/ton-grpc-v0.3.1) (2023-10-25)
+
+
+### Bug Fixes
+
+* rollback to tcp healthchecks ([bd7ec2f](https://github.com/getgems-io/tonlibjson/commit/bd7ec2fb0f605fa9ed7bcff0842ba50ab91c6e18))
+
 ## [0.3.0](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.2.2...charts/ton-grpc-v0.3.0) (2023-10-25)
 
 
