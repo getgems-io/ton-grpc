@@ -1,7 +1,7 @@
 replicaCount: 1
 
 image:
-  repository: ghcr.io/getgems-io/ton-grpc
+  repository: ghcr.io/getgems-io/tvm-grpc
   pullPolicy: IfNotPresent
   tag: "master"
 
