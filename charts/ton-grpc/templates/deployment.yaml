@@ -17,6 +17,7 @@ spec:
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+        kubectl.kubernetes.io/default-container: {{ .Chart.Name }}
       labels:
         {{- include "ton-grpc.selectorLabels" . | nindent 8 }}
     spec:
