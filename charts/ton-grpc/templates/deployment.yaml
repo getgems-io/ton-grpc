@@ -34,7 +34,7 @@ spec:
           {{- if .Values.testnet.enabled }}
           image: "{{ .Values.testnet.image.repository }}:{{ .Values.testnet.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.testnet.image.pullPolicy }}
-          {{- else -}}
+          {{ else }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           {{- end }}
