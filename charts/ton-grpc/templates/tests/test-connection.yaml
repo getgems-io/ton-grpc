@@ -8,8 +8,8 @@ metadata:
     "helm.sh/hook": test
 spec:
   containers:
-    - name: wget
-      image: busybox
-      command: ['wget']
-      args: ['{{ include "ton-grpc.fullname" . }}:{{ .Values.service.port }}']
+    - name: grpcurl
+      image: fullstorydev/grpcurl
+      command: ['grpcurl']
+      args: ['-plaintext', '{{ include "ton-grpc.fullname" . }}:{{ .Values.service.port }}', 'ton.BlockService/GetLastBlock']
   restartPolicy: Never

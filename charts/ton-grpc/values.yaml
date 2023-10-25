@@ -9,6 +9,15 @@ image:
   pullPolicy: IfNotPresent
   tag: "master"
 
+testnet:
+  enabled: false
+  image:
+    repository: ghcr.io/getgems-io/ton-grpc-testnet
+    pullPolicy: IfNotPresent
+    tag: "master"
+
+tonConfigUrl: ~
+
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
@@ -43,7 +52,7 @@ ingress:
   enabled: false
   className: ""
   annotations:
-     nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
+    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
   hosts:
     - host: chart-example.local
       paths:
@@ -78,8 +87,6 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-
-tonConfigUrl: ""
 
 extraEnvs: []
 

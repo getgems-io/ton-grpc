@@ -31,8 +31,13 @@ spec:
         - name: {{ .Chart.Name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- if .Values.testnet.enabled }}
+          image: "{{ .Values.testnet.image.repository }}:{{ .Values.testnet.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.testnet.image.pullPolicy }}
+          {{ else }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- end }}
           args:
             - /bin/ton-grpc
             {{- if .Values.metrics.enabled }}
@@ -48,24 +53,27 @@ spec:
               protocol: TCP
             {{- end }}
           env:
+            {{- if .Values.tonConfigUrl }}
             - name: TON_CONFIG_URL
               value: {{ .Values.tonConfigUrl }}
+            {{- end }}
             - name: RUST_LOG
-              value: error,ton_grpc=info
+              value: error,ton_grpc=info,tonlibjson_client=info
             - name: RUST_BACKTRACE
               value: "1"
             {{- if .Values.extraEnvs }}
               {{- toYaml .Values.extraEnvs | nindent 12 }}
             {{- end }}
           livenessProbe:
-            tcpSocket:
-              port: http
+            grpc:
+              port: 50052
           readinessProbe:
-            tcpSocket:
-              port: http
+            grpc:
+              port: 50052
           startupProbe:
             tcpSocket:
               port: http
+            initialDelaySeconds: 10
             failureThreshold: 30
             periodSeconds: 10
           resources:

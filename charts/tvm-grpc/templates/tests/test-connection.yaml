@@ -8,8 +8,8 @@ metadata:
     "helm.sh/hook": test
 spec:
   containers:
-    - name: wget
-      image: busybox
-      command: ['wget']
-      args: ['{{ include "tvm-grpc.fullname" . }}:{{ .Values.service.port }}']
+    - name: grpcurl
+      image: fullstorydev/grpcurl
+      command: ['grpcurl']
+      args: ['-plaintext', '-d', '{"requestId": "10000","prepare": {"codeBoc": "te6cckEBBAEAIAABFP8A9KQT9LzyyAsBAgFiAwIAEaE2DeWGEwIGEwAC0EJ6zz0=","dataBoc": "te6cckEBAQEAAgAAAEysuc0="}}', '{{ include "tvm-grpc.fullname" . }}:{{ .Values.service.port }}', 'tvm.TvmEmulatorService/Process']
   restartPolicy: Never
