@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
         ServiceExt::<GetMasterchainInfo>::ready(&mut client).await?;
 
         let first_block = client.take_first_block().unwrap();
-        let last_block = client.last_block_rx.borrow().clone().unwrap();
+        let last_block = client.take_last_block().unwrap();
 
         info!(seqno = first_block.0.id.seqno, lt = first_block.0.start_lt, "master start");
         info!(seqno = last_block.0.id.seqno, lt = last_block.0.end_lt, "master end");
