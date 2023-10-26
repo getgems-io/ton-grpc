@@ -103,7 +103,7 @@ impl Router {
                     self.last_headers.remove(&key);
                 }
                 Some(Change::Insert(key, svc)) => {
-                    self.first_headers.insert(key.clone(), svc.first_block_rx.clone());
+                    self.first_headers.insert(key.clone(), svc.first_block_receiver());
                     self.last_headers.insert(key.clone(), svc.last_block_rx.clone());
                     self.services.insert(key, svc);
                 }

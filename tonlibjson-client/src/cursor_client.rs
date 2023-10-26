@@ -35,13 +35,21 @@ pub struct CursorClient {
     id: Cow<'static, str>,
     client: InnerClient,
 
-    pub first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
+    first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
     pub last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
 
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
 
 impl CursorClient {
+    pub fn take_first_block(&self) -> Option<(BlockHeader, BlockHeader)> {
+        self.first_block_rx.borrow().clone()
+    }
+
+    pub fn first_block_receiver(&self) -> Receiver<Option<(BlockHeader, BlockHeader)>> {
+        self.first_block_rx.clone()
+    }
+
     fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
         let id = self.id.clone();
         let client = self.client.clone();
@@ -89,7 +97,7 @@ impl CursorClient {
     }
 
     pub fn headers(&self, chain_id: i32) -> Option<(BlockHeader, BlockHeader)> {
-        let Some(first_block) = self.first_block_rx.borrow().clone() else {
+        let Some(first_block) = self.take_first_block() else {
             return None;
         };
         let Some(last_block) = self.last_block_rx.borrow().clone() else {
@@ -166,7 +174,7 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
         if self.last_block_rx.borrow().is_some()
-            && self.first_block_rx.borrow().is_some()
+            && self.take_first_block().is_some()
             && self.masterchain_info_rx.borrow().is_some() {
             return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx)
         }
