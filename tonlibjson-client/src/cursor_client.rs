@@ -18,7 +18,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{info, instrument, trace};
+use tracing::{instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
@@ -355,7 +355,7 @@ impl FirstBlockDiscover {
             if let Err(e) = (&mut self.client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
                 trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
             } else {
-                info!("first block still available");
+                trace!("first block still available");
 
                 return Ok(None);
             }
@@ -366,7 +366,7 @@ impl FirstBlockDiscover {
         let (mfb, wfb) = find_first_blocks(&mut self.client, start, lhs, cur).await?;
 
         absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
-        info!(seqno = mfb.id.seqno, "master chain first block");
+        trace!(seqno = mfb.id.seqno, "master chain first block");
         trace!(seqno = wfb.id.seqno, "work chain first block");
 
         let _ = self.ftx.send(Some((mfb.clone(), wfb)));
