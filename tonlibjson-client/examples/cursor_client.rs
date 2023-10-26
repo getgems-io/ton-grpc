@@ -35,19 +35,19 @@ async fn main() -> anyhow::Result<()> {
 
         ServiceExt::<GetMasterchainInfo>::ready(&mut client).await?;
 
-        let first_block = client.take_first_block().unwrap();
-        let last_block = client.take_last_block().unwrap();
-
-        info!(seqno = first_block.0.id.seqno, lt = first_block.0.start_lt, "master start");
-        info!(seqno = last_block.0.id.seqno, lt = last_block.0.end_lt, "master end");
-
-        info!(seqno = first_block.1.id.seqno, lt = first_block.1.start_lt, "work start");
-        info!(seqno = last_block.1.id.seqno, lt = last_block.1.end_lt, "work end");
-
-        let contains = last_block.0.id.seqno - first_block.0.id.seqno;
-        let d = contains * 12 / 60 / 60 / 24;
-
-        info!(contains = contains, d = d, "data");
+        // let first_block = client.take_first_block().unwrap();
+        // let last_block = client.take_last_block().unwrap();
+        //
+        // info!(seqno = first_block.0.id.seqno, lt = first_block.0.start_lt, "master start");
+        // info!(seqno = last_block.0.id.seqno, lt = last_block.0.end_lt, "master end");
+        //
+        // info!(seqno = first_block.1.id.seqno, lt = first_block.1.start_lt, "work start");
+        // info!(seqno = last_block.1.id.seqno, lt = last_block.1.end_lt, "work end");
+        //
+        // let contains = last_block.0.id.seqno - first_block.0.id.seqno;
+        // let d = contains * 12 / 60 / 60 / 24;
+        //
+        // info!(contains = contains, d = d, "data");
     }
 
     info!(dead = dead, alive = alive);

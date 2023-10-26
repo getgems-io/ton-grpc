@@ -42,7 +42,7 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
-    pub fn take_first_block(&self) -> Option<(BlockHeader, BlockHeader)> {
+    fn take_first_block(&self) -> Option<(BlockHeader, BlockHeader)> {
         self.first_block_rx.borrow().clone()
     }
 
@@ -50,12 +50,16 @@ impl CursorClient {
         self.first_block_rx.clone()
     }
 
-    pub fn take_last_block(&self) -> Option<(BlockHeader, BlockHeader)> {
+    fn take_last_block(&self) -> Option<(BlockHeader, BlockHeader)> {
         self.last_block_rx.borrow().clone()
     }
 
     pub fn last_block_receiver(&self) -> Receiver<Option<(BlockHeader, BlockHeader)>> {
         self.last_block_rx.clone()
+    }
+
+    fn bounds_defined_for_all_chains(&self) -> bool {
+        self.take_last_block().is_some() && self.take_first_block().is_some()
     }
 
     fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
@@ -181,10 +185,8 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
-        if self.take_last_block().is_some()
-            && self.take_first_block().is_some()
-            && self.masterchain_info_rx.borrow().is_some() {
-            return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx)
+        if self.bounds_defined_for_all_chains() {
+            return Poll::Ready(Ok(()))
         }
 
         cx.waker().wake_by_ref();
