@@ -35,22 +35,13 @@ impl Route {
             Route::Any => { services.cloned().collect() },
             Route::Block { chain, criteria} => {
                 services
-                    .filter_map(|s| s.headers(*chain).map(|m| (s, m)))
-                    .filter(|(_, (first_block, last_block))| { match criteria {
-                        BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
-                        BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
-                    }})
-                    .map(|(s, _)| s)
+                    .filter(|s| s.contains(*chain, criteria))
                     .cloned()
                     .collect()
             },
             Route::Latest { chain } => {
-                fn last_seqno(client: &CursorClient, chain: &i32) -> Option<i32> {
-                    client.headers(*chain).map(|(_, l)| l.id.seqno)
-                }
-
                 let groups = services
-                    .filter_map(|s| last_seqno(s, chain).map(|seqno| (s, seqno)))
+                    .filter_map(|s| s.last_seqno(*chain).map(|seqno| (s, seqno)))
                     .sorted_unstable_by_key(|(_, seqno)| -seqno)
                     .group_by(|(_, seqno)| *seqno);
 
@@ -123,7 +114,7 @@ impl Service<&Route> for Router {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx)?;
 
-        if self.services.values().any(|s| s.headers(-1).is_some()) {
+        if self.services.values().any(|s| s.bounds_defined_for_main_chain()) {
             Poll::Ready(Ok(()))
         } else {
             cx.waker().wake_by_ref();

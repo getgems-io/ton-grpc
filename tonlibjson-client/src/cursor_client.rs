@@ -21,6 +21,7 @@ use tower::load::Load;
 use tracing::{instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
+use crate::balance::BlockCriteria;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
@@ -42,6 +43,21 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
+    pub fn last_seqno(&self, chain: i32) -> Option<i32> {
+        self.headers(chain).map(|(_, l)| l.id.seqno)
+    }
+
+    pub fn contains(&self, chain: i32, criteria: &BlockCriteria) -> bool {
+        let Some((first_block, last_block)) = self.headers(chain) else {
+            return false;
+        };
+
+        match criteria {
+            BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
+            BlockCriteria::Seqno(seqno) => first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
+        }
+    }
+
     pub fn first_block_receiver(&self) -> Receiver<Option<(BlockHeader, BlockHeader)>> {
         self.first_block_rx.clone()
     }
@@ -50,8 +66,9 @@ impl CursorClient {
         self.last_block_rx.clone()
     }
 
-    fn bounds_defined_for_all_chains(&self) -> bool {
-        self.take_last_block().is_some() && self.take_first_block().is_some()
+    // TODO[akostylev0] invert this
+    pub fn bounds_defined_for_main_chain(&self) -> bool {
+        self.bounds_defined_for_all_chains()
     }
 
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
@@ -82,7 +99,7 @@ impl CursorClient {
         _self
     }
 
-    pub fn headers(&self, chain_id: i32) -> Option<(BlockHeader, BlockHeader)> {
+    fn headers(&self, chain_id: i32) -> Option<(BlockHeader, BlockHeader)> {
         let Some(first_block) = self.take_first_block() else { return None; };
         let Some(last_block) = self.take_last_block() else { return None; };
 
@@ -116,6 +133,11 @@ impl CursorClient {
         let discover = FirstBlockDiscover { id, client, ftx, current: None };
 
         discover.discover()
+    }
+
+    // TODO[akostylev0] invert this
+    fn bounds_defined_for_all_chains(&self) -> bool {
+        self.take_last_block().is_some() && self.take_first_block().is_some()
     }
 }
 
