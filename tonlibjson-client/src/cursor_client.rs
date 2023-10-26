@@ -42,16 +42,8 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
-    fn take_first_block(&self) -> Option<(BlockHeader, BlockHeader)> {
-        self.first_block_rx.borrow().clone()
-    }
-
     pub fn first_block_receiver(&self) -> Receiver<Option<(BlockHeader, BlockHeader)>> {
         self.first_block_rx.clone()
-    }
-
-    fn take_last_block(&self) -> Option<(BlockHeader, BlockHeader)> {
-        self.last_block_rx.borrow().clone()
     }
 
     pub fn last_block_receiver(&self) -> Receiver<Option<(BlockHeader, BlockHeader)>> {
@@ -60,24 +52,6 @@ impl CursorClient {
 
     fn bounds_defined_for_all_chains(&self) -> bool {
         self.take_last_block().is_some() && self.take_first_block().is_some()
-    }
-
-    fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
-        let id = self.id.clone();
-        let client = self.client.clone();
-
-        let discover = LastBlockDiscover { id, client, mtx, ctx, current: None };
-
-        discover.discover()
-    }
-
-    fn first_block_loop(&self, ftx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
-        let id = self.id.clone();
-        let client = self.client.clone();
-
-        let discover = FirstBlockDiscover { id, client, ftx, current: None };
-
-        discover.discover()
     }
 
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
@@ -109,17 +83,39 @@ impl CursorClient {
     }
 
     pub fn headers(&self, chain_id: i32) -> Option<(BlockHeader, BlockHeader)> {
-        let Some(first_block) = self.take_first_block() else {
-            return None;
-        };
-        let Some(last_block) = self.take_last_block() else {
-            return None;
-        };
+        let Some(first_block) = self.take_first_block() else { return None; };
+        let Some(last_block) = self.take_last_block() else { return None; };
 
         match chain_id {
             -1 => Some((first_block.0, last_block.0)),
             _ => Some((first_block.1, last_block.1))
         }
+    }
+
+    fn take_last_block(&self) -> Option<(BlockHeader, BlockHeader)> {
+        self.last_block_rx.borrow().clone()
+    }
+
+    fn take_first_block(&self) -> Option<(BlockHeader, BlockHeader)> {
+        self.first_block_rx.borrow().clone()
+    }
+
+    fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
+        let id = self.id.clone();
+        let client = self.client.clone();
+
+        let discover = LastBlockDiscover { id, client, mtx, ctx, current: None };
+
+        discover.discover()
+    }
+
+    fn first_block_loop(&self, ftx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
+        let id = self.id.clone();
+        let client = self.client.clone();
+
+        let discover = FirstBlockDiscover { id, client, ftx, current: None };
+
+        discover.discover()
     }
 }
 
