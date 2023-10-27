@@ -50,27 +50,6 @@ impl TonClient {
     pub async fn ready(&mut self) -> anyhow::Result<()> {
         let _ = self.get_masterchain_info().await?;
 
-        tracing::info!("ready loop");
-        loop {
-            let Ok(_) = self.last_block_receiver.recv().await else {
-                tracing::warn!("last_block_receiver closed");
-                continue;
-            };
-
-            tracing::info!("last_block waited");
-            break;
-        }
-
-        loop {
-            let Ok(_) = self.first_block_receiver.recv().await else {
-                tracing::warn!("first_block_receiver closed");
-                continue;
-            };
-
-            tracing::info!("first_block waited");
-            break;
-        }
-
         tracing::info!("ready");
         return Ok(())
     }
