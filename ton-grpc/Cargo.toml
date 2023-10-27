@@ -29,5 +29,8 @@ derive-new = "0.5.9"
 clap = { version = "4.4.7", features = ["derive"] }
 metrics-exporter-prometheus = "0.12.1"
 
+[dev-dependencies]
+tracing-test = { workspace = true }
+
 [build-dependencies]
 tonic-build = { workspace = true }

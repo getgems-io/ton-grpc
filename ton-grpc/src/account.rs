@@ -142,3 +142,44 @@ impl BaseAccountService for AccountService {
         Ok(Response::new(stream))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use futures::StreamExt;
+    use tonic::Request;
+    use tonlibjson_client::ton::TonClient;
+    use tracing_test::traced_test;
+    use crate::account::AccountService;
+    use crate::ton::account_service_server::AccountService as BaseAccountService;
+    use crate::ton::{get_account_transactions_request, GetAccountTransactionsRequest, PartialTransactionId};
+    use crate::ton::get_account_transactions_request::bound;
+
+    #[tokio::test]
+    #[traced_test]
+    async fn account_get_from_to() {
+        tracing::info!("prep client");
+        let mut client = TonClient::from_env().await.unwrap();
+        client.ready().await.unwrap();
+        tracing::info!("ready");
+        let svc = AccountService::new(client);
+        let req = Request::new(GetAccountTransactionsRequest {
+            account_address: "EQCkgtq1pKJh4Zpif_z4RR2aYmespuImTw15amEacGX-k6Zj".to_string(),
+            order: 1,
+            from: Some(get_account_transactions_request::Bound { r#type: 0, bound: Some(bound::Bound::TransactionId(PartialTransactionId {
+                lt: 42048922000003,
+                hash: "JatZ7mIBIfBpCNHHHQkpIc1+72RrzSiM8xvqlqRAbmc=".to_string()
+            }))}),
+            to: Some(get_account_transactions_request::Bound { r#type: 0, bound: Some(bound::Bound::TransactionId(PartialTransactionId {
+                lt: 42048922000003,
+                hash: "JatZ7mIBIfBpCNHHHQkpIc1+72RrzSiM8xvqlqRAbmc=".to_string()
+            }))})
+        });
+
+        let resp = svc.get_account_transactions(req).await.unwrap();
+
+        let txs: Vec<_> = resp.into_inner().collect::<Vec<_>>().await;
+        tracing::info!("got txs: {:?}", txs);
+
+        assert_eq!(1, txs.len())
+    }
+}

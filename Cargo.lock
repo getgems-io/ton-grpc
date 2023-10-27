@@ -1954,6 +1954,7 @@ dependencies = [
  "tracing",
  "tracing-futures",
  "tracing-subscriber",
+ "tracing-test",
 ]
 
 [[package]]
