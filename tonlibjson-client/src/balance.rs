@@ -64,7 +64,6 @@ impl Route {
 pub struct Router {
     discover: CursorClientDiscover,
     services: HashMap<String, CursorClient>,
-    first_headers: BlockChannel,
     pub last_headers: BlockChannel
 }
 
@@ -73,8 +72,7 @@ impl Router {
         Router {
             discover,
             services: HashMap::new(),
-            first_headers: BlockChannel::new(BlockChannelMode::Min),
-            last_headers: BlockChannel::new(BlockChannelMode::Max)
+            last_headers: BlockChannel::new()
         }
     }
 
@@ -90,11 +88,9 @@ impl Router {
                 None => return Poll::Ready(None),
                 Some(Change::Remove(key)) => {
                     self.services.remove(&key);
-                    self.first_headers.remove(&key);
                     self.last_headers.remove(&key);
                 }
                 Some(Change::Insert(key, svc)) => {
-                    self.first_headers.insert(key.clone(), svc.first_block_receiver());
                     self.last_headers.insert(key.clone(), svc.last_block_receiver());
                     self.services.insert(key, svc);
                 }
@@ -222,10 +218,8 @@ pub struct BlockChannel {
     joined: tokio::sync::broadcast::Receiver<BlockChannelItem>
 }
 
-pub enum BlockChannelMode { Max, Min }
-
 impl BlockChannel {
-    pub fn new(mode: BlockChannelMode) -> Self {
+    pub fn new() -> Self {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<BlockChannelChange>();
         let (tj, rj) = tokio::sync::broadcast::channel::<BlockChannelItem>(256);
 
@@ -242,10 +236,7 @@ impl BlockChannel {
                         }
                     },
                     Some((_, Some((master, worker)))) = stream_map.next() => {
-                       if last_seqno == 0 || match mode {
-                            BlockChannelMode::Max => { master.id.seqno > last_seqno },
-                            BlockChannelMode::Min => { master.id.seqno < last_seqno }
-                        } {
+                       if last_seqno == 0 || master.id.seqno > last_seqno {
                             last_seqno = master.id.seqno;
 
                             let _ = tj.send((master, worker));
