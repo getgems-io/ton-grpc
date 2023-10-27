@@ -58,10 +58,6 @@ impl CursorClient {
         }
     }
 
-    pub fn first_block_receiver(&self) -> Receiver<Option<(BlockHeader, BlockHeader)>> {
-        self.first_block_rx.clone()
-    }
-
     pub fn last_block_receiver(&self) -> Receiver<Option<(BlockHeader, BlockHeader)>> {
         self.last_block_rx.clone()
     }

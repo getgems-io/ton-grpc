@@ -6,7 +6,7 @@ use derive_new::new;
 use tonlibjson_client::ton::TonClient;
 use crate::helpers::extend_block_id;
 use crate::ton::block_service_server::BlockService as BaseBlockService;
-use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, SubscribeLastBlockEvent, SubscribeLastBlockRequest, TransactionId};
+use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, TransactionId};
 use crate::ton::get_transaction_ids_request::Order;
 
 #[derive(new)]
@@ -16,20 +16,6 @@ pub struct BlockService {
 
 #[async_trait]
 impl BaseBlockService for BlockService {
-    type SubscribeLastBlockStream = BoxStream<'static, Result<SubscribeLastBlockEvent, Status>>;
-
-    #[tracing::instrument(skip_all, err)]
-    async fn subscribe_last_block(&self, _: Request<SubscribeLastBlockRequest>) -> Result<Response<Self::SubscribeLastBlockStream>, Status> {
-        let stream = self.client.last_block_stream()
-            .map(|(m, w)| Ok(SubscribeLastBlockEvent {
-                masterchain: Some(m.id.into()),
-                workchain: Some(w.id.into()),
-            }))
-            .boxed();
-
-        Ok(Response::new(stream))
-    }
-
     #[tracing::instrument(skip_all, err)]
     async fn get_last_block(&self, _request: Request<GetLastBlockRequest>) -> Result<Response<BlockIdExt>, Status> {
         let block = self.client.get_masterchain_info().await
