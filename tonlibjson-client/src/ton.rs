@@ -570,12 +570,8 @@ impl TonClient {
 
     pub fn last_block_stream(&self) -> impl Stream<Item=(BlockHeader, BlockHeader)> {
         tokio_stream::wrappers::BroadcastStream::new(self.last_block_receiver.resubscribe())
-            .filter_map(|r| async {
-                match r {
-                    Ok(v) => Some(v),
-                    Err(e) => { tracing::error!("{}", e); None }
-                }
-            })
+            .inspect_err(|e| tracing::error!(error =? e))
+            .filter_map(|r| async { r.ok() })
     }
 
     pub fn get_accounts_in_block_stream(&self, block: &BlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
