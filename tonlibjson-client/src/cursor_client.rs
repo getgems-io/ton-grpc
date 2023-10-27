@@ -196,7 +196,7 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
         if self.bounds_defined_for_all_chains() {
-            return Poll::Ready(Ok(()))
+            return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx);
         }
 
         cx.waker().wake_by_ref();
