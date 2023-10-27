@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.6](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.5...tonlibjson-client-v0.4.6) (2023-10-27)
+
+
+### Bug Fixes
+
+* dont wait for archive node ([cbc7b64](https://github.com/getgems-io/tonlibjson/commit/cbc7b64a6202a2589a566b9441fa690a1e68f5f4))
+
 ## [0.4.5](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.4...tonlibjson-client-v0.4.5) (2023-10-25)
 
 
