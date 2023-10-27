@@ -46,23 +46,33 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
     #[cfg(not(feature = "testnet"))]
+    // TODO[akostylev0]
     pub async fn ready(&mut self) -> anyhow::Result<()> {
         let _ = self.get_masterchain_info().await?;
 
         tracing::info!("ready loop");
         loop {
-            let Ok((block_header, _)) = self.first_block_receiver.recv().await else {
+            let Ok(_) = self.last_block_receiver.recv().await else {
+                tracing::warn!("last_block_receiver closed");
+                continue;
+            };
+
+            tracing::info!("last_block waited");
+            break;
+        }
+
+        loop {
+            let Ok(_) = self.first_block_receiver.recv().await else {
                 tracing::warn!("first_block_receiver closed");
                 continue;
             };
 
-            tracing::info!(seqno = block_header.id.seqno);
-
-            if block_header.id.seqno <= 100 {
-                tracing::info!("ready finish");
-                return Ok(());
-            }
+            tracing::info!("first_block waited");
+            break;
         }
+
+        tracing::info!("ready");
+        return Ok(())
     }
 
     #[cfg(feature = "testnet")]
