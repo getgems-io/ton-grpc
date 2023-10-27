@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.7](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.6...tonlibjson-client-v0.4.7) (2023-10-27)
+
+
+### Bug Fixes
+
+* dont do extra request ([5b692bd](https://github.com/getgems-io/tonlibjson/commit/5b692bde4869e63cb767262f0b57f5ceffc24513))
+
 ## [0.4.6](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.5...tonlibjson-client-v0.4.6) (2023-10-27)
 
 

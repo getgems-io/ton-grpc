@@ -18,6 +18,13 @@
 
 
 
+## [0.2.14](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.13...ton-grpc-v0.2.14) (2023-10-27)
+
+
+### Bug Fixes
+
+* dont do extra request ([5b692bd](https://github.com/getgems-io/tonlibjson/commit/5b692bde4869e63cb767262f0b57f5ceffc24513))
+
 ## [0.2.12](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.11...ton-grpc-v0.2.12) (2023-10-25)
 
 
