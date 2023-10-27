@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.3.0...charts/tvm-grpc-v0.4.0) (2023-10-27)
+
+
+### Features
+
+* set kubectl default container ([5cd3e98](https://github.com/getgems-io/tonlibjson/commit/5cd3e988a006593cf5e3ccd0817fab01ed95c17c))
+
 ## [0.3.0](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.2.1...charts/tvm-grpc-v0.3.0) (2023-10-25)
 
 
