@@ -28,7 +28,6 @@ use crate::shared::SharedService;
 
 pub struct TonClient {
     client: Retry<RetryPolicy, SharedService<Balance>>,
-    first_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>,
     last_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>
 }
 
@@ -36,7 +35,6 @@ impl Clone for TonClient {
     fn clone(&self) -> Self {
         Self {
             client: self.client.clone(),
-            first_block_receiver: self.first_block_receiver.resubscribe(),
             last_block_receiver: self.last_block_receiver.resubscribe()
         }
     }
@@ -64,7 +62,6 @@ impl TonClient {
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
         let router = Router::new(cursor_client_discover);
-        let first_block_receiver = router.first_headers.receiver();
         let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
@@ -77,7 +74,6 @@ impl TonClient {
 
         Ok(Self {
             client,
-            first_block_receiver,
             last_block_receiver
         })
     }
@@ -97,7 +93,6 @@ impl TonClient {
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
         let router = Router::new(cursor_client_discover);
-        let first_block_receiver = router.first_headers.receiver();
         let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
@@ -110,7 +105,6 @@ impl TonClient {
 
         Ok(Self {
             client,
-            first_block_receiver,
             last_block_receiver
         })
     }

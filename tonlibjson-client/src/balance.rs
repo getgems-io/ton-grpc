@@ -64,7 +64,7 @@ impl Route {
 pub struct Router {
     discover: CursorClientDiscover,
     services: HashMap<String, CursorClient>,
-    pub first_headers: BlockChannel,
+    first_headers: BlockChannel,
     pub last_headers: BlockChannel
 }
 
