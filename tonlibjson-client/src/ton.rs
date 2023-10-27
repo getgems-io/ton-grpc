@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, TryFutureExt};
 use anyhow::anyhow;
+use async_stream::try_stream;
 use itertools::Itertools;
 use serde_json::Value;
 use tokio_stream::StreamMap;
@@ -45,18 +46,9 @@ const MAIN_CHAIN: i32 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
 impl TonClient {
-    #[cfg(not(feature = "testnet"))]
-    // TODO[akostylev0]
-    pub async fn ready(&mut self) -> anyhow::Result<()> {
-        let _ = self.get_masterchain_info().await?;
-
-        tracing::info!("ready");
-        return Ok(())
-    }
-
-    #[cfg(feature = "testnet")]
     pub async fn ready(&mut self) -> anyhow::Result<()> {
         self.get_masterchain_info().await?;
+        tracing::info!("ready");
 
         Ok(())
     }
@@ -480,30 +472,23 @@ impl TonClient {
         ));
 
         let end = range.end_bound().cloned();
-        let mut found = false;
-        stream.try_take_while(move |x| std::future::ready(Ok({
-            match end.as_ref() {
-                Bound::Unbounded => true,
-                Bound::Included(tx) => {
-                    if tx == &x.transaction_id {
-                        found = true;
-
-                        true
-                    } else {
-                        !found
-                    }
-                },
-                Bound::Excluded(tx) => {
-                    if tx == &x.transaction_id {
-                        found = true;
-
-                        false
-                    } else {
-                        !found
+        try_stream! {
+            tokio::pin!(stream);
+            while let Some(x) = stream.try_next().await? {
+                match end.as_ref() {
+                    Bound::Unbounded => { yield x; },
+                    Bound::Included(tx) => {
+                        let cond = tx == &x.transaction_id ;
+                        yield x;
+                        if cond { break; }
+                    },
+                    Bound::Excluded(tx) => {
+                        if tx == &x.transaction_id { break; }
+                        yield x;
                     }
                 }
             }
-        })))
+        }
     }
 
     #[instrument(skip_all)]
