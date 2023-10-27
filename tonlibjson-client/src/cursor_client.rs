@@ -58,10 +58,6 @@ impl CursorClient {
         }
     }
 
-    pub fn last_block_receiver(&self) -> Receiver<Option<(BlockHeader, BlockHeader)>> {
-        self.last_block_rx.clone()
-    }
-
     // TODO[akostylev0] invert this
     pub fn bounds_defined_for_main_chain(&self) -> bool {
         self.bounds_defined_for_all_chains()

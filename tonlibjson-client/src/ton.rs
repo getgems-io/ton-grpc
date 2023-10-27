@@ -26,18 +26,9 @@ use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::shared::SharedService;
 
+#[derive(Clone)]
 pub struct TonClient {
-    client: Retry<RetryPolicy, SharedService<Balance>>,
-    last_block_receiver: tokio::sync::broadcast::Receiver<(BlockHeader, BlockHeader)>
-}
-
-impl Clone for TonClient {
-    fn clone(&self) -> Self {
-        Self {
-            client: self.client.clone(),
-            last_block_receiver: self.last_block_receiver.resubscribe()
-        }
-    }
+    client: Retry<RetryPolicy, SharedService<Balance>>
 }
 
 const MAIN_CHAIN: i32 = -1;
@@ -62,7 +53,6 @@ impl TonClient {
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
         let router = Router::new(cursor_client_discover);
-        let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
         let client = SharedService::new(client);
@@ -72,10 +62,7 @@ impl TonClient {
             0.1
         )), client);
 
-        Ok(Self {
-            client,
-            last_block_receiver
-        })
+        Ok(Self { client })
     }
 
     pub async fn from_url(url: Url, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
@@ -93,7 +80,6 @@ impl TonClient {
         let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
 
         let router = Router::new(cursor_client_discover);
-        let last_block_receiver = router.last_headers.receiver();
         let client = Balance::new(router);
 
         let client = SharedService::new(client);
@@ -103,10 +89,7 @@ impl TonClient {
             0.1
         )), client);
 
-        Ok(Self {
-            client,
-            last_block_receiver
-        })
+        Ok(Self { client })
     }
 
     pub async fn from_env() -> anyhow::Result<Self> {
@@ -566,12 +549,6 @@ impl TonClient {
             .clone()
             .oneshot(GetShardAccountCellByTransaction::new(address, transaction))
             .await
-    }
-
-    pub fn last_block_stream(&self) -> impl Stream<Item=(BlockHeader, BlockHeader)> {
-        tokio_stream::wrappers::BroadcastStream::new(self.last_block_receiver.resubscribe())
-            .inspect_err(|e| tracing::error!(error =? e))
-            .filter_map(|r| async { r.ok() })
     }
 
     pub fn get_accounts_in_block_stream(&self, block: &BlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {

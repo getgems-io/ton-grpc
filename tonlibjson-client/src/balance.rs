@@ -1,16 +1,13 @@
 use std::{pin::Pin, task::{Context, Poll}};
 use std::collections::HashMap;
 use std::future::{Future, Ready};
-use futures::{ready, StreamExt, TryFutureExt, FutureExt};
-use tokio::select;
-use tokio_stream::StreamMap;
-use tokio_stream::wrappers::WatchStream;
+use futures::{ready, TryFutureExt, FutureExt};
 use tower::{Service, ServiceExt};
 use tower::discover::{Change, Discover, ServiceList};
 use anyhow::anyhow;
 use derive_new::new;
 use itertools::Itertools;
-use crate::block::{BlockHeader, BlockIdExt, BlocksGetShards, BlocksLookupBlock, BlocksShards, GetMasterchainInfo, MasterchainInfo};
+use crate::block::{BlockIdExt, BlocksGetShards, BlocksLookupBlock, BlocksShards, GetMasterchainInfo, MasterchainInfo};
 use crate::cursor_client::{CursorClient, InnerClient};
 use crate::discover::CursorClientDiscover;
 use crate::error::ErrorService;
@@ -63,16 +60,14 @@ impl Route {
 
 pub struct Router {
     discover: CursorClientDiscover,
-    services: HashMap<String, CursorClient>,
-    pub last_headers: BlockChannel
+    services: HashMap<String, CursorClient>
 }
 
 impl Router {
     pub fn new(discover: CursorClientDiscover) -> Self {
         Router {
             discover,
-            services: HashMap::new(),
-            last_headers: BlockChannel::new()
+            services: HashMap::new()
         }
     }
 
@@ -86,14 +81,8 @@ impl Router {
                 .map_err(|e| anyhow!(e))?
             {
                 None => return Poll::Ready(None),
-                Some(Change::Remove(key)) => {
-                    self.services.remove(&key);
-                    self.last_headers.remove(&key);
-                }
-                Some(Change::Insert(key, svc)) => {
-                    self.last_headers.insert(key.clone(), svc.last_block_receiver());
-                    self.services.insert(key, svc);
-                }
+                Some(Change::Remove(key)) => { self.services.remove(&key); }
+                Some(Change::Insert(key, svc)) => { self.services.insert(key, svc); }
             }
         }
     }
@@ -203,64 +192,5 @@ impl Service<Specialized<BlocksLookupBlock>> for Balance {
             .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
                 ServiceList::new::<Specialized<BlocksLookupBlock>>(svc))).oneshot(req))
             .boxed()
-    }
-}
-
-type BlockChannelItem = (BlockHeader, BlockHeader);
-
-enum BlockChannelChange {
-    Insert { key: String, watcher: tokio::sync::watch::Receiver<Option<BlockChannelItem>>},
-    Remove { key: String }
-}
-
-pub struct BlockChannel {
-    changes: tokio::sync::mpsc::UnboundedSender<BlockChannelChange>,
-    joined: tokio::sync::broadcast::Receiver<BlockChannelItem>
-}
-
-impl BlockChannel {
-    pub fn new() -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<BlockChannelChange>();
-        let (tj, rj) = tokio::sync::broadcast::channel::<BlockChannelItem>(256);
-
-        tokio::spawn(async move {
-            let mut stream_map = StreamMap::new();
-            let mut last_seqno = 0;
-
-            loop {
-                select! {
-                    Some(change) = rx.recv() => {
-                        match change {
-                            BlockChannelChange::Insert { key, watcher } => { stream_map.insert(key, WatchStream::from_changes(watcher)); },
-                            BlockChannelChange::Remove { key } => { stream_map.remove(&key); }
-                        }
-                    },
-                    Some((_, Some((master, worker)))) = stream_map.next() => {
-                       if last_seqno == 0 || master.id.seqno > last_seqno {
-                            last_seqno = master.id.seqno;
-
-                            let _ = tj.send((master, worker));
-                        }
-                    }
-                };
-            }
-        });
-
-        Self {
-            changes: tx,
-            joined: rj
-        }
-    }
-
-    pub fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<BlockChannelItem>>) {
-        let _ = self.changes.send(BlockChannelChange::Insert { key, watcher });
-    }
-
-    pub fn remove(&self, key: &str) {
-        let _ = self.changes.send(BlockChannelChange::Remove { key: key.to_owned() });
-    }
-
-    pub fn receiver(&self) -> tokio::sync::broadcast::Receiver<BlockChannelItem> {
-        self.joined.resubscribe()
     }
 }
