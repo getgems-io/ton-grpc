@@ -44,17 +44,29 @@ pub struct CursorClient {
 
 impl CursorClient {
     pub fn last_seqno(&self) -> Option<i32> {
-        self.headers(-1).map(|(_, l)| l.id.seqno)
+        self.headers(-1).map(|(_, l)| l.first().unwrap().id.seqno)
     }
 
     pub fn contains(&self, chain: i32, criteria: &BlockCriteria) -> bool {
-        let Some((first_block, last_block)) = self.headers(chain) else {
+        let Some((left, right)) = self.headers(chain) else {
             return false;
         };
 
         match criteria {
-            BlockCriteria::LogicalTime(lt) => first_block.start_lt <= *lt && *lt <= last_block.end_lt,
-            BlockCriteria::Seqno { shard, seqno} => first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
+            BlockCriteria::LogicalTime(lt) => {
+                let Some(start_lt) = left.iter().map(|b| b.start_lt).min() else { return false; };
+                let Some(end_lt) = right.iter().map(|b| b.end_lt).max() else { return false; };
+
+                start_lt <= *lt && *lt <= end_lt
+            },
+
+            // TODO[akostylev0]
+            BlockCriteria::Seqno { shard, seqno} => {
+                let Some(first_block) = left.into_iter().find(|b| b.id.shard == *shard) else { return false; };
+                let Some(last_block) = right.into_iter().find(|b| b.id.shard == *shard) else { return false; };
+
+                first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
+            }
         }
     }
 
@@ -91,13 +103,13 @@ impl CursorClient {
         _self
     }
 
-    fn headers(&self, chain_id: i32) -> Option<(BlockHeader, BlockHeader)> {
+    fn headers(&self, chain_id: i32) -> Option<(Vec<BlockHeader>, Vec<BlockHeader>)> {
         let Some(first_block) = self.take_first_block() else { return None; };
         let Some(last_block) = self.take_last_block() else { return None; };
 
         match chain_id {
-            -1 => Some((first_block.0, last_block.0)),
-            _ => Some((first_block.1.first().expect("backward compatability").to_owned(), last_block.1.first().expect("backward compatability").to_owned()))
+            -1 => Some((vec![first_block.0], vec![last_block.0])),
+            _ => Some((first_block.1, last_block.1))
         }
     }
 
