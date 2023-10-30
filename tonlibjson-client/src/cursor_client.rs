@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::Result;
-use futures::{FutureExt, try_join, TryFutureExt};
+use futures::{FutureExt,try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
 use tokio::sync::watch::{Receiver, Sender};
@@ -18,7 +18,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{instrument, trace};
+use tracing::{info, instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::balance::BlockCriteria;
@@ -217,18 +217,24 @@ impl Load for CursorClient {
     }
 }
 
-async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
+async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, Vec<BlockHeader>)> {
     let block_id = cached_block_id_ext(block_id, client).await?;
     let shards = cached_get_shards(&BlocksGetShards::new(block_id.clone()), client).await?;
 
+    let clone = client.clone();
+    let requests = shards.shards
+        .into_iter()
+        .map(BlocksGetBlockHeader::new)
+        .map(|r| clone.clone().oneshot(r));
+
     try_join!(
-        client.clone().oneshot(BlocksGetBlockHeader::new(block_id)),
-        client.oneshot(BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()))
+        client.oneshot(BlocksGetBlockHeader::new(block_id)),
+        futures::future::try_join_all(requests)
     )
 }
 
 #[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, BlockHeader)> {
+async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, Vec<BlockHeader>)> {
     let length = start.seqno;
     let mut rhs = length;
     let mut lhs = lhs.unwrap_or(1);
@@ -395,9 +401,11 @@ impl FirstBlockDiscover {
 
         absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
         trace!(seqno = mfb.id.seqno, "master chain first block");
-        trace!(seqno = wfb.id.seqno, "work chain first block");
+        for work_chain_block in &wfb {
+            trace!(chain_id = work_chain_block.id.workchain, shard = work_chain_block.id.shard, seqno = work_chain_block.id.seqno, "work chain first block discovered");
+        }
 
-        let _ = self.ftx.send(Some((mfb.clone(), wfb)));
+        let _ = self.ftx.send(Some((mfb.clone(), wfb.first().unwrap().clone())));
 
         Ok(Some(mfb))
     }
