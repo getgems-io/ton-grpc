@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use futures::{FutureExt, try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
@@ -37,7 +37,7 @@ pub struct CursorClient {
     client: InnerClient,
 
     first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
-    last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
+    last_block_rx: Receiver<Option<(BlockHeader, Vec<BlockHeader>)>>,
 
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
@@ -97,11 +97,11 @@ impl CursorClient {
 
         match chain_id {
             -1 => Some((first_block.0, last_block.0)),
-            _ => Some((first_block.1, last_block.1))
+            _ => Some((first_block.1, last_block.1.first().expect("backward compatability").to_owned()))
         }
     }
 
-    fn take_last_block(&self) -> Option<(BlockHeader, BlockHeader)> {
+    fn take_last_block(&self) -> Option<(BlockHeader, Vec<BlockHeader>)> {
         self.last_block_rx.borrow().clone()
     }
 
@@ -109,7 +109,7 @@ impl CursorClient {
         self.first_block_rx.borrow().clone()
     }
 
-    fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
+    fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, Vec<BlockHeader>)>>) -> impl Future<Output = Infallible> {
         let id = self.id.clone();
         let client = self.client.clone();
 
@@ -277,21 +277,21 @@ async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Op
     Ok((master, work))
 }
 
-async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, BlockHeader)> {
+async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Vec<BlockHeader>)> {
     let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
     let shards = cached_get_shards(&BlocksGetShards::new(master_chain_last_block_id.clone()), client).await?;
-    // TODO[akostylev0] handle case when there are multiple shards
-    let work_chain_last_block_id = shards.shards.first()
-        .ok_or_else(|| anyhow!("last block for work chain not found"))?
-        .clone();
 
-    let mut clone = client.clone();
+    let clone = client.clone();
+    let requests = shards.shards
+        .into_iter()
+        .map(|s| wait_for_block_header(s, clone.clone()));
+
     let masterchain_header = BlocksGetBlockHeader::new(master_chain_last_block_id);
 
     Ok(try_join!(
-        cached_block_header(&masterchain_header, &mut clone),
-        wait_for_block_header(work_chain_last_block_id, client)
+        cached_block_header(&masterchain_header, client),
+        futures::future::try_join_all(requests)
     )?)
 }
 
@@ -333,7 +333,7 @@ async fn cached_block_header(req: &BlocksGetBlockHeader, client: &mut InnerClien
     block_header_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
 }
 
-async fn wait_for_block_header(block_id: BlockIdExt, client: &mut InnerClient) -> Result<BlockHeader> {
+async fn wait_for_block_header(block_id: BlockIdExt, client: InnerClient) -> Result<BlockHeader> {
     let retry = FibonacciBackoff::from_millis(512)
         .max_delay(Duration::from_millis(4096))
         .map(jitter)
@@ -408,7 +408,7 @@ struct LastBlockDiscover {
     client: InnerClient,
     current: Option<MasterchainInfo>,
     mtx: Sender<Option<MasterchainInfo>>,
-    ctx: Sender<Option<(BlockHeader, BlockHeader)>>
+    ctx: Sender<Option<(BlockHeader, Vec<BlockHeader>)>>
 }
 
 impl LastBlockDiscover {
@@ -444,8 +444,10 @@ impl LastBlockDiscover {
 
         masterchain_info.last = last_master_chain_header.id.clone();
         absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
-        trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
+        trace!(seqno = last_master_chain_header.id.seqno, "new master block discovered");
+        for work_chain_header in &last_work_chain_header {
+            trace!(chain_id = work_chain_header.id.workchain, shard = work_chain_header.id.shard, seqno = work_chain_header.id.seqno, "new block discovered");
+        }
 
         let _ = self.mtx.send(Some(masterchain_info.clone()));
         let _ = self.ctx.send(Some((last_master_chain_header, last_work_chain_header)));
