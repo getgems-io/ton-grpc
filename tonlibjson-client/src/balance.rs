@@ -15,7 +15,7 @@ use crate::request::{Routable, Callable, Specialized};
 
 #[derive(Debug, Clone, Copy)]
 pub enum BlockCriteria {
-    Seqno(i32),
+    Seqno { shard: i64, seqno: i32 },
     LogicalTime(i64)
 }
 
