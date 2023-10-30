@@ -23,7 +23,7 @@ pub enum BlockCriteria {
 pub enum Route {
     Any,
     Block { chain: i32, criteria: BlockCriteria },
-    Latest { chain: i32 }
+    Latest
 }
 
 impl Route {
@@ -36,9 +36,9 @@ impl Route {
                     .cloned()
                     .collect()
             },
-            Route::Latest { chain } => {
+            Route::Latest => {
                 let groups = services
-                    .filter_map(|s| s.last_seqno(*chain).map(|seqno| (s, seqno)))
+                    .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
                     .sorted_unstable_by_key(|(_, seqno)| -seqno)
                     .group_by(|(_, seqno)| *seqno);
 

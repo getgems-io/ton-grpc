@@ -18,7 +18,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{info, instrument, trace};
+use tracing::{instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::balance::BlockCriteria;
@@ -36,15 +36,15 @@ pub struct CursorClient {
     id: Cow<'static, str>,
     client: InnerClient,
 
-    first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
+    first_block_rx: Receiver<Option<(BlockHeader, Vec<BlockHeader>)>>,
     last_block_rx: Receiver<Option<(BlockHeader, Vec<BlockHeader>)>>,
 
     masterchain_info_rx: Receiver<Option<MasterchainInfo>>
 }
 
 impl CursorClient {
-    pub fn last_seqno(&self, chain: i32) -> Option<i32> {
-        self.headers(chain).map(|(_, l)| l.id.seqno)
+    pub fn last_seqno(&self) -> Option<i32> {
+        self.headers(-1).map(|(_, l)| l.id.seqno)
     }
 
     pub fn contains(&self, chain: i32, criteria: &BlockCriteria) -> bool {
@@ -97,7 +97,7 @@ impl CursorClient {
 
         match chain_id {
             -1 => Some((first_block.0, last_block.0)),
-            _ => Some((first_block.1, last_block.1.first().expect("backward compatability").to_owned()))
+            _ => Some((first_block.1.first().expect("backward compatability").to_owned(), last_block.1.first().expect("backward compatability").to_owned()))
         }
     }
 
@@ -105,7 +105,7 @@ impl CursorClient {
         self.last_block_rx.borrow().clone()
     }
 
-    fn take_first_block(&self) -> Option<(BlockHeader, BlockHeader)> {
+    fn take_first_block(&self) -> Option<(BlockHeader, Vec<BlockHeader>)> {
         self.first_block_rx.borrow().clone()
     }
 
@@ -118,7 +118,7 @@ impl CursorClient {
         discover.discover()
     }
 
-    fn first_block_loop(&self, ftx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
+    fn first_block_loop(&self, ftx: Sender<Option<(BlockHeader, Vec<BlockHeader>)>>) -> impl Future<Output = Infallible> {
         let id = self.id.clone();
         let client = self.client.clone();
 
@@ -357,7 +357,7 @@ struct FirstBlockDiscover {
     id: Cow<'static, str>,
     client: InnerClient,
     current: Option<BlockHeader>,
-    ftx: Sender<Option<(BlockHeader, BlockHeader)>>
+    ftx: Sender<Option<(BlockHeader, Vec<BlockHeader>)>>
 }
 
 impl FirstBlockDiscover {
@@ -405,7 +405,7 @@ impl FirstBlockDiscover {
             trace!(chain_id = work_chain_block.id.workchain, shard = work_chain_block.id.shard, seqno = work_chain_block.id.seqno, "work chain first block discovered");
         }
 
-        let _ = self.ftx.send(Some((mfb.clone(), wfb.first().unwrap().clone())));
+        let _ = self.ftx.send(Some((mfb.clone(), wfb)));
 
         Ok(Some(mfb))
     }

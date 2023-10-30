@@ -189,9 +189,7 @@ impl Requestable for GetShardAccountCell {
 }
 
 impl Routable for GetShardAccountCell {
-    fn route(&self) -> Route {
-        Route::Latest { chain: self.account_address.chain_id() }
-    }
+    fn route(&self) -> Route { Route::Latest }
 }
 
 #[derive(new, Debug, Serialize, Clone)]
@@ -242,7 +240,7 @@ impl Requestable for RawGetAccountState {
 
 impl Routable for RawGetAccountState {
     fn route(&self) -> Route {
-        Route::Latest { chain: self.account_address.chain_id() }
+        Route::Latest
     }
 }
 
@@ -276,9 +274,7 @@ impl Requestable for GetAccountState {
 }
 
 impl Routable for GetAccountState {
-    fn route(&self) -> Route {
-        Route::Latest { chain: self.account_address.chain_id() }
-    }
+    fn route(&self) -> Route { Route::Latest }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -347,7 +343,7 @@ impl Requestable for GetMasterchainInfo {
 
 impl Routable for GetMasterchainInfo {
     fn route(&self) -> Route {
-        Route::Latest { chain: -1 }
+        Route::Latest
     }
 }
 
@@ -519,7 +515,7 @@ impl Requestable for RawSendMessage {
 
 impl Routable for RawSendMessage {
     fn route(&self) -> Route {
-        Route::Latest { chain: -1 }
+        Route::Latest
     }
 }
 
@@ -534,7 +530,7 @@ impl Requestable for RawSendMessageReturnHash {
 }
 
 impl Routable for RawSendMessageReturnHash {
-    fn route(&self) -> Route { Route::Latest { chain: -1 } }
+    fn route(&self) -> Route { Route::Latest }
 }
 
 #[derive(Deserialize)]
@@ -553,9 +549,7 @@ impl Requestable for SmcLoad {
 }
 
 impl Routable for SmcLoad {
-    fn route(&self) -> Route {
-        Route::Latest { chain: self.account_address.chain_id() }
-    }
+    fn route(&self) -> Route { Route::Latest }
 }
 
 impl SmcLoad {
