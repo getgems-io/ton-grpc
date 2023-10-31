@@ -13,7 +13,7 @@ use futures::{FutureExt,try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
 use tokio::sync::watch::{Receiver, Sender};
-use tokio::time::{Instant, interval, MissedTickBehavior};
+use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
@@ -113,7 +113,7 @@ impl Registry {
     fn update_shard_registry(&self, shard_id: &ShardId) {
         match self.shard_registry.entry(shard_id.0) {
             Entry::Occupied(mut entry) => {
-                if !entry.get().contains(&shard_id) {
+                if !entry.get().contains(shard_id) {
                     entry.get_mut().insert(*shard_id);
                 }
             }
@@ -228,7 +228,7 @@ impl CursorClient {
         let client = self.client.clone();
         let registry = self.registry.clone();
 
-        let discover = FirstBlockDiscover::new(id, client, registry);
+        let discover = FirstBlockDiscover::new(id, client, registry, self.masterchain_info_rx.clone());
 
         discover.discover()
     }
@@ -458,16 +458,17 @@ struct FirstBlockDiscover {
     id: Cow<'static, str>,
     client: InnerClient,
     registry: Arc<Registry>,
+    rx: Receiver<Option<MasterchainInfo>>,
     current: Option<BlockHeader>,
 }
 
 impl FirstBlockDiscover {
-    fn new(id: Cow<'static, str>, client: InnerClient, registry: Arc<Registry>) -> Self {
-        // TODO[akostylev0]: pass master chain rx
+    fn new(id: Cow<'static, str>, client: InnerClient, registry: Arc<Registry>, rx: Receiver<Option<MasterchainInfo>>) -> Self {
         Self {
             id,
             client,
             registry,
+            rx,
             current: None
         }
     }
@@ -477,25 +478,20 @@ impl FirstBlockDiscover {
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
-            let Ok(start) = (&mut self.client).oneshot(GetMasterchainInfo::default()).await else {
-                timer.tick().await;
+            timer.tick().await;
 
+            let Some(start) = self.rx.borrow().as_ref().map(|m| m.last.clone()) else {
                 continue;
             };
 
-            let start_time = Instant::now();
-            while start_time.elapsed() < Duration::from_secs(60 * 60 * 4) { // Every 4 hours reset starting point
-                timer.tick().await;
-
-                match self.next(&start.last).await {
-                    Ok(Some(mfb)) => { self.current.replace(mfb); }
-                    Err(_) | Ok(None) => {}
-                }
+            match self.next(start).await {
+                Ok(Some(mfb)) => { self.current.replace(mfb); }
+                Err(_) | Ok(None) => {}
             }
         }
     }
 
-    async fn next(&mut self, start: &BlockIdExt) -> Result<Option<BlockHeader>> {
+    async fn next(&mut self, start: BlockIdExt) -> Result<Option<BlockHeader>> {
         if let Some(ref mfb) = self.current {
             if let Err(e) = (&mut self.client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
                 trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
@@ -508,17 +504,17 @@ impl FirstBlockDiscover {
 
         let lhs = self.current.as_ref().map(|n| n.id.seqno + 1);
         let cur = self.current.as_ref().map(|n| n.id.seqno + 32);
-        let (mfb, wfb) = find_first_blocks(&mut self.client, start, lhs, cur).await?;
+        let (mfb, wfb) = find_first_blocks(&mut self.client, &start, lhs, cur).await?;
 
         absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
         trace!(seqno = mfb.id.seqno, "master chain first block");
 
         self.registry.upsert_left(&mfb);
 
-        for shard in &wfb {
-            trace!(chain_id = shard.id.workchain, shard = shard.id.shard, seqno = shard.id.seqno, "work chain first block discovered");
+        for header in &wfb {
+            trace!(chain_id = header.id.workchain, shard = header.id.shard, seqno = header.id.seqno, "work chain first block discovered");
 
-            self.registry.upsert_left(&shard);
+            self.registry.upsert_left(header);
         }
 
         Ok(Some(mfb))
@@ -568,9 +564,9 @@ impl LastBlockDiscover {
         masterchain_info.last = last_master_chain_header.id.clone();
         absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => self.id.clone());
         trace!(seqno = last_master_chain_header.id.seqno, "new master block discovered");
-        for work_chain_header in &last_work_chain_header {
-            trace!(chain_id = work_chain_header.id.workchain, shard = work_chain_header.id.shard, seqno = work_chain_header.id.seqno, "new block discovered");
-            self.registry.upsert_right(&work_chain_header);
+        for header in &last_work_chain_header {
+            trace!(chain_id = header.id.workchain, shard = header.id.shard, seqno = header.id.seqno, "new block discovered");
+            self.registry.upsert_right(header);
         }
 
         let _ = self.mtx.send(Some(masterchain_info.clone()));
