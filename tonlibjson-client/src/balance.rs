@@ -32,7 +32,7 @@ impl Route {
             Route::Any => { services.cloned().collect() },
             Route::Block { chain, criteria} => {
                 services
-                    .filter(|s| s.contains(*chain, criteria))
+                    .filter(|s| s.contains(chain, criteria))
                     .cloned()
                     .collect()
             },
