@@ -7,6 +7,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::Result;
+use dashmap::DashMap;
 use futures::{FutureExt,try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
@@ -31,6 +32,33 @@ use crate::shared::SharedService;
 
 pub type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
 
+type ChainId = i32;
+type ShardId = (i32, i64);
+type Seqno = i32;
+#[derive(Debug, Clone)]
+struct ShardBounds {
+    shard_id: ShardId,
+    left: Option<BlockHeader>,
+    right: BlockHeader
+}
+
+impl ShardBounds {
+    fn contains_seqno(&self, seqno: Seqno) -> bool {
+        let Some(ref left) = self.left else { return false };
+
+        left.id.seqno <= seqno && seqno <= self.right.id.seqno
+    }
+
+    fn contains_lt(&self, lt: i64) -> bool {
+        let Some(ref left) = self.left else { return false };
+
+        left.start_lt <= lt && lt <= self.right.end_lt
+    }
+}
+
+type ShardRegistry = DashMap<ChainId, Vec<ShardId>>;
+type ShardBoundsRegistry = DashMap<ShardId, ShardBounds>;
+
 #[derive(Clone)]
 pub struct CursorClient {
     id: Cow<'static, str>,
@@ -39,40 +67,57 @@ pub struct CursorClient {
     first_block_rx: Receiver<Option<(BlockHeader, Vec<BlockHeader>)>>,
     last_block_rx: Receiver<Option<(BlockHeader, Vec<BlockHeader>)>>,
 
-    masterchain_info_rx: Receiver<Option<MasterchainInfo>>
+    masterchain_info_rx: Receiver<Option<MasterchainInfo>>,
+
+    shard_registry: ShardRegistry,
+    shard_bounds_registry: ShardBoundsRegistry,
 }
 
 impl CursorClient {
-    pub fn last_seqno(&self) -> Option<i32> {
-        self.headers(-1).map(|(_, l)| l.first().unwrap().id.seqno)
+    pub fn last_seqno(&self) -> Option<Seqno> {
+        let master_shard_id = self.masterchain_info_rx
+            .borrow()
+            .as_ref()
+            .map(|info| (info.last.workchain, info.last.shard))?;
+
+        self.shard_bounds_registry
+            .get(&master_shard_id)
+            .map(|shard_bounds| shard_bounds.right.id.seqno)
     }
 
-    pub fn contains(&self, chain: i32, criteria: &BlockCriteria) -> bool {
-        let Some((left, right)) = self.headers(chain) else {
-            return false;
-        };
-
+    pub fn contains(&self, chain: ChainId, criteria: &BlockCriteria) -> bool {
         match criteria {
             BlockCriteria::LogicalTime(lt) => {
-                let Some(start_lt) = left.iter().map(|b| b.start_lt).min() else { return false; };
-                let Some(end_lt) = right.iter().map(|b| b.end_lt).max() else { return false; };
+                let Some(shard_ids) = self.shard_registry.get(&chain) else {
+                    return false
+                };
 
-                start_lt <= *lt && *lt <= end_lt
+                shard_ids
+                    .iter()
+                    .filter_map(|shard_id| self.shard_bounds_registry.get(shard_id))
+                    .any(|bounds| bounds.contains_lt(*lt))
             },
 
-            // TODO[akostylev0]
             BlockCriteria::Seqno { shard, seqno} => {
-                let Some(first_block) = left.into_iter().find(|b| b.id.shard == *shard) else { return false; };
-                let Some(last_block) = right.into_iter().find(|b| b.id.shard == *shard) else { return false; };
+                let shard_id = (chain, *shard);
+                let Some(bounds) = self.shard_bounds_registry.get(&shard_id) else {
+                    return false
+                };
 
-                first_block.id.seqno <= *seqno && *seqno <= last_block.id.seqno
+                bounds.contains_seqno(*seqno)
             }
         }
     }
 
-    // TODO[akostylev0] invert this
-    pub fn bounds_defined_for_main_chain(&self) -> bool {
-        self.bounds_defined_for_all_chains()
+    pub fn edges_defined(&self) -> bool {
+        let Some(master_shard_id) = self.masterchain_info_rx
+            .borrow()
+            .as_ref()
+            .map(|info| (info.last.workchain, info.last.shard)) else { return false };
+
+        let Some(shard_bounds) = self.shard_bounds_registry.get(&master_shard_id) else { return false };
+
+        shard_bounds.left.is_some()
     }
 
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
@@ -94,31 +139,15 @@ impl CursorClient {
 
             first_block_rx: frx,
             last_block_rx: crx,
-            masterchain_info_rx: mrx
+            masterchain_info_rx: mrx,
+            shard_registry: Default::default(),
+            shard_bounds_registry: Default::default(),
         };
 
         tokio::spawn(_self.last_block_loop(mtx, ctx));
         tokio::spawn(_self.first_block_loop(ftx));
 
         _self
-    }
-
-    fn headers(&self, chain_id: i32) -> Option<(Vec<BlockHeader>, Vec<BlockHeader>)> {
-        let Some(first_block) = self.take_first_block() else { return None; };
-        let Some(last_block) = self.take_last_block() else { return None; };
-
-        match chain_id {
-            -1 => Some((vec![first_block.0], vec![last_block.0])),
-            _ => Some((first_block.1, last_block.1))
-        }
-    }
-
-    fn take_last_block(&self) -> Option<(BlockHeader, Vec<BlockHeader>)> {
-        self.last_block_rx.borrow().clone()
-    }
-
-    fn take_first_block(&self) -> Option<(BlockHeader, Vec<BlockHeader>)> {
-        self.first_block_rx.borrow().clone()
     }
 
     fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, Vec<BlockHeader>)>>) -> impl Future<Output = Infallible> {
@@ -137,11 +166,6 @@ impl CursorClient {
         let discover = FirstBlockDiscover { id, client, ftx, current: None };
 
         discover.discover()
-    }
-
-    // TODO[akostylev0] invert this
-    fn bounds_defined_for_all_chains(&self) -> bool {
-        self.take_last_block().is_some() && self.take_first_block().is_some()
     }
 }
 
@@ -207,7 +231,7 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
-        if self.bounds_defined_for_all_chains() {
+        if self.edges_defined() {
             return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx);
         }
 

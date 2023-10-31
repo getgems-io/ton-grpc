@@ -99,7 +99,7 @@ impl Service<&Route> for Router {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx)?;
 
-        if self.services.values().any(|s| s.bounds_defined_for_main_chain()) {
+        if self.services.values().any(|s| s.edges_defined()) {
             Poll::Ready(Ok(()))
         } else {
             cx.waker().wake_by_ref();
