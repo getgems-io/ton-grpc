@@ -1,0 +1,5 @@
+[toolchain]
+channel = "1.73"
+components = [ "rustc", "cargo", "clippy" ]
+targets = [ "x86_64-unknown-linux-gnu" ]
+profile = "default"
