@@ -18,6 +18,13 @@
 
 
 
+## [0.3.0](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.14...ton-grpc-v0.3.0) (2023-11-01)
+
+
+### Features
+
+* support multiple shards ([#518](https://github.com/getgems-io/tonlibjson/issues/518)) ([b76067f](https://github.com/getgems-io/tonlibjson/commit/b76067fa3a02566ac85a8e959ab2adf9a09d5978))
+
 ## [0.2.14](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.13...ton-grpc-v0.2.14) (2023-10-27)
 
 

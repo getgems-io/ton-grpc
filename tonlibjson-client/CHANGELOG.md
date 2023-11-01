@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.7...tonlibjson-client-v0.5.0) (2023-11-01)
+
+
+### Features
+
+* support multiple shards ([#518](https://github.com/getgems-io/tonlibjson/issues/518)) ([b76067f](https://github.com/getgems-io/tonlibjson/commit/b76067fa3a02566ac85a8e959ab2adf9a09d5978))
+
 ## [0.4.7](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.6...tonlibjson-client-v0.4.7) (2023-10-27)
 
 
