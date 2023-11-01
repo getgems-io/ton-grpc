@@ -1,12 +1,17 @@
 use std::{pin::Pin, task::{Context, Poll}};
-use std::future::{Future, Ready};
+use std::future::Future;
+use std::sync::Arc;
+use std::time::Duration;
 use futures::{ready, TryFutureExt, FutureExt};
 use tower::{Service, ServiceExt};
 use tower::discover::{Change, Discover, ServiceList};
 use anyhow::anyhow;
 use dashmap::DashMap;
 use derive_new::new;
+use futures::future::BoxFuture;
 use itertools::Itertools;
+use tokio_retry::Retry;
+use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksLookupBlock, BlocksShards, GetMasterchainInfo, MasterchainInfo};
 use crate::cursor_client::{CursorClient, InnerClient};
 use crate::discover::CursorClientDiscover;
@@ -59,7 +64,7 @@ impl Route {
 
 pub struct Router {
     discover: CursorClientDiscover,
-    services: DashMap<String, CursorClient>
+    services: Arc<DashMap<String, CursorClient>>
 }
 
 impl Router {
@@ -93,7 +98,7 @@ pub struct Balance { router: Router }
 impl Service<&Route> for Router {
     type Response = Vec<CursorClient>;
     type Error = anyhow::Error;
-    type Future = Ready<Result<Self::Response, Self::Error>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx)?;
@@ -108,15 +113,23 @@ impl Service<&Route> for Router {
     }
 
     fn call(&mut self, req: &Route) -> Self::Future {
-        let services = req.choose(self.services.iter().map(|s| s.clone()));
+        let req = *req;
+        let services = Arc::clone(&self.services);
 
-        let response = if services.is_empty() {
-            Err(anyhow!("no services available for {:?}", req))
-        } else {
-            Ok(services)
-        };
+        let retry = FibonacciBackoff::from_millis(512)
+            .max_delay(Duration::from_millis(4096))
+            .map(jitter)
+            .take(16);
 
-        std::future::ready(response)
+        Retry::spawn(retry, move || {
+            let svc = req.choose(services.iter().map(|s| s.clone()));
+
+            std::future::ready(if svc.is_empty() {
+                Err(anyhow!("no service available"))
+            } else {
+                Ok(svc)
+            })
+        }).boxed()
     }
 }
 
