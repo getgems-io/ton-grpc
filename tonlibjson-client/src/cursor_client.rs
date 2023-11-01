@@ -2,16 +2,17 @@ use std::borrow::Cow;
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
-use anyhow::{anyhow, Result};
-use futures::{FutureExt, try_join, TryFutureExt};
+use anyhow::Result;
+use dashmap::{DashMap, DashSet};
+use futures::{FutureExt,try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
 use tokio::sync::watch::{Receiver, Sender};
-use tokio::time::{Instant, interval, MissedTickBehavior};
+use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
@@ -21,6 +22,7 @@ use tower::load::Load;
 use tracing::{instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
+use crate::balance::BlockCriteria;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
@@ -30,34 +32,161 @@ use crate::shared::SharedService;
 
 pub type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
 
+type ChainId = i32;
+type ShardId = (i32, i64);
+type Seqno = i32;
+#[derive(Debug, Clone, Default)]
+struct ShardBounds {
+    left: Option<BlockHeader>,
+    right: Option<BlockHeader>
+}
+
+impl ShardBounds {
+    fn left(left: BlockHeader) -> Self {
+        Self {
+            left: Some(left),
+            right: None
+        }
+    }
+
+    fn right(right: BlockHeader) -> Self {
+        Self {
+            left: None,
+            right: Some(right)
+        }
+    }
+
+    fn contains_seqno(&self, seqno: Seqno) -> bool {
+        let Some(ref left) = self.left else { return false };
+        let Some(ref right) = self.right else { return false };
+
+        left.id.seqno <= seqno && seqno <= right.id.seqno
+    }
+
+    fn contains_lt(&self, lt: i64) -> bool {
+        let Some(ref left) = self.left else { return false };
+        let Some(ref right) = self.right else { return false };
+
+        left.start_lt <= lt && lt <= right.end_lt
+    }
+}
+
+type ShardRegistry = DashMap<ChainId, DashSet<ShardId>>;
+type ShardBoundsRegistry = DashMap<ShardId, ShardBounds>;
+
+#[derive(Default)]
+struct Registry {
+    shard_registry: ShardRegistry,
+    shard_bounds_registry: ShardBoundsRegistry
+}
+
+impl Registry {
+    fn get_last_seqno(&self, shard_id: &ShardId) -> Option<Seqno> {
+        self.shard_bounds_registry
+            .get(shard_id)
+            .and_then(|s| s.right.as_ref().map(|h| h.id.seqno))
+    }
+
+    fn upsert_left(&self, header: &BlockHeader) {
+        let shard_id = (header.id.workchain, header.id.shard);
+
+        self.update_shard_registry(&shard_id);
+
+        trace!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "left block");
+
+        self.shard_bounds_registry
+            .entry(shard_id)
+            .and_modify(|b| { b.left.replace(header.clone()); })
+            .or_insert_with(|| ShardBounds::left(header.clone()));
+    }
+
+    fn upsert_right(&self, header: &BlockHeader) {
+        let shard_id = (header.id.workchain, header.id.shard);
+
+        self.update_shard_registry(&shard_id);
+
+        trace!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "right block");
+
+        self.shard_bounds_registry
+            .entry(shard_id)
+            .and_modify(|b| { b.right.replace(header.clone()); })
+            .or_insert_with(|| ShardBounds::right(header.clone()));
+    }
+
+    fn update_shard_registry(&self, shard_id: &ShardId) {
+        let entry = self.shard_registry
+            .entry(shard_id.0)
+            .or_default();
+
+        if entry.contains(shard_id) {
+            return
+        }
+
+        trace!(chaid_id = shard_id.0, shard_id = shard_id.1, "new shard");
+
+        entry.insert(*shard_id);
+    }
+
+    fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+        match criteria {
+            BlockCriteria::LogicalTime(lt) => {
+                self.shard_registry
+                    .get(chain)
+                    .map(|shard_ids| shard_ids
+                        .iter()
+                        .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id))
+                        .any(|bounds| bounds.contains_lt(*lt))
+                    ).unwrap_or(false)
+            },
+
+            BlockCriteria::Seqno { shard, seqno} => {
+                let shard_id = (*chain, *shard);
+                let Some(bounds) = self.shard_bounds_registry.get(&shard_id) else {
+                    return false
+                };
+
+                bounds.contains_seqno(*seqno)
+            }
+        }
+    }
+
+    pub fn edges_defined(&self, shard_id: &ShardId) -> bool {
+        let Some(shard_bounds) = self.shard_bounds_registry.get(shard_id) else { return false };
+
+        shard_bounds.left.is_some()
+    }
+}
+
 #[derive(Clone)]
 pub struct CursorClient {
     id: Cow<'static, str>,
     client: InnerClient,
 
-    pub first_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
-    pub last_block_rx: Receiver<Option<(BlockHeader, BlockHeader)>>,
-
-    masterchain_info_rx: Receiver<Option<MasterchainInfo>>
+    masterchain_info_rx: Receiver<Option<MasterchainInfo>>,
+    registry: Arc<Registry>
 }
 
 impl CursorClient {
-    fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>, ctx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
-        let id = self.id.clone();
-        let client = self.client.clone();
+    pub fn last_seqno(&self) -> Option<Seqno> {
+        let master_shard_id = self.masterchain_info_rx
+            .borrow()
+            .as_ref()
+            .map(|info| (info.last.workchain, info.last.shard))?;
 
-        let discover = LastBlockDiscover { id, client, mtx, ctx, current: None };
-
-        discover.discover()
+        self.registry.get_last_seqno(&master_shard_id)
     }
 
-    fn first_block_loop(&self, ftx: Sender<Option<(BlockHeader, BlockHeader)>>) -> impl Future<Output = Infallible> {
-        let id = self.id.clone();
-        let client = self.client.clone();
+    pub fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+        self.registry.contains(chain, criteria)
+    }
 
-        let discover = FirstBlockDiscover { id, client, ftx, current: None };
+    pub fn edges_defined(&self) -> bool {
+        let Some(master_shard_id) = self.masterchain_info_rx
+            .borrow()
+            .as_ref()
+            .map(|info| (info.last.workchain, info.last.shard)) else { return false };
 
-        discover.discover()
+        self.registry.edges_defined(&master_shard_id)
     }
 
     pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
@@ -69,37 +198,40 @@ impl CursorClient {
 
         let id = Cow::from(id);
         let client = ConcurrencyMetric::new(client, id.clone());
-        let (ctx, crx) = tokio::sync::watch::channel(None);
         let (mtx, mrx) = tokio::sync::watch::channel(None);
-        let (ftx, frx) = tokio::sync::watch::channel(None);
 
         let _self = Self {
             id,
             client,
 
-            first_block_rx: frx,
-            last_block_rx: crx,
-            masterchain_info_rx: mrx
+            masterchain_info_rx: mrx,
+            registry: Default::default()
         };
 
-        tokio::spawn(_self.last_block_loop(mtx, ctx));
-        tokio::spawn(_self.first_block_loop(ftx));
+        tokio::spawn(_self.last_block_loop(mtx));
+        tokio::spawn(_self.first_block_loop());
 
         _self
     }
 
-    pub fn headers(&self, chain_id: i32) -> Option<(BlockHeader, BlockHeader)> {
-        let Some(first_block) = self.first_block_rx.borrow().clone() else {
-            return None;
-        };
-        let Some(last_block) = self.last_block_rx.borrow().clone() else {
-            return None;
-        };
+    fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>) -> impl Future<Output = Infallible> {
+        let id = self.id.clone();
+        let client = self.client.clone();
+        let registry = self.registry.clone();
 
-        match chain_id {
-            -1 => Some((first_block.0, last_block.0)),
-            _ => Some((first_block.1, last_block.1))
-        }
+        let discover = LastBlockDiscover { id, client, mtx, registry, current: None };
+
+        discover.discover()
+    }
+
+    fn first_block_loop(&self) -> impl Future<Output = Infallible> {
+        let id = self.id.clone();
+        let client = self.client.clone();
+        let registry = self.registry.clone();
+
+        let discover = FirstBlockDiscover::new(id, client, registry, self.masterchain_info_rx.clone());
+
+        discover.discover()
     }
 }
 
@@ -165,10 +297,8 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
-        if self.last_block_rx.borrow().is_some()
-            && self.first_block_rx.borrow().is_some()
-            && self.masterchain_info_rx.borrow().is_some() {
-            return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx)
+        if self.edges_defined() {
+            return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx);
         }
 
         cx.waker().wake_by_ref();
@@ -189,18 +319,24 @@ impl Load for CursorClient {
     }
 }
 
-async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, BlockHeader)> {
+async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, Vec<BlockHeader>)> {
     let block_id = cached_block_id_ext(block_id, client).await?;
     let shards = cached_get_shards(&BlocksGetShards::new(block_id.clone()), client).await?;
 
+    let clone = client.clone();
+    let requests = shards.shards
+        .into_iter()
+        .map(BlocksGetBlockHeader::new)
+        .map(|r| clone.clone().oneshot(r));
+
     try_join!(
-        client.clone().oneshot(BlocksGetBlockHeader::new(block_id)),
-        client.oneshot(BlocksGetBlockHeader::new(shards.shards.first().expect("must be exist").clone()))
+        client.oneshot(BlocksGetBlockHeader::new(block_id)),
+        futures::future::try_join_all(requests)
     )
 }
 
 #[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, BlockHeader)> {
+async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, Vec<BlockHeader>)> {
     let length = start.seqno;
     let mut rhs = length;
     let mut lhs = lhs.unwrap_or(1);
@@ -249,21 +385,21 @@ async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Op
     Ok((master, work))
 }
 
-async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, BlockHeader)> {
+async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Vec<BlockHeader>)> {
     let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
     let shards = cached_get_shards(&BlocksGetShards::new(master_chain_last_block_id.clone()), client).await?;
-    // TODO[akostylev0] handle case when there are multiple shards
-    let work_chain_last_block_id = shards.shards.first()
-        .ok_or_else(|| anyhow!("last block for work chain not found"))?
-        .clone();
 
-    let mut clone = client.clone();
+    let clone = client.clone();
+    let requests = shards.shards
+        .into_iter()
+        .map(|s| wait_for_block_header(s, clone.clone()));
+
     let masterchain_header = BlocksGetBlockHeader::new(master_chain_last_block_id);
 
     Ok(try_join!(
-        cached_block_header(&masterchain_header, &mut clone),
-        wait_for_block_header(work_chain_last_block_id, client)
+        cached_block_header(&masterchain_header, client),
+        futures::future::try_join_all(requests)
     )?)
 }
 
@@ -305,7 +441,7 @@ async fn cached_block_header(req: &BlocksGetBlockHeader, client: &mut InnerClien
     block_header_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
 }
 
-async fn wait_for_block_header(block_id: BlockIdExt, client: &mut InnerClient) -> Result<BlockHeader> {
+async fn wait_for_block_header(block_id: BlockIdExt, client: InnerClient) -> Result<BlockHeader> {
     let retry = FibonacciBackoff::from_millis(512)
         .max_delay(Duration::from_millis(4096))
         .map(jitter)
@@ -322,35 +458,41 @@ async fn wait_for_block_header(block_id: BlockIdExt, client: &mut InnerClient) -
 struct FirstBlockDiscover {
     id: Cow<'static, str>,
     client: InnerClient,
+    registry: Arc<Registry>,
+    rx: Receiver<Option<MasterchainInfo>>,
     current: Option<BlockHeader>,
-    ftx: Sender<Option<(BlockHeader, BlockHeader)>>
 }
 
 impl FirstBlockDiscover {
+    fn new(id: Cow<'static, str>, client: InnerClient, registry: Arc<Registry>, rx: Receiver<Option<MasterchainInfo>>) -> Self {
+        Self {
+            id,
+            client,
+            registry,
+            rx,
+            current: None
+        }
+    }
+
     async fn discover(mut self) -> Never {
         let mut timer = interval(Duration::from_secs(30));
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
         loop {
-            let Ok(start) = (&mut self.client).oneshot(GetMasterchainInfo::default()).await else {
-                timer.tick().await;
+            timer.tick().await;
 
+            let Some(start) = self.rx.borrow().as_ref().map(|m| m.last.clone()) else {
                 continue;
             };
 
-            let start_time = Instant::now();
-            while start_time.elapsed() < Duration::from_secs(60 * 60 * 4) { // Every 4 hours reset starting point
-                timer.tick().await;
-
-                match self.next(&start.last).await {
-                    Ok(Some(mfb)) => { self.current.replace(mfb); }
-                    Err(_) | Ok(None) => {}
-                }
+            match self.next(start).await {
+                Ok(Some(mfb)) => { self.current.replace(mfb); }
+                Err(_) | Ok(None) => {}
             }
         }
     }
 
-    async fn next(&mut self, start: &BlockIdExt) -> Result<Option<BlockHeader>> {
+    async fn next(&mut self, start: BlockIdExt) -> Result<Option<BlockHeader>> {
         if let Some(ref mfb) = self.current {
             if let Err(e) = (&mut self.client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
                 trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
@@ -363,13 +505,14 @@ impl FirstBlockDiscover {
 
         let lhs = self.current.as_ref().map(|n| n.id.seqno + 1);
         let cur = self.current.as_ref().map(|n| n.id.seqno + 32);
-        let (mfb, wfb) = find_first_blocks(&mut self.client, start, lhs, cur).await?;
+        let (mfb, wfb) = find_first_blocks(&mut self.client, &start, lhs, cur).await?;
 
         absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = mfb.id.seqno, "master chain first block");
-        trace!(seqno = wfb.id.seqno, "work chain first block");
 
-        let _ = self.ftx.send(Some((mfb.clone(), wfb)));
+        self.registry.upsert_left(&mfb);
+        for header in &wfb {
+            self.registry.upsert_left(header);
+        }
 
         Ok(Some(mfb))
     }
@@ -378,9 +521,9 @@ impl FirstBlockDiscover {
 struct LastBlockDiscover {
     id: Cow<'static, str>,
     client: InnerClient,
+    registry: Arc<Registry>,
     current: Option<MasterchainInfo>,
-    mtx: Sender<Option<MasterchainInfo>>,
-    ctx: Sender<Option<(BlockHeader, BlockHeader)>>
+    mtx: Sender<Option<MasterchainInfo>>
 }
 
 impl LastBlockDiscover {
@@ -410,17 +553,17 @@ impl LastBlockDiscover {
         }
 
         absolute_counter!("ton_liteserver_last_seqno", masterchain_info.last.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = masterchain_info.last.seqno, "block discovered");
 
-        let (last_master_chain_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
+        let (master_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
+        absolute_counter!("ton_liteserver_synced_seqno", master_header.id.seqno as u64, "liteserver_id" => self.id.clone());
 
-        masterchain_info.last = last_master_chain_header.id.clone();
-        absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = last_master_chain_header.id.seqno, "master chain block reached");
-        trace!(seqno = last_work_chain_header.id.seqno, "work chain block reached");
+        self.registry.upsert_right(&master_header);
+        for header in &last_work_chain_header {
+            self.registry.upsert_right(header);
+        }
 
+        masterchain_info.last = master_header.id.clone();
         let _ = self.mtx.send(Some(masterchain_info.clone()));
-        let _ = self.ctx.send(Some((last_master_chain_header, last_work_chain_header)));
 
         Ok(Some(masterchain_info))
     }

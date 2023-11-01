@@ -34,7 +34,7 @@ impl Requestable for BlocksGetBlockHeader {
 
 impl Routable for BlocksGetBlockHeader {
     fn route(&self) -> Route {
-        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) }
+        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
     }
 }
 
@@ -189,9 +189,7 @@ impl Requestable for GetShardAccountCell {
 }
 
 impl Routable for GetShardAccountCell {
-    fn route(&self) -> Route {
-        Route::Latest { chain: self.account_address.chain_id() }
-    }
+    fn route(&self) -> Route { Route::Latest }
 }
 
 #[derive(new, Debug, Serialize, Clone)]
@@ -242,7 +240,7 @@ impl Requestable for RawGetAccountState {
 
 impl Routable for RawGetAccountState {
     fn route(&self) -> Route {
-        Route::Latest { chain: self.account_address.chain_id() }
+        Route::Latest
     }
 }
 
@@ -276,9 +274,7 @@ impl Requestable for GetAccountState {
 }
 
 impl Routable for GetAccountState {
-    fn route(&self) -> Route {
-        Route::Latest { chain: self.account_address.chain_id() }
-    }
+    fn route(&self) -> Route { Route::Latest }
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -347,7 +343,7 @@ impl Requestable for GetMasterchainInfo {
 
 impl Routable for GetMasterchainInfo {
     fn route(&self) -> Route {
-        Route::Latest { chain: -1 }
+        Route::Latest
     }
 }
 
@@ -367,9 +363,9 @@ impl Requestable for BlocksLookupBlock {
 impl Routable for BlocksLookupBlock {
     fn route(&self) -> Route {
         let criteria = match self.mode {
-            1 => BlockCriteria::Seqno(self.id.seqno),
+            1 => BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno },
             2 => BlockCriteria::LogicalTime(self.lt),
-            _ => BlockCriteria::Seqno(self.id.seqno)
+            _ => BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno }
         };
 
         Route::Block { chain: self.id.workchain, criteria }
@@ -412,7 +408,7 @@ impl Requestable for BlocksGetShards {
 
 impl Routable for BlocksGetShards {
     fn route(&self) -> Route {
-        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) }
+        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
     }
 }
 
@@ -468,7 +464,7 @@ impl Requestable for BlocksGetTransactions {
 
 impl Routable for BlocksGetTransactions {
     fn route(&self) -> Route {
-        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno(self.id.seqno) }
+        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
     }
 }
 
@@ -519,7 +515,7 @@ impl Requestable for RawSendMessage {
 
 impl Routable for RawSendMessage {
     fn route(&self) -> Route {
-        Route::Latest { chain: -1 }
+        Route::Latest
     }
 }
 
@@ -534,7 +530,7 @@ impl Requestable for RawSendMessageReturnHash {
 }
 
 impl Routable for RawSendMessageReturnHash {
-    fn route(&self) -> Route { Route::Latest { chain: -1 } }
+    fn route(&self) -> Route { Route::Latest }
 }
 
 #[derive(Deserialize)]
@@ -553,9 +549,7 @@ impl Requestable for SmcLoad {
 }
 
 impl Routable for SmcLoad {
-    fn route(&self) -> Route {
-        Route::Latest { chain: self.account_address.chain_id() }
-    }
+    fn route(&self) -> Route { Route::Latest }
 }
 
 impl SmcLoad {
@@ -721,7 +715,7 @@ impl<T> Routable for WithBlock<T> {
     fn route(&self) -> Route {
         Route::Block {
             chain: self.id.workchain,
-            criteria: BlockCriteria::Seqno(self.id.seqno)
+            criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno }
         }
     }
 }

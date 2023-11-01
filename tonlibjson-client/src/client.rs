@@ -143,3 +143,27 @@ impl Drop for Stop {
         let _ = self.sender.send(());
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+    use tokio::sync::OnceCell;
+    use anyhow::anyhow;
+    use tower::ServiceExt;
+    use tracing_test::traced_test;
+    use crate::block::{BlocksGetShards, BlocksShards, GetMasterchainInfo};
+    use crate::client::Client;
+    use crate::make::ClientBuilder;
+    use crate::ton_config::load_ton_config;
+
+    #[tokio::test]
+    #[traced_test]
+    async fn not_initialized_call() {
+        let mut client = Client::default();
+
+        let resp = (&mut client).oneshot(GetMasterchainInfo::default()).await;
+
+        assert_eq!("Ton error occurred with code 400, message library is not inited", resp.unwrap_err().to_string())
+    }
+}

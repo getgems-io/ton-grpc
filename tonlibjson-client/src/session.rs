@@ -39,7 +39,5 @@ impl<S, E: Into<Error> + Send + 'static> Callable<S> for RunGetMethod
 }
 
 impl Routable for RunGetMethod {
-    fn route(&self) -> Route {
-        Route::Latest { chain: self.address.chain_id() }
-    }
+    fn route(&self) -> Route { Route::Latest }
 }

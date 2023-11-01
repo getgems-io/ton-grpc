@@ -158,19 +158,11 @@ message TvmCell {
 }
 
 service BlockService {
-  rpc SubscribeLastBlock (SubscribeLastBlockRequest) returns (stream SubscribeLastBlockEvent);
   rpc GetLastBlock (GetLastBlockRequest) returns (BlockIdExt);
   rpc GetBlock (BlockId) returns (BlockIdExt);
   rpc GetShards (BlockId) returns (GetShardsResponse);
   rpc GetTransactionIds (GetTransactionIdsRequest) returns (stream TransactionId);
   rpc GetAccountAddresses (BlockId) returns (stream AccountAddress);
-}
-
-message SubscribeLastBlockRequest {}
-
-message SubscribeLastBlockEvent {
-  BlockIdExt masterchain = 1;
-  BlockIdExt workchain = 2;
 }
 
 message GetLastBlockRequest {}
