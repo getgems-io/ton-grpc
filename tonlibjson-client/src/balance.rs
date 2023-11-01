@@ -1,10 +1,10 @@
 use std::{pin::Pin, task::{Context, Poll}};
-use std::collections::HashMap;
 use std::future::{Future, Ready};
 use futures::{ready, TryFutureExt, FutureExt};
 use tower::{Service, ServiceExt};
 use tower::discover::{Change, Discover, ServiceList};
 use anyhow::anyhow;
+use dashmap::DashMap;
 use derive_new::new;
 use itertools::Itertools;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksLookupBlock, BlocksShards, GetMasterchainInfo, MasterchainInfo};
@@ -27,13 +27,12 @@ pub enum Route {
 }
 
 impl Route {
-    pub fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
+    pub fn choose<T : Iterator<Item=CursorClient>>(&self, services: T) -> Vec<CursorClient> {
         match self {
-            Route::Any => { services.cloned().collect() },
+            Route::Any => { services.collect() },
             Route::Block { chain, criteria} => {
                 services
                     .filter(|s| s.contains(chain, criteria))
-                    .cloned()
                     .collect()
             },
             Route::Latest => {
@@ -52,7 +51,7 @@ impl Route {
                     }
                 }
 
-                idxs.into_iter().map(|(s, _)| s).cloned().collect()
+                idxs.into_iter().map(|(s, _)| s).collect()
             }
         }
     }
@@ -60,14 +59,14 @@ impl Route {
 
 pub struct Router {
     discover: CursorClientDiscover,
-    services: HashMap<String, CursorClient>
+    services: DashMap<String, CursorClient>
 }
 
 impl Router {
     pub fn new(discover: CursorClientDiscover) -> Self {
         Router {
             discover,
-            services: HashMap::new()
+            services: Default::default()
         }
     }
 
@@ -99,7 +98,7 @@ impl Service<&Route> for Router {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx)?;
 
-        if self.services.values().any(|s| s.edges_defined()) {
+        if self.services.iter().any(|s| s.edges_defined()) {
             Poll::Ready(Ok(()))
         } else {
             cx.waker().wake_by_ref();
@@ -109,7 +108,7 @@ impl Service<&Route> for Router {
     }
 
     fn call(&mut self, req: &Route) -> Self::Future {
-        let services = req.choose(self.services.values());
+        let services = req.choose(self.services.iter().map(|s| s.clone()));
 
         let response = if services.is_empty() {
             Err(anyhow!("no services available for {:?}", req))
