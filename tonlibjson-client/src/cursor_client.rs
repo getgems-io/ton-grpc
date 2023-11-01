@@ -118,7 +118,7 @@ impl Registry {
             .entry(shard_id.0)
             .or_default();
 
-        if entry.contains(&shard_id) {
+        if entry.contains(shard_id) {
             return
         }
 
