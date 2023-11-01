@@ -8,7 +8,6 @@ use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::Result;
 use dashmap::{DashMap, DashSet};
-use dashmap::mapref::entry::Entry;
 use futures::{FutureExt,try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
@@ -36,7 +35,7 @@ pub type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma
 type ChainId = i32;
 type ShardId = (i32, i64);
 type Seqno = i32;
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct ShardBounds {
     left: Option<BlockHeader>,
     right: Option<BlockHeader>
@@ -93,10 +92,12 @@ impl Registry {
 
         self.update_shard_registry(&shard_id);
 
-        match self.shard_bounds_registry.entry(shard_id) {
-            Entry::Occupied(mut entry) => { entry.get_mut().left.replace(header.clone()); }
-            Entry::Vacant(entry) => { entry.insert(ShardBounds::left(header.clone())); }
-        };
+        trace!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "left block");
+
+        self.shard_bounds_registry
+            .entry(shard_id)
+            .and_modify(|b| { b.left.replace(header.clone()); })
+            .or_insert_with(|| ShardBounds::left(header.clone()));
     }
 
     fn upsert_right(&self, header: &BlockHeader) {
@@ -104,26 +105,26 @@ impl Registry {
 
         self.update_shard_registry(&shard_id);
 
-        match self.shard_bounds_registry.entry(shard_id) {
-            Entry::Occupied(mut entry) => { entry.get_mut().right.replace(header.clone()); }
-            Entry::Vacant(entry) => { entry.insert(ShardBounds::right(header.clone())); }
-        };
+        trace!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "right block");
+
+        self.shard_bounds_registry
+            .entry(shard_id)
+            .and_modify(|b| { b.right.replace(header.clone()); })
+            .or_insert_with(|| ShardBounds::right(header.clone()));
     }
 
     fn update_shard_registry(&self, shard_id: &ShardId) {
-        match self.shard_registry.entry(shard_id.0) {
-            Entry::Occupied(mut entry) => {
-                if !entry.get().contains(shard_id) {
-                    entry.get_mut().insert(*shard_id);
-                }
-            }
-            Entry::Vacant(entry) => {
-                let set = DashSet::new();
-                set.insert(*shard_id);
+        let entry = self.shard_registry
+            .entry(shard_id.0)
+            .or_default();
 
-                entry.insert(set);
-            }
+        if entry.contains(&shard_id) {
+            return
         }
+
+        trace!(chaid_id = shard_id.0, shard_id = shard_id.1, "new shard");
+
+        entry.insert(*shard_id);
     }
 
     fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
@@ -507,13 +508,9 @@ impl FirstBlockDiscover {
         let (mfb, wfb) = find_first_blocks(&mut self.client, &start, lhs, cur).await?;
 
         absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = mfb.id.seqno, "master chain first block");
 
         self.registry.upsert_left(&mfb);
-
         for header in &wfb {
-            trace!(chain_id = header.id.workchain, shard = header.id.shard, seqno = header.id.seqno, "work chain first block discovered");
-
             self.registry.upsert_left(header);
         }
 
@@ -556,19 +553,16 @@ impl LastBlockDiscover {
         }
 
         absolute_counter!("ton_liteserver_last_seqno", masterchain_info.last.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = masterchain_info.last.seqno, "block discovered");
 
-        let (last_master_chain_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
-        self.registry.upsert_right(&last_master_chain_header);
+        let (master_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
+        absolute_counter!("ton_liteserver_synced_seqno", master_header.id.seqno as u64, "liteserver_id" => self.id.clone());
 
-        masterchain_info.last = last_master_chain_header.id.clone();
-        absolute_counter!("ton_liteserver_synced_seqno", last_master_chain_header.id.seqno as u64, "liteserver_id" => self.id.clone());
-        trace!(seqno = last_master_chain_header.id.seqno, "new master block discovered");
+        self.registry.upsert_right(&master_header);
         for header in &last_work_chain_header {
-            trace!(chain_id = header.id.workchain, shard = header.id.shard, seqno = header.id.seqno, "new block discovered");
             self.registry.upsert_right(header);
         }
 
+        masterchain_info.last = master_header.id.clone();
         let _ = self.mtx.send(Some(masterchain_info.clone()));
 
         Ok(Some(masterchain_info))
