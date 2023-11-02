@@ -19,7 +19,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{instrument, trace};
+use tracing::{info, instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::balance::BlockCriteria;
@@ -56,18 +56,30 @@ impl ShardBounds {
         }
     }
 
-    fn contains_seqno(&self, seqno: Seqno) -> bool {
-        let Some(ref left) = self.left else { return false };
-        let Some(ref right) = self.right else { return false };
+    fn distance_seqno(&self, seqno: Seqno) -> Option<Seqno> {
+        let Some(ref left) = self.left else { return None };
+        let Some(ref right) = self.right else { return None };
 
-        left.id.seqno <= seqno && seqno <= right.id.seqno
+        if seqno < left.id.seqno {
+            Some(seqno - left.id.seqno)
+        } else if seqno > right.id.seqno {
+            Some(seqno - right.id.seqno)
+        } else {
+            Some(0)
+        }
     }
 
-    fn contains_lt(&self, lt: i64) -> bool {
-        let Some(ref left) = self.left else { return false };
-        let Some(ref right) = self.right else { return false };
+    fn distance_lt(&self, lt: i64) -> Option<i64> {
+        let Some(ref left) = self.left else { return None };
+        let Some(ref right) = self.right else { return None };
 
-        left.start_lt <= lt && lt <= right.end_lt
+        if lt < left.start_lt {
+            Some(lt - left.start_lt) // negative
+        } else if lt > right.end_lt {
+            Some(lt - right.end_lt) // positive
+        } else {
+            Some(0)
+        }
     }
 }
 
@@ -127,25 +139,49 @@ impl Registry {
         entry.insert(*shard_id);
     }
 
-    fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+    fn waitable_distance(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
         match criteria {
             BlockCriteria::LogicalTime(lt) => {
                 self.shard_registry
                     .get(chain)
-                    .map(|shard_ids| shard_ids
-                        .iter()
-                        .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id))
-                        .any(|bounds| bounds.contains_lt(*lt))
-                    ).unwrap_or(false)
+                    .and_then(|shard_ids| {
+                        let bounds = shard_ids.iter()
+                            .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id));
+
+                        let mut min_waitable_distance = None;
+                        for bound in bounds {
+                            let Some(distance) = bound.distance_lt(*lt) else {
+                                continue;
+                            };
+
+                            if distance == 0 {
+                                return Some(0);
+                            } else if distance > 0 && distance < *min_waitable_distance.get_or_insert(distance) {
+                                min_waitable_distance.replace(distance);
+                            }
+                        }
+
+                        return min_waitable_distance.map(|lt| (lt / 1000) as i32)
+                    })
             },
 
             BlockCriteria::Seqno { shard, seqno} => {
                 let shard_id = (*chain, *shard);
                 let Some(bounds) = self.shard_bounds_registry.get(&shard_id) else {
-                    return false
+                    return None
                 };
 
-                bounds.contains_seqno(*seqno)
+                let Some(ref left) = bounds.left else { return None };
+                let Some(ref right) = bounds.right else { return None };
+
+                let right_lt = right.end_lt - right.start_lt;
+                let left_lt = left.end_lt - left.start_lt;
+
+                info!(left_lt = left_lt, right_lt = right_lt, left_start = left.start_lt, right_end = right.end_lt,
+                    left_seqno = left.id.seqno, right_seqno = right.id.seqno,
+                    "waitable distance");
+
+                bounds.distance_seqno(*seqno).filter(|d| *d >= 0)
             }
         }
     }
@@ -177,7 +213,17 @@ impl CursorClient {
     }
 
     pub fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
-        self.registry.contains(chain, criteria)
+        let Some(distance) = self.registry.waitable_distance(chain, criteria) else {
+            return false;
+        };
+
+        if distance > 0 {
+            info!(min_waitable_distance = distance);
+
+            return false;
+        };
+
+        return true;
     }
 
     pub fn edges_defined(&self) -> bool {
