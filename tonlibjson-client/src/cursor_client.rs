@@ -81,6 +81,12 @@ impl ShardBounds {
             Some(0)
         }
     }
+
+    fn delta_lt(&self) -> Option<i64> {
+        let Some(ref right) = self.right else { return None };
+
+        Some(right.end_lt - right.start_lt)
+    }
 }
 
 type ShardRegistry = DashMap<ChainId, DashSet<ShardId>>;
@@ -149,10 +155,17 @@ impl Registry {
                             .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id));
 
                         let mut min_waitable_distance = None;
+                        let mut delta_lt = None;
                         for bound in bounds {
                             let Some(distance) = bound.distance_lt(*lt) else {
                                 continue;
                             };
+
+                            if delta_lt.is_none() {
+                                if let Some(new_delta_lt) = bound.delta_lt() {
+                                    delta_lt.replace(new_delta_lt);
+                                }
+                            }
 
                             if distance == 0 {
                                 return Some(0);
@@ -161,7 +174,8 @@ impl Registry {
                             }
                         }
 
-                        return min_waitable_distance.map(|lt| (lt / 1000) as i32)
+                        return min_waitable_distance.zip(delta_lt)
+                            .map(|(lt_diff, lt_delta)| (lt_delta as f64 / lt_diff as f64).ceil() as Seqno)
                     })
             },
 
@@ -212,18 +226,18 @@ impl CursorClient {
         self.registry.get_last_seqno(&master_shard_id)
     }
 
-    pub fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+    pub fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
         let Some(distance) = self.registry.waitable_distance(chain, criteria) else {
-            return false;
+            return None;
         };
 
         if distance > 0 {
             info!(min_waitable_distance = distance);
 
-            return false;
+            return Some(distance);
         };
 
-        return true;
+        return Some(0);
     }
 
     pub fn edges_defined(&self) -> bool {
