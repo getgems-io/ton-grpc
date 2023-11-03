@@ -1,25 +1,33 @@
 use std::any::TypeId;
-use std::future;
 use std::sync::Arc;
+use std::time::Duration;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use tower::retry::budget::Budget;
 use tower::retry::Policy;
+use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use crate::block::{RawSendMessage, RawSendMessageReturnHash};
 
 #[derive(Clone)]
 pub struct RetryPolicy {
-    budget: Arc<Budget>
+    budget: Arc<Budget>,
+    backoff: FibonacciBackoff
 }
 
 impl RetryPolicy {
     pub fn new(budget: Budget) -> Self {
+        let retry_strategy = FibonacciBackoff::from_millis(128)
+            .max_delay(Duration::from_millis(4096));
+
         Self {
-            budget: Arc::new(budget)
+            budget: Arc::new(budget),
+            backoff: retry_strategy
         }
     }
 }
 
 impl<T: Clone + 'static, Res, E> Policy<T, Res, E> for RetryPolicy {
-    type Future = future::Ready<Self>;
+    type Future = BoxFuture<'static, Self>;
 
     fn retry(&self, _: &T, result: Result<&Res, &E>) -> Option<Self::Future> {
         match result {
@@ -35,7 +43,21 @@ impl<T: Clone + 'static, Res, E> Policy<T, Res, E> for RetryPolicy {
                     None
                 } else {
                     match self.budget.withdraw() {
-                        Ok(_) => Some(future::ready(self.clone())),
+                        Ok(_) => Some({
+                            let mut pol = self.clone();
+
+                            async move {
+                                let millis = pol.backoff
+                                    .by_ref()
+                                    .map(jitter)
+                                    .next()
+                                    .unwrap();
+
+                                tokio::time::sleep(millis).await;
+
+                                pol
+                            }.boxed()
+                        }),
                         Err(_) => None
                     }
                 }
