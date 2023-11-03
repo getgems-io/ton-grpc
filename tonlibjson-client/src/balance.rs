@@ -27,19 +27,13 @@ pub enum Route {
     Latest
 }
 
-
-// TODO[akostylev0]
-enum RouteError {
-    Waitable(i32),
-}
-
 impl Route {
-    pub fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Result<Vec<CursorClient>, RouteError> {
+    pub fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
         match self {
             Route::Any => { services.cloned().collect() },
             Route::Block { chain, criteria} => {
                 services
-                    .filter_map(|s| s.contains(chain, criteria).map(|d| (s, d)))
+                    .filter(|s| s.contains(chain, criteria).is_some_and(|b| b <= 1))
                     .cloned()
                     .collect()
             },
