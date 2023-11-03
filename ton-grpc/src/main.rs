@@ -72,8 +72,10 @@ async fn main() -> anyhow::Result<()> {
     health_reporter.set_serving::<MessageServiceServer<MessageService>>().await;
 
     Server::builder()
-        .tcp_keepalive(Some(Duration::from_secs(120)))
-        .http2_keepalive_interval(Some(Duration::from_secs(90)))
+        .tcp_keepalive(Some(Duration::from_secs(300)))
+        .http2_keepalive_interval(Some(Duration::from_secs(120)))
+        .http2_keepalive_timeout(Some(Duration::from_secs(20)))
+        .timeout(Duration::from_secs(10))
         .add_service(reflection)
         .add_service(health_server)
         .add_service(account_service)
