@@ -7,6 +7,7 @@ use tower::discover::{Change, Discover, ServiceList};
 use anyhow::anyhow;
 use derive_new::new;
 use itertools::Itertools;
+use metrics::{describe_counter, increment_counter};
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksLookupBlock, BlocksShards, GetMasterchainInfo, MasterchainInfo};
 use crate::cursor_client::{CursorClient, InnerClient};
 use crate::discover::CursorClientDiscover;
@@ -65,6 +66,8 @@ pub struct Router {
 
 impl Router {
     pub fn new(discover: CursorClientDiscover) -> Self {
+        describe_counter!("ton_router_miss_count", "Count of misses in router");
+
         Router {
             discover,
             services: HashMap::new()
@@ -112,6 +115,8 @@ impl Service<&Route> for Router {
         let services = req.choose(self.services.values());
 
         let response = if services.is_empty() {
+            increment_counter!("ton_router_miss_count");
+
             Err(anyhow!("no services available for {:?}", req))
         } else {
             Ok(services)
