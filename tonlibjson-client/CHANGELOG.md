@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.5.0...tonlibjson-client-v0.6.0) (2023-11-03)
+
+
+### Features
+
+* add router miss metric ([ce35f5f](https://github.com/getgems-io/tonlibjson/commit/ce35f5f41a166795ac3db5beb60f9ef1f60f6c87))
+
 ## [0.5.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.4.7...tonlibjson-client-v0.5.0) (2023-11-01)
 
 
