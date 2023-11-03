@@ -15,6 +15,7 @@ message GetAccountStateRequest {
     BlockId block_id = 2;
     PartialTransactionId transaction_id = 3;
   }
+  optional BlockId block_reached = 4;
 }
 
 message GetAccountStateResponse {
