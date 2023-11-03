@@ -24,7 +24,19 @@ use crate::ton::message_service_server::MessageServiceServer;
 #[command(author, version, about, long_about = None)]
 struct Args {
     #[clap(long, action)]
-    enable_metrics: bool
+    enable_metrics: bool,
+    #[clap(long, action, default_value_t = 10)]
+    timeout: u64,
+    #[clap(long, action, default_value_t = 10)]
+    retry_budget_ttl: u64,
+    #[clap(long, action, default_value_t = 1)]
+    retry_min_rps: u64,
+    #[clap(long, action, default_value_t = 0.1)]
+    retry_withdraw_percent: f32,
+    #[clap(long, action, default_value_t = 128)]
+    retry_first_delay_millis: u32,
+    #[clap(long, action, default_value_t = 4096)]
+    retry_max_delay_millis: u32,
 }
 
 #[tokio::main]
@@ -75,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
         .tcp_keepalive(Some(Duration::from_secs(300)))
         .http2_keepalive_interval(Some(Duration::from_secs(120)))
         .http2_keepalive_timeout(Some(Duration::from_secs(20)))
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(args.timeout))
         .add_service(reflection)
         .add_service(health_server)
         .add_service(account_service)
