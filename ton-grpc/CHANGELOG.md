@@ -20,6 +20,13 @@
 
 
 
+## [0.4.0](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.3.1...ton-grpc-v0.4.0) (2023-11-03)
+
+
+### Features
+
+* set up timeuts & delay between retries ([223f55d](https://github.com/getgems-io/tonlibjson/commit/223f55d1e1fa8b2cfdf630aa3e066b69acbb071d))
+
 ## [0.3.0](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.2.14...ton-grpc-v0.3.0) (2023-11-01)
 
 

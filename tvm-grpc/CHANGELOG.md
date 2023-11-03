@@ -10,6 +10,13 @@
 
 
 
+## [0.4.0](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.11...tvm-grpc-v0.4.0) (2023-11-03)
+
+
+### Features
+
+* set up timeuts & delay between retries ([223f55d](https://github.com/getgems-io/tonlibjson/commit/223f55d1e1fa8b2cfdf630aa3e066b69acbb071d))
+
 ## [0.3.8](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.7...tvm-grpc-v0.3.8) (2023-10-17)
 
 

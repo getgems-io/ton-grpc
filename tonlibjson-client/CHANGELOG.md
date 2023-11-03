@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.6.0...tonlibjson-client-v0.7.0) (2023-11-03)
+
+
+### Features
+
+* set up timeuts & delay between retries ([223f55d](https://github.com/getgems-io/tonlibjson/commit/223f55d1e1fa8b2cfdf630aa3e066b69acbb071d))
+
 ## [0.6.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.5.0...tonlibjson-client-v0.6.0) (2023-11-03)
 
 
