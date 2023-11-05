@@ -16,12 +16,12 @@ use tower::ServiceExt;
 use tracing::{instrument, trace};
 use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
-use crate::balance::{Balance, Router};
+use crate::balance::{Balance, BlockCriteria, Route, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
 use crate::config::AppConfig;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::helper::Side;
-use crate::request::Specialized;
+use crate::request::{Forward, Specialized};
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::shared::SharedService;
@@ -195,6 +195,17 @@ impl TonClient {
         self.client
             .clone()
             .oneshot(WithBlock::new(block_id, RawGetAccountState::new(account_address)))
+            .await
+    }
+
+    #[instrument(skip_all, err)]
+    pub async fn raw_get_account_state_at_least_block(&self, address: &str, block_id: &BlockIdExt) -> anyhow::Result<RawFullAccountState> {
+        let route = Route::Block { chain: block_id.workchain, criteria: BlockCriteria::Seqno { shard: block_id.shard, seqno: block_id.seqno } };
+        let account_address = AccountAddress::new(address)?;
+
+        self.client
+            .clone()
+            .oneshot(Forward::new(route, RawGetAccountState::new(account_address)))
             .await
     }
 
