@@ -2,7 +2,7 @@ use std::future::Future;
 use std::time::Duration;
 use derive_new::new;
 use uuid::Uuid;
-use serde::{Serialize, Deserialize};
+use serde::{Serialize, Deserialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service};
@@ -45,6 +45,32 @@ pub trait Routable {
 
 impl Requestable for Value {
     type Response = Value;
+}
+
+#[derive(Clone, Debug)]
+pub struct Forward<T> {
+    route: Route,
+    inner: T
+}
+
+impl<T> Forward<T> {
+    pub fn new(route: Route, inner: T) -> Self {
+        Self { route, inner }
+    }
+}
+
+impl<T: Serialize> Serialize for Forward<T> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error> where S: Serializer {
+        self.inner.serialize(serializer)
+    }
+}
+
+impl<T> Routable for Forward<T> {
+    fn route(&self) -> Route { self.route }
+}
+
+impl<T> Requestable for Forward<T> where T : Requestable {
+    type Response = T::Response;
 }
 
 pub type RequestId = Uuid;

@@ -3,9 +3,10 @@ use std::str::FromStr;
 use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
 use anyhow::Result;
-use futures::{Stream, StreamExt, try_join, TryStreamExt};
+use futures::{Stream, StreamExt, try_join, TryStreamExt, TryFutureExt};
 use derive_new::new;
 use tonlibjson_client::address::AccountAddressData;
+use tonlibjson_client::block::RawFullAccountState;
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_service_server::AccountService as BaseAccountService;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
@@ -27,27 +28,9 @@ impl BaseAccountService for AccountService {
         let address = AccountAddressData::from_str(&msg.account_address)
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let criteria = match msg.criteria {
-            None => {
-                let block_id = self.client.get_masterchain_info()
-                    .await
-                    .map(|i| i.last);
-
-                either::Left(block_id)
-            },
-            Some(get_account_state_request::Criteria::BlockId(block_id)) => {
-                either::Left(extend_block_id(&self.client, &block_id).await)
-            },
-            Some(get_account_state_request::Criteria::TransactionId(tx_id)) => either::Right(Ok(tx_id.into()))
-        }.factor_err().map_err(|e| Status::internal(e.to_string()))?;
-
-        let state = criteria.map_left(|block_id| async {
-            self.client.raw_get_account_state_on_block(&msg.account_address, block_id)
-                .await
-        }).map_right(|tx_id| async {
-            self.client.raw_get_account_state_by_transaction(&msg.account_address, tx_id)
-                .await
-        }).await.map_err(|e| Status::internal(e.to_string()))?;
+        let state = self.fetch_account_state(&msg)
+            .map_err(|e| Status::internal(e.to_string()))
+            .await?;
 
         let block_id = state.block_id.clone();
         let balance = state.balance.unwrap_or_default();
@@ -143,6 +126,32 @@ impl BaseAccountService for AccountService {
     }
 }
 
+impl AccountService {
+    async fn fetch_account_state(&self, msg: &GetAccountStateRequest) -> Result<RawFullAccountState> {
+        let state = match &msg.criteria {
+            None => {
+                let block_id = self.client.get_masterchain_info().await?.last;
+
+                self.client.raw_get_account_state_at_least_block(&msg.account_address, &block_id).await?
+            },
+            Some(get_account_state_request::Criteria::BlockId(block_id)) => {
+                let block_id = extend_block_id(&self.client, block_id).await?;
+
+                self.client.raw_get_account_state_on_block(&msg.account_address, block_id).await?
+            },
+            Some(get_account_state_request::Criteria::AtLeastBlockId(block_id)) => {
+                let block_id = extend_block_id(&self.client, block_id).await?;
+
+                self.client.raw_get_account_state_at_least_block(&msg.account_address, &block_id).await?
+            },
+            Some(get_account_state_request::Criteria::TransactionId(tx_id)) => {
+                self.client.raw_get_account_state_by_transaction(&msg.account_address, tx_id.clone().into()).await?
+            },
+        };
+        Ok(state)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use futures::StreamExt;
@@ -151,7 +160,7 @@ mod tests {
     use tracing_test::traced_test;
     use crate::account::AccountService;
     use crate::ton::account_service_server::AccountService as BaseAccountService;
-    use crate::ton::{get_account_transactions_request, GetAccountTransactionsRequest, PartialTransactionId};
+    use crate::ton::{get_account_transactions_request, GetAccountStateRequest, GetAccountTransactionsRequest, PartialTransactionId};
     use crate::ton::get_account_transactions_request::bound;
 
     #[tokio::test]
@@ -181,5 +190,24 @@ mod tests {
         tracing::info!("got txs: {:?}", txs);
 
         assert_eq!(1, txs.len())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn get_account_state_without_criteria() {
+        tracing::info!("prep client");
+        let mut client = TonClient::from_env().await.unwrap();
+        client.ready().await.unwrap();
+        tracing::info!("ready");
+        let svc = AccountService::new(client);
+
+        let req = Request::new(GetAccountStateRequest {
+            account_address: "EQCaatdRleXHdMCc3ONQsZklcF32jyCiJhHyN3YEKxPXMhsF".to_string(),
+            criteria: None
+        });
+
+        let resp = svc.get_account_state(req).await;
+
+        assert_eq!(resp.is_ok())
     }
 }
