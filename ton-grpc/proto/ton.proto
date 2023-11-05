@@ -14,8 +14,8 @@ message GetAccountStateRequest {
   /* optional */ oneof criteria {
     BlockId block_id = 2;
     PartialTransactionId transaction_id = 3;
+    BlockId at_least_block_id = 4;
   }
-  optional BlockId block_reached = 4;
 }
 
 message GetAccountStateResponse {
