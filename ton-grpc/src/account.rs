@@ -139,7 +139,7 @@ impl AccountService {
                 (block_id, cell)
             }
             Some(get_shard_account_cell_request::Criteria::BlockId(block_id)) => {
-                let block_id = extend_block_id(&self.client, &block_id).await?;
+                let block_id = extend_block_id(&self.client, block_id).await?;
                 let cell = self.client.get_shard_account_cell_on_block(&msg.account_address, block_id.clone()).await?;
 
                 (block_id, cell)
@@ -151,7 +151,7 @@ impl AccountService {
                 (state.block_id, cell)
             },
             Some(get_shard_account_cell_request::Criteria::AtLeastBlockId(block_id)) => {
-                let block_id = extend_block_id(&self.client, &block_id).await?;
+                let block_id = extend_block_id(&self.client, block_id).await?;
                 let cell = self.client.get_shard_account_cell_at_least_block(&msg.account_address, &block_id).await?;
 
                 (block_id, cell)
