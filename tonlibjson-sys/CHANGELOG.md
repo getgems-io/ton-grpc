@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-sys-v0.1.4...tonlibjson-sys-v0.1.5) (2023-11-06)
+
+
+### Bug Fixes
+
+* **deps:** bump tonlibjson-sys/ton-testnet from `89700cb` to `ba03657` ([bf9d8e3](https://github.com/getgems-io/tonlibjson/commit/bf9d8e398a880aa1f1bb0d718d8fa4fc3b979f0a))
+
 ## [0.1.4](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-sys-v0.1.3...tonlibjson-sys-v0.1.4) (2023-11-01)
 
 
