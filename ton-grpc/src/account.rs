@@ -170,7 +170,7 @@ mod tests {
     use tracing_test::traced_test;
     use crate::account::AccountService;
     use crate::ton::account_service_server::AccountService as BaseAccountService;
-    use crate::ton::{get_account_transactions_request, GetAccountStateRequest, GetAccountTransactionsRequest, PartialTransactionId};
+    use crate::ton::{get_account_transactions_request, GetAccountStateRequest, GetAccountTransactionsRequest, GetShardAccountCellRequest, PartialTransactionId};
     use crate::ton::get_account_transactions_request::bound;
 
     #[tokio::test]
@@ -218,6 +218,29 @@ mod tests {
 
         let resp = svc.get_account_state(req).await;
 
-        assert_eq!(resp.is_ok())
+        tracing::info!(resp = ?resp);
+
+        assert!(resp.is_ok())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn get_shard_account_cell_without_criteria() {
+        tracing::info!("prep client");
+        let mut client = TonClient::from_env().await.unwrap();
+        client.ready().await.unwrap();
+        tracing::info!("ready");
+        let svc = AccountService::new(client);
+
+        let req = Request::new(GetShardAccountCellRequest {
+            account_address: "EQCaatdRleXHdMCc3ONQsZklcF32jyCiJhHyN3YEKxPXMhsF".to_string(),
+            criteria: None
+        });
+
+        let resp = svc.get_shard_account_cell(req).await;
+
+        tracing::info!(resp = ?resp);
+
+        assert!(resp.is_ok())
     }
 }
