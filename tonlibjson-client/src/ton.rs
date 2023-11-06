@@ -198,7 +198,7 @@ impl TonClient {
             .await
     }
 
-    #[instrument(skip_all, err)]
+    // TODO[akostylev0]: (optimization) use BlockId instead of BlockIdExt
     pub async fn raw_get_account_state_at_least_block(&self, address: &str, block_id: &BlockIdExt) -> anyhow::Result<RawFullAccountState> {
         let route = Route::Block { chain: block_id.workchain, criteria: BlockCriteria::Seqno { shard: block_id.shard, seqno: block_id.seqno } };
         let account_address = AccountAddress::new(address)?;
@@ -553,6 +553,7 @@ impl TonClient {
             .await
     }
 
+    // TODO[akostylev0]: (optimization) use BlockId instead of BlockIdExt
     pub async fn get_shard_account_cell_at_least_block(&self, address: &str, block_id: &BlockIdExt) -> anyhow::Result<Cell> {
         let route = Route::Block { chain: block_id.workchain, criteria: BlockCriteria::Seqno { shard: block_id.shard, seqno: block_id.seqno } };
         let address = AccountAddress::new(address)?;
