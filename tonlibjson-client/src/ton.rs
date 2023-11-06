@@ -553,6 +553,16 @@ impl TonClient {
             .await
     }
 
+    pub async fn get_shard_account_cell_at_least_block(&self, address: &str, block_id: &BlockIdExt) -> anyhow::Result<Cell> {
+        let route = Route::Block { chain: block_id.workchain, criteria: BlockCriteria::Seqno { shard: block_id.shard, seqno: block_id.seqno } };
+        let address = AccountAddress::new(address)?;
+
+        self.client
+            .clone()
+            .oneshot(Forward::new(route, GetShardAccountCell::new(address)))
+            .await
+    }
+
     pub async fn get_shard_account_cell_by_transaction(&self, address: &str, transaction: InternalTransactionId) -> anyhow::Result<Cell> {
         let address = AccountAddress::new(address)?;
 
