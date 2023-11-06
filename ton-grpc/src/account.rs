@@ -6,7 +6,7 @@ use anyhow::Result;
 use futures::{Stream, StreamExt, try_join, TryStreamExt, TryFutureExt};
 use derive_new::new;
 use tonlibjson_client::address::AccountAddressData;
-use tonlibjson_client::block::RawFullAccountState;
+use tonlibjson_client::block::{BlockIdExt, Cell, RawFullAccountState};
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_service_server::AccountService as BaseAccountService;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
@@ -51,30 +51,9 @@ impl BaseAccountService for AccountService {
     async fn get_shard_account_cell(&self, request: Request<GetShardAccountCellRequest>) -> Result<Response<GetShardAccountCellResponse>, Status> {
         let msg = request.into_inner();
 
-        let criteria = match msg.criteria {
-            None => {
-                let block_id = self.client.get_masterchain_info()
-                    .await
-                    .map(|i| i.last);
-
-                either::Left(block_id)
-            },
-            Some(get_shard_account_cell_request::Criteria::BlockId(block_id)) => {
-                either::Left(extend_block_id(&self.client, &block_id).await)
-            },
-            Some(get_shard_account_cell_request::Criteria::TransactionId(tx_id)) => either::Right(Ok(tx_id.into()))
-        }.factor_err().map_err(|e| Status::internal(e.to_string()))?;
-
-        let (block_id, cell) = criteria.map_left(|block_id| async {
-            let cell = self.client.get_shard_account_cell_on_block(&msg.account_address, block_id.clone()).await?;
-
-            Ok((block_id, cell))
-        }).map_right(|tx_id| async {
-            let state = self.client.raw_get_account_state_by_transaction(&msg.account_address, tx_id).await?;
-            let cell = self.client.get_shard_account_cell_on_block(&msg.account_address, state.block_id.clone()).await?;
-
-            Ok((state.block_id, cell))
-        }).await.map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
+        let (block_id, cell) = self.fetch_shard_account_cell(&msg)
+            .await
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         let block_id = block_id.into();
         let cell = cell.into();
@@ -149,6 +128,37 @@ impl AccountService {
             },
         };
         Ok(state)
+    }
+
+    async fn fetch_shard_account_cell(&self, msg: &GetShardAccountCellRequest) -> Result<(BlockIdExt, Cell)> {
+        let (block_id, cell) = match &msg.criteria {
+            None => {
+                let block_id = self.client.get_masterchain_info().await?.last;
+                let cell = self.client.get_shard_account_cell_at_least_block(&msg.account_address, &block_id).await?;
+
+                (block_id, cell)
+            }
+            Some(get_shard_account_cell_request::Criteria::BlockId(block_id)) => {
+                let block_id = extend_block_id(&self.client, &block_id).await?;
+                let cell = self.client.get_shard_account_cell_on_block(&msg.account_address, block_id.clone()).await?;
+
+                (block_id, cell)
+            },
+            Some(get_shard_account_cell_request::Criteria::TransactionId(tx_id)) => {
+                let state = self.client.raw_get_account_state_by_transaction(&msg.account_address, tx_id.clone().into()).await?;
+                let cell = self.client.get_shard_account_cell_on_block(&msg.account_address, state.block_id.clone()).await?;
+
+                (state.block_id, cell)
+            },
+            Some(get_shard_account_cell_request::Criteria::AtLeastBlockId(block_id)) => {
+                let block_id = extend_block_id(&self.client, &block_id).await?;
+                let cell = self.client.get_shard_account_cell_at_least_block(&msg.account_address, &block_id).await?;
+
+                (block_id, cell)
+            }
+        };
+
+        Ok((block_id, cell))
     }
 }
 
