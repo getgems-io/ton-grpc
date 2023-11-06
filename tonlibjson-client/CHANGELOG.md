@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.7.0...tonlibjson-client-v0.8.0) (2023-11-06)
+
+
+### Features
+
+* GetAccountStateRequest at_least_block_id criteria ([b37a0a0](https://github.com/getgems-io/tonlibjson/commit/b37a0a0f17dd170c50623a10a3f7dc20f31c5ef7))
+* GetShardAccountCellRequest at_least_block_id criteria ([4ea3004](https://github.com/getgems-io/tonlibjson/commit/4ea3004b70cf2d3904a52b59de3f4753198860e5))
+
 ## [0.7.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.6.0...tonlibjson-client-v0.7.0) (2023-11-03)
 
 
