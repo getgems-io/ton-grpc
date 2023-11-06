@@ -1,3 +1,4 @@
+use std::os::linux::raw::stat;
 use std::pin::Pin;
 use std::str::FromStr;
 use tonic::{async_trait, Request, Response, Status};
@@ -151,10 +152,10 @@ impl AccountService {
                 (state.block_id, cell)
             },
             Some(get_shard_account_cell_request::Criteria::AtLeastBlockId(block_id)) => {
-                let block_id = extend_block_id(&self.client, block_id).await?;
-                let cell = self.client.get_shard_account_cell_at_least_block(&msg.account_address, &block_id).await?;
+                let state = self.client.raw_get_account_state_at_least_block(&msg.account_address, block_id.clone().into()).await?;
+                let cell = self.client.get_shard_account_cell_on_block(&msg.account_address, state.block_id.clone()).await?;
 
-                (block_id, cell)
+                (state.block_id, cell)
             }
         };
 
