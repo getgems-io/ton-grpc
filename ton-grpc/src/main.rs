@@ -50,6 +50,11 @@ struct Args {
     retry_first_delay: Duration,
     #[clap(long, value_parser = humantime::parse_duration, default_value = "4096ms")]
     retry_max_delay: Duration,
+
+    #[clap(long, value_parser = humantime::parse_duration, default_value = "70ms")]
+    ewma_default_rtt: Duration,
+    #[clap(long, value_parser = humantime::parse_duration, default_value = "1ms")]
+    ewma_decay: Duration,
 }
 
 #[tokio::main]
@@ -76,6 +81,8 @@ async fn main() -> anyhow::Result<()> {
         .set_retry_percent(args.retry_withdraw_percent)
         .set_retry_first_delay(args.retry_first_delay)
         .set_retry_max_delay(args.retry_max_delay)
+        .set_ewma_default_rtt(args.ewma_default_rtt)
+        .set_ewma_decay(args.ewma_decay)
         .await?;
 
     client.ready().await?;
