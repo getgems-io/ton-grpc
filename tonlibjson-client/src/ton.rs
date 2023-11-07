@@ -1,11 +1,13 @@
 use std::cmp::min;
 use std::collections::{Bound, HashMap};
+use std::future::IntoFuture;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::time::Duration;
-use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, TryFutureExt};
+use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, TryFutureExt, FutureExt};
 use anyhow::anyhow;
 use async_stream::try_stream;
+use futures::future::BoxFuture;
 use itertools::Itertools;
 use serde_json::Value;
 use tokio_stream::StreamMap;
@@ -45,7 +47,9 @@ pub struct TonClientBuilder {
     ewma_decay: Duration,
     retry_budget_ttl: Duration,
     retry_min_per_sec: u32,
-    retry_percent: f32
+    retry_percent: f32,
+    retry_first_delay: Duration,
+    retry_max_delay: Duration,
 }
 
 impl Default for TonClientBuilder {
@@ -57,6 +61,8 @@ impl Default for TonClientBuilder {
             retry_budget_ttl: Duration::from_secs(10),
             retry_min_per_sec: 10,
             retry_percent: 0.1,
+            retry_first_delay: Duration::from_millis(128),
+            retry_max_delay: Duration::from_millis(4096),
         }
     }
 }
@@ -74,6 +80,12 @@ impl TonClientBuilder {
             config_source: ConfigSource::FromUrl { url, interval, fallback_path: None },
             .. Default::default()
         }
+    }
+
+    pub fn set_config_url<U: TryInto<Url>>(mut self, url: U, interval: Duration) -> Result<Self, U::Error> {
+        self.config_source = ConfigSource::FromUrl { url: url.try_into()?, interval, fallback_path: None };
+
+        Ok(self)
     }
 
     pub fn from_config_url_with_fallback(url: Url, interval: Duration, fallback_path: Option<PathBuf>) -> Self {
@@ -113,6 +125,18 @@ impl TonClientBuilder {
         self
     }
 
+    pub fn set_retry_first_delay(mut self, first_delay: Duration) -> Self {
+        self.retry_first_delay = first_delay;
+
+        self
+    }
+
+    pub fn set_retry_max_delay(mut self, delay: Duration) -> Self {
+        self.retry_max_delay = delay;
+
+        self
+    }
+
     pub async fn build(self) -> anyhow::Result<TonClient> {
         let client_discover = match self.config_source {
             ConfigSource::FromFile { path } => { ClientDiscover::from_path(path).await? }
@@ -136,9 +160,18 @@ impl TonClientBuilder {
             self.retry_budget_ttl,
             self.retry_min_per_sec,
             self.retry_percent
-        )), client);
+        ), self.retry_first_delay.as_millis() as u64, self.retry_max_delay), client);
 
         Ok(TonClient { client } )
+    }
+}
+
+impl IntoFuture for TonClientBuilder {
+    type Output = anyhow::Result<TonClient>;
+    type IntoFuture = BoxFuture<'static, Self::Output>;
+
+    fn into_future(self) -> Self::IntoFuture {
+        self.build().boxed()
     }
 }
 

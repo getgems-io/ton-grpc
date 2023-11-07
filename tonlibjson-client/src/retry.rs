@@ -15,9 +15,9 @@ pub struct RetryPolicy {
 }
 
 impl RetryPolicy {
-    pub fn new(budget: Budget) -> Self {
-        let retry_strategy = FibonacciBackoff::from_millis(128)
-            .max_delay(Duration::from_millis(4096));
+    pub fn new(budget: Budget, first_delay_millis: u64, max_delay: Duration) -> Self {
+        let retry_strategy = FibonacciBackoff::from_millis(first_delay_millis)
+            .max_delay(max_delay);
 
         Self {
             budget: Arc::new(budget),
