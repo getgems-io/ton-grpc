@@ -183,17 +183,17 @@ impl TonClient {
         Ok(())
     }
 
-    pub async fn from_url(url: Url, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
-        TonClientBuilder::from_config_url_with_fallback(url, Duration::from_secs(60), fallback_path).build().await
-    }
-
     pub async fn from_env() -> anyhow::Result<Self> {
         let config = AppConfig::from_env()?;
 
         tracing::warn!("Ton config url: {}", config.config_url);
         tracing::warn!("Ton config fallback path: {:?}", config.config_path);
 
-        Self::from_url(config.config_url, config.config_path).await
+        TonClientBuilder::from_config_url_with_fallback(
+            config.config_url,
+            Duration::from_secs(60),
+            config.config_path
+        ).await
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
