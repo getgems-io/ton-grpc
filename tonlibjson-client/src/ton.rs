@@ -18,7 +18,7 @@ use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
 use crate::balance::{Balance, BlockCriteria, Route, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
-use crate::config::AppConfig;
+use crate::config::{AppConfig, default_ton_config_url};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::helper::Side;
 use crate::request::{Forward, Specialized};
@@ -34,6 +34,114 @@ pub struct TonClient {
 const MAIN_CHAIN: i32 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
+enum ConfigSource {
+    FromFile { path: PathBuf },
+    FromUrl { url: Url, interval: Duration, fallback_path: Option<PathBuf> },
+}
+
+pub struct TonClientBuilder {
+    config_source: ConfigSource,
+    ewma_default_rtt: Duration,
+    ewma_decay: Duration,
+    retry_budget_ttl: Duration,
+    retry_min_per_sec: u32,
+    retry_percent: f32
+}
+
+impl Default for TonClientBuilder {
+    fn default() -> Self {
+        Self {
+            config_source: ConfigSource::FromUrl { url: default_ton_config_url(), interval: Duration::from_secs(60), fallback_path: None },
+            ewma_default_rtt: Duration::from_secs(15),
+            ewma_decay: Duration::from_secs(60),
+            retry_budget_ttl: Duration::from_secs(10),
+            retry_min_per_sec: 10,
+            retry_percent: 0.1,
+        }
+    }
+}
+
+impl TonClientBuilder {
+    pub fn from_config_path(path: PathBuf) -> Self {
+        Self {
+            config_source: ConfigSource::FromFile { path },
+            .. Default::default()
+        }
+    }
+
+    pub fn from_config_url(url: Url, interval: Duration) -> Self {
+        Self {
+            config_source: ConfigSource::FromUrl { url, interval, fallback_path: None },
+            .. Default::default()
+        }
+    }
+
+    pub fn from_config_url_with_fallback(url: Url, interval: Duration, fallback_path: Option<PathBuf>) -> Self {
+        Self {
+            config_source: ConfigSource::FromUrl { url, interval, fallback_path },
+            .. Default::default()
+        }
+    }
+
+    pub fn set_ewma_default_rtt(mut self, default_rtt: Duration) -> Self {
+        self.ewma_default_rtt = default_rtt;
+
+        self
+    }
+
+    pub fn set_ewma_decay(mut self, decay: Duration) -> Self {
+        self.ewma_decay = decay;
+
+        self
+    }
+
+    pub fn set_retry_budget_ttl(mut self, budget_ttl: Duration) -> Self {
+        self.retry_budget_ttl = budget_ttl;
+
+        self
+    }
+
+    pub fn set_retry_min_per_sec(mut self, retry_min_per_sec: u32) -> Self {
+        self.retry_min_per_sec = retry_min_per_sec;
+
+        self
+    }
+
+    pub fn set_retry_percent(mut self, retry_percent: f32) -> Self {
+        self.retry_percent = retry_percent;
+
+        self
+    }
+
+    pub async fn build(self) -> anyhow::Result<TonClient> {
+        let client_discover = match self.config_source {
+            ConfigSource::FromFile { path } => { ClientDiscover::from_path(path).await? }
+            ConfigSource::FromUrl { url, interval, fallback_path } => { ClientDiscover::new(url, interval, fallback_path).await? }
+        };
+
+        let ewma_discover = PeakEwmaDiscover::new::<Value>(
+            client_discover,
+            self.ewma_default_rtt,
+            self.ewma_decay,
+            tower::load::CompleteOnResponse::default(),
+        );
+
+        let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
+
+        let router = Router::new(cursor_client_discover);
+        let client = Balance::new(router);
+
+        let client = SharedService::new(client);
+        let client = Retry::new(RetryPolicy::new(Budget::new(
+            self.retry_budget_ttl,
+            self.retry_min_per_sec,
+            self.retry_percent
+        )), client);
+
+        Ok(TonClient { client } )
+    }
+}
+
 impl TonClient {
     pub async fn ready(&mut self) -> anyhow::Result<()> {
         self.get_masterchain_info().await?;
@@ -42,54 +150,8 @@ impl TonClient {
         Ok(())
     }
 
-    pub async fn from_path(path: PathBuf) -> anyhow::Result<Self> {
-        let client_discover = ClientDiscover::from_path(path).await?;
-        let ewma_discover = PeakEwmaDiscover::new::<Value>(
-            client_discover,
-            Duration::from_secs(15),
-            Duration::from_secs(60),
-            tower::load::CompleteOnResponse::default(),
-        );
-        let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
-
-        let router = Router::new(cursor_client_discover);
-        let client = Balance::new(router);
-
-        let client = SharedService::new(client);
-        let client = Retry::new(RetryPolicy::new(Budget::new(
-            Duration::from_secs(10),
-            10,
-            0.1
-        )), client);
-
-        Ok(Self { client })
-    }
-
     pub async fn from_url(url: Url, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
-        let client_discover = ClientDiscover::new(
-            url,
-            Duration::from_secs(60),
-            fallback_path
-        ).await?;
-        let ewma_discover = PeakEwmaDiscover::new::<Value>(
-            client_discover,
-            Duration::from_secs(15),
-            Duration::from_secs(60),
-            tower::load::CompleteOnResponse::default(),
-        );
-        let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
-
-        let router = Router::new(cursor_client_discover);
-        let client = Balance::new(router);
-
-        let client = SharedService::new(client);
-        let client = Retry::new(RetryPolicy::new(Budget::new(
-            Duration::from_secs(10),
-            10,
-            0.1
-        )), client);
-
-        Ok(Self { client })
+        TonClientBuilder::from_config_url_with_fallback(url, Duration::from_secs(60), fallback_path).build().await
     }
 
     pub async fn from_env() -> anyhow::Result<Self> {
