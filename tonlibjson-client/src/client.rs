@@ -154,7 +154,6 @@ mod tests {
     use tracing_test::traced_test;
     use crate::block::{BlocksGetShards, BlocksShards, GetMasterchainInfo};
     use crate::client::Client;
-    use crate::make::ClientBuilder;
     use crate::ton_config::load_ton_config;
 
     #[tokio::test]
