@@ -56,8 +56,8 @@ impl Default for TonClientBuilder {
     fn default() -> Self {
         Self {
             config_source: ConfigSource::FromUrl { url: default_ton_config_url(), interval: Duration::from_secs(60), fallback_path: None },
-            ewma_default_rtt: Duration::from_secs(15),
-            ewma_decay: Duration::from_secs(60),
+            ewma_default_rtt: Duration::from_millis(70),
+            ewma_decay: Duration::from_millis(1),
             retry_budget_ttl: Duration::from_secs(10),
             retry_min_per_sec: 10,
             retry_percent: 0.1,
