@@ -80,6 +80,8 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Listening metrics on {:?}", &args.metrics_listen);
     }
 
+    tracing::info!("TON Config URL: {}", &args.ton_config_url);
+
     let mut client = TonClientBuilder::from_config_url(args.ton_config_url, Duration::from_secs(60))
         .set_timeout(args.ton_timeout)
         .set_retry_budget_ttl(args.retry_budget_ttl)

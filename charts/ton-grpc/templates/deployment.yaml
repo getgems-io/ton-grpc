@@ -44,6 +44,9 @@ spec:
             {{- if .Values.metrics.enabled }}
             - --enable-metrics
             {{- end }}
+            {{- if .Values.tonConfigUrl }}
+            - --ton-config-url="{{ .Values.tonConfigUrl }}"
+            {{- end }}
           ports:
             - name: http
               containerPort: 50052
@@ -54,6 +57,7 @@ spec:
               protocol: TCP
             {{- end }}
           env:
+            # DEPRECATED[akostylev0]
             {{- if .Values.tonConfigUrl }}
             - name: TON_CONFIG_URL
               value: {{ .Values.tonConfigUrl }}
