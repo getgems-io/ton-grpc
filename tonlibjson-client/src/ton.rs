@@ -18,10 +18,10 @@ use tower::ServiceExt;
 use tower::timeout::Timeout;
 use tracing::{instrument, trace};
 use url::Url;
+use std::str::FromStr;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
 use crate::balance::{Balance, BlockCriteria, Route, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
-use crate::config::default_ton_config_url;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
 use crate::helper::Side;
@@ -29,6 +29,16 @@ use crate::request::{Forward, Specialized};
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use crate::shared::SharedService;
+
+#[cfg(not(feature = "testnet"))]
+pub(crate) fn default_ton_config_url() -> Url {
+    Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/global.config.json").unwrap()
+}
+
+#[cfg(feature = "testnet")]
+pub(crate) fn default_ton_config_url() -> Url {
+    Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/testnet-global.config.json").unwrap()
+}
 
 #[derive(Clone)]
 pub struct TonClient {
