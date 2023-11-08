@@ -1920,6 +1920,7 @@ dependencies = [
  "tracing-futures",
  "tracing-subscriber",
  "tracing-test",
+ "url",
 ]
 
 [[package]]

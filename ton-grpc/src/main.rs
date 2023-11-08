@@ -13,6 +13,7 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tonlibjson_client::ton::TonClientBuilder;
 use clap::Parser;
+use url::Url;
 use crate::account::AccountService;
 use crate::block::BlockService;
 use crate::message::MessageService;
@@ -40,6 +41,8 @@ struct Args {
     #[clap(long, default_value = "0.0.0.0:9000")]
     metrics_listen: SocketAddr,
 
+    #[clap(long, value_parser = Url::parse, default_value_t = tonlibjson_client::ton::default_ton_config_url())]
+    ton_config_url: Url,
     #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
     ton_timeout: Duration,
     #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
@@ -77,7 +80,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Listening metrics on {:?}", &args.metrics_listen);
     }
 
-    let mut client = TonClientBuilder::default()
+    let mut client = TonClientBuilder::from_config_url(args.ton_config_url, Duration::from_secs(60))
         .set_timeout(args.ton_timeout)
         .set_retry_budget_ttl(args.retry_budget_ttl)
         .set_retry_min_per_sec(args.retry_min_rps)
