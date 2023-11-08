@@ -26,7 +26,7 @@ use crate::ton::message_service_server::MessageServiceServer;
 struct Args {
     #[clap(long, default_value = "0.0.0.0:50052")]
     listen: SocketAddr,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
+    #[clap(long, value_parser = humantime::parse_duration, default_value = "30s")]
     timeout: Duration,
     #[clap(long, value_parser = humantime::parse_duration, default_value = "300s")]
     tcp_keepalive: Duration,
@@ -40,6 +40,8 @@ struct Args {
     #[clap(long, default_value = "0.0.0.0:9000")]
     metrics_listen: SocketAddr,
 
+    #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
+    ton_timeout: Duration,
     #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
     retry_budget_ttl: Duration,
     #[clap(long, default_value_t = 1)]
@@ -76,6 +78,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let mut client = TonClientBuilder::default()
+        .set_timeout(args.ton_timeout)
         .set_retry_budget_ttl(args.retry_budget_ttl)
         .set_retry_min_per_sec(args.retry_min_rps)
         .set_retry_percent(args.retry_withdraw_percent)

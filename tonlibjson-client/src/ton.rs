@@ -15,6 +15,7 @@ use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
 use tower::ServiceExt;
+use tower::timeout::Timeout;
 use tracing::{instrument, trace};
 use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
@@ -22,6 +23,7 @@ use crate::balance::{Balance, BlockCriteria, Route, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
 use crate::config::{AppConfig, default_ton_config_url};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
+use crate::error::ErrorService;
 use crate::helper::Side;
 use crate::request::{Forward, Specialized};
 use crate::retry::RetryPolicy;
@@ -30,7 +32,7 @@ use crate::shared::SharedService;
 
 #[derive(Clone)]
 pub struct TonClient {
-    client: Retry<RetryPolicy, SharedService<Balance>>
+    client: ErrorService<Timeout<Retry<RetryPolicy, SharedService<Balance>>>>
 }
 
 const MAIN_CHAIN: i32 = -1;
@@ -43,26 +45,28 @@ enum ConfigSource {
 
 pub struct TonClientBuilder {
     config_source: ConfigSource,
+    timeout: Duration,
     ewma_default_rtt: Duration,
     ewma_decay: Duration,
     retry_budget_ttl: Duration,
     retry_min_per_sec: u32,
     retry_percent: f32,
     retry_first_delay: Duration,
-    retry_max_delay: Duration,
+    retry_max_delay: Duration
 }
 
 impl Default for TonClientBuilder {
     fn default() -> Self {
         Self {
             config_source: ConfigSource::FromUrl { url: default_ton_config_url(), interval: Duration::from_secs(60), fallback_path: None },
+            timeout: Duration::from_secs(10),
             ewma_default_rtt: Duration::from_millis(70),
             ewma_decay: Duration::from_millis(1),
             retry_budget_ttl: Duration::from_secs(10),
             retry_min_per_sec: 10,
             retry_percent: 0.1,
             retry_first_delay: Duration::from_millis(128),
-            retry_max_delay: Duration::from_millis(4096),
+            retry_max_delay: Duration::from_millis(4096)
         }
     }
 }
@@ -137,6 +141,12 @@ impl TonClientBuilder {
         self
     }
 
+    pub fn set_timeout(mut self, timeout: Duration) -> Self {
+        self.timeout = timeout;
+
+        self
+    }
+
     pub async fn build(self) -> anyhow::Result<TonClient> {
         let client_discover = match self.config_source {
             ConfigSource::FromFile { path } => { ClientDiscover::from_path(path).await? }
@@ -161,6 +171,9 @@ impl TonClientBuilder {
             self.retry_min_per_sec,
             self.retry_percent
         ), self.retry_first_delay.as_millis() as u64, self.retry_max_delay), client);
+
+        let client = Timeout::new(client, self.timeout);
+        let client = ErrorService::new(client);
 
         Ok(TonClient { client } )
     }
