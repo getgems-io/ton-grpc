@@ -19,12 +19,12 @@ base64 = { workspace = true }
 hex = { workspace = true }
 async-stream = { workspace = true }
 quick_cache = { workspace = true }
+url = { workspace = true }
 dashmap = "5.5"
 uuid = { version = "1.5", features = ["v4", "fast-rng", "serde"] }
 pin-project = "1.1"
 reqwest = { version = "0.11", features = ["rustls-tls", "trust-dns"], default-features = false }
 config = { version = "0.13", default-features = false }
-url = { version = "2.4", features = ["serde"] }
 rand = "0.8"
 itertools = "0.11"
 derive-new = "0.6.0"

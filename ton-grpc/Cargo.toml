@@ -24,6 +24,7 @@ tonic = { workspace = true }
 tonic-reflection = { workspace = true }
 tonic-health = { workspace = true }
 prost = { workspace = true }
+url = { workspace = true }
 either = "1.9"
 derive-new = "0.6.0"
 clap = { version = "4.4.7", features = ["derive"] }
