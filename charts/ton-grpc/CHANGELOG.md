@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.4.0...charts/ton-grpc-v0.5.0) (2023-11-08)
+
+
+### Features
+
+* support ton config url arg ([7faa030](https://github.com/getgems-io/ton-grpc/commit/7faa030802e36e67899a0cbc109c8d6079c98a7e))
+
 ## [0.4.0](https://github.com/getgems-io/tonlibjson/compare/charts/ton-grpc-v0.3.1...charts/ton-grpc-v0.4.0) (2023-10-27)
 
 

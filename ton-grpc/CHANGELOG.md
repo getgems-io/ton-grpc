@@ -20,6 +20,23 @@
 
 
 
+## [0.6.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.5.0...ton-grpc-v0.6.0) (2023-11-08)
+
+
+### Features
+
+* drop from_env ([9baddec](https://github.com/getgems-io/ton-grpc/commit/9baddec6cbdd59225df33c3955eca93851f712af))
+* ewma configurable ([e20bb2d](https://github.com/getgems-io/ton-grpc/commit/e20bb2d63e0e77ebe9379c3aae1f1d877d87e054))
+* support ton config url arg ([7faa030](https://github.com/getgems-io/ton-grpc/commit/7faa030802e36e67899a0cbc109c8d6079c98a7e))
+* ton-grpc args ([a7e6a09](https://github.com/getgems-io/ton-grpc/commit/a7e6a09f5210bee28227f45abd17a396abaa66e1))
+* ton-grpc ton config url ([6dadf81](https://github.com/getgems-io/ton-grpc/commit/6dadf8123397796d150183cee94b3363667a174d))
+* tonclient timeout layer ([fc3ec4d](https://github.com/getgems-io/ton-grpc/commit/fc3ec4defe858c060f9e6c83b10effef37c33e09))
+
+
+### Bug Fixes
+
+* **deps:** bump derive-new from 0.5.9 to 0.6.0 ([218e91b](https://github.com/getgems-io/ton-grpc/commit/218e91bcdc19444d48c2de5f9d79b04be43eb640))
+
 ## [0.5.0](https://github.com/getgems-io/tonlibjson/compare/ton-grpc-v0.4.0...ton-grpc-v0.5.0) (2023-11-06)
 
 
