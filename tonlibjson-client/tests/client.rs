@@ -15,7 +15,6 @@ async fn client() -> TonClient {
 #[traced_test]
 async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
     let client = client().await;
-
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned();
     let hash = "752Szayka+Eh54Zvco5l84d6WL+zJFmyh1wqRxD08Uo=";
     let lt = 33756943000007;
@@ -31,10 +30,8 @@ async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
         .await;
 
     debug!("{:#?}", transaction_list);
-
     assert_eq!(transaction_list.len(), 1);
     assert_eq!(transaction_list[0].as_ref().unwrap().transaction_id, tx);
-
     Ok(())
 }
 
@@ -43,7 +40,6 @@ async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
 #[traced_test]
 async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result<()> {
     let client = client().await;
-
     let address = "EQBO_mAVkaHxt6Ibz7wqIJ_UIDmxZBFcgkk7fvIzkh7l42wO".to_owned();
 
     let transaction_list: Vec<anyhow::Result<RawTransaction>> = client
@@ -53,9 +49,7 @@ async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result
         .await;
 
     debug!("{:#?}", transaction_list);
-
     assert_eq!(transaction_list.len(), 1);
-
     Ok(())
 }
 
@@ -64,7 +58,6 @@ async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result
 #[traced_test]
 async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
     let client = client().await;
-
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
     let len = client.get_block_tx_stream(&block, false)
@@ -72,7 +65,6 @@ async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
         .await;
 
     assert_eq!(len, 512);
-
     Ok(())
 }
 
@@ -80,7 +72,6 @@ async fn get_block_tx_stream_correct() -> anyhow::Result<()> {
 #[traced_test]
 async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
     let client = client().await;
-
     let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
     let len = client.get_block_tx_stream(&block, true)
@@ -88,7 +79,6 @@ async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
         .await;
 
     assert_eq!(len, 512);
-
     Ok(())
 }
 
@@ -97,14 +87,10 @@ async fn get_block_tx_stream_reverse_correct() -> anyhow::Result<()> {
 #[traced_test]
 async fn get_block_tx_stream_unordered_correct() -> anyhow::Result<()> {
     let client = client().await;
+    let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
 
-    let block = client.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await.unwrap();
-
-    let len = client.get_block_tx_stream_unordered(&block)
-        .count()
-        .await;
+    let len = client.get_block_tx_stream_unordered(&block).count().await;
 
     assert_eq!(len, 512);
-
     Ok(())
 }
