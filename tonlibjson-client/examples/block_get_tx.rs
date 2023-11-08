@@ -1,16 +1,15 @@
-use futures::{StreamExt, TryStreamExt};
+use futures::TryStreamExt;
 // use std::sync::{Arc, Mutex};
 // use futures::{stream, StreamExt};
 // use tokio::sync::RwLock;
 use tokio::time::Instant;
-use tonlibjson_client::ton::TonClient;
+use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let mut ton = TonClient::from_env().await?;
-
+    let mut ton = TonClientBuilder::default().await?;
     ton.ready().await?;
 
     // let block = ton.get_masterchain_info().await?.last;

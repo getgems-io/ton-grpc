@@ -167,7 +167,7 @@ impl AccountService {
 mod tests {
     use futures::StreamExt;
     use tonic::Request;
-    use tonlibjson_client::ton::TonClient;
+    use tonlibjson_client::ton::TonClientBuilder;
     use tracing_test::traced_test;
     use crate::account::AccountService;
     use crate::ton::account_service_server::AccountService as BaseAccountService;
@@ -178,7 +178,7 @@ mod tests {
     #[traced_test]
     async fn account_get_from_to() {
         tracing::info!("prep client");
-        let mut client = TonClient::from_env().await.unwrap();
+        let mut client = TonClientBuilder::default().await.unwrap();
         client.ready().await.unwrap();
         tracing::info!("ready");
         let svc = AccountService::new(client);
@@ -199,7 +199,6 @@ mod tests {
 
         let txs: Vec<_> = resp.into_inner().collect::<Vec<_>>().await;
         tracing::info!("got txs: {:?}", txs);
-
         assert_eq!(1, txs.len())
     }
 
@@ -207,11 +206,10 @@ mod tests {
     #[traced_test]
     async fn get_account_state_without_criteria() {
         tracing::info!("prep client");
-        let mut client = TonClient::from_env().await.unwrap();
+        let mut client = TonClientBuilder::default().await.unwrap();
         client.ready().await.unwrap();
         tracing::info!("ready");
         let svc = AccountService::new(client);
-
         let req = Request::new(GetAccountStateRequest {
             account_address: "EQCaatdRleXHdMCc3ONQsZklcF32jyCiJhHyN3YEKxPXMhsF".to_string(),
             criteria: None
@@ -220,7 +218,6 @@ mod tests {
         let resp = svc.get_account_state(req).await;
 
         tracing::info!(resp = ?resp);
-
         assert!(resp.is_ok())
     }
 
@@ -228,11 +225,10 @@ mod tests {
     #[traced_test]
     async fn get_shard_account_cell_without_criteria() {
         tracing::info!("prep client");
-        let mut client = TonClient::from_env().await.unwrap();
+        let mut client = TonClientBuilder::default().await.unwrap();
         client.ready().await.unwrap();
         tracing::info!("ready");
         let svc = AccountService::new(client);
-
         let req = Request::new(GetShardAccountCellRequest {
             account_address: "EQCaatdRleXHdMCc3ONQsZklcF32jyCiJhHyN3YEKxPXMhsF".to_string(),
             criteria: None
@@ -241,7 +237,6 @@ mod tests {
         let resp = svc.get_shard_account_cell(req).await;
 
         tracing::info!(resp = ?resp);
-
         assert!(resp.is_ok())
     }
 }
