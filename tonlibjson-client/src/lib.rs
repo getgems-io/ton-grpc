@@ -4,7 +4,6 @@ pub mod request;
 pub mod block;
 pub mod session;
 pub mod ton;
-pub mod config;
 pub mod ton_config;
 pub mod make;
 pub mod cursor_client;
