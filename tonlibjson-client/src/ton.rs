@@ -96,12 +96,6 @@ impl TonClientBuilder {
         }
     }
 
-    pub fn set_config_url<U: TryInto<Url>>(mut self, url: U, interval: Duration) -> Result<Self, U::Error> {
-        self.config_source = ConfigSource::FromUrl { url: url.try_into()?, interval, fallback_path: None };
-
-        Ok(self)
-    }
-
     pub fn from_config_url_with_fallback(url: Url, interval: Duration, fallback_path: Option<PathBuf>) -> Self {
         Self {
             config_source: ConfigSource::FromUrl { url, interval, fallback_path },
