@@ -147,14 +147,10 @@ impl Drop for Stop {
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-    use tokio::sync::OnceCell;
-    use anyhow::anyhow;
     use tower::ServiceExt;
     use tracing_test::traced_test;
-    use crate::block::{BlocksGetShards, BlocksShards, GetMasterchainInfo};
+    use crate::block::GetMasterchainInfo;
     use crate::client::Client;
-    use crate::ton_config::load_ton_config;
 
     #[tokio::test]
     #[traced_test]
