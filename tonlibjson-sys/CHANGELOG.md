@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.6](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.1.5...tonlibjson-sys-v0.1.6) (2023-11-08)
+
+
+### Bug Fixes
+
+* drop dep on old num ([fc59e1f](https://github.com/getgems-io/ton-grpc/commit/fc59e1f2002c6a791a1b7902f13e350872e53c48))
+
 ## [0.1.5](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-sys-v0.1.4...tonlibjson-sys-v0.1.5) (2023-11-06)
 
 

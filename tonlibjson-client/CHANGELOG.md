@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.9.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.8.0...tonlibjson-client-v0.9.0) (2023-11-08)
+
+
+### Features
+
+* drop from_env ([9baddec](https://github.com/getgems-io/ton-grpc/commit/9baddec6cbdd59225df33c3955eca93851f712af))
+* ewma configurable ([e20bb2d](https://github.com/getgems-io/ton-grpc/commit/e20bb2d63e0e77ebe9379c3aae1f1d877d87e054))
+* ton client builder ([a4ff592](https://github.com/getgems-io/ton-grpc/commit/a4ff592a501ffd997821c178ac37150432459f81))
+* ton-grpc ton config url ([6dadf81](https://github.com/getgems-io/ton-grpc/commit/6dadf8123397796d150183cee94b3363667a174d))
+* tonclient timeout layer ([fc3ec4d](https://github.com/getgems-io/ton-grpc/commit/fc3ec4defe858c060f9e6c83b10effef37c33e09))
+
+
+### Bug Fixes
+
+* **deps:** bump derive-new from 0.5.9 to 0.6.0 ([218e91b](https://github.com/getgems-io/ton-grpc/commit/218e91bcdc19444d48c2de5f9d79b04be43eb640))
+
 ## [0.8.0](https://github.com/getgems-io/tonlibjson/compare/tonlibjson-client-v0.7.0...tonlibjson-client-v0.8.0) (2023-11-06)
 
 
