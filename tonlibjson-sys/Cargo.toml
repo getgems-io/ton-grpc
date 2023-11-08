@@ -13,9 +13,6 @@ tracing = { workspace = true }
 cmake = "0.1"
 pkg-config = "0.3"
 
-[dev-dependencies]
-procinfo = "0.4"
-
 [features]
 default = ["tonlibjson", "tonemulator"]
 testnet = []
