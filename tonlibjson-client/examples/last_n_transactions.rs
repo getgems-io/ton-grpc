@@ -1,12 +1,13 @@
 use futures::{stream, StreamExt};
 use tokio::time::Instant;
-use tonlibjson_client::ton::TonClient;
+use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let ton = TonClient::from_env().await?;
+    let mut ton = TonClientBuilder::default().await?;
+    ton.ready().await?;
 
     let master = ton.get_masterchain_info().await?;
 

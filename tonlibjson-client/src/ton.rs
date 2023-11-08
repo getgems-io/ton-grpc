@@ -21,7 +21,7 @@ use url::Url;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
 use crate::balance::{Balance, BlockCriteria, Route, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
-use crate::config::{AppConfig, default_ton_config_url};
+use crate::config::default_ton_config_url;
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
 use crate::helper::Side;
@@ -194,19 +194,6 @@ impl TonClient {
         tracing::info!("ready");
 
         Ok(())
-    }
-
-    pub async fn from_env() -> anyhow::Result<Self> {
-        let config = AppConfig::from_env()?;
-
-        tracing::warn!("Ton config url: {}", config.config_url);
-        tracing::warn!("Ton config fallback path: {:?}", config.config_path);
-
-        TonClientBuilder::from_config_url_with_fallback(
-            config.config_url,
-            Duration::from_secs(60),
-            config.config_path
-        ).await
     }
 
     pub async fn get_masterchain_info(&self) -> anyhow::Result<MasterchainInfo> {
