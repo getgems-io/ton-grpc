@@ -126,7 +126,7 @@ impl Service<&Route> for Router {
     }
 }
 
-impl<R> Service<R> for Balance where R: Routable + Callable<InnerClient> + Clone {
+impl<R> Service<R> for Balance where R: Routable + Callable<InnerClient> {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;

@@ -9,7 +9,7 @@ use tower::{Service};
 use crate::balance::Route;
 use crate::error::Error;
 
-pub trait Callable<S> : Sized + Send + Clone + 'static {
+pub trait Callable<S> : Sized + Send + 'static {
     type Response : DeserializeOwned;
     type Error: Into<Error>;
     type Future : Future<Output=Result<Self::Response, Self::Error>> + Send;
@@ -31,7 +31,7 @@ impl<S, T, E: Into<Error>> Callable<S> for T
     }
 }
 
-pub trait Requestable where Self : Serialize + Clone + Send + Sync {
+pub trait Requestable where Self : Serialize + Send + Sync {
     type Response : DeserializeOwned + Send + Sync + 'static;
 
     fn timeout(&self) -> Duration {
@@ -75,8 +75,8 @@ impl<T> Requestable for Forward<T> where T : Requestable {
 
 pub type RequestId = Uuid;
 
-#[derive(Serialize, Clone)]
-pub struct Request<T : Serialize + Clone> {
+#[derive(Serialize)]
+pub struct Request<T : Serialize> {
     #[serde(rename="@extra")]
     pub id: RequestId,
 
