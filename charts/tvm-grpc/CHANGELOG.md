@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.4.0...charts/tvm-grpc-v0.4.1) (2023-11-10)
+
+
+### Bug Fixes
+
+* use grpc startup probe for tvm ([7e432b1](https://github.com/getgems-io/ton-grpc/commit/7e432b1f43ed62fecf0aaff3f94b76c410c113c6))
+
 ## [0.4.0](https://github.com/getgems-io/tonlibjson/compare/charts/tvm-grpc-v0.3.0...charts/tvm-grpc-v0.4.0) (2023-10-27)
 
 
