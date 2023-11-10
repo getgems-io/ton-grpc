@@ -56,7 +56,7 @@ spec:
           readinessProbe:
             grpc:
               port: 50052
-          readinessProbe:
+          startupProbe:
             grpc:
               port: 50052
           resources:
