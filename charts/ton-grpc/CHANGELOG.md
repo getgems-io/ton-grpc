@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.0...charts/ton-grpc-v0.5.1) (2023-11-10)
+
+
+### Bug Fixes
+
+* ton chart grpc probes ([60bd50c](https://github.com/getgems-io/ton-grpc/commit/60bd50c8cae584744a0d13b398a0efb4e0b5c08d))
+
 ## [0.5.0](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.4.0...charts/ton-grpc-v0.5.0) (2023-11-08)
 
 
