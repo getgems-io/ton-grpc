@@ -44,7 +44,7 @@ impl<Res, E> Policy<RawSendMessage, Res, E> for RetryPolicy {
     fn clone_request(&self, _: &RawSendMessage) -> Option<RawSendMessage> { None }
 }
 
-impl<T: Clone + 'static, Res, E> Policy<T, Res, E> for RetryPolicy {
+impl<T: Clone, Res, E> Policy<T, Res, E> for RetryPolicy {
     type Future = BoxFuture<'static, Self>;
 
     fn retry(&self, _: &T, result: Result<&Res, &E>) -> Option<Self::Future> {
