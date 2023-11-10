@@ -56,9 +56,9 @@ spec:
           readinessProbe:
             grpc:
               port: 50052
-          startupProbe:
-            tcpSocket:
-              port: http
+          readinessProbe:
+            grpc:
+              port: 50052
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}
