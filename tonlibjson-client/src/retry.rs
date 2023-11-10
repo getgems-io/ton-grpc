@@ -1,4 +1,3 @@
-use std::any::TypeId;
 use std::sync::Arc;
 use std::time::Duration;
 use futures::future::BoxFuture;
@@ -16,6 +15,9 @@ pub struct RetryPolicy {
 
 impl RetryPolicy {
     pub fn new(budget: Budget, first_delay_millis: u64, max_delay: Duration) -> Self {
+        metrics::describe_counter!("ton_retry_withdraw_success", "Number of withdraws that were successful");
+        metrics::describe_counter!("ton_retry_withdraw_fail", "Number of withdraws that were unsuccessful");
+
         let retry_strategy = FibonacciBackoff::from_millis(first_delay_millis)
             .max_delay(max_delay);
 
@@ -24,6 +26,22 @@ impl RetryPolicy {
             backoff: retry_strategy
         }
     }
+}
+
+impl<Res, E> Policy<RawSendMessageReturnHash, Res, E> for RetryPolicy {
+    type Future = BoxFuture<'static, Self>;
+
+    fn retry(&self, _: &RawSendMessageReturnHash, _: Result<&Res, &E>) -> Option<Self::Future> { None }
+
+    fn clone_request(&self, _: &RawSendMessageReturnHash) -> Option<RawSendMessageReturnHash> { None }
+}
+
+impl<Res, E> Policy<RawSendMessage, Res, E> for RetryPolicy {
+    type Future = BoxFuture<'static, Self>;
+
+    fn retry(&self, _: &RawSendMessage, _: Result<&Res, &E>) -> Option<Self::Future> { None }
+
+    fn clone_request(&self, _: &RawSendMessage) -> Option<RawSendMessage> { None }
 }
 
 impl<T: Clone + 'static, Res, E> Policy<T, Res, E> for RetryPolicy {
@@ -37,13 +55,11 @@ impl<T: Clone + 'static, Res, E> Policy<T, Res, E> for RetryPolicy {
                 None
             }
             Err(_) => {
-                // TODO[akostylev0] rewrite to trait fn
-                let type_of = TypeId::of::<T>();
-                if type_of == TypeId::of::<RawSendMessageReturnHash>() || type_of == TypeId::of::<RawSendMessage>() {
-                    None
-                } else {
-                    match self.budget.withdraw() {
-                        Ok(_) => Some({
+                match self.budget.withdraw() {
+                    Ok(_) => {
+                        metrics::increment_counter!("ton_retry_withdraw_success");
+
+                        Some({
                             let mut pol = self.clone();
 
                             async move {
@@ -57,8 +73,11 @@ impl<T: Clone + 'static, Res, E> Policy<T, Res, E> for RetryPolicy {
 
                                 pol
                             }.boxed()
-                        }),
-                        Err(_) => None
+                    }) },
+                    Err(_) => {
+                        metrics::increment_counter!("ton_retry_withdraw_fail");
+
+                        None
                     }
                 }
             }

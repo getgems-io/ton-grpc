@@ -502,7 +502,7 @@ impl From<&ShortTxId> for AccountTransactionId {
     }
 }
 
-#[derive(new, Debug, Serialize, Deserialize, Clone)]
+#[derive(new, Debug, Serialize, Deserialize)]
 #[serde(tag = "@type", rename = "raw.sendMessage")]
 pub struct RawSendMessage {
     pub body: String,
@@ -519,7 +519,7 @@ impl Routable for RawSendMessage {
     }
 }
 
-#[derive(new, Debug, Serialize, Deserialize, Clone)]
+#[derive(new, Debug, Serialize, Deserialize)]
 #[serde(tag = "@type", rename = "raw.sendMessageReturnHash")]
 pub struct RawSendMessageReturnHash {
     pub body: String,
