@@ -1,7 +1,7 @@
 apiVersion: v2
 name: ton-grpc
 home: https://github.com/getgems-io/tonlibjson
-version: 0.5.0
+version: 0.5.1
 maintainers:
   - name: akostylev0
     email: a.kostylev@pm.me
