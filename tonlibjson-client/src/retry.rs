@@ -15,8 +15,8 @@ pub struct RetryPolicy {
 
 impl RetryPolicy {
     pub fn new(budget: Budget, first_delay_millis: u64, max_delay: Duration) -> Self {
-        metrics::describe_counter!("ton_retry_withdraw_success", "Number of withdraws that were successful");
-        metrics::describe_counter!("ton_retry_withdraw_fail", "Number of withdraws that were unsuccessful");
+        metrics::describe_counter!("ton_retry_budget_withdraw_success", "Number of withdraws that were successful");
+        metrics::describe_counter!("ton_retry_budget_withdraw_fail", "Number of withdraws that were unsuccessful");
 
         let retry_strategy = FibonacciBackoff::from_millis(first_delay_millis)
             .max_delay(max_delay);
@@ -59,7 +59,7 @@ impl<T: Clone, Res, E> Policy<T, Res, E> for RetryPolicy {
 
                 match self.budget.withdraw() {
                     Ok(_) => {
-                        metrics::increment_counter!("ton_retry_withdraw_success", "request_type" => request_type);
+                        metrics::increment_counter!("ton_retry_budget_withdraw_success", "request_type" => request_type);
 
                         Some({
                             let mut pol = self.clone();
@@ -77,7 +77,7 @@ impl<T: Clone, Res, E> Policy<T, Res, E> for RetryPolicy {
                             }.boxed()
                     }) },
                     Err(_) => {
-                        metrics::increment_counter!("ton_retry_withdraw_fail", "request_type" => request_type);
+                        metrics::increment_counter!("ton_retry_budget_withdraw_fail", "request_type" => request_type);
 
                         None
                     }
