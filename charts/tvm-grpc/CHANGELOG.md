@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.4.1...charts/tvm-grpc-v0.4.2) (2023-11-10)
+
+
+### Bug Fixes
+
+* typo in tvm chart ([a1dc2bf](https://github.com/getgems-io/ton-grpc/commit/a1dc2bf041a7ed37013ff525ad79c0ad69c3fb78))
+
 ## [0.4.1](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.4.0...charts/tvm-grpc-v0.4.1) (2023-11-10)
 
 
