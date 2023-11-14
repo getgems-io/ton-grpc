@@ -1,13 +1,16 @@
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
-use std::time::Duration;
 use futures::future::BoxFuture;
-use futures::{FutureExt};
+use futures::{FutureExt, StreamExt};
 use tower::discover::{Change, Discover};
 use tower::Service;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use itertools::Itertools;
+use tokio::select;
+use tokio_stream::StreamMap;
+use tokio_stream::wrappers::WatchStream;
+use crate::block::MasterchainInfo;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 
@@ -17,18 +20,21 @@ pub(crate) trait Routable {
 
 pub(crate) struct Router {
     discover: CursorClientDiscover,
-    services: DashMap<String, CursorClient>
+    services: DashMap<String, CursorClient>,
+    last_block: LastBlockStreamMap
 }
 
 impl Router {
     pub(crate) fn new(discover: CursorClientDiscover) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
-        metrics::describe_counter!("ton_router_delayed_miss_count", "Count of misses in router");
         metrics::describe_counter!("ton_router_delayed_count", "Count of delayed requests in router");
+        metrics::describe_counter!("ton_router_delayed_hit_count", "Count of delayed request hits in router");
+        metrics::describe_counter!("ton_router_delayed_miss_count", "Count of delayed request misses in router");
 
         Router {
             discover,
-            services: Default::default()
+            services: Default::default(),
+            last_block: LastBlockStreamMap::new()
         }
     }
 
@@ -36,8 +42,14 @@ impl Router {
         loop {
             match ready!(Pin::new(&mut self.discover).poll_discover(cx)).transpose()? {
                 None => return Poll::Ready(None),
-                Some(Change::Remove(key)) => { self.services.remove(&key); }
-                Some(Change::Insert(key, svc)) => { self.services.insert(key, svc); }
+                Some(Change::Remove(key)) => {
+                    self.services.remove(&key);
+                    self.last_block.remove(&key);
+                }
+                Some(Change::Insert(key, svc)) => {
+                    self.last_block.insert(key.clone(), svc.subscribe_masterchain_info());
+                    self.services.insert(key, svc);
+                }
             }
         }
     }
@@ -94,10 +106,10 @@ impl Service<&Route> for Router {
 
                 let req = *req;
                 let svcs = self.services.clone();
+                let mut next_block = self.last_block.receiver();
 
                 return async move {
-                    // TODO[akostylev0]
-                    tokio::time::sleep(Duration::from_secs(2)).await;
+                    let _ = next_block.recv().await;
 
                     let services = req.choose(&svcs);
                     if services.is_empty() {
@@ -105,6 +117,8 @@ impl Service<&Route> for Router {
 
                         Err(anyhow!("no services available for {:?}", req))
                     } else {
+                        metrics::increment_counter!("ton_router_delayed_hit_count");
+
                         Ok(services)
                     }
                 }.boxed();
@@ -148,5 +162,64 @@ impl Route {
                     .collect()
             }
         }
+    }
+}
+
+
+enum StreamMapChange {
+    Insert { key: String, watcher: tokio::sync::watch::Receiver<Option<MasterchainInfo>> },
+    Remove { key: String }
+}
+struct LastBlockStreamMap {
+    changes: tokio::sync::mpsc::UnboundedSender<StreamMapChange>,
+    joined: tokio::sync::broadcast::Receiver<MasterchainInfo>
+}
+
+impl LastBlockStreamMap {
+    fn new() -> Self {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<StreamMapChange>();
+        let (tj, rj) = tokio::sync::broadcast::channel::<MasterchainInfo>(256);
+
+        tokio::spawn(async move {
+            let mut stream_map = StreamMap::new();
+            let mut last_seqno = None;
+
+            loop {
+                select! {
+                    Some(change) = rx.recv() => {
+                        match change {
+                            StreamMapChange::Insert { key, watcher } => { stream_map.insert(key, WatchStream::from_changes(watcher)); },
+                            StreamMapChange::Remove { key } => { stream_map.remove(&key); }
+                        }
+                    },
+                    Some((_, Some(master))) = stream_map.next() => {
+                       if last_seqno.is_none() || last_seqno.is_some_and(|last_seqno| master.last.seqno > last_seqno) {
+                            last_seqno.replace(master.last.seqno);
+
+                            tracing::warn!(seqno = master.last.seqno, "last block seqno updated");
+
+                            let _ = tj.send(master);
+                        }
+                    }
+                };
+            }
+        });
+
+        Self {
+            changes: tx,
+            joined: rj
+        }
+    }
+
+    fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<MasterchainInfo>>) {
+        let _ = self.changes.send(StreamMapChange::Insert { key, watcher });
+    }
+
+    fn remove(&self, key: &str) {
+        let _ = self.changes.send(StreamMapChange::Remove { key: key.to_owned() });
+    }
+
+    fn receiver(&self) -> tokio::sync::broadcast::Receiver<MasterchainInfo> {
+        self.joined.resubscribe()
     }
 }

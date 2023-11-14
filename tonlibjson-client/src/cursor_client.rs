@@ -215,6 +215,10 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
+    pub(crate) fn subscribe_masterchain_info(&self) -> Receiver<Option<MasterchainInfo>> {
+        self.masterchain_info_rx.clone()
+    }
+
     pub fn last_seqno(&self) -> Option<Seqno> {
         let master_shard_id = self.masterchain_info_rx
             .borrow()
