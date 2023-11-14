@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
@@ -138,6 +139,18 @@ pub struct MasterchainInfo {
     pub init: BlockIdExt,
     pub last: BlockIdExt,
     pub state_root_hash: String,
+}
+
+impl PartialOrd for MasterchainInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.last.seqno.partial_cmp(&other.last.seqno)
+    }
+}
+
+impl Ord for MasterchainInfo {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.last.seqno.cmp(&other.last.seqno)
+    }
 }
 
 #[derive(new, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]

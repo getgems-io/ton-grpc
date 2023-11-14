@@ -21,7 +21,7 @@ pub(crate) trait Routable {
 pub(crate) struct Router {
     discover: CursorClientDiscover,
     services: DashMap<String, CursorClient>,
-    last_block: LastBlockStreamMap
+    last_block: MergeStreamMap<MasterchainInfo>
 }
 
 impl Router {
@@ -34,7 +34,7 @@ impl Router {
         Router {
             discover,
             services: Default::default(),
-            last_block: LastBlockStreamMap::new()
+            last_block: MergeStreamMap::new()
         }
     }
 
@@ -164,19 +164,19 @@ impl Route {
 }
 
 
-enum StreamMapChange {
-    Insert { key: String, watcher: tokio::sync::watch::Receiver<Option<MasterchainInfo>> },
+enum StreamMapChange<T> {
+    Insert { key: String, watcher: tokio::sync::watch::Receiver<Option<T>> },
     Remove { key: String }
 }
-struct LastBlockStreamMap {
-    changes: tokio::sync::mpsc::UnboundedSender<StreamMapChange>,
-    joined: tokio::sync::broadcast::Receiver<MasterchainInfo>
+struct MergeStreamMap<T> {
+    changes: tokio::sync::mpsc::UnboundedSender<StreamMapChange<T>>,
+    joined: tokio::sync::broadcast::Receiver<T>
 }
 
-impl LastBlockStreamMap {
+impl<T> MergeStreamMap<T> where T : Sync + Send + Clone + Ord + 'static {
     fn new() -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<StreamMapChange>();
-        let (tj, rj) = tokio::sync::broadcast::channel::<MasterchainInfo>(256);
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<StreamMapChange<T>>();
+        let (tj, rj) = tokio::sync::broadcast::channel::<T>(256);
 
         tokio::spawn(async move {
             let mut stream_map = StreamMap::new();
@@ -191,8 +191,8 @@ impl LastBlockStreamMap {
                         }
                     },
                     Some((_, Some(master))) = stream_map.next() => {
-                       if last_seqno.is_none() || last_seqno.is_some_and(|last_seqno| master.last.seqno > last_seqno) {
-                            last_seqno.replace(master.last.seqno);
+                       if last_seqno.is_none() || last_seqno.as_ref().is_some_and(|last_seqno| master > *last_seqno) {
+                            last_seqno.replace(master.clone());
 
                             let _ = tj.send(master);
                         }
@@ -207,7 +207,7 @@ impl LastBlockStreamMap {
         }
     }
 
-    fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<MasterchainInfo>>) {
+    fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<T>>) {
         let _ = self.changes.send(StreamMapChange::Insert { key, watcher });
     }
 
@@ -215,7 +215,7 @@ impl LastBlockStreamMap {
         let _ = self.changes.send(StreamMapChange::Remove { key: key.to_owned() });
     }
 
-    fn receiver(&self) -> tokio::sync::broadcast::Receiver<MasterchainInfo> {
+    fn receiver(&self) -> tokio::sync::broadcast::Receiver<T> {
         self.joined.resubscribe()
     }
 }
