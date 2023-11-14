@@ -196,8 +196,6 @@ impl LastBlockStreamMap {
                        if last_seqno.is_none() || last_seqno.is_some_and(|last_seqno| master.last.seqno > last_seqno) {
                             last_seqno.replace(master.last.seqno);
 
-                            tracing::warn!(seqno = master.last.seqno, "last block seqno updated");
-
                             let _ = tj.send(master);
                         }
                     }
