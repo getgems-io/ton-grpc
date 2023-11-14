@@ -7,7 +7,7 @@ use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use crate::address::{AccountAddressData, ShardContextAccountAddress};
 use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
-use crate::balance::{BlockCriteria, Route};
+use crate::router::{BlockCriteria, Route};
 use crate::request::{Requestable, Routable};
 
 #[derive(Debug, Serialize, Default, Clone)]

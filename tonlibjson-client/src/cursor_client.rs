@@ -22,7 +22,7 @@ use tower::load::Load;
 use tracing::{info, instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
-use crate::balance::BlockCriteria;
+use crate::router::BlockCriteria;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
@@ -57,8 +57,8 @@ impl ShardBounds {
     }
 
     fn distance_seqno(&self, seqno: Seqno) -> Option<Seqno> {
-        let Some(ref left) = self.left else { return None };
-        let Some(ref right) = self.right else { return None };
+        let left = self.left.as_ref()?;
+        let right = self.right.as_ref()?;
 
         if seqno < left.id.seqno {
             Some(seqno - left.id.seqno)
@@ -70,8 +70,8 @@ impl ShardBounds {
     }
 
     fn distance_lt(&self, lt: i64) -> Option<i64> {
-        let Some(ref left) = self.left else { return None };
-        let Some(ref right) = self.right else { return None };
+        let left = self.left.as_ref()?;
+        let right = self.right.as_ref()?;
 
         if lt < left.start_lt {
             Some(lt - left.start_lt) // negative
@@ -83,7 +83,7 @@ impl ShardBounds {
     }
 
     fn delta_lt(&self) -> Option<i64> {
-        let Some(ref right) = self.right else { return None };
+        let right = self.right.as_ref()?;
 
         Some(right.end_lt - right.start_lt)
     }
@@ -174,19 +174,17 @@ impl Registry {
                             }
                         }
 
-                        return min_waitable_distance.zip(delta_lt)
+                        min_waitable_distance.zip(delta_lt)
                             .map(|(lt_diff, lt_delta)| (lt_delta as f64 / lt_diff as f64).ceil() as Seqno)
                     })
             },
 
             BlockCriteria::Seqno { shard, seqno} => {
                 let shard_id = (*chain, *shard);
-                let Some(bounds) = self.shard_bounds_registry.get(&shard_id) else {
-                    return None
-                };
+                let bounds = self.shard_bounds_registry.get(&shard_id)?;
 
-                let Some(ref left) = bounds.left else { return None };
-                let Some(ref right) = bounds.right else { return None };
+                let left = bounds.left.as_ref()?;
+                let right = bounds.right.as_ref()?;
 
                 let right_lt = right.end_lt - right.start_lt;
                 let left_lt = left.end_lt - left.start_lt;
@@ -237,7 +235,7 @@ impl CursorClient {
             return Some(distance);
         };
 
-        return Some(0);
+        Some(0)
     }
 
     pub fn edges_defined(&self) -> bool {
