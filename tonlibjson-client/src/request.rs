@@ -6,7 +6,7 @@ use serde::{Serialize, Deserialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service};
-use crate::router::Route;
+use crate::router::{Routable, Route};
 use crate::error::Error;
 
 pub trait Callable<S> : Sized + Send + 'static {
@@ -37,10 +37,6 @@ pub trait Requestable where Self : Serialize + Send + Sync {
     fn timeout(&self) -> Duration {
         Duration::from_secs(3)
     }
-}
-
-pub(crate) trait Routable {
-    fn route(&self) -> Route;
 }
 
 impl Requestable for Value {

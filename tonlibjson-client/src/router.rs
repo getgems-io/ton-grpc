@@ -9,6 +9,10 @@ use tower::Service;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 
+pub(crate) trait Routable {
+    fn route(&self) -> Route;
+}
+
 pub(crate) struct Router {
     discover: CursorClientDiscover,
     services: HashMap<String, CursorClient>

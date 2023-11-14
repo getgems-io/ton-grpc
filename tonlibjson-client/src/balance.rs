@@ -7,8 +7,8 @@ use tower::discover::ServiceList;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksLookupBlock, BlocksShards, GetMasterchainInfo, MasterchainInfo};
 use crate::cursor_client::InnerClient;
 use crate::error::ErrorService;
-use crate::request::{Routable, Callable, Specialized};
-use crate::router::Router;
+use crate::request::{Callable, Specialized};
+use crate::router::{Router, Routable};
 
 #[derive(new)]
 pub(crate) struct Balance { router: Router }
