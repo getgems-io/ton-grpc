@@ -19,7 +19,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{info, instrument, trace};
+use tracing::{instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::router::BlockCriteria;
@@ -183,16 +183,6 @@ impl Registry {
                 let shard_id = (*chain, *shard);
                 let bounds = self.shard_bounds_registry.get(&shard_id)?;
 
-                let left = bounds.left.as_ref()?;
-                let right = bounds.right.as_ref()?;
-
-                let right_lt = right.end_lt - right.start_lt;
-                let left_lt = left.end_lt - left.start_lt;
-
-                info!(left_lt = left_lt, right_lt = right_lt, left_start = left.start_lt, right_end = right.end_lt,
-                    left_seqno = left.id.seqno, right_seqno = right.id.seqno,
-                    "waitable distance");
-
                 bounds.distance_seqno(*seqno).filter(|d| *d >= 0)
             }
         }
@@ -234,8 +224,6 @@ impl CursorClient {
         };
 
         if distance > 0 {
-            info!(min_waitable_distance = distance);
-
             return Some(distance);
         };
 

@@ -109,17 +109,15 @@ impl Service<&Route> for Router {
                 let mut next_block = self.last_block.receiver();
 
                 return async move {
-                    let _ = next_block.recv().await;
+                    loop {
+                        let _ = next_block.recv().await?;
 
-                    let services = req.choose(&svcs);
-                    if services.is_empty() {
-                        metrics::increment_counter!("ton_router_delayed_miss_count");
+                        let services = req.choose(&svcs);
+                        if !services.is_empty() {
+                            metrics::increment_counter!("ton_router_delayed_hit_count");
 
-                        Err(anyhow!("no services available for {:?}", req))
-                    } else {
-                        metrics::increment_counter!("ton_router_delayed_hit_count");
-
-                        Ok(services)
+                            return Ok(services)
+                        }
                     }
                 }.boxed();
             }
@@ -136,7 +134,7 @@ impl Route {
             Route::Block { chain, criteria} => {
                 services
                     .iter()
-                    .filter(|s| s.contains(chain, criteria).is_some_and(|b| b <= 1))
+                    .filter(|s| s.contains(chain, criteria).is_some_and(|b| b == 0))
                     .map(|s| s.clone())
                     .collect()
             },
