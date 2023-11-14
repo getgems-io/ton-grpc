@@ -57,37 +57,6 @@ pub(crate) enum Route {
     Latest
 }
 
-impl Route {
-    pub(crate) fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
-        match self {
-            Route::Block { chain, criteria} => {
-                services
-                    .filter(|s| s.contains(chain, criteria).is_some_and(|b| b <= 1))
-                    .cloned()
-                    .collect()
-            },
-            Route::Latest => {
-                let groups = services
-                    .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
-                    .sorted_unstable_by_key(|(_, seqno)| -seqno)
-                    .group_by(|(_, seqno)| *seqno);
-
-                let mut idxs = vec![];
-                for (_, group) in &groups {
-                    idxs = group.collect();
-
-                    // we need at least 3 nodes in group
-                    if idxs.len() > 2 {
-                        break;
-                    }
-                }
-
-                idxs.into_iter().map(|(s, _)| s).cloned().collect()
-            }
-        }
-    }
-}
-
 impl Service<&Route> for Router {
     type Response = Vec<CursorClient>;
     type Error = anyhow::Error;
@@ -117,5 +86,36 @@ impl Service<&Route> for Router {
         };
 
         std::future::ready(response)
+    }
+}
+
+impl Route {
+    pub(crate) fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
+        match self {
+            Route::Block { chain, criteria} => {
+                services
+                    .filter(|s| s.contains(chain, criteria).is_some_and(|b| b <= 1))
+                    .cloned()
+                    .collect()
+            },
+            Route::Latest => {
+                let groups = services
+                    .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
+                    .sorted_unstable_by_key(|(_, seqno)| -seqno)
+                    .group_by(|(_, seqno)| *seqno);
+
+                let mut idxs = vec![];
+                for (_, group) in &groups {
+                    idxs = group.collect();
+
+                    // we need at least 3 nodes in group
+                    if idxs.len() > 2 {
+                        break;
+                    }
+                }
+
+                idxs.into_iter().map(|(s, _)| s).cloned().collect()
+            }
+        }
     }
 }
