@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 use futures::future::BoxFuture;
@@ -6,6 +5,7 @@ use futures::FutureExt;
 use tower::discover::{Change, Discover};
 use tower::Service;
 use anyhow::anyhow;
+use dashmap::DashMap;
 use itertools::Itertools;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
@@ -16,7 +16,7 @@ pub(crate) trait Routable {
 
 pub(crate) struct Router {
     discover: CursorClientDiscover,
-    services: HashMap<String, CursorClient>
+    services: DashMap<String, CursorClient>
 }
 
 impl Router {
@@ -25,7 +25,7 @@ impl Router {
 
         Router {
             discover,
-            services: HashMap::new()
+            services: Default::default()
         }
     }
 
@@ -43,14 +43,14 @@ impl Router {
         match route {
             Route::Block { chain, criteria} => {
                 self.services
-                    .values()
+                    .iter()
                     .filter(|s| s.contains(chain, criteria).is_some_and(|b| b <= 1))
-                    .cloned()
+                    .map(|s| s.clone())
                     .collect()
             },
             Route::Latest => {
                 let groups = self.services
-                    .values()
+                    .iter()
                     .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
                     .sorted_unstable_by_key(|(_, seqno)| -seqno)
                     .group_by(|(_, seqno)| *seqno);
@@ -65,7 +65,9 @@ impl Router {
                     }
                 }
 
-                idxs.into_iter().map(|(s, _)| s).cloned().collect()
+                idxs.into_iter()
+                    .map(|(s, _)| s.clone())
+                    .collect()
             }
         }
     }
@@ -91,7 +93,7 @@ impl Service<&Route> for Router {
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx)?;
 
-        if self.services.values().any(|s| s.edges_defined()) {
+        if self.services.iter().any(|s| s.edges_defined()) {
             Poll::Ready(Ok(()))
         } else {
             cx.waker().wake_by_ref();
@@ -101,7 +103,7 @@ impl Service<&Route> for Router {
     }
 
     fn call(&mut self, req: &Route) -> Self::Future {
-        let services = self.choose(&req);
+        let services = self.choose(req);
 
         let response = if services.is_empty() {
             metrics::increment_counter!("ton_router_miss_count");
