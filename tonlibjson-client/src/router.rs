@@ -15,7 +15,7 @@ pub(crate) struct Router {
 }
 
 impl Router {
-    pub fn new(discover: CursorClientDiscover) -> Self {
+    pub(crate) fn new(discover: CursorClientDiscover) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
 
         Router {
@@ -42,7 +42,7 @@ impl Router {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum BlockCriteria {
+pub(crate) enum BlockCriteria {
     Seqno { shard: i64, seqno: i32 },
     LogicalTime(i64)
 }
@@ -54,7 +54,7 @@ pub(crate) enum Route {
 }
 
 impl Route {
-    pub fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
+    pub(crate) fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
         match self {
             Route::Block { chain, criteria} => {
                 services
