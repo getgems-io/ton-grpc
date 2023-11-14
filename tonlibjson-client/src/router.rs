@@ -1,11 +1,12 @@
 use std::collections::HashMap;
-use std::future::Ready;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
-use anyhow::anyhow;
-use itertools::Itertools;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 use tower::discover::{Change, Discover};
 use tower::Service;
+use anyhow::anyhow;
+use itertools::Itertools;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 
@@ -85,7 +86,7 @@ pub(crate) enum Route {
 impl Service<&Route> for Router {
     type Response = Vec<CursorClient>;
     type Error = anyhow::Error;
-    type Future = Ready<Result<Self::Response, Self::Error>>;
+    type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx)?;
@@ -110,6 +111,6 @@ impl Service<&Route> for Router {
             Ok(services)
         };
 
-        std::future::ready(response)
+        std::future::ready(response).boxed()
     }
 }
