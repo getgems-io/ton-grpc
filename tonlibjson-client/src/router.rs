@@ -165,7 +165,7 @@ impl Route {
 
 
 enum StreamMapChange<T> {
-    Insert { key: String, watcher: tokio::sync::watch::Receiver<Option<T>> },
+    Insert { key: String, stream: WatchStream<Option<T>>},
     Remove { key: String }
 }
 struct MergeStreamMap<T> {
@@ -175,40 +175,33 @@ struct MergeStreamMap<T> {
 
 impl<T> MergeStreamMap<T> where T : Sync + Send + Clone + Ord + 'static {
     fn new() -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<StreamMapChange<T>>();
-        let (tj, rj) = tokio::sync::broadcast::channel::<T>(256);
+        let (changes, mut rx) = tokio::sync::mpsc::unbounded_channel::<StreamMapChange<T>>();
+        let (tj, joined) = tokio::sync::broadcast::channel::<T>(256);
 
         tokio::spawn(async move {
             let mut stream_map = StreamMap::new();
             let mut last_seqno = None;
 
-            loop {
-                select! {
-                    Some(change) = rx.recv() => {
-                        match change {
-                            StreamMapChange::Insert { key, watcher } => { stream_map.insert(key, WatchStream::from_changes(watcher)); },
-                            StreamMapChange::Remove { key } => { stream_map.remove(&key); }
-                        }
-                    },
-                    Some((_, Some(master))) = stream_map.next() => {
-                       if last_seqno.is_none() || last_seqno.as_ref().is_some_and(|last_seqno| master > *last_seqno) {
-                            last_seqno.replace(master.clone());
+            loop { select! {
+                Some(change) = rx.recv() => { match change {
+                    StreamMapChange::Insert { key, stream } => { stream_map.insert(key, stream); },
+                    StreamMapChange::Remove { key } => { stream_map.remove(&key); }
+                }},
+                Some((_, Some(master))) = stream_map.next() => {
+                   if last_seqno.is_none() || last_seqno.as_ref().is_some_and(|last_seqno| &master > last_seqno) {
+                        last_seqno.replace(master.clone());
 
-                            let _ = tj.send(master);
-                        }
+                        let _ = tj.send(master);
                     }
-                };
-            }
+                }
+            } }
         });
 
-        Self {
-            changes: tx,
-            joined: rj
-        }
+        Self { changes, joined }
     }
 
     fn insert(&self, key: String, watcher: tokio::sync::watch::Receiver<Option<T>>) {
-        let _ = self.changes.send(StreamMapChange::Insert { key, watcher });
+        let _ = self.changes.send(StreamMapChange::Insert { key, stream: WatchStream::from_changes(watcher) });
     }
 
     fn remove(&self, key: &str) {

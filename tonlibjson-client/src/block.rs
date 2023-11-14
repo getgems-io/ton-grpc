@@ -143,7 +143,7 @@ pub struct MasterchainInfo {
 
 impl PartialOrd for MasterchainInfo {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.last.seqno.partial_cmp(&other.last.seqno)
+        Some(self.cmp(other))
     }
 }
 

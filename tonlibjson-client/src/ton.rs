@@ -42,9 +42,11 @@ pub fn default_ton_config_url() -> Url {
     Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/testnet-global.config.json").unwrap()
 }
 
+type SharedBalance = SharedService<Balance>;
+
 #[derive(Clone)]
 pub struct TonClient {
-    client: ErrorService<Timeout<Either<Retry<RetryPolicy, SharedService<Balance>>, SharedService<Balance>>>>
+    client: ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance>, SharedBalance>>>
 }
 
 const MAIN_CHAIN: i32 = -1;
