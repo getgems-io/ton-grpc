@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.9.0...tonlibjson-client-v0.10.0) (2023-11-14)
+
+
+### Features
+
+* retry metrics ([cb7bf9d](https://github.com/getgems-io/ton-grpc/commit/cb7bf9d7ea93cc9f1b74a43a519f267d44285e3a))
+
 ## [0.9.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.8.0...tonlibjson-client-v0.9.0) (2023-11-08)
 
 
