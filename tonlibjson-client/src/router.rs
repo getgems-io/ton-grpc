@@ -1,7 +1,8 @@
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
+use std::time::Duration;
 use futures::future::BoxFuture;
-use futures::FutureExt;
+use futures::{FutureExt};
 use tower::discover::{Change, Discover};
 use tower::Service;
 use anyhow::anyhow;
@@ -22,6 +23,8 @@ pub(crate) struct Router {
 impl Router {
     pub(crate) fn new(discover: CursorClientDiscover) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
+        metrics::describe_counter!("ton_router_delayed_miss_count", "Count of misses in router");
+        metrics::describe_counter!("ton_router_delayed_count", "Count of delayed requests in router");
 
         Router {
             discover,
@@ -39,37 +42,12 @@ impl Router {
         }
     }
 
-    fn choose(&self, route: &Route) -> Vec<CursorClient> {
-        match route {
-            Route::Block { chain, criteria} => {
-                self.services
-                    .iter()
-                    .filter(|s| s.contains(chain, criteria).is_some_and(|b| b <= 1))
-                    .map(|s| s.clone())
-                    .collect()
-            },
-            Route::Latest => {
-                let groups = self.services
-                    .iter()
-                    .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
-                    .sorted_unstable_by_key(|(_, seqno)| -seqno)
-                    .group_by(|(_, seqno)| *seqno);
-
-                let mut idxs = vec![];
-                for (_, group) in &groups {
-                    idxs = group.collect();
-
-                    // we need at least 3 nodes in group
-                    if idxs.len() > 2 {
-                        break;
-                    }
-                }
-
-                idxs.into_iter()
-                    .map(|(s, _)| s.clone())
-                    .collect()
-            }
-        }
+    fn distance_to(&self, chain: &i32, criteria: &BlockCriteria) -> Option<i32> {
+        self.services
+            .iter()
+            .filter_map(|s| s.contains(chain, criteria))
+            .filter(|d| d.is_positive())
+            .min()
     }
 }
 
@@ -103,16 +81,72 @@ impl Service<&Route> for Router {
     }
 
     fn call(&mut self, req: &Route) -> Self::Future {
-        let services = self.choose(req);
+        let services = req.choose(&self.services);
+        if !services.is_empty() {
+            return std::future::ready(Ok(services)).boxed();
+        }
 
-        let response = if services.is_empty() {
-            metrics::increment_counter!("ton_router_miss_count");
+        metrics::increment_counter!("ton_router_miss_count");
 
-            Err(anyhow!("no services available for {:?}", req))
-        } else {
-            Ok(services)
-        };
+        if let Route::Block { chain, criteria } = req {
+            if self.distance_to(chain, criteria).is_some_and(|d| d <= 1) {
+                metrics::increment_counter!("ton_router_delayed_count");
 
-        std::future::ready(response).boxed()
+                let req = *req;
+                let svcs = self.services.clone();
+
+                return async move {
+                    // TODO[akostylev0]
+                    tokio::time::sleep(Duration::from_secs(2)).await;
+
+                    let services = req.choose(&svcs);
+                    if services.is_empty() {
+                        metrics::increment_counter!("ton_router_delayed_miss_count");
+
+                        Err(anyhow!("no services available for {:?}", req))
+                    } else {
+                        Ok(services)
+                    }
+                }.boxed();
+            }
+        }
+
+        std::future::ready(Err(anyhow!("no services available for {:?}", req))).boxed()
+    }
+}
+
+
+impl Route {
+    fn choose(&self, services: &DashMap<String, CursorClient>) -> Vec<CursorClient> {
+        match self {
+            Route::Block { chain, criteria} => {
+                services
+                    .iter()
+                    .filter(|s| s.contains(chain, criteria).is_some_and(|b| b <= 1))
+                    .map(|s| s.clone())
+                    .collect()
+            },
+            Route::Latest => {
+                let groups = services
+                    .iter()
+                    .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
+                    .sorted_unstable_by_key(|(_, seqno)| -seqno)
+                    .group_by(|(_, seqno)| *seqno);
+
+                let mut idxs = vec![];
+                for (_, group) in &groups {
+                    idxs = group.collect();
+
+                    // we need at least 3 nodes in group
+                    if idxs.len() > 2 {
+                        break;
+                    }
+                }
+
+                idxs.into_iter()
+                    .map(|(s, _)| s.clone())
+                    .collect()
+            }
+        }
     }
 }
