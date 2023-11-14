@@ -48,8 +48,7 @@ pub enum BlockCriteria {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub enum Route {
-    Any,
+pub(crate) enum Route {
     Block { chain: i32, criteria: BlockCriteria },
     Latest
 }
@@ -57,7 +56,6 @@ pub enum Route {
 impl Route {
     pub fn choose<'a, T : Iterator<Item=&'a CursorClient>>(&self, services: T) -> Vec<CursorClient> {
         match self {
-            Route::Any => { services.cloned().collect() },
             Route::Block { chain, criteria} => {
                 services
                     .filter(|s| s.contains(chain, criteria).is_some_and(|b| b <= 1))
