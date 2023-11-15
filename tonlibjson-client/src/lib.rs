@@ -1,12 +1,12 @@
 extern crate core;
 
-pub mod request;
-pub mod block;
-pub mod session;
 pub mod ton;
-pub mod ton_config;
-pub mod make;
-pub mod cursor_client;
+pub mod block;
+mod request;
+mod session;
+mod ton_config;
+mod make;
+mod cursor_client;
 mod retry;
 mod discover;
 mod client;

@@ -52,19 +52,12 @@ pub struct ConcurrencyMetric<S> {
 }
 
 impl<S> ConcurrencyMetric<S> {
-    pub fn new(inner: S, liteserver_id: Cow<'static, str>) -> Self {
+    pub(crate) fn new(inner: S, liteserver_id: Cow<'static, str>) -> Self {
         Self { inner, liteserver_id, inflight: Counter::default() }
     }
 
-    pub fn get_ref(&self) -> &S {
+    pub(crate) fn get_ref(&self) -> &S {
         &self.inner
-    }
-
-    pub fn get_mut(&mut self) -> &mut S {
-        &mut self.inner
-    }
-    pub fn into_inner(self) -> S {
-        self.inner
     }
 }
 
