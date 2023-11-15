@@ -30,7 +30,7 @@ use crate::metric::ConcurrencyMetric;
 use crate::request::{Specialized, Callable};
 use crate::shared::SharedService;
 
-pub type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
+pub(crate) type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
 
 type ChainId = i32;
 type ShardId = (i32, i64);
@@ -232,7 +232,7 @@ impl Registry {
 }
 
 #[derive(Clone)]
-pub struct CursorClient {
+pub(crate) struct CursorClient {
     id: Cow<'static, str>,
     client: InnerClient,
 
@@ -279,7 +279,7 @@ impl CursorClient {
         self.registry.edges_defined(&master_shard_id)
     }
 
-    pub fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
+    pub(crate) fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
         describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
         describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
         describe_counter!("ton_liteserver_first_seqno", "The seqno of the first block that is available for the liteserver to request");
