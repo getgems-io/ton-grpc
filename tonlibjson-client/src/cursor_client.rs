@@ -218,7 +218,11 @@ impl CursorClient {
         self.registry.get_last_seqno(&master_shard_id)
     }
 
-    pub(crate) fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
+    pub(crate) fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+        self.distance_to(chain, criteria).is_some_and(|d| d == 0)
+    }
+
+    pub(crate) fn distance_to(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
         let Some(distance) = self.registry.waitable_distance(chain, criteria) else {
             return None;
         };

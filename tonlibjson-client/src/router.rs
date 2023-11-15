@@ -57,7 +57,7 @@ impl Router {
     fn distance_to(&self, chain: &i32, criteria: &BlockCriteria) -> Option<i32> {
         self.services
             .iter()
-            .filter_map(|s| s.contains(chain, criteria))
+            .filter_map(|s| s.distance_to(chain, criteria))
             .filter(|d| d.is_positive())
             .min()
     }
@@ -131,10 +131,10 @@ impl Service<&Route> for Router {
 impl Route {
     fn choose(&self, services: &DashMap<String, CursorClient>) -> Vec<CursorClient> {
         match self {
-            Route::Block { chain, criteria} => {
+            Route::Block { chain, criteria } => {
                 services
                     .iter()
-                    .filter(|s| s.contains(chain, criteria).is_some_and(|b| b == 0))
+                    .filter(|s| s.contains(chain, criteria))
                     .map(|s| s.clone())
                     .collect()
             },
