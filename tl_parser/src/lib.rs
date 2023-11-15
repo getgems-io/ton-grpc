@@ -1,10 +1,12 @@
 use anyhow::anyhow;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_while1, take_while_m_n};
-use nom::character::complete::{multispace0, satisfy};
-use nom::combinator::{map, opt};
-use nom::multi::fold_many0;
-use nom::sequence::{delimited, preceded, terminated};
+use nom::bytes::complete::{is_not, tag, take_till, take_until, take_while, take_while1, take_while_m_n};
+use nom::character::complete::{char, line_ending, multispace0, multispace1, newline, satisfy};
+use nom::combinator::{map, opt, recognize, value};
+use nom::error::Error;
+use nom::multi::{fold_many0, many0};
+use nom::Parser;
+use nom::sequence::{delimited, pair, preceded, terminated};
 
 pub type ConstructorNumber = u32;
 
@@ -13,14 +15,19 @@ pub struct Combinator {
     builtin: bool,
     id: String,
     r#type: String,
-    constructor_number: Option<ConstructorNumber>
+    constructor_number: Option<ConstructorNumber>,
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
-    let (_, vecs) = fold_many0(alt((combinator_decl, builtin_combinator_decl)), Vec::new, |mut acc: Vec<_>, item| {
-        acc.push(item);
-        acc
-    })(input).map_err(|e| anyhow!("parse error: {}", e))?;
+    let (input, vecs) = many0(
+        delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
+    )(input).map_err(|e| {
+        println!("ERRROR BLYA");
+
+        anyhow!("parse error: {}", e)
+    })?;
+
+    println!("{}", input);
 
     Ok(vecs)
 }
@@ -38,6 +45,20 @@ fn is_underscore(c: char) -> bool { c == '_' }
 fn is_letter(c: char) -> bool { is_lc_letter(c) || is_uc_letter(c) }
 
 fn is_ident_char(c: char) -> bool { is_letter(c) || is_digit(c) || is_underscore(c) }
+
+fn single_line_comment(input: &str) -> nom::IResult<&str, &str> {
+    preceded(tag("//"), take_till(|c| c == '\n'))(input)
+}
+
+fn space_or_comment(input: &str) -> nom::IResult<&str, ()> {
+    let (input, _) = many0(alt((
+        multispace1,
+        single_line_comment,
+        line_ending
+    )))(input)?;
+
+    Ok((input, ()))
+}
 
 fn lc_ident(input: &str) -> nom::IResult<&str, String> {
     let (input, head) = satisfy(is_lc_letter)(input)?;
@@ -227,6 +248,15 @@ mod tests {
     }
 
     #[test]
+    fn single_line_comment_test() {
+        let input = "// comment";
+
+        let output = single_line_comment(input);
+
+        assert_eq!(output, Ok(("", " comment")));
+    }
+
+    #[test]
     fn empty_input() {
         let input = "";
 
@@ -264,5 +294,35 @@ string ? = String;";
             Combinator::builtin("long", "Long"),
             Combinator::builtin("double", "Double"),
             Combinator::builtin("string", "String")]);
+    }
+
+    #[test]
+    fn comments() {
+        let input = "/////
+//
+// Common Types
+//
+/////
+
+// Built-in types
+int ? = Int;
+long ? = Long;
+double ? = Double;
+string ? = String;
+
+// Boolean emulation
+boolFalse = Bool;
+boolTrue = Bool;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::builtin("int", "Int"),
+            Combinator::builtin("long", "Long"),
+            Combinator::builtin("double", "Double"),
+            Combinator::builtin("string", "String"),
+            Combinator::new("boolFalse", "Bool"),
+            Combinator::new("boolTrue", "Bool")]
+        );
     }
 }
