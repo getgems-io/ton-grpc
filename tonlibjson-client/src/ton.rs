@@ -14,13 +14,15 @@ use tokio_stream::StreamMap;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::budget::Budget;
 use tower::retry::Retry;
-use tower::ServiceExt;
+use tower::{Layer, ServiceExt};
 use tower::timeout::Timeout;
 use tracing::{instrument, trace};
 use url::Url;
 use std::str::FromStr;
+use tower::util::Either;
 use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
-use crate::balance::{Balance, BlockCriteria, Route, Router};
+use crate::balance::Balance;
+use crate::router::{BlockCriteria, Route, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
@@ -40,9 +42,11 @@ pub fn default_ton_config_url() -> Url {
     Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/testnet-global.config.json").unwrap()
 }
 
+type SharedBalance = SharedService<Balance>;
+
 #[derive(Clone)]
 pub struct TonClient {
-    client: ErrorService<Timeout<Retry<RetryPolicy, SharedService<Balance>>>>
+    client: ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance>, SharedBalance>>>
 }
 
 const MAIN_CHAIN: i32 = -1;
@@ -58,6 +62,7 @@ pub struct TonClientBuilder {
     timeout: Duration,
     ewma_default_rtt: Duration,
     ewma_decay: Duration,
+    retry_enabled: bool,
     retry_budget_ttl: Duration,
     retry_min_per_sec: u32,
     retry_percent: f32,
@@ -72,6 +77,7 @@ impl Default for TonClientBuilder {
             timeout: Duration::from_secs(10),
             ewma_default_rtt: Duration::from_millis(70),
             ewma_decay: Duration::from_millis(1),
+            retry_enabled: true,
             retry_budget_ttl: Duration::from_secs(10),
             retry_min_per_sec: 10,
             retry_percent: 0.1,
@@ -111,6 +117,12 @@ impl TonClientBuilder {
 
     pub fn set_ewma_decay(mut self, decay: Duration) -> Self {
         self.ewma_decay = decay;
+
+        self
+    }
+
+    pub fn disable_retry(mut self) -> Self {
+        self.retry_enabled = false;
 
         self
     }
@@ -170,11 +182,13 @@ impl TonClientBuilder {
         let client = Balance::new(router);
 
         let client = SharedService::new(client);
-        let client = Retry::new(RetryPolicy::new(Budget::new(
-            self.retry_budget_ttl,
-            self.retry_min_per_sec,
-            self.retry_percent
-        ), self.retry_first_delay.as_millis() as u64, self.retry_max_delay), client);
+        let client = tower::util::option_layer(if self.retry_enabled {
+            Some(tower::retry::RetryLayer::new(RetryPolicy::new(Budget::new(
+                self.retry_budget_ttl,
+                self.retry_min_per_sec,
+                self.retry_percent
+            ), self.retry_first_delay.as_millis() as u64, self.retry_max_delay)))
+        } else { None }).layer(client);
 
         let client = Timeout::new(client, self.timeout);
         let client = ErrorService::new(client);

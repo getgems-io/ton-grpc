@@ -22,7 +22,7 @@ use tower::load::Load;
 use tracing::{instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
-use crate::balance::BlockCriteria;
+use crate::router::BlockCriteria;
 use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
 use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
 use crate::client::Client;
@@ -68,6 +68,38 @@ impl ShardBounds {
         let Some(ref right) = self.right else { return false };
 
         left.start_lt <= lt && lt <= right.end_lt
+    }
+
+    fn distance_seqno(&self, seqno: Seqno) -> Option<Seqno> {
+        let left = self.left.as_ref()?;
+        let right = self.right.as_ref()?;
+
+        if seqno < left.id.seqno {
+            Some(seqno - left.id.seqno)
+        } else if seqno > right.id.seqno {
+            Some(seqno - right.id.seqno)
+        } else {
+            Some(0)
+        }
+    }
+
+    fn distance_lt(&self, lt: i64) -> Option<i64> {
+        let left = self.left.as_ref()?;
+        let right = self.right.as_ref()?;
+
+        if lt < left.start_lt {
+            Some(lt - left.start_lt) // negative
+        } else if lt > right.end_lt {
+            Some(lt - right.end_lt) // positive
+        } else {
+            Some(0)
+        }
+    }
+
+    fn delta_lt(&self) -> Option<i64> {
+        let right = self.right.as_ref()?;
+
+        Some(right.end_lt - right.start_lt)
     }
 }
 
@@ -138,14 +170,56 @@ impl Registry {
                         .any(|bounds| bounds.contains_lt(*lt))
                     ).unwrap_or(false)
             },
-
-            BlockCriteria::Seqno { shard, seqno} => {
+            BlockCriteria::Seqno { shard, seqno } => {
                 let shard_id = (*chain, *shard);
                 let Some(bounds) = self.shard_bounds_registry.get(&shard_id) else {
                     return false
                 };
 
                 bounds.contains_seqno(*seqno)
+            }
+        }
+    }
+
+    fn waitable_distance(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
+        match criteria {
+            BlockCriteria::LogicalTime(lt) => {
+                self.shard_registry
+                    .get(chain)
+                    .and_then(|shard_ids| {
+                        let bounds = shard_ids.iter()
+                            .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id));
+
+                        let mut min_waitable_distance = None;
+                        let mut delta_lt = None;
+                        for bound in bounds {
+                            let Some(distance) = bound.distance_lt(*lt) else {
+                                continue;
+                            };
+
+                            if delta_lt.is_none() {
+                                if let Some(new_delta_lt) = bound.delta_lt() {
+                                    delta_lt.replace(new_delta_lt);
+                                }
+                            }
+
+                            if distance == 0 {
+                                return Some(0);
+                            } else if distance > 0 && distance < *min_waitable_distance.get_or_insert(distance) {
+                                min_waitable_distance.replace(distance);
+                            }
+                        }
+
+                        min_waitable_distance.zip(delta_lt)
+                            .map(|(lt_diff, lt_delta)| (lt_delta as f64 / lt_diff as f64).ceil() as Seqno)
+                    })
+            },
+
+            BlockCriteria::Seqno { shard, seqno} => {
+                let shard_id = (*chain, *shard);
+                let bounds = self.shard_bounds_registry.get(&shard_id)?;
+
+                bounds.distance_seqno(*seqno).filter(|d| *d >= 0)
             }
         }
     }
@@ -167,7 +241,11 @@ pub struct CursorClient {
 }
 
 impl CursorClient {
-    pub fn last_seqno(&self) -> Option<Seqno> {
+    pub(crate) fn subscribe_masterchain_info(&self) -> Receiver<Option<MasterchainInfo>> {
+        self.masterchain_info_rx.clone()
+    }
+
+    pub(crate) fn last_seqno(&self) -> Option<Seqno> {
         let master_shard_id = self.masterchain_info_rx
             .borrow()
             .as_ref()
@@ -176,11 +254,23 @@ impl CursorClient {
         self.registry.get_last_seqno(&master_shard_id)
     }
 
-    pub fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+    pub(crate) fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
         self.registry.contains(chain, criteria)
     }
 
-    pub fn edges_defined(&self) -> bool {
+    pub(crate) fn distance_to(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
+        let Some(distance) = self.registry.waitable_distance(chain, criteria) else {
+            return None;
+        };
+
+        if distance > 0 {
+            return Some(distance);
+        };
+
+        Some(0)
+    }
+
+    pub(crate) fn edges_defined(&self) -> bool {
         let Some(master_shard_id) = self.masterchain_info_rx
             .borrow()
             .as_ref()

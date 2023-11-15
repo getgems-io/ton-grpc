@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
@@ -7,8 +8,8 @@ use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use crate::address::{AccountAddressData, ShardContextAccountAddress};
 use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
-use crate::balance::{BlockCriteria, Route};
-use crate::request::{Requestable, Routable};
+use crate::router::{BlockCriteria, Route, Routable};
+use crate::request::Requestable;
 
 #[derive(Debug, Serialize, Default, Clone)]
 #[serde(tag = "@type", rename = "sync")]
@@ -138,6 +139,18 @@ pub struct MasterchainInfo {
     pub init: BlockIdExt,
     pub last: BlockIdExt,
     pub state_root_hash: String,
+}
+
+impl PartialOrd for MasterchainInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for MasterchainInfo {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.last.seqno.cmp(&other.last.seqno)
+    }
 }
 
 #[derive(new, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]

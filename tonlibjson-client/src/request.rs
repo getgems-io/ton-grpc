@@ -6,7 +6,7 @@ use serde::{Serialize, Deserialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service};
-use crate::balance::Route;
+use crate::router::{Routable, Route};
 use crate::error::Error;
 
 pub trait Callable<S> : Sized + Send + 'static {
@@ -39,22 +39,18 @@ pub trait Requestable where Self : Serialize + Send + Sync {
     }
 }
 
-pub trait Routable {
-    fn route(&self) -> Route;
-}
-
 impl Requestable for Value {
     type Response = Value;
 }
 
 #[derive(Clone, Debug)]
-pub struct Forward<T> {
+pub(crate) struct Forward<T> {
     route: Route,
     inner: T
 }
 
 impl<T> Forward<T> {
-    pub fn new(route: Route, inner: T) -> Self {
+    pub(crate) fn new(route: Route, inner: T) -> Self {
         Self { route, inner }
     }
 }
@@ -76,7 +72,7 @@ impl<T> Requestable for Forward<T> where T : Requestable {
 pub type RequestId = Uuid;
 
 #[derive(Serialize)]
-pub struct Request<T : Serialize> {
+pub(crate) struct Request<T : Serialize> {
     #[serde(rename="@extra")]
     pub id: RequestId,
 
@@ -90,7 +86,7 @@ pub struct Request<T : Serialize> {
 
 // TODO[akostylev0] generic over request type
 #[derive(Deserialize, Debug)]
-pub struct Response {
+pub(crate) struct Response {
     #[serde(rename="@extra")]
     pub id: RequestId,
 
