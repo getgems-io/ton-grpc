@@ -245,7 +245,7 @@ impl CursorClient {
         self.masterchain_info_rx.clone()
     }
 
-    pub fn last_seqno(&self) -> Option<Seqno> {
+    pub(crate) fn last_seqno(&self) -> Option<Seqno> {
         let master_shard_id = self.masterchain_info_rx
             .borrow()
             .as_ref()
@@ -270,7 +270,7 @@ impl CursorClient {
         Some(0)
     }
 
-    pub fn edges_defined(&self) -> bool {
+    pub(crate) fn edges_defined(&self) -> bool {
         let Some(master_shard_id) = self.masterchain_info_rx
             .borrow()
             .as_ref()
