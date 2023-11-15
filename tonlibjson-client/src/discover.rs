@@ -22,7 +22,7 @@ use crate::ton_config::Liteserver;
 
 type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 
-pub struct ClientDiscover {
+pub(crate) struct ClientDiscover {
     changes: Pin<Box<dyn Stream<Item = DiscoverResult<Client>> + Send + Sync>>,
 }
 
@@ -128,12 +128,12 @@ impl Stream for ClientDiscover {
     }
 }
 
-pub struct CursorClientDiscover {
+pub(crate) struct CursorClientDiscover {
     discover: PeakEwmaDiscover<ClientDiscover>
 }
 
 impl CursorClientDiscover {
-    pub fn new(discover: PeakEwmaDiscover<ClientDiscover>) -> Self {
+    pub(crate) fn new(discover: PeakEwmaDiscover<ClientDiscover>) -> Self {
         Self { discover }
     }
 }

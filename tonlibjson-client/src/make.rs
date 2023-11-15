@@ -13,7 +13,7 @@ use crate::shared::SharedLayer;
 use crate::ton_config::TonConfig;
 
 #[derive(Default, Debug)]
-pub struct ClientFactory;
+pub(crate) struct ClientFactory;
 
 impl Service<TonConfig> for ClientFactory {
     type Response = Client;
@@ -39,10 +39,10 @@ impl Service<TonConfig> for ClientFactory {
 }
 
 #[derive(Default, Debug, Copy, Clone)]
-pub struct CursorClientFactory;
+pub(crate) struct CursorClientFactory;
 
 impl CursorClientFactory {
-    pub fn create(id: String, client: PeakEwma<Client>) -> CursorClient {
+    pub(crate) fn create(id: String, client: PeakEwma<Client>) -> CursorClient {
         debug!("make new cursor client");
         let client = SharedLayer
             .layer(client);

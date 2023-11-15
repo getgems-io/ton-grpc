@@ -4,26 +4,28 @@ use std::sync::{Arc, mpsc, Mutex};
 use std::sync::mpsc::TryRecvError;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use anyhow::{anyhow, bail};
-use dashmap::DashMap;
 use tower::{Service};
-use tracing::trace;
+use anyhow::{anyhow, bail};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use dashmap::DashMap;
+use uuid::Uuid;
 use crate::block::TonError;
-use crate::request::{Requestable, RequestId, Response, Request};
+use crate::request::Requestable;
 
 #[derive(Debug)]
-pub struct Client {
+pub(crate) struct Client {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
     _stop_signal: Arc<Mutex<Stop>>
 }
 
 impl Client {
-    pub fn set_logging(level: i32) {
+    pub(crate) fn set_logging(level: i32) {
         tonlibjson_sys::Client::set_verbosity_level(level);
     }
 
-    pub fn new() -> Self {
+    pub(crate) fn new() -> Self {
         let client = Arc::new(tonlibjson_sys::Client::new());
         let client_recv = client.clone();
 
@@ -112,7 +114,7 @@ impl<R : Requestable> Service<R> for Client {
 
             // TODO[akostylev0] refac!!
             if response.data["@type"] == "error" {
-                trace!("Error occurred: {:?}", &response.data);
+                tracing::trace!("Error occurred: {:?}", &response.data);
                 let error = serde_json::from_value::<TonError>(response.data)?;
 
                 bail!(error)
@@ -144,13 +146,39 @@ impl Drop for Stop {
     }
 }
 
+type RequestId = Uuid;
+
+#[derive(Serialize)]
+struct Request<T : Serialize> {
+    #[serde(rename="@extra")]
+    id: RequestId,
+
+    #[serde(skip_serializing)]
+    timeout: Duration,
+
+    #[serde(flatten)]
+    body: T
+}
+
+#[derive(Deserialize, Debug)]
+struct Response {
+    #[serde(rename="@extra")]
+    id: RequestId,
+
+    #[serde(flatten)]
+    data: Value
+}
 
 #[cfg(test)]
 mod tests {
+    use std::str::FromStr;
+    use std::time::Duration;
+    use serde_json::json;
     use tower::ServiceExt;
     use tracing_test::traced_test;
+    use uuid::Uuid;
     use crate::block::GetMasterchainInfo;
-    use crate::client::Client;
+    use crate::client::{Client, Request};
 
     #[tokio::test]
     #[traced_test]
@@ -160,5 +188,18 @@ mod tests {
         let resp = (&mut client).oneshot(GetMasterchainInfo::default()).await;
 
         assert_eq!("Ton error occurred with code 400, message library is not inited", resp.unwrap_err().to_string())
+    }
+
+    #[test]
+    fn data_is_flatten() {
+        let request = Request {
+            id: Uuid::from_str("7431f198-7514-40ff-876c-3e8ee0a311ba").unwrap(),
+            timeout: Duration::from_secs(3),
+            body: json!({
+                "data": "is flatten"
+            })
+        };
+
+        assert_eq!(serde_json::to_string(&request).unwrap(), "{\"@extra\":\"7431f198-7514-40ff-876c-3e8ee0a311ba\",\"data\":\"is flatten\"}")
     }
 }
