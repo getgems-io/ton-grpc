@@ -173,7 +173,7 @@ impl Registry {
             BlockCriteria::Seqno { shard, seqno } => {
                 let shard_id = (*chain, *shard);
                 let Some(bounds) = self.shard_bounds_registry.get(&shard_id) else {
-                    return false;
+                    return false
                 };
 
                 bounds.contains_seqno(*seqno)
