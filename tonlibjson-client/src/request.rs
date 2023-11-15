@@ -96,17 +96,13 @@ pub(crate) struct Response {
 
 // TODO[akostylev0] reinvent that layer
 #[derive(new, Clone)]
-pub struct Specialized<T> {
+pub(crate) struct Specialized<T> {
     inner: T
 }
 
 impl<T> Specialized<T> {
-    pub fn inner(&self) -> &T {
+    pub(crate) fn inner(&self) -> &T {
         &self.inner
-    }
-
-    pub fn into_inner(self) -> T {
-        self.inner
     }
 }
 
