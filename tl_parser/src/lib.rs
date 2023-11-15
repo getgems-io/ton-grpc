@@ -21,11 +21,7 @@ pub struct Combinator {
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
     let (input, vecs) = many0(
         delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
-    )(input).map_err(|e| {
-        println!("ERRROR BLYA");
-
-        anyhow!("parse error: {}", e)
-    })?;
+    )(input).map_err(|e| anyhow!("parse error: {}", e))?;
 
     println!("{}", input);
 
