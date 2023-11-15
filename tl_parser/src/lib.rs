@@ -8,12 +8,13 @@ use nom::sequence::{delimited, preceded, terminated};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Combinator {
+    builtin: bool,
     id: String,
     r#type: String
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
-    let (_, vecs) = fold_many0(combinator_decl, Vec::new, |mut acc: Vec<_>, item| {
+    let (_, vecs) = fold_many0(alt((combinator_decl, builtin_combinator_decl)), Vec::new, |mut acc: Vec<_>, item| {
         acc.push(item);
         acc
     })(input).map_err(|e| anyhow!("parse error: {}", e))?;
@@ -104,7 +105,17 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, combinator_type) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false }))
+}
+
+fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
+    let (input, combinator_id) = preceded(multispace0, full_combinator_id)(input)?;
+    let (input, _) = delimited(multispace0, tag("?"), multispace0)(input)?;
+    let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
+    let (input, combinator_type) = boxed_type_ident(input)?;
+    let (input, _) = preceded(multispace0, tag(";"))(input)?;
+
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true }))
 }
 
 #[cfg(test)]
@@ -113,7 +124,11 @@ mod tests {
 
     impl Combinator {
         fn new(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned() }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false }
+        }
+
+        fn builtin(name: &str, r#type: &str) -> Self {
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true }
         }
     }
 
@@ -195,7 +210,7 @@ mod tests {
 
         let output = combinator_decl(input);
 
-        assert_eq!(output, Ok(("", Combinator { id: "null".to_owned(), r#type: "Null".to_owned() })));
+        assert_eq!(output, Ok(("", Combinator::new("null", "Null"))));
     }
 
     #[test]
@@ -220,5 +235,21 @@ boolTrue = Bool;
             Combinator::new("boolFalse", "Bool"),
             Combinator::new("boolTrue", "Bool")
         ]);
+    }
+
+    #[test]
+    fn builtin() {
+        let input = "int#a8509bda ? = Int;
+long ? = Long;
+double ? = Double;
+string ? = String;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::builtin("int#a8509bda", "Int"),
+            Combinator::builtin("long", "Long"),
+            Combinator::builtin("double", "Double"),
+            Combinator::builtin("string", "String")]);
     }
 }
