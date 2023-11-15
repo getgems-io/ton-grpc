@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.10.0...tonlibjson-client-v0.11.0) (2023-11-15)
+
+
+### Features
+
+* Graceful handling for next block request ([#530](https://github.com/getgems-io/ton-grpc/issues/530)) ([a045855](https://github.com/getgems-io/ton-grpc/commit/a04585558768c222cb9e05b3d4671c18a53f8878))
+
+
+### Bug Fixes
+
+* **deps:** bump itertools from 0.11.0 to 0.12.0 ([fe22337](https://github.com/getgems-io/ton-grpc/commit/fe22337562d77688003814f2b269201ed6723e1b))
+
 ## [0.10.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.9.0...tonlibjson-client-v0.10.0) (2023-11-14)
 
 
