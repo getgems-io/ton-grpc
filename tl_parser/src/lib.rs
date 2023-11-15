@@ -6,11 +6,14 @@ use nom::combinator::{map, opt};
 use nom::multi::fold_many0;
 use nom::sequence::{delimited, preceded, terminated};
 
+pub type ConstructorNumber = u32;
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Combinator {
     builtin: bool,
     id: String,
-    r#type: String
+    r#type: String,
+    constructor_number: Option<ConstructorNumber>
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
@@ -72,20 +75,24 @@ fn uc_ident_ns(input: &str) -> nom::IResult<&str, String> {
     }
 }
 
-fn lc_ident_full(input: &str) -> nom::IResult<&str, String> {
+fn lc_ident_full(input: &str) -> nom::IResult<&str, (String, Option<ConstructorNumber>)> {
     let (input, ident) = lc_ident_ns(input)?;
     let (input, combinator_number) = opt(preceded(tag("#"), take_while_m_n(8, 8, is_hex_digit)))(input)?;
 
     match combinator_number {
-        None => Ok((input, ident)),
-        Some(combinator_number) => Ok((input, format!("{}#{}", ident, combinator_number)))
+        None => Ok((input, (ident, None))),
+        Some(combinator_number) => {
+            let combinator_number = ConstructorNumber::from_str_radix(combinator_number, 16).expect("invalid combinator number");
+
+            Ok((input, (ident, Some(combinator_number))))
+        }
     }
 }
 
-fn full_combinator_id(input: &str) -> nom::IResult<&str, String> {
+fn full_combinator_id(input: &str) -> nom::IResult<&str, (String, Option<ConstructorNumber>)> {
     Ok(alt((
         lc_ident_full,
-        map(tag("_"), |s: &str| s.to_owned())
+        map(tag("_"), |s: &str| (s.to_owned(), None))
     ))(input)?)
 }
 
@@ -100,22 +107,22 @@ fn result_type(input: &str) -> nom::IResult<&str, String> {
 }
 
 fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
-    let (input, combinator_id) = preceded(multispace0, full_combinator_id)(input)?;
+    let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
     let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
     let (input, combinator_type) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number }))
 }
 
 fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
-    let (input, combinator_id) = preceded(multispace0, full_combinator_id)(input)?;
+    let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
     let (input, _) = delimited(multispace0, tag("?"), multispace0)(input)?;
     let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
     let (input, combinator_type) = boxed_type_ident(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number }))
 }
 
 #[cfg(test)]
@@ -124,11 +131,17 @@ mod tests {
 
     impl Combinator {
         fn new(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false, constructor_number: None }
         }
 
         fn builtin(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true, constructor_number: None }
+        }
+
+        fn set_constructor_number(mut self, constructor_number: ConstructorNumber) -> Self {
+            self.constructor_number.replace(constructor_number);
+
+            self
         }
     }
 
@@ -183,7 +196,7 @@ mod tests {
 
         let output = lc_ident_full(input);
 
-        assert_eq!(output, Ok(("", "input#a8509bda".to_owned())));
+        assert_eq!(output, Ok(("", ("input".to_owned(), Some(2823855066)))));
     }
 
     #[test]
@@ -192,7 +205,7 @@ mod tests {
 
         let output = full_combinator_id(input);
 
-        assert_eq!(output, Ok(("", "_".to_owned())));
+        assert_eq!(output, Ok(("", ("_".to_owned(), None))));
     }
 
     #[test]
@@ -201,7 +214,7 @@ mod tests {
 
         let output = full_combinator_id(input);
 
-        assert_eq!(output, Ok(("", "input#a8509bda".to_owned())));
+        assert_eq!(output, Ok(("", ("input".to_owned(), Some(2823855066)))));
     }
 
     #[test]
@@ -247,7 +260,7 @@ string ? = String;";
         let output = parse(input).unwrap();
 
         assert_eq!(output, vec![
-            Combinator::builtin("int#a8509bda", "Int"),
+            Combinator::builtin("int", "Int").set_constructor_number(2823855066),
             Combinator::builtin("long", "Long"),
             Combinator::builtin("double", "Double"),
             Combinator::builtin("string", "String")]);
