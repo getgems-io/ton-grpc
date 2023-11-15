@@ -57,8 +57,8 @@ impl ShardBounds {
     }
 
     fn contains_seqno(&self, seqno: Seqno) -> bool {
-        let Some(left) = &self.left else { return false };
-        let Some(right) = &self.right else { return false };
+        let Some(ref left) = self.left else { return false };
+        let Some(ref right) = self.right else { return false };
 
         left.id.seqno <= seqno && seqno <= right.id.seqno
     }
