@@ -50,10 +50,15 @@ fn single_line_comment(input: &str) -> nom::IResult<&str, &str> {
     preceded(tag("//"), take_till(|c| c == '\n'))(input)
 }
 
+fn multi_line_comment(input: &str) -> nom::IResult<&str, &str> {
+    delimited(tag("/*"), take_until("*/"), tag("*/"))(input)
+}
+
 fn space_or_comment(input: &str) -> nom::IResult<&str, ()> {
     let (input, _) = many0(alt((
         multispace1,
         single_line_comment,
+        multi_line_comment,
         line_ending
     )))(input)?;
 
@@ -257,6 +262,19 @@ mod tests {
     }
 
     #[test]
+    fn multi_line_comment_test() {
+        let input = "/* multi
+        line
+comment */";
+
+        let output = multi_line_comment(input);
+
+        assert_eq!(output, Ok(("", " multi
+        line
+comment ")));
+    }
+
+    #[test]
     fn empty_input() {
         let input = "";
 
@@ -309,6 +327,10 @@ int ? = Int;
 long ? = Long;
 double ? = Double;
 string ? = String;
+
+/* multi
+    line
+comment */
 
 // Boolean emulation
 boolFalse = Bool;
