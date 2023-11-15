@@ -56,6 +56,20 @@ impl ShardBounds {
         }
     }
 
+    fn contains_seqno(&self, seqno: Seqno) -> bool {
+        let Some(left) = &self.left else { return false };
+        let Some(right) = &self.right else { return false };
+
+        left.id.seqno <= seqno && seqno <= right.id.seqno
+    }
+
+    fn contains_lt(&self, lt: i64) -> bool {
+        let Some(ref left) = self.left else { return false };
+        let Some(ref right) = self.right else { return false };
+
+        left.start_lt <= lt && lt <= right.end_lt
+    }
+
     fn distance_seqno(&self, seqno: Seqno) -> Option<Seqno> {
         let left = self.left.as_ref()?;
         let right = self.right.as_ref()?;
@@ -145,6 +159,28 @@ impl Registry {
         entry.insert(*shard_id);
     }
 
+    fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+        match criteria {
+            BlockCriteria::LogicalTime(lt) => {
+                self.shard_registry
+                    .get(chain)
+                    .map(|shard_ids| shard_ids
+                        .iter()
+                        .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id))
+                        .any(|bounds| bounds.contains_lt(*lt))
+                    ).unwrap_or(false)
+            },
+            BlockCriteria::Seqno { shard, seqno } => {
+                let shard_id = (*chain, *shard);
+                let Some(bounds) = self.shard_bounds_registry.get(&shard_id) else {
+                    return false;
+                };
+
+                bounds.contains_seqno(*seqno)
+            }
+        }
+    }
+
     fn waitable_distance(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
         match criteria {
             BlockCriteria::LogicalTime(lt) => {
@@ -219,7 +255,7 @@ impl CursorClient {
     }
 
     pub(crate) fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
-        self.distance_to(chain, criteria).is_some_and(|d| d == 0)
+        self.registry.contains(chain, criteria)
     }
 
     pub(crate) fn distance_to(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
