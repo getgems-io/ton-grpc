@@ -156,10 +156,7 @@ fn result_type(input: &str) -> nom::IResult<&str, String> {
 }
 
 fn expr(input: &str) -> nom::IResult<&str, String> {
-    map(
-        many0(delimited(space0, subexpr, space0)),
-        |vs| vs.join(" ")
-    )(input)
+    map(separated_list1(tag(" "),subexpr), |vs| vs.join(" "))(input)
 }
 
 fn type_expr(input: &str) -> nom::IResult<&str, String> {
@@ -237,7 +234,7 @@ fn type_ident(input: &str) -> nom::IResult<&str, String> {
 
 fn term(input: &str) -> nom::IResult<&str, String> {
     alt((
-        delimited(tag("("), subexpr, tag(")")),
+        delimited(tag("("), expr, tag(")")),
         map(
             recognize(pair(type_ident, delimited(tag("<"), separated_list1(tag(","), type_ident), tag(">")))),
             |s| s.to_owned()
@@ -658,20 +655,6 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
     }
 
     #[test]
-    fn gen_vector_test() {
-        let input = "exportedKey word_list:vector<secureString> = ExportedKey;";
-
-        let output = parse(input).unwrap();
-
-        assert_eq!(output, vec![
-            Combinator::new("exportedKey", "ExportedKey")
-                .with_fields(vec![
-                    Field::bare("word_list", "vector<secureString>")
-                ])
-        ]);
-    }
-
-    #[test]
     fn nested_lc_namespaces_test() {
         let input = "n1.n2.n3.input";
 
@@ -687,5 +670,33 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
         let output = uc_ident_ns(input);
 
         assert_eq!(output, Ok(("", "n1.n2.n3.Input".to_owned())));
+    }
+
+    #[test]
+    fn field_vector_of_test() {
+        let input = "exportedKey word_list:vector<secureString> = ExportedKey;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("exportedKey", "ExportedKey")
+                .with_fields(vec![
+                    Field::bare("word_list", "vector<secureString>")
+                ])
+        ]);
+    }
+
+    #[test]
+    fn field_vector_of_test_spaces() {
+        let input = "smc.libraryResult result:(vector smc.libraryEntry) = smc.LibraryResult;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("smc.libraryResult", "smc.LibraryResult")
+                .with_fields(vec![
+                    Field::bare("result", "vector smc.libraryEntry")
+                ])
+        ]);
     }
 }
