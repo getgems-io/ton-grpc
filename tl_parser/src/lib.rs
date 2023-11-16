@@ -17,13 +17,14 @@ pub struct Combinator {
     id: String,
     r#type: String,
     constructor_number: Option<ConstructorNumber>,
+    fields: Vec<Field>
 }
 
 #[derive(Debug, PartialEq, Eq)]
 enum FieldType {
     ConditionalField {
-        condition: Option<String>,
-        r#type: String
+        condition: String,
+        name: String
     },
     Repetition {
         multiplicity: Option<String>,
@@ -152,11 +153,12 @@ fn result_type(input: &str) -> nom::IResult<&str, String> {
 
 fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
+    let (input, fields) = many0(delimited(space0, args, space0))(input)?;
     let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
     let (input, combinator_type) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number, fields }))
 }
 
 fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -166,7 +168,7 @@ fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, combinator_type) = boxed_type_ident(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number, fields: vec![] }))
 }
 
 fn var_ident(input: &str) -> nom::IResult<&str, String> {
@@ -227,10 +229,18 @@ fn args_1(input: &str) -> nom::IResult<&str, Field> {
     let (input, _) = tag(":")(input)?;
     let (input, conditional_def) = opt(conditional_def)(input)?;
     let (input, marker) = opt(tag("!"))(input)?;
-    let (input, r#type) = type_term(input)?;
+    let (input, name) = type_term(input)?;
+
+    match conditional_def {
+        None => {
+            Ok((input, Field { name: Some(id), r#type: Bare { name: name }}))
+        }
+        Some(condition) => {
+            Ok((input, Field { name: Some(id), r#type: ConditionalField { condition, name }}))
+        }
+    }
 
 
-    Ok((input, Field { name: Some(id), r#type: ConditionalField { condition: conditional_def, r#type }}))
 }
 
 fn nat_term(input: &str) -> nom::IResult<&str, String> {
@@ -283,17 +293,29 @@ mod tests {
 
     impl Combinator {
         fn new(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false, constructor_number: None }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false, constructor_number: None, fields: vec![] }
         }
 
         fn builtin(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true, constructor_number: None }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true, constructor_number: None, fields: vec![] }
         }
 
-        fn set_constructor_number(mut self, constructor_number: ConstructorNumber) -> Self {
+        fn with_constructor_number(mut self, constructor_number: ConstructorNumber) -> Self {
             self.constructor_number.replace(constructor_number);
 
             self
+        }
+
+        fn with_fields(mut self, fields: Vec<Field>) -> Self {
+            self.fields = fields;
+
+            self
+        }
+    }
+
+    impl Field {
+        fn bare(name: &str, r#type: &str) -> Self {
+            Self { name: Some(name.to_owned()), r#type: Bare { name: r#type.to_owned() } }
         }
     }
 
@@ -406,7 +428,7 @@ comment ")));
 
         let output = args_1(input);
 
-        assert_eq!(output, Ok(("", Field { name: Some("first_name".to_owned()), r#type: ConditionalField { condition: Some("fields.0".to_owned()), r#type: "string".to_owned() }})));
+        assert_eq!(output, Ok(("", Field { name: Some("first_name".to_owned()), r#type: ConditionalField { condition: "fields.0".to_owned(), name: "string".to_owned() }})));
     }
 
     #[test]
@@ -502,7 +524,7 @@ string ? = String;";
         let output = parse(input).unwrap();
 
         assert_eq!(output, vec![
-            Combinator::builtin("int", "Int").set_constructor_number(2823855066),
+            Combinator::builtin("int", "Int").with_constructor_number(2823855066),
             Combinator::builtin("long", "Long"),
             Combinator::builtin("double", "Double"),
             Combinator::builtin("string", "String")]);
@@ -551,6 +573,11 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
 
         assert_eq!(output, vec![
             Combinator::new("boolStat", "BoolStat")
+                .with_fields(vec![
+                    Field::bare("statTrue", "int"),
+                    Field::bare("statFalse", "int"),
+                    Field::bare("statUnknown", "int")
+                ])
         ]);
     }
 }
