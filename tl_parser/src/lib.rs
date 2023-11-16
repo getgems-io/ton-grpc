@@ -1,11 +1,11 @@
-use anyhow::anyhow;
+use anyhow::{anyhow, bail};
+use nom::AsChar;
 use nom::branch::alt;
-use nom::bytes::complete::{is_not, tag, take_till, take_until, take_while, take_while1, take_while_m_n};
-use nom::character::complete::{char, line_ending, multispace0, multispace1, newline, satisfy, space0};
-use nom::combinator::{map, opt, recognize, value};
+use nom::bytes::complete::{tag, take_till, take_until, take_while, take_while1, take_while_m_n};
+use nom::character::complete::{line_ending, multispace0, multispace1, satisfy, space0};
+use nom::combinator::{map, opt, recognize};
 use nom::error::Error;
-use nom::multi::{fold_many0, many0, many1, separated_list1};
-use nom::Parser;
+use nom::multi::{many0, many1, separated_list1};
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated};
 use crate::FieldType::{Bare, ConditionalField, Repetition};
 
@@ -13,6 +13,7 @@ pub type ConstructorNumber = u32;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Combinator {
+    //TODO: functional: bool,
     builtin: bool,
     id: String,
     r#type: String,
@@ -63,16 +64,20 @@ pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
         types.extend(funcs);
     }
 
-    Ok(types)
+    if input.is_empty() {
+        Ok(types)
+    } else {
+        bail!("parse error: input is not empty: \"{}\"", input)
+    }
 }
 
 fn is_lc_letter(c: char) -> bool { c.is_ascii_lowercase() }
 
 fn is_uc_letter(c: char) -> bool { c.is_ascii_uppercase() }
 
-fn is_digit(c: char) -> bool { c.is_digit(10) }
+fn is_digit(c: char) -> bool { c.is_ascii_digit() }
 
-fn is_hex_digit(c: char) -> bool { c.is_digit(16) }
+fn is_hex_digit(c: char) -> bool { c.is_hex_digit() }
 
 fn is_underscore(c: char) -> bool { c == '_' }
 
@@ -144,10 +149,10 @@ fn lc_ident_full(input: &str) -> nom::IResult<&str, (String, Option<ConstructorN
 }
 
 fn full_combinator_id(input: &str) -> nom::IResult<&str, (String, Option<ConstructorNumber>)> {
-    Ok(alt((
+    alt((
         lc_ident_full,
         map(tag("_"), |s: &str| (s.to_owned(), None))
-    ))(input)?)
+    ))(input)
 }
 
 fn boxed_type_ident(input: &str) -> nom::IResult<&str, String> {
@@ -230,13 +235,13 @@ fn conditional_def(input: &str) -> nom::IResult<&str, String> {
 }
 
 fn subexpr(input: &str) -> nom::IResult<&str, String> {
-    Ok(alt(
+    alt(
         (term, map(many1(map(separated_pair(
             alt((term, map(nat_const, |s: &str| s.to_owned()))),
             map(tag("+"), |s: &str| s.to_owned()),
             alt((term, map(nat_const, |s: &str| s.to_owned()))),
         ), |(s1, s2)| format!("{} + {}", s1, s2))), |vs: Vec<String>| vs.join("+")))
-    )(input)?)
+    )(input)
 }
 
 fn type_ident(input: &str) -> nom::IResult<&str, String> {
@@ -270,7 +275,7 @@ fn args_1(input: &str) -> nom::IResult<&str, Vec<Field>> {
 
     match conditional_def {
         None => {
-            Ok((input, vec![Field { name: Some(id), r#type: Bare { name: name } }]))
+            Ok((input, vec![Field { name: Some(id), r#type: Bare { name } }]))
         }
         Some(condition) => {
             Ok((input, vec![Field { name: Some(id), r#type: ConditionalField { condition, name } }]))
