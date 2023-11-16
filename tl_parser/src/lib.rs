@@ -18,14 +18,14 @@ pub struct Combinator {
     r#type: String,
     constructor_number: Option<ConstructorNumber>,
     optional_fields: Vec<OptionalField>,
-    fields: Vec<Field>
+    fields: Vec<Field>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 enum FieldType {
     ConditionalField {
         condition: String,
-        name: String
+        name: String,
     },
     Repetition {
         multiplicity: Option<String>,
@@ -33,7 +33,7 @@ enum FieldType {
     },
     Bare {
         name: String
-    }
+    },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -45,15 +45,25 @@ pub struct Field {
 #[derive(Debug, PartialEq, Eq)]
 pub struct OptionalField {
     name: String,
-    r#type: String
+    r#type: String,
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
-    let (input, vecs) = many0(
+    let (input, mut types) = many0(
         delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
     )(input).map_err(|e| anyhow!("parse error: {}", e))?;
 
-    Ok(vecs)
+    let (input, funcs) = opt(preceded(
+        tag("---functions---"),
+        many0(
+            delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
+        )))(input).map_err(|e: nom::Err<Error<&str>>| anyhow!("parse error: {}", e))?;
+
+    if let Some(funcs) = funcs {
+        types.extend(funcs);
+    }
+
+    Ok(types)
 }
 
 fn is_lc_letter(c: char) -> bool { c.is_ascii_lowercase() }
@@ -156,7 +166,7 @@ fn result_type(input: &str) -> nom::IResult<&str, String> {
 }
 
 fn expr(input: &str) -> nom::IResult<&str, String> {
-    map(separated_list1(tag(" "),subexpr), |vs| vs.join(" "))(input)
+    map(separated_list1(tag(" "), subexpr), |vs| vs.join(" "))(input)
 }
 
 fn type_expr(input: &str) -> nom::IResult<&str, String> {
@@ -179,7 +189,8 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, combinator_type) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number, fields, optional_fields: opts.unwrap_or_default() }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number,
+        fields: fields.into_iter().flatten().collect(), optional_fields: opts.unwrap_or_default() }))
 }
 
 fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -223,7 +234,7 @@ fn subexpr(input: &str) -> nom::IResult<&str, String> {
         (term, map(many1(map(separated_pair(
             alt((term, map(nat_const, |s: &str| s.to_owned()))),
             map(tag("+"), |s: &str| s.to_owned()),
-            alt((term, map(nat_const, |s: &str| s.to_owned())))
+            alt((term, map(nat_const, |s: &str| s.to_owned()))),
         ), |(s1, s2)| format!("{} + {}", s1, s2))), |vs: Vec<String>| vs.join("+")))
     )(input)?)
 }
@@ -237,7 +248,7 @@ fn term(input: &str) -> nom::IResult<&str, String> {
         delimited(tag("("), expr, tag(")")),
         map(
             recognize(pair(type_ident, delimited(tag("<"), separated_list1(tag(","), type_ident), tag(">")))),
-            |s| s.to_owned()
+            |s| s.to_owned(),
         ),
         type_ident,
         var_ident,
@@ -250,7 +261,7 @@ fn type_term(input: &str) -> nom::IResult<&str, String> {
     term(input)
 }
 
-fn args_1(input: &str) -> nom::IResult<&str, Field> {
+fn args_1(input: &str) -> nom::IResult<&str, Vec<Field>> {
     let (input, id) = var_ident_opt(input)?;
     let (input, _) = tag(":")(input)?;
     let (input, conditional_def) = opt(conditional_def)(input)?;
@@ -259,14 +270,12 @@ fn args_1(input: &str) -> nom::IResult<&str, Field> {
 
     match conditional_def {
         None => {
-            Ok((input, Field { name: Some(id), r#type: Bare { name: name }}))
+            Ok((input, vec![Field { name: Some(id), r#type: Bare { name: name } }]))
         }
         Some(condition) => {
-            Ok((input, Field { name: Some(id), r#type: ConditionalField { condition, name }}))
+            Ok((input, vec![Field { name: Some(id), r#type: ConditionalField { condition, name } }]))
         }
     }
-
-
 }
 
 fn nat_term(input: &str) -> nom::IResult<&str, String> {
@@ -276,14 +285,15 @@ fn nat_term(input: &str) -> nom::IResult<&str, String> {
 fn multiplicity(input: &str) -> nom::IResult<&str, String> {
     terminated(nat_term, tag("*"))(input)
 }
-fn args_2(input: &str) -> nom::IResult<&str, Field> {
+
+fn args_2(input: &str) -> nom::IResult<&str, Vec<Field>> {
     let (input, id) = opt(terminated(var_ident_opt, tag(":")))(input)?;
     let (input, multiplicity) = opt(multiplicity)(input)?;
     let (input, _) = tag("[")(input)?;
     let (input, fields) = many1(delimited(space0, args, space0))(input)?;
     let (input, _) = tag("]")(input)?;
 
-    Ok((input, Field { name: id, r#type: Repetition { multiplicity, fields } }))
+    Ok((input, vec![Field { name: id, r#type: Repetition { multiplicity, fields: fields.into_iter().flatten().collect() } }]))
 }
 
 fn args_3(input: &str) -> nom::IResult<&str, Vec<Field>> {
@@ -298,19 +308,19 @@ fn args_3(input: &str) -> nom::IResult<&str, Vec<Field>> {
         name: Some(id),
         r#type: Bare {
             name: type_term.clone()
-        }
+        },
     }).collect()))
 }
 
-fn args_4(input: &str) -> nom::IResult<&str, Field> {
+fn args_4(input: &str) -> nom::IResult<&str, Vec<Field>> {
     let (input, mark) = opt(tag("!"))(input)?;
     let (input, type_term) = type_term(input)?;
 
-    Ok((input, Field { name: None, r#type: Bare { name: type_term } }))
+    Ok((input, vec![Field { name: None, r#type: Bare { name: type_term } }]))
 }
 
-fn args(input: &str) -> nom::IResult<&str, Field> {
-    alt((args_1, args_2, args_4))(input)
+fn args(input: &str) -> nom::IResult<&str, Vec<Field>> {
+    alt((args_1, args_2, args_3, args_4))(input)
 }
 
 #[cfg(test)]
@@ -355,7 +365,7 @@ mod tests {
         }
 
         fn repetition(name: Option<String>, multiplicity: Option<String>, fields: Vec<Field>) -> Self {
-            Self { name, r#type: Repetition { multiplicity, fields }}
+            Self { name, r#type: Repetition { multiplicity, fields } }
         }
     }
 
@@ -474,7 +484,9 @@ comment ")));
 
         let output = args_1(input);
 
-        assert_eq!(output, Ok(("", Field { name: Some("first_name".to_owned()), r#type: ConditionalField { condition: "fields.0".to_owned(), name: "string".to_owned() }})));
+        assert_eq!(output, Ok(("", vec![Field {
+            name: Some("first_name".to_owned()), r#type: ConditionalField { condition: "fields.0".to_owned(), name: "string".to_owned() }
+        }])));
     }
 
     #[test]
@@ -483,19 +495,22 @@ comment ")));
 
         let output = args_2(input);
 
-        assert_eq!(output, Ok(("", Field { name: Some("a".to_owned()), r#type: Repetition {
-            multiplicity: Some("m".to_owned()),
-            fields: vec![Field {
-                name: None,
-                r#type: Repetition {
-                    multiplicity: Some("n".to_owned()),
-                    fields: vec![Field {
-                        name: None,
-                        r#type: Bare {name: "double".to_owned()}
-                    }]
-                },
-            }]
-        }})));
+        assert_eq!(output, Ok(("", vec![Field {
+            name: Some("a".to_owned()),
+            r#type: Repetition {
+                multiplicity: Some("m".to_owned()),
+                fields: vec![Field {
+                    name: None,
+                    r#type: Repetition {
+                        multiplicity: Some("n".to_owned()),
+                        fields: vec![Field {
+                            name: None,
+                            r#type: Bare { name: "double".to_owned() },
+                        }],
+                    },
+                }],
+            },
+        }])));
     }
 
     #[test]
@@ -509,20 +524,20 @@ comment ")));
                 name: Some("x".to_string()),
                 r#type: Bare {
                     name: "int32".to_string()
-                }
+                },
             },
             Field {
                 name: Some("y".to_string()),
                 r#type: Bare {
                     name: "int32".to_string()
-                }
+                },
             },
             Field {
                 name: Some("z".to_string()),
                 r#type: Bare {
                     name: "int32".to_string()
-                }
-            }
+                },
+            },
         ])));
     }
 
@@ -532,7 +547,7 @@ comment ")));
 
         let output = args_4(input);
 
-        assert_eq!(output, Ok(("", Field { name: None, r#type: Bare { name: "double".to_owned() } })));
+        assert_eq!(output, Ok(("", vec![Field { name: None, r#type: Bare { name: "double".to_owned() } }])));
     }
 
 
@@ -556,7 +571,7 @@ boolTrue = Bool;
 
         assert_eq!(output, vec![
             Combinator::new("boolFalse", "Bool"),
-            Combinator::new("boolTrue", "Bool")
+            Combinator::new("boolTrue", "Bool"),
         ]);
     }
 
@@ -622,7 +637,7 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
                 .with_fields(vec![
                     Field::bare("statTrue", "int"),
                     Field::bare("statFalse", "int"),
-                    Field::bare("statUnknown", "int")
+                    Field::bare("statUnknown", "int"),
                 ])
         ]);
     }
@@ -649,7 +664,7 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
                 ])
                 .with_fields(vec![
                     Field::unnamed_bare("#"),
-                    Field::repetition(None, None, vec![Field::unnamed_bare("t")])
+                    Field::repetition(None, None, vec![Field::unnamed_bare("t")]),
                 ])
         ]);
     }
