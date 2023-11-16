@@ -6,7 +6,7 @@ use nom::combinator::{map, opt, recognize, value};
 use nom::error::Error;
 use nom::multi::{fold_many0, many0, many1};
 use nom::Parser;
-use nom::sequence::{delimited, pair, preceded, terminated};
+use nom::sequence::{delimited, pair, preceded, separated_pair, terminated};
 use crate::FieldType::{Bare, ConditionalField, Repetition};
 
 pub type ConstructorNumber = u32;
@@ -147,15 +147,47 @@ fn boxed_type_ident(input: &str) -> nom::IResult<&str, String> {
 
 fn result_type(input: &str) -> nom::IResult<&str, String> {
     let (input, ident) = boxed_type_ident(input)?;
+    let (input, exprs) = many0(delimited(space0, subexpr, space0))(input)?;
 
-    Ok((input, ident))
+    if !exprs.is_empty() {
+        Ok((input, format!("{} {}", ident, exprs.join(" "))))
+    } else {
+        Ok((input, ident))
+    }
+}
+
+fn expr(input: &str) -> nom::IResult<&str, Vec<String>> {
+    many0(delimited(space0, subexpr, space0))(input)
+}
+
+fn type_expr(input: &str) -> nom::IResult<&str, Vec<String>> {
+    expr(input)
+}
+
+fn opt_args(input: &str) -> nom::IResult<&str, String> {
+    let (input, args) = preceded(tag("{"), many1(delimited(space0, var_ident, space0)))(input)?;
+    println!("{:?}", args);
+    let (input, _) = delimited(space0, tag(":"), space0)(input)?;
+    let (input, type_name) = terminated(type_expr, tag("}"))(input)?;
+    println!("{:?}", type_name);
+
+    Ok((input, "".to_owned()))
 }
 
 fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
+    println!("{}", combinator_id);
+    let (input, opts) = opt(delimited(space0, opt_args, space0))(input)?;
+    println!("{:?}", opts);
+
     let (input, fields) = many0(delimited(space0, args, space0))(input)?;
+
+    println!("fields = {:?}", fields);
     let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
+    println!("input = {}", input);
     let (input, combinator_type) = result_type(input)?;
+    println!("combinator_type = {}", combinator_type);
+    println!("input = {}", input);
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
     Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number, fields }))
@@ -198,11 +230,13 @@ fn conditional_def(input: &str) -> nom::IResult<&str, String> {
 }
 
 fn subexpr(input: &str) -> nom::IResult<&str, String> {
-    alt((
-        term,
-        map(pair(nat_const, preceded(tag("+"), subexpr)), |(s1, s2)| format!("{}+{}", s1, s2)),
-        map(pair(subexpr, preceded(tag("+"), nat_const)), |(s1, s2)| format!("{}+{}", s1, s2))
-    ))(input)
+    Ok(alt(
+        (term, map(many1(map(separated_pair(
+            alt((term, map(nat_const, |s: &str| s.to_owned()))),
+            map(tag("+"), |s: &str| s.to_owned()),
+            alt((term, map(nat_const, |s: &str| s.to_owned())))
+        ), |(s1, s2)| format!("{} + {}", s1, s2))), |vs: Vec<String>| vs.join("+")))
+    )(input)?)
 }
 
 fn type_ident(input: &str) -> nom::IResult<&str, String> {
@@ -254,7 +288,7 @@ fn args_2(input: &str) -> nom::IResult<&str, Field> {
     let (input, id) = opt(terminated(var_ident_opt, tag(":")))(input)?;
     let (input, multiplicity) = opt(multiplicity)(input)?;
     let (input, _) = tag("[")(input)?;
-    let (input, fields) = many1(args)(input)?;
+    let (input, fields) = many1(delimited(space0, args, space0))(input)?;
     let (input, _) = tag("]")(input)?;
 
     Ok((input, Field { name: id, r#type: Repetition { multiplicity, fields } }))
@@ -316,6 +350,14 @@ mod tests {
     impl Field {
         fn bare(name: &str, r#type: &str) -> Self {
             Self { name: Some(name.to_owned()), r#type: Bare { name: r#type.to_owned() } }
+        }
+
+        fn unnamed_bare(r#type: &str) -> Self {
+            Self { name: None, r#type: Bare { name: r#type.to_owned() } }
+        }
+
+        fn repetition(name: Option<String>, multiplicity: Option<String>, fields: Vec<Field>) -> Self {
+            Self { name, r#type: Repetition { multiplicity, fields }}
         }
     }
 
@@ -577,6 +619,30 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
                     Field::bare("statTrue", "int"),
                     Field::bare("statFalse", "int"),
                     Field::bare("statUnknown", "int")
+                ])
+        ]);
+    }
+
+    #[test]
+    fn type_term_hash_test() {
+        let input = "#";
+
+        let output = type_term(input).unwrap();
+
+        assert_eq!(output, ("", "#".to_owned()))
+    }
+
+    #[test]
+    fn vector_test() {
+        let input = "vector {t:Type} # [ t ] = Vector t;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("vector", "Vector t")
+                .with_fields(vec![
+                    Field::unnamed_bare("#"),
+                    Field::repetition(None, None, vec![Field::unnamed_bare("t")])
                 ])
         ]);
     }
