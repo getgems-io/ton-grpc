@@ -106,22 +106,16 @@ fn uc_ident(input: &str) -> nom::IResult<&str, String> {
 fn namespace_ident(input: &str) -> nom::IResult<&str, String> { lc_ident(input) }
 
 fn lc_ident_ns(input: &str) -> nom::IResult<&str, String> {
-    let (input, ns) = opt(terminated(namespace_ident, tag(".")))(input)?;
-    let (input, head) = lc_ident(input)?;
-
-    match ns {
-        None => Ok((input, head)),
-        Some(ns) => Ok((input, format!("{}.{}", ns, head)))
-    }
+    map(separated_list1(tag("."), lc_ident), |vec| vec.join("."))(input)
 }
 
 fn uc_ident_ns(input: &str) -> nom::IResult<&str, String> {
-    let (input, ns) = opt(terminated(namespace_ident, tag(".")))(input)?;
+    let (input, ns) = opt(terminated(separated_list1(tag("."), namespace_ident), tag(".")))(input)?;
     let (input, head) = uc_ident(input)?;
 
     match ns {
         None => Ok((input, head)),
-        Some(ns) => Ok((input, format!("{}.{}", ns, head)))
+        Some(ns) => Ok((input, format!("{}.{}", ns.join("."), head)))
     }
 }
 
@@ -675,5 +669,23 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
                     Field::bare("word_list", "vector<secureString>")
                 ])
         ]);
+    }
+
+    #[test]
+    fn nested_lc_namespaces_test() {
+        let input = "n1.n2.n3.input";
+
+        let output = lc_ident_ns(input);
+
+        assert_eq!(output, Ok(("", "n1.n2.n3.input".to_owned())));
+    }
+
+    #[test]
+    fn nested_uc_namespaces_test() {
+        let input = "n1.n2.n3.Input";
+
+        let output = uc_ident_ns(input);
+
+        assert_eq!(output, Ok(("", "n1.n2.n3.Input".to_owned())));
     }
 }
