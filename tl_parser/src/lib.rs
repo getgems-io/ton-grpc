@@ -4,7 +4,7 @@ use nom::bytes::complete::{is_not, tag, take_till, take_until, take_while, take_
 use nom::character::complete::{char, line_ending, multispace0, multispace1, newline, satisfy, space0};
 use nom::combinator::{map, opt, recognize, value};
 use nom::error::Error;
-use nom::multi::{fold_many0, many0, many1};
+use nom::multi::{fold_many0, many0, many1, separated_list1};
 use nom::Parser;
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated};
 use crate::FieldType::{Bare, ConditionalField, Repetition};
@@ -52,8 +52,6 @@ pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
     let (input, vecs) = many0(
         delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
     )(input).map_err(|e| anyhow!("parse error: {}", e))?;
-
-    println!("{}", input);
 
     Ok(vecs)
 }
@@ -178,25 +176,16 @@ fn opt_args(input: &str) -> nom::IResult<&str, Vec<OptionalField>> {
     let (input, names) = preceded(tag("{"), many1(delimited(space0, var_ident, space0)))(input)?;
     let (input, _) = delimited(space0, tag(":"), space0)(input)?;
     let (input, type_name) = terminated(type_expr, tag("}"))(input)?;
-    println!("{:?}", type_name);
 
     Ok((input, names.into_iter().map(|name| OptionalField { name, r#type: type_name.clone() }).collect()))
 }
 
 fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
-    println!("{}", combinator_id);
     let (input, opts) = opt(delimited(space0, opt_args, space0))(input)?;
-    println!("{:?}", opts);
-
     let (input, fields) = many0(delimited(space0, args, space0))(input)?;
-
-    println!("fields = {:?}", fields);
     let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
-    println!("input = {}", input);
     let (input, combinator_type) = result_type(input)?;
-    println!("combinator_type = {}", combinator_type);
-    println!("input = {}", input);
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
     Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number, fields, optional_fields: opts.unwrap_or_default() }))
@@ -255,12 +244,15 @@ fn type_ident(input: &str) -> nom::IResult<&str, String> {
 fn term(input: &str) -> nom::IResult<&str, String> {
     alt((
         delimited(tag("("), subexpr, tag(")")),
+        map(
+            recognize(pair(type_ident, delimited(tag("<"), separated_list1(tag(","), type_ident), tag(">")))),
+            |s| s.to_owned()
+        ),
         type_ident,
         var_ident,
         map(nat_const, |s| s.to_owned()),
-        preceded(tag("%"), term)),
-        // TODO
-    )(input)
+        preceded(tag("%"), term)
+    ))(input)
 }
 
 fn type_term(input: &str) -> nom::IResult<&str, String> {
@@ -667,6 +659,20 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
                 .with_fields(vec![
                     Field::unnamed_bare("#"),
                     Field::repetition(None, None, vec![Field::unnamed_bare("t")])
+                ])
+        ]);
+    }
+
+    #[test]
+    fn gen_vector_test() {
+        let input = "exportedKey word_list:vector<secureString> = ExportedKey;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("exportedKey", "ExportedKey")
+                .with_fields(vec![
+                    Field::bare("word_list", "vector<secureString>")
                 ])
         ]);
     }
