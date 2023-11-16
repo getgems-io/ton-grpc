@@ -17,6 +17,7 @@ pub struct Combinator {
     id: String,
     r#type: String,
     constructor_number: Option<ConstructorNumber>,
+    optional_fields: Vec<OptionalField>,
     fields: Vec<Field>
 }
 
@@ -39,6 +40,12 @@ enum FieldType {
 pub struct Field {
     name: Option<String>,
     r#type: FieldType,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub struct OptionalField {
+    name: String,
+    r#type: String
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
@@ -156,22 +163,24 @@ fn result_type(input: &str) -> nom::IResult<&str, String> {
     }
 }
 
-fn expr(input: &str) -> nom::IResult<&str, Vec<String>> {
-    many0(delimited(space0, subexpr, space0))(input)
+fn expr(input: &str) -> nom::IResult<&str, String> {
+    map(
+        many0(delimited(space0, subexpr, space0)),
+        |vs| vs.join(" ")
+    )(input)
 }
 
-fn type_expr(input: &str) -> nom::IResult<&str, Vec<String>> {
+fn type_expr(input: &str) -> nom::IResult<&str, String> {
     expr(input)
 }
 
-fn opt_args(input: &str) -> nom::IResult<&str, String> {
-    let (input, args) = preceded(tag("{"), many1(delimited(space0, var_ident, space0)))(input)?;
-    println!("{:?}", args);
+fn opt_args(input: &str) -> nom::IResult<&str, Vec<OptionalField>> {
+    let (input, names) = preceded(tag("{"), many1(delimited(space0, var_ident, space0)))(input)?;
     let (input, _) = delimited(space0, tag(":"), space0)(input)?;
     let (input, type_name) = terminated(type_expr, tag("}"))(input)?;
     println!("{:?}", type_name);
 
-    Ok((input, "".to_owned()))
+    Ok((input, names.into_iter().map(|name| OptionalField { name, r#type: type_name.clone() }).collect()))
 }
 
 fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -190,7 +199,7 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     println!("input = {}", input);
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number, fields }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number, fields, optional_fields: opts.unwrap_or_default() }))
 }
 
 fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -200,7 +209,7 @@ fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, combinator_type) = boxed_type_ident(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number, fields: vec![] }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number, fields: vec![], optional_fields: vec![] }))
 }
 
 fn var_ident(input: &str) -> nom::IResult<&str, String> {
@@ -327,11 +336,11 @@ mod tests {
 
     impl Combinator {
         fn new(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false, constructor_number: None, fields: vec![] }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false, constructor_number: None, fields: vec![], optional_fields: vec![] }
         }
 
         fn builtin(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true, constructor_number: None, fields: vec![] }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true, constructor_number: None, fields: vec![], optional_fields: vec![] }
         }
 
         fn with_constructor_number(mut self, constructor_number: ConstructorNumber) -> Self {
@@ -342,6 +351,12 @@ mod tests {
 
         fn with_fields(mut self, fields: Vec<Field>) -> Self {
             self.fields = fields;
+
+            self
+        }
+
+        fn with_optional_fields(mut self, optional_fields: Vec<OptionalField>) -> Self {
+            self.optional_fields = optional_fields;
 
             self
         }
@@ -358,6 +373,12 @@ mod tests {
 
         fn repetition(name: Option<String>, multiplicity: Option<String>, fields: Vec<Field>) -> Self {
             Self { name, r#type: Repetition { multiplicity, fields }}
+        }
+    }
+
+    impl OptionalField {
+        fn new(name: &str, r#type: &str) -> Self {
+            OptionalField { name: name.to_owned(), r#type: r#type.to_owned() }
         }
     }
 
@@ -640,6 +661,9 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
 
         assert_eq!(output, vec![
             Combinator::new("vector", "Vector t")
+                .with_optional_fields(vec![
+                    OptionalField::new("t", "Type")
+                ])
                 .with_fields(vec![
                     Field::unnamed_bare("#"),
                     Field::repetition(None, None, vec![Field::unnamed_bare("t")])
