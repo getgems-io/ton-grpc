@@ -11,9 +11,12 @@ use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_
 use crate::router::{BlockCriteria, Route, Routable};
 use crate::request::Requestable;
 
-#[derive(Debug, Serialize, Default, Clone)]
-#[serde(tag = "@type", rename = "sync")]
-pub struct Sync {}
+type Int32 = i32;
+type Int64 = i64;
+type Bytes = String;
+
+
+include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 impl Requestable for Sync {
     type Response = BlockIdExt;
@@ -21,12 +24,6 @@ impl Requestable for Sync {
     fn timeout(&self) -> Duration {
         Duration::from_secs(5 * 60)
     }
-}
-
-#[derive(Debug, Serialize, Clone, Hash, PartialEq, Eq)]
-#[serde(tag = "@type", rename = "blocks.getBlockHeader")]
-pub struct BlocksGetBlockHeader {
-    pub id: BlockIdExt
 }
 
 impl Requestable for BlocksGetBlockHeader {
@@ -39,26 +36,9 @@ impl Routable for BlocksGetBlockHeader {
     }
 }
 
-impl BlocksGetBlockHeader {
-    pub fn new(id: BlockIdExt) -> Self {
-        Self {
-            id
-        }
-    }
-}
 
-#[derive(Debug, Hash, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
-#[serde(tag = "@type", rename = "ton.blockIdExt")]
-pub struct BlockIdExt {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub workchain: i32,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub shard: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub seqno: i32,
-    pub root_hash: String,
-    pub file_hash: String,
-}
+// TODO[akostylev0]: replace BlockIdExt with TonBlockIdExt
+pub(crate) type BlockIdExt = TonBlockIdExt;
 
 #[derive(Debug, Hash, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
 #[serde(tag = "@type", rename = "ton.blockId")]

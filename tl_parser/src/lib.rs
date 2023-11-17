@@ -22,6 +22,20 @@ pub struct Combinator {
     fields: Vec<Field>,
 }
 
+impl Combinator {
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub fn result_type(&self) -> &str {
+        &self.r#type
+    }
+
+    pub fn fields(&self) -> &Vec<Field> {
+        &self.fields
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum FieldType {
     Plain { name: String, condition: Option<String> },
@@ -33,6 +47,20 @@ pub struct Field {
     name: Option<String>,
     r#type: FieldType,
     exclamation_point_modifier: bool,
+}
+
+impl Field {
+    pub fn id(&self) -> &Option<String> {
+        &self.name
+    }
+
+    pub fn field_type(&self) -> Option<&str> {
+        let Plain { name , ..} = &self.r#type else {
+            return None
+        };
+
+        Some(name.as_str())
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]
