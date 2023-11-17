@@ -7,7 +7,7 @@ use nom::combinator::{map, opt, recognize};
 use nom::error::Error;
 use nom::multi::{many0, many1, separated_list1};
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated};
-use crate::FieldType::{Bare, ConditionalField, Repetition};
+use crate::FieldType::{Plain, Repetition};
 
 pub type ConstructorNumber = u32;
 
@@ -24,17 +24,8 @@ pub struct Combinator {
 
 #[derive(Debug, PartialEq, Eq)]
 enum FieldType {
-    ConditionalField {
-        condition: String,
-        name: String,
-    },
-    Repetition {
-        multiplicity: Option<String>,
-        fields: Vec<Field>,
-    },
-    Bare {
-        name: String
-    },
+    Plain { name: String, condition: Option<String> },
+    Repetition { multiplicity: Option<String>, fields: Vec<Field>, },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -286,17 +277,10 @@ fn type_term(input: &str) -> nom::IResult<&str, (bool, String)> {
 fn args_1(input: &str) -> nom::IResult<&str, Vec<Field>> {
     let (input, id) = var_ident_opt(input)?;
     let (input, _) = tag(":")(input)?;
-    let (input, conditional_def) = opt(conditional_def)(input)?;
+    let (input, condition) = opt(conditional_def)(input)?;
     let (input, (exclamation_point_modifier, name)) = type_term(input)?;
 
-    match conditional_def {
-        None => {
-            Ok((input, vec![Field { name: Some(id), r#type: Bare { name }, exclamation_point_modifier }]))
-        }
-        Some(condition) => {
-            Ok((input, vec![Field { name: Some(id), r#type: ConditionalField { condition, name }, exclamation_point_modifier }]))
-        }
-    }
+    Ok((input, vec![Field { name: Some(id), r#type: Plain { name, condition }, exclamation_point_modifier }]))
 }
 
 fn nat_term(input: &str) -> nom::IResult<&str, String> {
@@ -326,8 +310,9 @@ fn args_3(input: &str) -> nom::IResult<&str, Vec<Field>> {
 
     Ok((input, fields.into_iter().map(|id| Field {
         name: Some(id),
-        r#type: Bare {
-            name: type_term.clone()
+        r#type: Plain {
+            name: type_term.clone(),
+            condition: None
         },
         exclamation_point_modifier
     }).collect()))
@@ -336,7 +321,7 @@ fn args_3(input: &str) -> nom::IResult<&str, Vec<Field>> {
 fn args_4(input: &str) -> nom::IResult<&str, Vec<Field>> {
     let (input, (exclamation_point_modifier, type_term)) = type_term(input)?;
 
-    Ok((input, vec![Field { name: None, r#type: Bare { name: type_term }, exclamation_point_modifier }]))
+    Ok((input, vec![Field { name: None, r#type: Plain { name: type_term, condition: None }, exclamation_point_modifier }]))
 }
 
 fn args(input: &str) -> nom::IResult<&str, Vec<Field>> {
@@ -382,12 +367,12 @@ mod tests {
     }
 
     impl Field {
-        fn bare(name: &str, r#type: &str) -> Self {
-            Self { name: Some(name.to_owned()), r#type: Bare { name: r#type.to_owned() }, exclamation_point_modifier: false }
+        fn plain(name: &str, r#type: &str) -> Self {
+            Self { name: Some(name.to_owned()), r#type: Plain { name: r#type.to_owned(), condition: None }, exclamation_point_modifier: false }
         }
 
-        fn unnamed_bare(r#type: &str) -> Self {
-            Self { name: None, r#type: Bare { name: r#type.to_owned() }, exclamation_point_modifier: false }
+        fn unnamed_plain(r#type: &str) -> Self {
+            Self { name: None, r#type: Plain { name: r#type.to_owned(), condition: None }, exclamation_point_modifier: false }
         }
 
         fn repetition(name: Option<String>, multiplicity: Option<String>, fields: Vec<Field>) -> Self {
@@ -512,7 +497,7 @@ comment ")));
 
         assert_eq!(output, Ok(("", vec![Field {
             name: Some("first_name".to_owned()),
-            r#type: ConditionalField { condition: "fields.0".to_owned(), name: "string".to_owned() },
+            r#type: Plain { name: "string".to_owned(), condition: Some("fields.0".to_owned()) },
             exclamation_point_modifier: false
         }])));
     }
@@ -533,7 +518,7 @@ comment ")));
                         multiplicity: Some("n".to_owned()),
                         fields: vec![Field {
                             name: None,
-                            r#type: Bare { name: "double".to_owned() },
+                            r#type: Plain { name: "double".to_owned(), condition: None },
                             exclamation_point_modifier: false
                         }],
                     },
@@ -553,22 +538,25 @@ comment ")));
         assert_eq!(output, Ok(("", vec![
             Field {
                 name: Some("x".to_string()),
-                r#type: Bare {
-                    name: "int32".to_string()
+                r#type: Plain {
+                    name: "int32".to_string(),
+                    condition: None
                 },
                 exclamation_point_modifier: false
             },
             Field {
                 name: Some("y".to_string()),
-                r#type: Bare {
-                    name: "int32".to_string()
+                r#type: Plain {
+                    name: "int32".to_string(),
+                    condition: None
                 },
                 exclamation_point_modifier: false
             },
             Field {
                 name: Some("z".to_string()),
-                r#type: Bare {
-                    name: "int32".to_string()
+                r#type: Plain {
+                    name: "int32".to_string(),
+                    condition: None
                 },
                 exclamation_point_modifier: false
             },
@@ -581,7 +569,7 @@ comment ")));
 
         let output = args_4(input);
 
-        assert_eq!(output, Ok(("", vec![Field { name: None, r#type: Bare { name: "double".to_owned() }, exclamation_point_modifier: false }])));
+        assert_eq!(output, Ok(("", vec![Field { name: None, r#type: Plain { name: "double".to_owned(), condition: None }, exclamation_point_modifier: false }])));
     }
 
 
@@ -669,9 +657,9 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
         assert_eq!(output, vec![
             Combinator::new("boolStat", "BoolStat")
                 .with_fields(vec![
-                    Field::bare("statTrue", "int"),
-                    Field::bare("statFalse", "int"),
-                    Field::bare("statUnknown", "int"),
+                    Field::plain("statTrue", "int"),
+                    Field::plain("statFalse", "int"),
+                    Field::plain("statUnknown", "int"),
                 ])
         ]);
     }
@@ -706,8 +694,8 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
                     OptionalField::new("t", "Type")
                 ])
                 .with_fields(vec![
-                    Field::unnamed_bare("#"),
-                    Field::repetition(None, None, vec![Field::unnamed_bare("t")]),
+                    Field::unnamed_plain("#"),
+                    Field::repetition(None, None, vec![Field::unnamed_plain("t")]),
                 ])
         ]);
     }
@@ -739,7 +727,7 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
         assert_eq!(output, vec![
             Combinator::new("exportedKey", "ExportedKey")
                 .with_fields(vec![
-                    Field::bare("word_list", "vector<secureString>")
+                    Field::plain("word_list", "vector<secureString>")
                 ])
         ]);
     }
@@ -753,7 +741,7 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
         assert_eq!(output, vec![
             Combinator::new("smc.libraryResult", "smc.LibraryResult")
                 .with_fields(vec![
-                    Field::bare("result", "vector smc.libraryEntry")
+                    Field::plain("result", "vector smc.libraryEntry")
                 ])
         ]);
     }
