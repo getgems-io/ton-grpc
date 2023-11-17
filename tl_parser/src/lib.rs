@@ -13,7 +13,7 @@ pub type ConstructorNumber = u32;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Combinator {
-    //TODO: functional: bool,
+    functional: bool,
     builtin: bool,
     id: String,
     r#type: String,
@@ -57,7 +57,7 @@ pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
     let (input, funcs) = opt(preceded(
         tag("---functions---"),
         many0(
-            delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
+            delimited(opt(space_or_comment), alt((functional_combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
         )))(input).map_err(|e: nom::Err<Error<&str>>| anyhow!("parse error: {}", e))?;
 
     if let Some(funcs) = funcs {
@@ -159,14 +159,15 @@ fn boxed_type_ident(input: &str) -> nom::IResult<&str, String> {
     uc_ident_ns(input)
 }
 
-fn result_type(input: &str) -> nom::IResult<&str, String> {
+fn result_type(input: &str) -> nom::IResult<&str, (bool, String)> {
+    let (input, exclamation) = opt(tag("!"))(input)?;
     let (input, ident) = boxed_type_ident(input)?;
     let (input, exprs) = many0(delimited(space0, subexpr, space0))(input)?;
 
     if !exprs.is_empty() {
-        Ok((input, format!("{} {}", ident, exprs.join(" "))))
+        Ok((input, (exclamation.is_some(), format!("{} {}", ident, exprs.join(" ")))))
     } else {
-        Ok((input, ident))
+        Ok((input, (exclamation.is_some(), ident)))
     }
 }
 
@@ -191,11 +192,23 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, opts) = opt(delimited(space0, opt_args, space0))(input)?;
     let (input, fields) = many0(delimited(space0, args, space0))(input)?;
     let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
-    let (input, combinator_type) = result_type(input)?;
+    let (input, (functional, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
     Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number,
-        fields: fields.into_iter().flatten().collect(), optional_fields: opts.unwrap_or_default() }))
+        fields: fields.into_iter().flatten().collect(), optional_fields: opts.unwrap_or_default(), functional }))
+}
+
+fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
+    let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
+    let (input, opts) = opt(delimited(space0, opt_args, space0))(input)?;
+    let (input, fields) = many0(delimited(space0, args, space0))(input)?;
+    let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
+    let (input, (_, combinator_type)) = result_type(input)?;
+    let (input, _) = preceded(multispace0, tag(";"))(input)?;
+
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number,
+        fields: fields.into_iter().flatten().collect(), optional_fields: opts.unwrap_or_default(), functional: true }))
 }
 
 fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -205,7 +218,7 @@ fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, combinator_type) = boxed_type_ident(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number, fields: vec![], optional_fields: vec![] }))
+    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number, fields: vec![], optional_fields: vec![], functional: false }))
 }
 
 fn var_ident(input: &str) -> nom::IResult<&str, String> {
@@ -334,11 +347,17 @@ mod tests {
 
     impl Combinator {
         fn new(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false, constructor_number: None, fields: vec![], optional_fields: vec![] }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: false, constructor_number: None, fields: vec![], optional_fields: vec![], functional: false }
         }
 
         fn builtin(name: &str, r#type: &str) -> Self {
-            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true, constructor_number: None, fields: vec![], optional_fields: vec![] }
+            Self { id: name.to_owned(), r#type: r#type.to_owned(), builtin: true, constructor_number: None, fields: vec![], optional_fields: vec![], functional: false }
+        }
+
+        fn functional(mut self) -> Self {
+            self.functional = true;
+
+            self
         }
 
         fn with_constructor_number(mut self, constructor_number: ConstructorNumber) -> Self {
@@ -717,6 +736,22 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
                 .with_fields(vec![
                     Field::bare("result", "vector smc.libraryEntry")
                 ])
+        ]);
+    }
+
+    #[test]
+    fn functional_combinator_test() {
+        let input = "a = A;
+c = !C;
+---functions---
+b = B;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("a", "A"),
+            Combinator::new("c", "C").functional(),
+            Combinator::new("b", "B").functional()
         ]);
     }
 }
