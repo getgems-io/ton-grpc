@@ -1,5 +1,5 @@
 use anyhow::{anyhow, bail};
-use nom::AsChar;
+use nom::{AsChar};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till, take_until, take_while, take_while1, take_while_m_n};
 use nom::character::complete::{line_ending, multispace0, multispace1, satisfy, space0};
@@ -41,6 +41,7 @@ enum FieldType {
 pub struct Field {
     name: Option<String>,
     r#type: FieldType,
+    exclamation_point_modifier: bool,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -275,23 +276,25 @@ fn term(input: &str) -> nom::IResult<&str, String> {
     ))(input)
 }
 
-fn type_term(input: &str) -> nom::IResult<&str, String> {
-    term(input)
+fn type_term(input: &str) -> nom::IResult<&str, (bool, String)> {
+    pair(
+        map(opt(tag("!")), |s| s.is_some()),
+        term
+    )(input)
 }
 
 fn args_1(input: &str) -> nom::IResult<&str, Vec<Field>> {
     let (input, id) = var_ident_opt(input)?;
     let (input, _) = tag(":")(input)?;
     let (input, conditional_def) = opt(conditional_def)(input)?;
-    let (input, marker) = opt(tag("!"))(input)?;
-    let (input, name) = type_term(input)?;
+    let (input, (exclamation_point_modifier, name)) = type_term(input)?;
 
     match conditional_def {
         None => {
-            Ok((input, vec![Field { name: Some(id), r#type: Bare { name } }]))
+            Ok((input, vec![Field { name: Some(id), r#type: Bare { name }, exclamation_point_modifier }]))
         }
         Some(condition) => {
-            Ok((input, vec![Field { name: Some(id), r#type: ConditionalField { condition, name } }]))
+            Ok((input, vec![Field { name: Some(id), r#type: ConditionalField { condition, name }, exclamation_point_modifier }]))
         }
     }
 }
@@ -311,15 +314,14 @@ fn args_2(input: &str) -> nom::IResult<&str, Vec<Field>> {
     let (input, fields) = many1(delimited(space0, args, space0))(input)?;
     let (input, _) = tag("]")(input)?;
 
-    Ok((input, vec![Field { name: id, r#type: Repetition { multiplicity, fields: fields.into_iter().flatten().collect() } }]))
+    Ok((input, vec![Field { name: id, r#type: Repetition { multiplicity, fields: fields.into_iter().flatten().collect() }, exclamation_point_modifier: false }]))
 }
 
 fn args_3(input: &str) -> nom::IResult<&str, Vec<Field>> {
     let (input, _) = tag("(")(input)?;
     let (input, fields) = many1(delimited(space0, var_ident_opt, space0))(input)?;
     let (input, _) = tag(":")(input)?;
-    let (input, mark) = opt(tag("!"))(input)?;
-    let (input, type_term) = type_term(input)?;
+    let (input, (exclamation_point_modifier, type_term)) = type_term(input)?;
     let (input, _) = tag(")")(input)?;
 
     Ok((input, fields.into_iter().map(|id| Field {
@@ -327,14 +329,14 @@ fn args_3(input: &str) -> nom::IResult<&str, Vec<Field>> {
         r#type: Bare {
             name: type_term.clone()
         },
+        exclamation_point_modifier
     }).collect()))
 }
 
 fn args_4(input: &str) -> nom::IResult<&str, Vec<Field>> {
-    let (input, mark) = opt(tag("!"))(input)?;
-    let (input, type_term) = type_term(input)?;
+    let (input, (exclamation_point_modifier, type_term)) = type_term(input)?;
 
-    Ok((input, vec![Field { name: None, r#type: Bare { name: type_term } }]))
+    Ok((input, vec![Field { name: None, r#type: Bare { name: type_term }, exclamation_point_modifier }]))
 }
 
 fn args(input: &str) -> nom::IResult<&str, Vec<Field>> {
@@ -381,15 +383,15 @@ mod tests {
 
     impl Field {
         fn bare(name: &str, r#type: &str) -> Self {
-            Self { name: Some(name.to_owned()), r#type: Bare { name: r#type.to_owned() } }
+            Self { name: Some(name.to_owned()), r#type: Bare { name: r#type.to_owned() }, exclamation_point_modifier: false }
         }
 
         fn unnamed_bare(r#type: &str) -> Self {
-            Self { name: None, r#type: Bare { name: r#type.to_owned() } }
+            Self { name: None, r#type: Bare { name: r#type.to_owned() }, exclamation_point_modifier: false }
         }
 
         fn repetition(name: Option<String>, multiplicity: Option<String>, fields: Vec<Field>) -> Self {
-            Self { name, r#type: Repetition { multiplicity, fields } }
+            Self { name, r#type: Repetition { multiplicity, fields }, exclamation_point_modifier: false }
         }
     }
 
@@ -509,7 +511,9 @@ comment ")));
         let output = args_1(input);
 
         assert_eq!(output, Ok(("", vec![Field {
-            name: Some("first_name".to_owned()), r#type: ConditionalField { condition: "fields.0".to_owned(), name: "string".to_owned() }
+            name: Some("first_name".to_owned()),
+            r#type: ConditionalField { condition: "fields.0".to_owned(), name: "string".to_owned() },
+            exclamation_point_modifier: false
         }])));
     }
 
@@ -530,10 +534,13 @@ comment ")));
                         fields: vec![Field {
                             name: None,
                             r#type: Bare { name: "double".to_owned() },
+                            exclamation_point_modifier: false
                         }],
                     },
+                    exclamation_point_modifier: false
                 }],
             },
+            exclamation_point_modifier: false
         }])));
     }
 
@@ -549,18 +556,21 @@ comment ")));
                 r#type: Bare {
                     name: "int32".to_string()
                 },
+                exclamation_point_modifier: false
             },
             Field {
                 name: Some("y".to_string()),
                 r#type: Bare {
                     name: "int32".to_string()
                 },
+                exclamation_point_modifier: false
             },
             Field {
                 name: Some("z".to_string()),
                 r#type: Bare {
                     name: "int32".to_string()
                 },
+                exclamation_point_modifier: false
             },
         ])));
     }
@@ -571,7 +581,7 @@ comment ")));
 
         let output = args_4(input);
 
-        assert_eq!(output, Ok(("", vec![Field { name: None, r#type: Bare { name: "double".to_owned() } }])));
+        assert_eq!(output, Ok(("", vec![Field { name: None, r#type: Bare { name: "double".to_owned() }, exclamation_point_modifier: false }])));
     }
 
 
@@ -672,7 +682,16 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
 
         let output = type_term(input).unwrap();
 
-        assert_eq!(output, ("", "#".to_owned()))
+        assert_eq!(output, ("", (false, "#".to_owned())))
+    }
+
+    #[test]
+    fn type_term_marked_hash_test() {
+        let input = "!A";
+
+        let output = type_term(input).unwrap();
+
+        assert_eq!(output, ("", (true, "A".to_owned())))
     }
 
     #[test]
@@ -744,14 +763,16 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
         let input = "a = A;
 c = !C;
 ---functions---
-b = B;";
+b = B;
+d = !D;";
 
         let output = parse(input).unwrap();
 
         assert_eq!(output, vec![
             Combinator::new("a", "A"),
             Combinator::new("c", "C").functional(),
-            Combinator::new("b", "B").functional()
+            Combinator::new("b", "B").functional(),
+            Combinator::new("d", "D").functional()
         ]);
     }
 }
