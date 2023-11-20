@@ -19,7 +19,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_type("ton.blockIdExt", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
         .add_type("blocks.header", vec!["Deserialize"])
         .add_type("blocks.shortTxId", vec!["Deserialize"])
-        .add_type("blocks.masterchainInfo", vec!["Deserialize"])
+        .add_type("blocks.masterchainInfo", vec!["Deserialize", "Eq", "PartialEq"])
+        .add_type("internal.transactionId", vec!["Serialize", "Deserialize", "Eq", "PartialEq"])
+        .add_type("raw.message", vec!["Deserialize"])
+        .add_type("raw.transaction", vec!["Deserialize"])
+        .add_type("blocks.accountTransactionId", vec!["Serialize", "Deserialize"])
+        // .add_type("blocks.transactions", vec!["Deserialize"])
 
         .add_type("sync", vec!["Default", "Serialize"])
         .add_type("blocks.getBlockHeader", vec!["Serialize", "Hash", "PartialEq", "Eq", "new"])

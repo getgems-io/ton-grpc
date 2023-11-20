@@ -122,32 +122,18 @@ impl PartialEq for ShortTxId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
-#[serde(tag = "@type", rename = "blocks.masterchainInfo")]
-pub struct MasterchainInfo {
-    pub init: BlockIdExt,
-    pub last: BlockIdExt,
-    pub state_root_hash: String,
-}
+pub type MasterchainInfo = BlocksMasterchainInfo;
 
-impl PartialOrd for MasterchainInfo {
+impl PartialOrd for BlocksMasterchainInfo {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for MasterchainInfo {
+impl Ord for BlocksMasterchainInfo {
     fn cmp(&self, other: &Self) -> Ordering {
         self.last.seqno.cmp(&other.last.seqno)
     }
-}
-
-#[derive(new, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
-#[serde(tag = "@type", rename = "internal.transactionId")]
-pub struct InternalTransactionId {
-    pub hash: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub lt: i64,
 }
 
 impl Default for InternalTransactionId {
@@ -292,41 +278,7 @@ pub enum MessageData {
     EncryptedText { text: String }
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "@type", rename = "raw.message")]
-pub struct RawMessage {
-    pub source: AccountAddress,
-    pub destination: AccountAddress,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub value: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub fwd_fee: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub ihr_fee: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub created_lt: i64,
-    pub body_hash: String,
-    pub msg_data: MessageData
-}
-
-#[derive(Deserialize, Debug)]
-#[serde(tag = "@type", rename = "raw.transaction")]
-pub struct RawTransaction {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub utime: i64,
-    pub data: String,
-    pub transaction_id: InternalTransactionId,
-
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub fee: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub storage_fee: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub other_fee: i64,
-
-    pub in_msg: RawMessage,
-    pub out_msgs: Vec<RawMessage>,
-}
+pub type MsgBoxedData = MessageData;
 
 #[derive(Deserialize, Debug)]
 pub struct RawTransactions {
@@ -478,13 +430,8 @@ pub struct BlocksTransactions {
     pub transactions: Vec<ShortTxId>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type", rename = "blocks.accountTransactionId")]
-pub struct AccountTransactionId {
-    pub account: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub lt: i64,
-}
+
+pub type AccountTransactionId = BlocksAccountTransactionId;
 
 impl Default for AccountTransactionId {
     fn default() -> Self {
