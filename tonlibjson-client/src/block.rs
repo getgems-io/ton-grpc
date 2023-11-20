@@ -11,12 +11,51 @@ use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_
 use crate::router::{BlockCriteria, Route, Routable};
 use crate::request::Requestable;
 
+/**
+double ? = Double;
+string ? = String;
+
+int32 = Int32;
+int53 = Int53;
+int64 = Int64;
+int256 8*[ int32 ] = Int256;
+bytes = Bytes;
+secureString = SecureString;
+secureBytes = SecureBytes;
+
+object ? = Object;
+function ? = Function;
+
+boolFalse = Bool;
+boolTrue = Bool;
+
+vector {t:Type} # [ t ] = Vector t;
+
+**/
+
+type Double = f64;
+// type String = String;
+
+type Int31 = i32; // "#" / nat type
 type Int32 = i32;
+type Int53 = i64;
 type Int64 = i64;
+
+/* enum BoxedBool {
+    BoolFalse,
+    BoolTrue
+} */
+
+type BoxedBool = bool;
+
 type Bytes = String;
 
+type Vector<T> = Vec<T>;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
+// TODO[akostylev0]
+pub type TonBoxedBlockIdExt = TonBlockIdExt;
 
 impl Requestable for Sync {
     type Response = BlockIdExt;
@@ -27,7 +66,7 @@ impl Requestable for Sync {
 }
 
 impl Requestable for BlocksGetBlockHeader {
-    type Response = BlockHeader;
+    type Response = BlocksHeader;
 }
 
 impl Routable for BlocksGetBlockHeader {
@@ -38,18 +77,9 @@ impl Routable for BlocksGetBlockHeader {
 
 
 // TODO[akostylev0]: replace BlockIdExt with TonBlockIdExt
-pub(crate) type BlockIdExt = TonBlockIdExt;
+pub type BlockIdExt = TonBlockIdExt;
 
-#[derive(Debug, Hash, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
-#[serde(tag = "@type", rename = "ton.blockId")]
-pub struct BlockId {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub workchain: i32,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub shard: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub seqno: i32
-}
+pub type BlockId = TonBlockId;
 
 impl From<BlockIdExt> for BlockId {
     fn from(block: BlockIdExt) -> Self {
@@ -61,32 +91,10 @@ impl From<BlockIdExt> for BlockId {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "@type", rename = "blocks.header")]
-pub struct BlockHeader {
-    pub id: BlockIdExt,
-    pub global_id: i32,
-    pub version: i32,
-    pub after_merge: bool,
-    pub after_split: bool,
-    pub before_split: bool,
-    pub want_merge: bool,
-    pub validator_list_hash_short: i32,
-    pub catchain_seqno: i32,
-    pub min_ref_mc_seqno: i32,
-    pub is_key_block: bool,
-    pub prev_key_block_seqno: i32,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub start_lt: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub end_lt: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub gen_utime: i64,
-    pub prev_blocks: Vec<BlockIdExt>
-}
+pub type BlockHeader = BlocksHeader;
 
-impl From<BlockHeader> for BlockId {
-    fn from(header: BlockHeader) -> Self {
+impl From<BlocksHeader> for BlockId {
+    fn from(header: BlocksHeader) -> Self {
         BlockId {
             workchain: header.id.workchain,
             shard: header.id.shard,
@@ -95,6 +103,7 @@ impl From<BlockHeader> for BlockId {
     }
 }
 
+// TODO[akostylev0] use BlocksShortTxId
 #[derive(Debug, Deserialize, Clone)]
 #[serde(tag = "@type", rename = "blocks.shortTxId")]
 pub struct ShortTxId {

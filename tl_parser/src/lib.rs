@@ -49,6 +49,8 @@ pub struct Field {
     exclamation_point_modifier: bool,
 }
 
+
+// TODO[akostylev0] TypeDefinition
 impl Field {
     pub fn id(&self) -> &Option<String> {
         &self.name
@@ -59,7 +61,41 @@ impl Field {
             return None
         };
 
-        Some(name.as_str())
+        if !self.type_is_polymorphic() {
+            return Some(name.as_str());
+        }
+
+        let (left, _) = name.split_once("<").unwrap();
+
+        Some(left)
+    }
+
+    pub fn type_is_optional(&self) -> bool {
+        let Plain { name, condition } = &self.r#type else {
+            return false
+        };
+
+        condition.is_some()
+    }
+
+    pub fn type_is_polymorphic(&self) -> bool {
+        let Plain { name , ..} = &self.r#type else {
+            return false
+        };
+
+        name.contains('<')
+    }
+
+    pub fn type_variables(&self) -> Option<Vec<String>> {
+        let Plain { name , ..} = &self.r#type else {
+            return None
+        };
+
+        let Some((_, tail)) = name.split_once("<") else {
+            return Some(vec![])
+        };
+
+        Some(tail.replace(">", "").split(",").map(|s| s.trim().to_owned()).collect())
     }
 }
 

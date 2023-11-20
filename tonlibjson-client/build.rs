@@ -1,11 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::{env, fs};
-use std::fmt::format;
 use std::path::{Path, PathBuf};
-use anyhow::bail;
-use quote::{format_ident, quote};
-use syn::{Expr, Ident, Meta, MetaList};
-
+use quote::{format_ident, quote, ToTokens};
+use syn::{GenericArgument, Ident, MetaList};
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scheme_path = if cfg!(testnet) {
         Path::new("../tonlibjson-sys/ton-testnet/tl/generate/scheme/tonlib_api.tl")
@@ -17,8 +14,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed={}", scheme_path.to_string_lossy());
 
     Generator::from(scheme_path, "generated.rs")
+
+        .add_type("ton.blockId", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
         .add_type("ton.blockIdExt", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
-        .add_type("sync", vec!["Serialize"])
+        .add_type("blocks.header", vec!["Deserialize"])
+        .add_type("blocks.shortTxId", vec!["Deserialize"])
+        .add_type("blocks.masterchainInfo", vec!["Deserialize"])
+
+        .add_type("sync", vec!["Default", "Serialize"])
         .add_type("blocks.getBlockHeader", vec!["Serialize", "Hash", "PartialEq", "Eq", "new"])
         .generate()?;
 
@@ -65,25 +68,54 @@ impl Generator {
             let id = definition.id();
             let struct_name = structure_ident(definition.id());
 
-            let mut traits = vec!["Debug".to_owned(), "Default".to_owned(), "Clone".to_owned()];
+            let mut traits = vec!["Debug".to_owned(), "Clone".to_owned()];
             traits.extend(derives);
 
             let derives = format!("derive({})", traits.join(","));
-
             let t = syn::parse_str::<MetaList>(&derives)?;
+
             // eprintln!("t = {:?}", t);
-            //
-            // bail!("HUI");
 
             // let derives: Vec<syn::Ident> = derives.into_iter().map(|d| format_ident!("{}", d)).collect();
 
             let fields: Vec<_> = definition.fields().iter().map(|field| {
                 eprintln!("field = {:?}", field);
                 let field_name = format_ident!("{}", field.id().clone().unwrap());
-                let field_type = format_ident!("{}", structure_ident(field.field_type().clone().unwrap()));
+                let mut deserialize_number_from_string = false; // TODO[akostylev0]
+                let field_type: Box<dyn ToTokens> = if field.field_type().is_some_and(|typ| typ == "#") {
+                    deserialize_number_from_string = true;
+                    Box::new(format_ident!("{}", "Int31"))
+                } else if field.type_is_polymorphic() {
+                    let type_name = generate_type_name(field.field_type().unwrap());
+                    let type_variables = field.type_variables().unwrap();
+                    let args: Vec<_> = type_variables
+                        .into_iter()
+                        .map(|s| generate_type_name(&s))
+                        .collect();
 
-                // TODO[akostylev0]: just write custom wrappers for primitive types
-                if field_type == "Int32" || field_type == "Int64" {
+                    let mut gen = format!("{}<{}>", type_name, args.join(","));
+                    if field.type_is_optional() {
+                        gen = format!("Option<{}>", gen);
+                    }
+
+                    eprintln!("gen = {:?}", gen);
+                    let r = syn::parse_str::<GenericArgument>(&gen).unwrap();
+                    eprintln!("r = {:?}", r);
+
+                    Box::new(r)
+                } else {
+                    let field_type = field.field_type();
+                    if field_type.is_some_and(|s| s == "int32" || s == "int64" || s == "int53" || s == "int256")  {
+                        deserialize_number_from_string = true;
+                    }
+
+                    // TODO[akostylev0]
+                    Box::new(format_ident!("{}", structure_ident(field_type.clone().unwrap())))
+                };
+
+
+                // // TODO[akostylev0]: just write custom wrappers for primitive types
+                if deserialize_number_from_string {
                     quote! {
                         #[serde(deserialize_with = "deserialize_number_from_string")]
                         pub #field_name: #field_type
@@ -91,7 +123,7 @@ impl Generator {
                 } else {
                     quote! {
                     pub #field_name: #field_type
-                }
+                    }
                 }
             }).collect();
 
@@ -123,6 +155,26 @@ impl Generator {
     }
 }
 
+fn generate_type_name(s: &str) -> String {
+    let (ns, name) = s.rsplit_once(".").unwrap_or(("", s));
+
+    let boxed_prefix = if name.starts_with(|c: char| c.is_uppercase()) {
+        "Boxed"
+    } else { "" };
+
+    let ns_prefix = ns.split('.')
+        .map(uppercase_first_letter)
+        .collect::<Vec<_>>()
+        .join("");
+
+    let name = uppercase_first_letter(name);
+
+    format!("{}{}{}", ns_prefix, boxed_prefix, name)
+}
+
+fn structure_ident(s: &str) -> Ident {
+    format_ident!("{}", generate_type_name(s))
+}
 
 fn uppercase_first_letter(s: &str) -> String {
     let mut c = s.chars();
@@ -130,9 +182,4 @@ fn uppercase_first_letter(s: &str) -> String {
         None => String::new(),
         Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
     }
-}
-
-
-fn structure_ident(s: &str) -> Ident {
-    format_ident!("{}",s.split('.').map(uppercase_first_letter).collect::<Vec<_>>().join(""))
 }
