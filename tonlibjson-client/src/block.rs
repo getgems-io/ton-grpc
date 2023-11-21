@@ -65,9 +65,7 @@ mod tl {
     type MsgBoxedData = crate::block::MessageData;
 }
 
-#[derive(Debug, Serialize, Default, Clone)]
-#[serde(tag = "@type", rename = "sync")]
-pub struct Sync {}
+pub type Sync = tl::Sync;
 
 impl Requestable for Sync {
     type Response = BlockIdExt;
@@ -77,11 +75,7 @@ impl Requestable for Sync {
     }
 }
 
-#[derive(Debug, Serialize, Clone, Hash, PartialEq, Eq)]
-#[serde(tag = "@type", rename = "blocks.getBlockHeader")]
-pub struct BlocksGetBlockHeader {
-    pub id: BlockIdExt
-}
+pub type BlocksGetBlockHeader = tl::BlocksGetBlockHeader;
 
 impl Requestable for BlocksGetBlockHeader {
     type Response = BlockHeader;
@@ -93,37 +87,9 @@ impl Routable for BlocksGetBlockHeader {
     }
 }
 
-impl BlocksGetBlockHeader {
-    pub fn new(id: BlockIdExt) -> Self {
-        Self {
-            id
-        }
-    }
-}
+pub type BlockIdExt = tl::TonBlockIdExt;
 
-#[derive(Debug, Hash, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
-#[serde(tag = "@type", rename = "ton.blockIdExt")]
-pub struct BlockIdExt {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub workchain: i32,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub shard: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub seqno: i32,
-    pub root_hash: String,
-    pub file_hash: String,
-}
-
-#[derive(Debug, Hash, Serialize, Deserialize, Clone, Eq, PartialEq, new)]
-#[serde(tag = "@type", rename = "ton.blockId")]
-pub struct BlockId {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub workchain: i32,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub shard: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub seqno: i32
-}
+pub type BlockId = tl::TonBlockId;
 
 impl From<BlockIdExt> for BlockId {
     fn from(block: BlockIdExt) -> Self {
@@ -135,29 +101,7 @@ impl From<BlockIdExt> for BlockId {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "@type", rename = "blocks.header")]
-pub struct BlockHeader {
-    pub id: BlockIdExt,
-    pub global_id: i32,
-    pub version: i32,
-    pub after_merge: bool,
-    pub after_split: bool,
-    pub before_split: bool,
-    pub want_merge: bool,
-    pub validator_list_hash_short: i32,
-    pub catchain_seqno: i32,
-    pub min_ref_mc_seqno: i32,
-    pub is_key_block: bool,
-    pub prev_key_block_seqno: i32,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub start_lt: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub end_lt: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub gen_utime: i64,
-    pub prev_blocks: Vec<BlockIdExt>
-}
+pub type BlockHeader = tl::BlocksHeader;
 
 impl From<BlockHeader> for BlockId {
     fn from(header: BlockHeader) -> Self {
@@ -207,13 +151,7 @@ impl Ord for MasterchainInfo {
     }
 }
 
-#[derive(new, Deserialize, Serialize, Debug, Clone, Eq, PartialEq)]
-#[serde(tag = "@type", rename = "internal.transactionId")]
-pub struct InternalTransactionId {
-    pub hash: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub lt: i64,
-}
+pub type InternalTransactionId = tl::InternalTransactionId;
 
 impl Default for InternalTransactionId {
     fn default() -> Self {
@@ -357,41 +295,9 @@ pub enum MessageData {
     EncryptedText { text: String }
 }
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "@type", rename = "raw.message")]
-pub struct RawMessage {
-    pub source: AccountAddress,
-    pub destination: AccountAddress,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub value: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub fwd_fee: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub ihr_fee: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub created_lt: i64,
-    pub body_hash: String,
-    pub msg_data: MessageData
-}
+pub type RawMessage = tl::RawMessage;
 
-#[derive(Deserialize, Debug)]
-#[serde(tag = "@type", rename = "raw.transaction")]
-pub struct RawTransaction {
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub utime: i64,
-    pub data: String,
-    pub transaction_id: InternalTransactionId,
-
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub fee: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub storage_fee: i64,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub other_fee: i64,
-
-    pub in_msg: RawMessage,
-    pub out_msgs: Vec<RawMessage>,
-}
+pub type RawTransaction = tl::RawTransaction;
 
 #[derive(Deserialize, Debug)]
 pub struct RawTransactions {
@@ -479,11 +385,7 @@ impl Routable for BlocksGetShards {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type", rename = "blocks.shards")]
-pub struct BlocksShards {
-    pub shards: Vec<BlockIdExt>,
-}
+pub type BlocksShards = tl::BlocksShards;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type")]
@@ -535,6 +437,8 @@ impl Routable for BlocksGetTransactions {
     }
 }
 
+// pub type BlocksTransactions = tl::BlocksTransactions;
+
 #[derive(Debug, Deserialize)]
 pub struct BlocksTransactions {
     pub id: BlockIdExt,
@@ -543,13 +447,7 @@ pub struct BlocksTransactions {
     pub transactions: Vec<ShortTxId>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type", rename = "blocks.accountTransactionId")]
-pub struct AccountTransactionId {
-    pub account: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub lt: i64,
-}
+pub type AccountTransactionId = tl::BlocksAccountTransactionId;
 
 impl Default for AccountTransactionId {
     fn default() -> Self {
@@ -600,10 +498,7 @@ impl Routable for RawSendMessageReturnHash {
     fn route(&self) -> Route { Route::Latest }
 }
 
-#[derive(Deserialize)]
-pub struct RawExtMessageInfo {
-    pub hash: String
-}
+pub type RawExtMessageInfo = tl::RawExtMessageInfo;
 
 #[derive(Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "smc.load")]
@@ -660,26 +555,9 @@ pub enum SmcMethodId {
     Name { name: String }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "tvm.slice")]
-pub struct Slice {
-    pub bytes: String
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "tvm.cell")]
-pub struct Cell {
-    pub bytes: String
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "tvm.numberDecimal")]
-pub struct Number {
-    pub number: String
-}
+pub type Slice = tl::TvmSlice;
+pub type Cell = tl::TvmCell;
+pub type Number = tl::TvmNumberDecimal;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "@type")]
@@ -713,11 +591,7 @@ pub enum StackEntry {
     Unsupported
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(tag = "smc.info")]
-pub struct SmcInfo {
-    pub id: i64
-}
+pub type SmcInfo = tl::SmcInfo;
 
 #[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type")]
