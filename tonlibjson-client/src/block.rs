@@ -8,7 +8,7 @@ use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
 use crate::block::tl::SmcMethodIdName;
-use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
+use crate::deserialize::{deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
 use crate::router::{BlockCriteria, Route, Routable};
 use crate::request::Requestable;
 
@@ -127,9 +127,7 @@ impl ShortTxId {
 
 impl PartialEq for ShortTxId {
     fn eq(&self, other: &Self) -> bool {
-        self.account == other.account
-            && self.hash == other.hash
-            && self.lt == other.lt
+        self.account == other.account && self.hash == other.hash && self.lt == other.lt
     }
 }
 
@@ -422,15 +420,7 @@ impl Routable for BlocksGetTransactions {
     }
 }
 
-// pub type BlocksTransactions = tl::BlocksTransactions;
-
-#[derive(Debug, Deserialize)]
-pub struct BlocksTransactions {
-    pub id: BlockIdExt,
-    pub incomplete: bool,
-    pub req_count: u32,
-    pub transactions: Vec<ShortTxId>,
-}
+pub type BlocksTransactions = tl::BlocksTransactions;
 
 pub type AccountTransactionId = tl::BlocksAccountTransactionId;
 
