@@ -1,5 +1,6 @@
 use tonlibjson_client::address::AccountAddressData;
 use tonlibjson_client::block;
+use tonlibjson_client::block::MessageData;
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;
 
@@ -34,7 +35,7 @@ impl From<BlockIdExt> for block::BlockIdExt {
 impl From<(i32, block::ShortTxId)> for TransactionId {
     fn from((chain_id, value): (i32, block::ShortTxId)) -> Self {
         let address = value
-            .get_account_address_in_shard_context()
+            .account
             .into_internal(chain_id)
             .to_string();
 
@@ -101,11 +102,13 @@ impl From<block::Cell> for TvmCell {
 
 impl From<block::MessageData> for MsgData {
     fn from(value: block::MessageData) -> Self {
+        use block::tl::{MsgDataRaw, MsgDataText, MsgDataDecryptedText, MsgDataEncryptedText};
+
         match value {
-            block::MessageData::Raw { body, init_state } => { Self::Raw(MessageDataRaw { body, init_state }) }
-            block::MessageData::Text { text } => { Self::Text(MessageDataText { text }) }
-            block::MessageData::DecryptedText { text } => { Self::DecryptedText(MessageDataDecryptedText { text }) }
-            block::MessageData::EncryptedText { text } => { Self::EncryptedText(MessageDataEncryptedText { text }) }
+            MessageData::MsgDataRaw(MsgDataRaw { body, init_state }) => { Self::Raw(MessageDataRaw { body, init_state })}
+            MessageData::MsgDataText(MsgDataText { text }) => { Self::Text(MessageDataText { text })}
+            MessageData::MsgDataDecryptedText(MsgDataDecryptedText { text }) => { Self::DecryptedText(MessageDataDecryptedText { text }) }
+            MessageData::MsgDataEncryptedText(MsgDataEncryptedText { text }) => { Self::EncryptedText(MessageDataEncryptedText { text }) }
         }
     }
 }
@@ -113,8 +116,8 @@ impl From<block::MessageData> for MsgData {
 impl From<block::RawMessage> for Message {
     fn from(value: block::RawMessage) -> Self {
         Self {
-            source: value.source.account_address.map(|s| s.to_string()),
-            destination: value.destination.account_address.map(|s| s.to_string()),
+            source: Some(value.source.account_address),
+            destination: Some(value.destination.account_address),
             value: value.value,
             fwd_fee: value.fwd_fee,
             ihr_fee: value.ihr_fee,

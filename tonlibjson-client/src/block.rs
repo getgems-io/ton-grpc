@@ -11,7 +11,7 @@ use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_
 use crate::router::{BlockCriteria, Route, Routable};
 use crate::request::Requestable;
 
-mod tl {
+pub mod tl {
     use derive_new::new;
     use serde::{Serialize, Deserialize};
     use crate::deserialize::deserialize_number_from_string;
@@ -280,6 +280,7 @@ impl Routable for GetAccountState {
     fn route(&self) -> Route { Route::Latest }
 }
 
+pub type MessageData = tl::MsgBoxedData;
 
 pub type RawMessage = tl::RawMessage;
 
