@@ -20,7 +20,7 @@ use tracing::{instrument, trace};
 use url::Url;
 use std::str::FromStr;
 use tower::util::Either;
-use crate::address::{InternalAccountAddress, ShardContextAccountAddress};
+use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
 use crate::router::{BlockCriteria, Route, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
@@ -693,26 +693,27 @@ impl TonClient {
         });
         let stream_map = StreamMap::from_iter(streams);
 
-        let stream = async_stream::try_stream! {
+        let stream = try_stream! {
             let mut last = HashMap::with_capacity(2);
 
             for await (key, tx) in stream_map {
                 let tx = tx?;
 
                 if let Some(addr) = last.get(&key.opposite()) {
-                    if addr == &tx.account { return }
+                    if addr == tx.account() { return }
                 }
 
                 if let Some(addr) = last.get(&key) {
-                    if addr == &tx.account { continue }
+                    if addr == tx.account() { continue }
                 }
 
-                last.insert(key, tx.account.clone());
-                yield tx.account;
+                last.insert(key, tx.account().to_owned());
+
+                yield tx.into_internal(chain);
             }
         };
 
-        stream.map_ok(move |a: ShardContextAccountAddress| a.into_internal(chain))
+        stream
     }
 
     #[instrument(skip_all, err)]

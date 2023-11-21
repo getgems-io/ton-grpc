@@ -6,7 +6,7 @@ use std::str::FromStr;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
-use crate::address::{AccountAddressData, ShardContextAccountAddress};
+use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
 use crate::block::tl::SmcMethodIdName;
 use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
 use crate::router::{BlockCriteria, Route, Routable};
@@ -109,14 +109,20 @@ impl From<BlockHeader> for BlockId {
     }
 }
 
-#[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "@type", rename = "blocks.shortTxId")]
-pub struct ShortTxId {
-    pub account: ShardContextAccountAddress,
-    pub hash: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub lt: i64,
-    pub mode: u8,
+pub type ShortTxId = tl::BlocksShortTxId;
+
+impl ShortTxId {
+    pub fn account(&self) -> &str {
+        &self.account
+    }
+
+    pub fn into_internal(self, chain_id: i32) -> InternalAccountAddress {
+        ShardContextAccountAddress::from_str(&self.account).unwrap().into_internal(chain_id)
+    }
+
+    pub fn into_internal_string(self, chain_id: i32) -> String {
+        self.into_internal(chain_id).to_string()
+    }
 }
 
 impl PartialEq for ShortTxId {

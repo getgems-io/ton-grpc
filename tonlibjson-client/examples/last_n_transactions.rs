@@ -30,7 +30,7 @@ async fn main() -> anyhow::Result<()> {
 
                                     tracing::info!(tx = ?tx);
 
-                                    let address = tx.account.into_internal(block.workchain).to_string();
+                                    let address = tx.into_internal_string(block.workchain);
                                     match ton.get_account_state(&address).await {
                                         Ok(account) => tracing::info!("{}: {}", &address, account["balance"].as_str().unwrap()),
                                         Err(e) => tracing::error!("{:?}", e)
