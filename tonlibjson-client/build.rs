@@ -65,6 +65,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_boxed_type("tvm.Tuple")
         .add_boxed_type("tvm.List")
         .add_boxed_type("smc.MethodId")
+        .add_boxed_type("ton.BlockIdExt")
 
         .generate()?;
 
@@ -207,24 +208,33 @@ impl Generator {
 
             let types = map.get(&type_ident).unwrap();
 
-            let fields: Vec<_> = types
-                .iter()
-                .filter(|combinator| !combinator.is_functional())
-                .map(|combinator| {
-                    let rename = combinator.id();
-                    let field_name = format_ident!("{}", generate_type_name(rename));
+            let output = if types.iter().filter(|combinator| !combinator.is_functional()).count() == 1 {
+                let bare_type = types.first().unwrap().id();
+                let name = format_ident!("{}", generate_type_name(bare_type));
 
-                    quote! {
+                quote! {
+                    pub type #struct_name = #name;
+                }
+            } else {
+                let fields: Vec<_> = types
+                    .iter()
+                    .filter(|combinator| !combinator.is_functional())
+                    .map(|combinator| {
+                        let rename = combinator.id();
+                        let field_name = format_ident!("{}", generate_type_name(rename));
+
+                        quote! {
                         #field_name(#field_name)
                     }
-                })
-                .collect();
+                    })
+                    .collect();
 
-            let output = quote! {
-                #[derive(Deserialize, Serialize, Clone, Debug)]
-                #[serde(untagged)]
-                pub enum #struct_name {
-                    #(#fields),*
+                quote! {
+                    #[derive(Deserialize, Serialize, Clone, Debug)]
+                    #[serde(untagged)]
+                    pub enum #struct_name {
+                        #(#fields),*
+                    }
                 }
             };
 

@@ -59,9 +59,6 @@ pub mod tl {
     type Vector<T> = Vec<T>;
 
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
-
-    // TODO[akostylev0]
-    type TonBoxedBlockIdExt = TonBlockIdExt;
 }
 
 pub type Sync = tl::Sync;
@@ -130,13 +127,7 @@ impl PartialEq for ShortTxId {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, Eq, PartialEq)]
-#[serde(tag = "@type", rename = "blocks.masterchainInfo")]
-pub struct MasterchainInfo {
-    pub init: BlockIdExt,
-    pub last: BlockIdExt,
-    pub state_root_hash: String,
-}
+pub type MasterchainInfo = tl::BlocksMasterchainInfo;
 
 impl PartialOrd for MasterchainInfo {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
@@ -617,10 +608,10 @@ impl<T> Routable for WithBlock<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{Cell, List, Number, Slice, StackEntry, Tuple, SmcMethodId, AccountAddress};
+    use crate::block::{Cell, Number, Slice, StackEntry,SmcMethodId, AccountAddress};
     use serde_json::json;
     use tracing_test::traced_test;
-    use crate::block::tl::{TvmBoxedList, TvmBoxedNumber, TvmBoxedTuple, TvmList, TvmNumberDecimal, TvmStackEntryCell, TvmStackEntryList, TvmStackEntryNumber, TvmStackEntrySlice, TvmStackEntryTuple, TvmTuple};
+    use crate::block::tl::{SmcMethodIdName, SmcMethodIdNumber, TvmList, TvmNumberDecimal, TvmStackEntryCell, TvmStackEntryList, TvmStackEntryNumber, TvmStackEntrySlice, TvmStackEntryTuple, TvmTuple};
 
     #[test]
     fn deserialize_account_address_empty() {
@@ -680,9 +671,9 @@ mod tests {
     fn stack_entry_correct_json() {
         let slice = StackEntry::TvmStackEntrySlice(TvmStackEntrySlice { slice: Slice { bytes: "test".to_string() } });
         let cell = StackEntry::TvmStackEntryCell(TvmStackEntryCell { cell: Cell { bytes: "test".to_string() } });
-        let number = StackEntry::TvmStackEntryNumber(TvmStackEntryNumber { number: TvmBoxedNumber::TvmNumberDecimal(TvmNumberDecimal { number: "123".to_string() }) });
-        let tuple = StackEntry::TvmStackEntryTuple(TvmStackEntryTuple { tuple: TvmBoxedTuple::TvmTuple(TvmTuple { elements: vec![slice.clone(), cell.clone()] })});
-        let list = StackEntry::TvmStackEntryList(TvmStackEntryList { list: TvmBoxedList::TvmList(TvmList { elements: vec![slice.clone(), tuple.clone()] })});
+        let number = StackEntry::TvmStackEntryNumber(TvmStackEntryNumber { number: TvmNumberDecimal { number: "123".to_string() } });
+        let tuple = StackEntry::TvmStackEntryTuple(TvmStackEntryTuple { tuple: TvmTuple { elements: vec![slice.clone(), cell.clone()] } });
+        let list = StackEntry::TvmStackEntryList(TvmStackEntryList { list: TvmList { elements: vec![slice.clone(), tuple.clone()] } });
 
         assert_eq!(serde_json::to_string(&slice).unwrap(), "{\"@type\":\"tvm.stackEntrySlice\",\"slice\":{\"@type\":\"tvm.slice\",\"bytes\":\"test\"}}");
         assert_eq!(serde_json::to_string(&cell).unwrap(), "{\"@type\":\"tvm.stackEntryCell\",\"cell\":{\"@type\":\"tvm.cell\",\"bytes\":\"test\"}}");
@@ -693,8 +684,8 @@ mod tests {
 
     #[test]
     fn smc_method_id() {
-        let number = SmcMethodId::Number { number: 123 };
-        let name = SmcMethodId::Name { name: "getOwner".to_owned() };
+        let number = SmcMethodId::SmcMethodIdNumber(SmcMethodIdNumber { number: 123 }) ;
+        let name = SmcMethodId::SmcMethodIdName(SmcMethodIdName { name: "getOwner".to_owned() });
 
         assert_eq!(serde_json::to_value(number).unwrap(), json!({
             "@type": "smc.methodIdNumber",
