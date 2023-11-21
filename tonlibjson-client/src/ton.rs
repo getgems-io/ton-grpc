@@ -640,7 +640,7 @@ impl TonClient {
 
     pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {
         let address = AccountAddress::new(&address)?;
-        let method = SmcMethodId::new_name(method);
+        let method = SmcMethodId::by_name(&method);
 
         self.client
             .clone()

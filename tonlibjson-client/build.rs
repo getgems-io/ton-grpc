@@ -53,6 +53,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_type("tvm.stackEntryUnsupported", vec!["Serialize", "Deserialize"])
 
         .add_type("smc.info", vec!["Deserialize"])
+        .add_type("smc.methodIdNumber", vec!["Serialize", "Deserialize"])
+        .add_type("smc.methodIdName", vec!["Serialize", "Deserialize"])
 
         .add_type("sync", vec!["Default", "Serialize"])
         .add_type("blocks.getBlockHeader", vec!["Serialize", "Hash", "PartialEq", "Eq", "new"])
@@ -62,6 +64,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_boxed_type("tvm.Number")
         .add_boxed_type("tvm.Tuple")
         .add_boxed_type("tvm.List")
+        .add_boxed_type("smc.MethodId")
 
         .generate()?;
 

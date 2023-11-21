@@ -7,6 +7,7 @@ use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use crate::address::{AccountAddressData, ShardContextAccountAddress};
+use crate::block::tl::SmcMethodIdName;
 use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
 use crate::router::{BlockCriteria, Route, Routable};
 use crate::request::Requestable;
@@ -532,14 +533,10 @@ impl SmcRunGetMethod {
 }
 
 pub type SmcStack = Vec<StackEntry>;
+pub type SmcMethodId = tl::SmcBoxedMethodId;
 
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type")]
-pub enum SmcMethodId {
-    #[serde(rename = "smc.methodIdNumber")]
-    Number { number: i32 },
-    #[serde(rename = "smc.methodIdName")]
-    Name { name: String }
+impl SmcMethodId {
+    pub fn by_name(name: &str) -> Self { Self::SmcMethodIdName(SmcMethodIdName { name: name.to_owned() })}
 }
 
 pub type Slice = tl::TvmSlice;
