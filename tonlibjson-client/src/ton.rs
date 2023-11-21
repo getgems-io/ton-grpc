@@ -698,17 +698,19 @@ impl TonClient {
 
             for await (key, tx) in stream_map {
                 let tx = tx?;
+                let account = tx.get_account_address_in_shard_context();
 
                 if let Some(addr) = last.get(&key.opposite()) {
-                    if addr == &tx.account { return }
+                    if addr == &account { return }
                 }
 
                 if let Some(addr) = last.get(&key) {
-                    if addr == &tx.account { continue }
+                    if addr == &account { continue }
                 }
 
-                last.insert(key, tx.account.clone());
-                yield tx.account;
+                last.insert(key, account.clone());
+
+                yield account;
             }
         };
 

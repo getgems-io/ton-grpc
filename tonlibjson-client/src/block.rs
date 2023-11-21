@@ -102,16 +102,12 @@ impl From<BlocksHeader> for BlockId {
         }
     }
 }
+pub type ShortTxId = BlocksShortTxId;
 
-// TODO[akostylev0] use BlocksShortTxId
-#[derive(Debug, Deserialize, Clone)]
-#[serde(tag = "@type", rename = "blocks.shortTxId")]
-pub struct ShortTxId {
-    pub account: ShardContextAccountAddress,
-    pub hash: String,
-    #[serde(deserialize_with = "deserialize_number_from_string")]
-    pub lt: i64,
-    pub mode: u8,
+impl ShortTxId {
+    pub fn get_account_address_in_shard_context(&self) -> ShardContextAccountAddress {
+        ShardContextAccountAddress::new(&self.account)
+    }
 }
 
 impl PartialEq for ShortTxId {

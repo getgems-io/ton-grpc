@@ -33,7 +33,10 @@ impl From<BlockIdExt> for block::BlockIdExt {
 
 impl From<(i32, block::ShortTxId)> for TransactionId {
     fn from((chain_id, value): (i32, block::ShortTxId)) -> Self {
-        let address = value.account.into_internal(chain_id).to_string();
+        let address = value
+            .get_account_address_in_shard_context()
+            .into_internal(chain_id)
+            .to_string();
 
         Self {
             account_address: address,
