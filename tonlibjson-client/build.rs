@@ -1,8 +1,11 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{HashMap, HashSet};
 use std::{env, fs};
 use std::path::{Path, PathBuf};
+use anyhow::bail;
 use quote::{format_ident, quote, ToTokens};
 use syn::{GenericArgument, Ident, MetaList};
+use tl_parser::Combinator;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scheme_path = if cfg!(testnet) {
         Path::new("../tonlibjson-sys/ton-testnet/tl/generate/scheme/tonlib_api.tl")
@@ -28,6 +31,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_type("blocks.shards", vec!["Deserialize"])
         .add_type("blocks.transactions", vec!["Deserialize"])
 
+        .add_type("msg.dataEncrypted", vec!["Serialize", "Deserialize"])
+
+        .add_type("msg.dataRaw", vec!["Serialize", "Deserialize"])
+        .add_type("msg.dataText", vec!["Serialize", "Deserialize"])
+        .add_type("msg.dataDecryptedText", vec!["Serialize", "Deserialize"])
+        .add_type("msg.dataEncryptedText", vec!["Serialize", "Deserialize"])
+        .add_type("msg.decryptWithProof", vec!["Serialize", "Deserialize"])
+
         .add_type("tvm.slice", vec!["Serialize", "Deserialize"])
         .add_type("tvm.cell", vec!["Serialize", "Deserialize"])
         .add_type("tvm.numberDecimal", vec!["Serialize", "Deserialize"])
@@ -36,6 +47,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         .add_type("sync", vec!["Default", "Serialize"])
         .add_type("blocks.getBlockHeader", vec!["Serialize", "Hash", "PartialEq", "Eq", "new"])
+
+        .add_boxed_type("msg.Data")
+
         .generate()?;
 
     Ok(())
@@ -44,7 +58,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 struct Generator {
     input: PathBuf,
     output: PathBuf,
-    types: Vec<(String, Vec<String>)>
+    types: Vec<(String, Vec<String>)>,
+    boxed_types: Vec<String>,
 }
 
 impl Generator {
@@ -52,7 +67,7 @@ impl Generator {
         let input: PathBuf = input.as_ref().to_path_buf();
         let output: PathBuf = output.as_ref().to_path_buf();
 
-        Self { input, output, types: vec![] }
+        Self { input, output, types: vec![], boxed_types: vec![] }
     }
 
     fn add_type(mut self, name: &str, derives: Vec<&str>) -> Self {
@@ -61,16 +76,30 @@ impl Generator {
         self
     }
 
+    fn add_boxed_type(mut self, name: &str) -> Self {
+        self.boxed_types.push(name.to_owned());
+
+        self
+    }
+
     fn generate(self) -> anyhow::Result<()> {
         let content = std::fs::read_to_string(self.input)?;
 
         let combinators = tl_parser::parse(&content)?;
-        let btree: BTreeMap<_, _> = combinators
+
+        let mut map: HashMap<String, Vec<Combinator>> = HashMap::default();
+        for combinator in combinators.iter() {
+            map.entry(combinator.result_type().to_owned())
+                .or_insert(Vec::new())
+                .push(combinator.to_owned());
+        }
+
+        let btree: HashMap<_, _> = combinators
             .into_iter()
             .map(|combinator| (combinator.id().to_owned(), combinator))
             .collect();
 
-        let mut generated = BTreeSet::new();
+        let mut generated = HashSet::new();
         let mut formatted = String::new();
 
         for (type_ident, derives) in self.types.into_iter() {
@@ -154,6 +183,42 @@ impl Generator {
             eprintln!("tokens = {}", output);
 
             generated.insert(definition.result_type());
+        }
+
+        for type_ident in self.boxed_types.into_iter() {
+            let output_name = generate_type_name(&type_ident);
+            let struct_name = format_ident!("{}", output_name);
+
+            let types = map.get(&type_ident).unwrap();
+
+            let fields: Vec<_> = types
+                .iter()
+                .filter(|combinator| !combinator.is_functional())
+                .map(|combinator| {
+                    let rename = combinator.id();
+                    let field_name = format_ident!("{}", generate_type_name(rename));
+
+                    quote! {
+                        #[serde(rename = #rename)]
+                        #field_name(#field_name)
+                    }
+                })
+                .collect();
+
+            let output = quote! {
+                #[derive(Deserialize, Serialize, Clone, Debug)]
+                #[serde(tag = "@type")]
+                pub enum #struct_name {
+                    #(#fields),*
+                }
+            };
+
+            eprintln!("tokens = {}", output);
+
+            let syntax_tree = syn::parse2(output.clone()).unwrap();
+            formatted += &prettyplease::unparse(&syntax_tree);
+
+            eprintln!("tokens = {}", output);
         }
 
         let out_dir = env::var_os("OUT_DIR").unwrap();

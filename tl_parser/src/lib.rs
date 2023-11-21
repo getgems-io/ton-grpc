@@ -11,7 +11,7 @@ use crate::FieldType::{Plain, Repetition};
 
 pub type ConstructorNumber = u32;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Combinator {
     functional: bool,
     builtin: bool,
@@ -34,15 +34,19 @@ impl Combinator {
     pub fn fields(&self) -> &Vec<Field> {
         &self.fields
     }
+
+    pub fn is_functional(&self) -> bool {
+        self.functional
+    }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum FieldType {
     Plain { name: String, condition: Option<String> },
     Repetition { multiplicity: Option<String>, fields: Vec<Field>, },
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Field {
     name: Option<String>,
     r#type: FieldType,
@@ -99,7 +103,7 @@ impl Field {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct OptionalField {
     name: String,
     r#type: String,

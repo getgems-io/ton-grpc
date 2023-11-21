@@ -61,8 +61,6 @@ mod tl {
 
     // TODO[akostylev0]
     type TonBoxedBlockIdExt = TonBlockIdExt;
-
-    type MsgBoxedData = crate::block::MessageData;
 }
 
 pub type Sync = tl::Sync;
@@ -282,18 +280,6 @@ impl Routable for GetAccountState {
     fn route(&self) -> Route { Route::Latest }
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
-#[serde(tag = "@type")]
-pub enum MessageData {
-    #[serde(rename = "msg.dataRaw")]
-    Raw { body: String, init_state: String },
-    #[serde(rename = "msg.dataText")]
-    Text { text: String },
-    #[serde(rename = "msg.dataDecryptedText")]
-    DecryptedText { text: String },
-    #[serde(rename = "msg.dataEncryptedText")]
-    EncryptedText { text: String }
-}
 
 pub type RawMessage = tl::RawMessage;
 
