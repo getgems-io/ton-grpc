@@ -545,39 +545,9 @@ pub enum SmcMethodId {
 pub type Slice = tl::TvmSlice;
 pub type Cell = tl::TvmCell;
 pub type Number = tl::TvmNumberDecimal;
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "tvm.tuple")]
-pub struct Tuple {
-    pub elements: Vec<StackEntry>
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "tvm.list")]
-pub struct List {
-    pub elements: Vec<StackEntry>
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-#[serde(tag = "@type")]
-pub enum StackEntry {
-    #[serde(rename = "tvm.stackEntrySlice")]
-    Slice { slice: Slice },
-    #[serde(rename = "tvm.stackEntryCell")]
-    Cell { cell: Cell },
-    #[serde(rename = "tvm.stackEntryNumber")]
-    Number { number: Number },
-    #[serde(rename = "tvm.stackEntryTuple")]
-    Tuple { tuple: Tuple },
-    #[serde(rename = "tvm.stackEntryList")]
-    List { list: List },
-
-    #[serde(rename = "tvm.stackEntryUnsupported")]
-    Unsupported
-}
-
+pub type Tuple = tl::TvmTuple;
+pub type List = tl::TvmList;
+pub type StackEntry = tl::TvmBoxedStackEntry;
 pub type SmcInfo = tl::SmcInfo;
 
 #[derive(new, Debug, Serialize, Clone)]
@@ -653,6 +623,7 @@ mod tests {
     use crate::block::{Cell, List, Number, Slice, StackEntry, Tuple, SmcMethodId, AccountAddress};
     use serde_json::json;
     use tracing_test::traced_test;
+    use crate::block::tl::{TvmBoxedList, TvmBoxedNumber, TvmBoxedTuple, TvmList, TvmNumberDecimal, TvmStackEntryCell, TvmStackEntryList, TvmStackEntryNumber, TvmStackEntrySlice, TvmStackEntryTuple, TvmTuple};
 
     #[test]
     fn deserialize_account_address_empty() {
@@ -710,11 +681,11 @@ mod tests {
 
     #[test]
     fn stack_entry_correct_json() {
-        let slice = StackEntry::Slice { slice: Slice { bytes: "test".to_string() }};
-        let cell = StackEntry::Cell { cell: Cell { bytes: "test".to_string() }};
-        let number = StackEntry::Number { number: Number { number: "123".to_string() }};
-        let tuple = StackEntry::Tuple { tuple: Tuple { elements: vec![slice.clone(), cell.clone()]  }};
-        let list = StackEntry::List { list: List { elements: vec![slice.clone(), tuple.clone()]  }};
+        let slice = StackEntry::TvmStackEntrySlice(TvmStackEntrySlice { slice: Slice { bytes: "test".to_string() } });
+        let cell = StackEntry::TvmStackEntryCell(TvmStackEntryCell { cell: Cell { bytes: "test".to_string() } });
+        let number = StackEntry::TvmStackEntryNumber(TvmStackEntryNumber { number: TvmBoxedNumber::TvmNumberDecimal(TvmNumberDecimal { number: "123".to_string() }) });
+        let tuple = StackEntry::TvmStackEntryTuple(TvmStackEntryTuple { tuple: TvmBoxedTuple::TvmTuple(TvmTuple { elements: vec![slice.clone(), cell.clone()] })});
+        let list = StackEntry::TvmStackEntryList(TvmStackEntryList { list: TvmBoxedList::TvmList(TvmList { elements: vec![slice.clone(), tuple.clone()] })});
 
         assert_eq!(serde_json::to_string(&slice).unwrap(), "{\"@type\":\"tvm.stackEntrySlice\",\"slice\":{\"@type\":\"tvm.slice\",\"bytes\":\"test\"}}");
         assert_eq!(serde_json::to_string(&cell).unwrap(), "{\"@type\":\"tvm.stackEntryCell\",\"cell\":{\"@type\":\"tvm.cell\",\"bytes\":\"test\"}}");

@@ -42,6 +42,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_type("tvm.slice", vec!["Serialize", "Deserialize"])
         .add_type("tvm.cell", vec!["Serialize", "Deserialize"])
         .add_type("tvm.numberDecimal", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.tuple", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.list", vec!["Serialize", "Deserialize"])
+
+        .add_type("tvm.stackEntrySlice", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryCell", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryNumber", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryTuple", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryList", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryUnsupported", vec!["Serialize", "Deserialize"])
 
         .add_type("smc.info", vec!["Deserialize"])
 
@@ -49,6 +58,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_type("blocks.getBlockHeader", vec!["Serialize", "Hash", "PartialEq", "Eq", "new"])
 
         .add_boxed_type("msg.Data")
+        .add_boxed_type("tvm.StackEntry")
+        .add_boxed_type("tvm.Number")
+        .add_boxed_type("tvm.Tuple")
+        .add_boxed_type("tvm.List")
 
         .generate()?;
 
@@ -199,7 +212,6 @@ impl Generator {
                     let field_name = format_ident!("{}", generate_type_name(rename));
 
                     quote! {
-                        #[serde(rename = #rename)]
                         #field_name(#field_name)
                     }
                 })
@@ -207,7 +219,7 @@ impl Generator {
 
             let output = quote! {
                 #[derive(Deserialize, Serialize, Clone, Debug)]
-                #[serde(tag = "@type")]
+                #[serde(untagged)]
                 pub enum #struct_name {
                     #(#fields),*
                 }
