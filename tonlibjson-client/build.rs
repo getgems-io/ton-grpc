@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed={}", scheme_path.to_string_lossy());
 
     Generator::from(scheme_path, "generated.rs")
-
+        .add_type("accountAddress", vec!["Deserialize", "Serialize"])
         .add_type("ton.blockId", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
         .add_type("ton.blockIdExt", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
         .add_type("blocks.header", vec!["Deserialize"])
