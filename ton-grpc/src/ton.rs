@@ -74,14 +74,14 @@ impl From<PartialTransactionId> for block::InternalTransactionId {
 
 impl From<block::RawFullAccountState> for AccountState {
     fn from(value: block::RawFullAccountState) -> Self {
-        if value.code.is_some() {
+        if !value.code.is_empty() {
             AccountState::Active(ActiveAccountState {
-                code: value.code.unwrap_or_default(),
-                data: value.data.unwrap_or_default()
+                code: value.code,
+                data: value.data
             })
-        } else if value.frozen_hash.is_some() {
+        } else if !value.frozen_hash.is_empty() {
             AccountState::Frozen(FrozenAccountState {
-                frozen_hash: value.frozen_hash.unwrap_or_default()
+                frozen_hash: value.frozen_hash
             })
         } else {
             AccountState::Uninitialized(UninitializedAccountState {})

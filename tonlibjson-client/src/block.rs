@@ -217,19 +217,16 @@ pub struct RawGetAccountState {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(tag = "@type", rename = "raw.FullAccountState")]
+#[serde(tag = "@type", rename = "raw.fullAccountState")]
 pub struct RawFullAccountState {
     #[serde(deserialize_with = "deserialize_ton_account_balance")]
     pub balance: Option<i64>,
-    #[serde(deserialize_with = "deserialize_default_as_none")]
-    pub code: Option<String>,
-    #[serde(deserialize_with = "deserialize_default_as_none")]
-    pub data: Option<String>,
+    pub code: String,
+    pub data: String,
     #[serde(deserialize_with = "deserialize_default_as_none")]
     pub last_transaction_id: Option<InternalTransactionId>,
     pub block_id: BlockIdExt,
-    #[serde(deserialize_with = "deserialize_default_as_none")]
-    pub frozen_hash: Option<String>,
+    pub frozen_hash: String,
     pub sync_utime: i64
 }
 
