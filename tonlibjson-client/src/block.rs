@@ -169,7 +169,7 @@ impl AccountAddress {
     pub fn chain_id(&self) -> i32 {
         self.account_address
             .as_ref()
-            .and_then(|a| AccountAddressData::from_str(&a).ok())
+            .and_then(|a| AccountAddressData::from_str(a).ok())
             .map(|d| d.chain_id)
             .unwrap_or(-1)
     }

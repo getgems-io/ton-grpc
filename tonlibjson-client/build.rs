@@ -212,7 +212,7 @@ impl Generator {
         let mut map: HashMap<String, Vec<Combinator>> = HashMap::default();
         for combinator in combinators.iter() {
             map.entry(combinator.result_type().to_owned())
-                .or_insert(Vec::new())
+                .or_default()
                 .push(combinator.to_owned());
         }
 
@@ -245,7 +245,7 @@ impl Generator {
             let fields: Vec<_> = definition.fields().iter().map(|field| {
                 let default_configuration = &FieldConfiguration::default();
                 let field_name = field.id().clone().unwrap();
-                let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+                let field_configuration = configuration.fields.get(&field_name).unwrap_or(default_configuration);
 
                 eprintln!("field = {:?}", field);
                 let field_name = format_ident!("{}", &field_name);
@@ -277,10 +277,10 @@ impl Generator {
                     }
 
                     if field_configuration.optional {
-                        let id = format!("Option<{}>", structure_ident(field_type.clone().unwrap()));
+                        let id = format!("Option<{}>", structure_ident(field_type.unwrap()));
                         Box::new(syn::parse_str::<GenericArgument>(&id).unwrap())
                     } else {
-                        Box::new(format_ident!("{}", structure_ident(field_type.clone().unwrap())))
+                        Box::new(format_ident!("{}", structure_ident(field_type.unwrap())))
                     }
                 };
 
@@ -384,7 +384,7 @@ impl Generator {
 }
 
 fn generate_type_name(s: &str) -> String {
-    let (ns, name) = s.rsplit_once(".").unwrap_or(("", s));
+    let (ns, name) = s.rsplit_once('.').unwrap_or(("", s));
 
     let boxed_prefix = if name.starts_with(|c: char| c.is_uppercase()) {
         "Boxed"

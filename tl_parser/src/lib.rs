@@ -69,7 +69,7 @@ impl Field {
             return Some(name.as_str());
         }
 
-        let (left, _) = name.split_once("<").unwrap();
+        let (left, _) = name.split_once('<').unwrap();
 
         Some(left)
     }
@@ -95,11 +95,11 @@ impl Field {
             return None
         };
 
-        let Some((_, tail)) = name.split_once("<") else {
+        let Some((_, tail)) = name.split_once('<') else {
             return Some(vec![])
         };
 
-        Some(tail.replace(">", "").split(",").map(|s| s.trim().to_owned()).collect())
+        Some(tail.replace('>', "").split(',').map(|s| s.trim().to_owned()).collect())
     }
 }
 
