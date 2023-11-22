@@ -15,7 +15,7 @@ use crate::request::Requestable;
 pub mod tl {
     use derive_new::new;
     use serde::{Serialize, Deserialize};
-    use crate::deserialize::deserialize_number_from_string;
+    use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance};
 
     /**
     double ? = Double;
@@ -215,20 +215,7 @@ impl Routable for GetShardAccountCellByTransaction {
 pub struct RawGetAccountState {
     account_address: AccountAddress
 }
-
-#[derive(Deserialize, Debug)]
-#[serde(tag = "@type", rename = "raw.fullAccountState")]
-pub struct RawFullAccountState {
-    #[serde(deserialize_with = "deserialize_ton_account_balance")]
-    pub balance: Option<i64>,
-    pub code: String,
-    pub data: String,
-    #[serde(deserialize_with = "deserialize_default_as_none")]
-    pub last_transaction_id: Option<InternalTransactionId>,
-    pub block_id: BlockIdExt,
-    pub frozen_hash: String,
-    pub sync_utime: i64
-}
+pub type RawFullAccountState = tl::RawFullAccountState;
 
 impl Requestable for RawGetAccountState {
     type Response = RawFullAccountState;

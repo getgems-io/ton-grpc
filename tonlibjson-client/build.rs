@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 use std::{env, fs};
 use std::path::{Path, PathBuf};
-use anyhow::bail;
 use quote::{format_ident, quote, ToTokens};
 use syn::{GenericArgument, Ident, MetaList};
 use tl_parser::Combinator;
@@ -27,6 +26,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_type("raw.message", vec!["Deserialize"])
         .add_type("raw.transaction", vec!["Deserialize"])
         .add_type("raw.extMessageInfo", vec!["Deserialize"])
+        .add_type_full("raw.fullAccountState", configure_type()
+            .derives(vec!["Deserialize"])
+            .field("balance", configure_field()
+                .optional()
+                .deserialize_with("deserialize_ton_account_balance")
+                .build())
+            .field("last_transaction_id", configure_field()
+                .optional()
+                .deserialize_with("deserialize_default_as_none")
+                .build()
+            )
+            .build()
+        )
         .add_type("blocks.accountTransactionId", vec!["Serialize", "Deserialize"])
         .add_type("blocks.shards", vec!["Deserialize"])
         .add_type("blocks.transactions", vec!["Deserialize"])
@@ -75,9 +87,73 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 struct Generator {
     input: PathBuf,
     output: PathBuf,
-    types: Vec<(String, Vec<String>)>,
+    types: Vec<(String, TypeConfiguration)>,
     boxed_types: Vec<String>,
 }
+
+
+fn configure_type() -> TypeConfigurationBuilder { Default::default() }
+fn configure_field() -> FieldConfigurationBuilder { Default::default() }
+
+#[derive(Default)]
+struct TypeConfigurationBuilder {
+    derives: Vec<String>,
+    fields: HashMap<String, FieldConfiguration>
+}
+
+struct TypeConfiguration {
+    pub derives: Vec<String>,
+    pub fields: HashMap<String, FieldConfiguration>
+}
+
+#[derive(Default)]
+struct FieldConfigurationBuilder {
+    optional: bool,
+    deserialize_with: Option<String>,
+}
+
+#[derive(Default)]
+struct FieldConfiguration {
+    pub optional: bool,
+    pub deserialize_with: Option<String>,
+}
+
+impl FieldConfigurationBuilder {
+    fn optional(mut self) -> Self {
+        self.optional = true;
+
+        self
+    }
+
+    fn deserialize_with(mut self, deserialize_with: &str) -> Self {
+        self.deserialize_with = Some(deserialize_with.to_owned());
+
+        self
+    }
+
+    fn build(self) -> FieldConfiguration {
+        FieldConfiguration { optional: self.optional, deserialize_with: self.deserialize_with }
+    }
+}
+
+impl TypeConfigurationBuilder {
+    fn derives(mut self, derives: Vec<&str>) -> Self {
+        self.derives = derives.into_iter().map(|s| s.to_owned()).collect();
+
+        self
+    }
+
+    fn field(mut self, field: &str, configuration: FieldConfiguration) -> Self {
+        self.fields.insert(field.to_owned(), configuration);
+
+        self
+    }
+
+    fn build(self) -> TypeConfiguration {
+        TypeConfiguration { derives: self.derives, fields: self.fields }
+    }
+}
+
 
 impl Generator {
     fn from<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O) -> Self {
@@ -88,7 +164,13 @@ impl Generator {
     }
 
     fn add_type(mut self, name: &str, derives: Vec<&str>) -> Self {
-        self.types.push((name.to_owned(), derives.into_iter().map(|s| s.to_owned()).collect()));
+        self.types.push((name.to_owned(), configure_type().derives(derives).build()));
+
+        self
+    }
+
+    fn add_type_full(mut self, name: &str, configuration: TypeConfiguration) -> Self {
+        self.types.push((name.to_owned(), configuration));
 
         self
     }
@@ -119,7 +201,7 @@ impl Generator {
         let mut generated = HashSet::new();
         let mut formatted = String::new();
 
-        for (type_ident, derives) in self.types.into_iter() {
+        for (type_ident, configuration) in self.types.into_iter() {
             let definition = btree.get(&type_ident).unwrap();
 
             eprintln!("definition = {:?}", definition);
@@ -128,7 +210,7 @@ impl Generator {
             let struct_name = structure_ident(definition.id());
 
             let mut traits = vec!["Debug".to_owned(), "Clone".to_owned()];
-            traits.extend(derives);
+            traits.extend(configuration.derives);
 
             let derives = format!("derive({})", traits.join(","));
             let t = syn::parse_str::<MetaList>(&derives)?;
@@ -138,12 +220,20 @@ impl Generator {
             // let derives: Vec<syn::Ident> = derives.into_iter().map(|d| format_ident!("{}", d)).collect();
 
             let fields: Vec<_> = definition.fields().iter().map(|field| {
+                let default_configuration = &FieldConfiguration::default();
+                let field_name = field.id().clone().unwrap();
+                let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+
                 eprintln!("field = {:?}", field);
-                let field_name = format_ident!("{}", field.id().clone().unwrap());
+                let field_name = format_ident!("{}", &field_name);
                 let mut deserialize_number_from_string = false; // TODO[akostylev0]
                 let field_type: Box<dyn ToTokens> = if field.field_type().is_some_and(|typ| typ == "#") {
                     deserialize_number_from_string = true;
-                    Box::new(format_ident!("{}", "Int31"))
+                    if field_configuration.optional {
+                        Box::new(syn::parse_str::<GenericArgument>("Option<Int31>").unwrap())
+                    } else {
+                        Box::new(format_ident!("{}", "Int31"))
+                    }
                 } else if field.type_is_polymorphic() {
                     let type_name = generate_type_name(field.field_type().unwrap());
                     let type_variables = field.type_variables().unwrap();
@@ -153,35 +243,38 @@ impl Generator {
                         .collect();
 
                     let mut gen = format!("{}<{}>", type_name, args.join(","));
-                    if field.type_is_optional() {
+                    if field.type_is_optional() || field_configuration.optional {
                         gen = format!("Option<{}>", gen);
                     }
-
-                    eprintln!("gen = {:?}", gen);
-                    let r = syn::parse_str::<GenericArgument>(&gen).unwrap();
-                    eprintln!("r = {:?}", r);
-
-                    Box::new(r)
+                    Box::new(syn::parse_str::<GenericArgument>(&gen).unwrap())
                 } else {
                     let field_type = field.field_type();
                     if field_type.is_some_and(|s| s == "int32" || s == "int64" || s == "int53" || s == "int256")  {
                         deserialize_number_from_string = true;
                     }
 
-                    // TODO[akostylev0]
-                    Box::new(format_ident!("{}", structure_ident(field_type.clone().unwrap())))
+                    if field_configuration.optional {
+                        let id = format!("Option<{}>", structure_ident(field_type.clone().unwrap()));
+                        Box::new(syn::parse_str::<GenericArgument>(&id).unwrap())
+                    } else {
+                        Box::new(format_ident!("{}", structure_ident(field_type.clone().unwrap())))
+                    }
                 };
 
-
                 // // TODO[akostylev0]: just write custom wrappers for primitive types
-                if deserialize_number_from_string {
+               if let Some(deserialize_with) = &field_configuration.deserialize_with {
                     quote! {
+                        #[serde(deserialize_with = #deserialize_with)]
+                        pub #field_name: #field_type
+                    }
+                } else if deserialize_number_from_string {
+                   quote! {
                         #[serde(deserialize_with = "deserialize_number_from_string")]
                         pub #field_name: #field_type
                     }
-                } else {
+               } else  {
                     quote! {
-                    pub #field_name: #field_type
+                        pub #field_name: #field_type
                     }
                 }
             }).collect();
