@@ -472,7 +472,7 @@ impl SmcLoad {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "smc.runGetMethod")]
 pub struct SmcRunGetMethod {
     id: i64,
@@ -482,16 +482,6 @@ pub struct SmcRunGetMethod {
 
 impl Requestable for SmcRunGetMethod {
     type Response = Value;
-}
-
-impl SmcRunGetMethod {
-    pub fn new(contract_id: i64, method: SmcMethodId, stack: SmcStack) -> Self {
-        Self {
-            id: contract_id,
-            method,
-            stack
-        }
-    }
 }
 
 pub type SmcStack = Vec<StackEntry>;
