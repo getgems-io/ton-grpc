@@ -75,7 +75,7 @@ impl Field {
     }
 
     pub fn type_is_optional(&self) -> bool {
-        let Plain { name, condition } = &self.r#type else {
+        let Plain { condition, .. } = &self.r#type else {
             return false
         };
 

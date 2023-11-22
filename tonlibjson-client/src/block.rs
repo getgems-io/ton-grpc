@@ -8,7 +8,6 @@ use serde::{Serialize, Deserialize};
 use serde_json::Value;
 use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
 use crate::block::tl::SmcMethodIdName;
-use crate::deserialize::{deserialize_default_as_none, deserialize_ton_account_balance, deserialize_empty_as_none, serialize_none_as_empty};
 use crate::router::{BlockCriteria, Route, Routable};
 use crate::request::Requestable;
 
@@ -39,7 +38,7 @@ pub mod tl {
 
      **/
 
-    type Double = f64;
+    // type Double = f64;
     // type String = String;
 
     type Int31 = i32; // "#" / nat type
