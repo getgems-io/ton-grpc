@@ -113,8 +113,8 @@ impl From<block::MessageData> for MsgData {
 impl From<block::RawMessage> for Message {
     fn from(value: block::RawMessage) -> Self {
         Self {
-            source: Some(value.source.account_address),
-            destination: Some(value.destination.account_address),
+            source: value.source.account_address.map(|s| s.to_string()),
+            destination: value.destination.account_address.map(|s| s.to_string()),
             value: value.value,
             fwd_fee: value.fwd_fee,
             ihr_fee: value.ihr_fee,

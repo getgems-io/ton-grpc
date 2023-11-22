@@ -15,7 +15,7 @@ use crate::request::Requestable;
 pub mod tl {
     use derive_new::new;
     use serde::{Serialize, Deserialize};
-    use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance};
+    use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, serialize_none_as_empty, deserialize_empty_as_none};
 
     /**
     double ? = Double;
@@ -156,23 +156,23 @@ impl Default for InternalTransactionId {
     }
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(tag = "@type", rename = "accountAddress")]
-pub struct AccountAddress {
-    #[serde(deserialize_with = "deserialize_empty_as_none", serialize_with = "serialize_none_as_empty")]
-    pub account_address: Option<AccountAddressData>,
-}
+pub type AccountAddress = tl::AccountAddress;
 
 impl AccountAddress {
+    // TODO[akostylev0]
     pub fn new(account_address: &str) -> anyhow::Result<Self> {
-        Ok(Self {
-            account_address: Some(AccountAddressData::from_str(account_address)?)
-        })
+        AccountAddressData::from_str(account_address)?; // validate
+
+        Ok(Self { account_address: Some(account_address.to_owned()) })
     }
 
+    // TODO[akostylev0]
     pub fn chain_id(&self) -> i32 {
-        // TODO[akostylev0]
-        self.account_address.as_ref().map(|d| d.chain_id).unwrap_or(-1)
+        self.account_address
+            .as_ref()
+            .and_then(|a| AccountAddressData::from_str(&a).ok())
+            .map(|d| d.chain_id)
+            .unwrap_or(-1)
     }
 }
 
@@ -261,17 +261,9 @@ impl Routable for GetAccountState {
 }
 
 pub type MessageData = tl::MsgBoxedData;
-
 pub type RawMessage = tl::RawMessage;
-
 pub type RawTransaction = tl::RawTransaction;
-
-#[derive(Deserialize, Debug)]
-pub struct RawTransactions {
-    pub transactions: Vec<RawTransaction>,
-    #[serde(deserialize_with = "deserialize_default_as_none")]
-    pub previous_transaction_id: Option<InternalTransactionId>
-}
+pub type RawTransactions = tl::RawTransactions;
 
 #[derive(Debug, Serialize, Deserialize, Default, Clone)]
 #[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]

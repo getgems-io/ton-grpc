@@ -16,13 +16,28 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed={}", scheme_path.to_string_lossy());
 
     Generator::from(scheme_path, "generated.rs")
-        .add_type("accountAddress", vec!["Deserialize", "Serialize"])
+        .add_type_full("accountAddress", configure_type()
+            .derives(vec!["Deserialize", "Serialize"])
+            .field("account_address", configure_field()
+                .optional()
+                .serialize_with("serialize_none_as_empty")
+                .deserialize_with("deserialize_empty_as_none")
+                .build())
+            .build()
+        )
         .add_type("ton.blockId", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
         .add_type("ton.blockIdExt", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
         .add_type("blocks.header", vec!["Deserialize"])
         .add_type("blocks.shortTxId", vec!["Deserialize"])
         .add_type("blocks.masterchainInfo", vec!["Deserialize", "Eq", "PartialEq"])
         .add_type("internal.transactionId", vec!["Serialize", "Deserialize", "Eq", "PartialEq"])
+        .add_type_full("raw.transactions", configure_type()
+            .derives(vec!["Deserialize"])
+            .field("previous_transaction_id", configure_field()
+                .optional()
+                .deserialize_with("deserialize_default_as_none")
+                .build())
+            .build())
         .add_type("raw.message", vec!["Deserialize"])
         .add_type("raw.transaction", vec!["Deserialize"])
         .add_type("raw.extMessageInfo", vec!["Deserialize"])
@@ -110,12 +125,14 @@ struct TypeConfiguration {
 struct FieldConfigurationBuilder {
     optional: bool,
     deserialize_with: Option<String>,
+    serialize_with: Option<String>
 }
 
 #[derive(Default)]
 struct FieldConfiguration {
     pub optional: bool,
     pub deserialize_with: Option<String>,
+    pub serialize_with: Option<String>
 }
 
 impl FieldConfigurationBuilder {
@@ -131,8 +148,14 @@ impl FieldConfigurationBuilder {
         self
     }
 
+    fn serialize_with(mut self, serialize_with: &str) -> Self {
+        self.serialize_with = Some(serialize_with.to_owned());
+
+        self
+    }
+
     fn build(self) -> FieldConfiguration {
-        FieldConfiguration { optional: self.optional, deserialize_with: self.deserialize_with }
+        FieldConfiguration { optional: self.optional, deserialize_with: self.deserialize_with, serialize_with: self.serialize_with }
     }
 }
 
@@ -261,22 +284,31 @@ impl Generator {
                     }
                 };
 
+                let serialize_with = if let Some(serialize_with) = &field_configuration.serialize_with { quote! {
+                    #[serde(serialize_with = #serialize_with)]
+                } } else {
+                    quote! {}
+                };
+                let deserialize_with = if let Some(deserialize_with) = &field_configuration.deserialize_with { quote! {
+                    #[serde(deserialize_with = #deserialize_with)]
+                } } else {
+                    quote! {}
+                };
+
                 // // TODO[akostylev0]: just write custom wrappers for primitive types
-               if let Some(deserialize_with) = &field_configuration.deserialize_with {
-                    quote! {
-                        #[serde(deserialize_with = #deserialize_with)]
-                        pub #field_name: #field_type
-                    }
-                } else if deserialize_number_from_string {
+               if deserialize_number_from_string && deserialize_with.is_empty() {
                    quote! {
+                        #serialize_with
                         #[serde(deserialize_with = "deserialize_number_from_string")]
                         pub #field_name: #field_type
                     }
                } else  {
                     quote! {
+                        #serialize_with
+                        #deserialize_with
                         pub #field_name: #field_type
-                    }
-                }
+                   }
+               }
             }).collect();
 
             let output = quote! {
