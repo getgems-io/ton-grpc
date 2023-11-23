@@ -1,3 +1,4 @@
+use std::any::{TypeId};
 use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -31,17 +32,6 @@ pub mod tl {
 }
 
 pub type Sync = tl::Sync;
-
-// TODO[akostylev0]: timeout for Sync
-
-// impl Requestable for Sync {
-//     type Response = BlockIdExt;
-//
-//     fn timeout(&self) -> Duration {
-//         Duration::from_secs(5 * 60)
-//     }
-// }
-
 pub type BlocksGetBlockHeader = tl::BlocksGetBlockHeader;
 
 impl Routable for BlocksGetBlockHeader {
@@ -51,7 +41,6 @@ impl Routable for BlocksGetBlockHeader {
 }
 
 pub type BlockIdExt = tl::TonBlockIdExt;
-
 pub type BlockId = tl::TonBlockId;
 
 impl From<BlockIdExt> for BlockId {
@@ -184,7 +173,6 @@ pub type MessageData = tl::MsgBoxedData;
 pub type RawMessage = tl::RawMessage;
 pub type RawTransaction = tl::RawTransaction;
 pub type RawTransactions = tl::RawTransactions;
-
 pub type GetMasterchainInfo = tl::BlocksGetMasterchainInfo;
 
 impl Routable for GetMasterchainInfo {
@@ -264,7 +252,6 @@ impl Routable for BlocksGetTransactions {
 }
 
 pub type BlocksTransactions = tl::BlocksTransactions;
-
 pub type AccountTransactionId = tl::BlocksAccountTransactionId;
 
 impl Default for AccountTransactionId {
@@ -299,7 +286,6 @@ impl Routable for SmcLoad {
 }
 
 pub type SmcRunGetMethod = tl::SmcRunGetMethod;
-
 pub type SmcMethodId = tl::SmcBoxedMethodId;
 
 impl SmcMethodId {
@@ -315,11 +301,18 @@ pub type StackEntry = tl::TvmBoxedStackEntry;
 pub type SmcInfo = tl::SmcInfo;
 pub type RawGetTransactionsV2 = tl::RawGetTransactionsV2;
 
-impl<T> Requestable for T
-    where T : Functional + Serialize + Send + std::marker::Sync,
-        T::Result: DeserializeOwned + Send + std::marker::Sync + 'static,
-{
+
+// TODO[akostylev0]
+impl<T> Requestable for T where T: Functional + Serialize + Send + std::marker::Sync + 'static,
+        T::Result: DeserializeOwned + Send + std::marker::Sync + 'static {
     type Response = T::Result;
+    fn timeout(&self) -> Duration {
+        if TypeId::of::<T>() == TypeId::of::<Sync>() {
+            Duration::from_secs(5 * 60)
+        } else {
+            Duration::from_secs(3)
+        }
+    }
 }
 
 impl Routable for RawGetTransactionsV2 {
@@ -362,6 +355,7 @@ pub struct WithBlock<T> where T : tl::Functional {
 
 impl<T: tl::Functional> Requestable for WithBlock<T> where T : Requestable {
     type Response = T::Response;
+    fn timeout(&self) -> Duration { self.function.timeout() }
 }
 
 impl<T: tl::Functional> Routable for WithBlock<T> {
