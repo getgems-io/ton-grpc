@@ -5,9 +5,9 @@ use std::time::Duration;
 use std::str::FromStr;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
-use serde_json::Value;
+use serde::de::DeserializeOwned;
 use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
-use crate::block::tl::SmcMethodIdName;
+use crate::block::tl::{Functional, SmcMethodIdName};
 use crate::router::{BlockCriteria, Route, Routable};
 use crate::request::Requestable;
 
@@ -15,7 +15,9 @@ pub mod tl {
     use derive_new::new;
     use serde::{Serialize, Deserialize};
     use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, serialize_none_as_empty, deserialize_empty_as_none};
-    pub trait Functional {}
+    pub trait Functional {
+        type Result;
+    }
 
     type Int31 = i32; // "#" / nat type
     type Int32 = i32;
@@ -30,19 +32,17 @@ pub mod tl {
 
 pub type Sync = tl::Sync;
 
-impl Requestable for Sync {
-    type Response = BlockIdExt;
+// TODO[akostylev0]: timeout for Sync
 
-    fn timeout(&self) -> Duration {
-        Duration::from_secs(5 * 60)
-    }
-}
+// impl Requestable for Sync {
+//     type Response = BlockIdExt;
+//
+//     fn timeout(&self) -> Duration {
+//         Duration::from_secs(5 * 60)
+//     }
+// }
 
 pub type BlocksGetBlockHeader = tl::BlocksGetBlockHeader;
-
-impl Requestable for BlocksGetBlockHeader {
-    type Response = BlockHeader;
-}
 
 impl Routable for BlocksGetBlockHeader {
     fn route(&self) -> Route {
@@ -145,19 +145,11 @@ impl AccountAddress {
 
 pub type GetShardAccountCell = tl::GetShardAccountCell;
 
-impl Requestable for GetShardAccountCell {
-    type Response = Cell;
-}
-
 impl Routable for GetShardAccountCell {
     fn route(&self) -> Route { Route::Latest }
 }
 
 pub type GetShardAccountCellByTransaction = tl::GetShardAccountCellByTransaction;
-
-impl Requestable for GetShardAccountCellByTransaction {
-    type Response = Cell;
-}
 
 impl Routable for GetShardAccountCellByTransaction {
     fn route(&self) -> Route {
@@ -168,10 +160,6 @@ impl Routable for GetShardAccountCellByTransaction {
 pub type RawFullAccountState = tl::RawFullAccountState;
 pub type RawGetAccountState = tl::RawGetAccountState;
 
-impl Requestable for RawGetAccountState {
-    type Response = RawFullAccountState;
-}
-
 impl Routable for RawGetAccountState {
     fn route(&self) -> Route {
         Route::Latest
@@ -180,10 +168,6 @@ impl Routable for RawGetAccountState {
 
 pub type RawGetAccountStateByTransaction = tl::RawGetAccountStateByTransaction;
 
-impl Requestable for RawGetAccountStateByTransaction {
-    type Response = RawFullAccountState;
-}
-
 impl Routable for RawGetAccountStateByTransaction {
     fn route(&self) -> Route {
         Route::Block { chain: self.account_address.chain_id(), criteria: BlockCriteria::LogicalTime(self.transaction_id.lt)  }
@@ -191,10 +175,6 @@ impl Routable for RawGetAccountStateByTransaction {
 }
 
 pub type GetAccountState = tl::GetAccountState;
-
-impl Requestable for GetAccountState {
-    type Response = Value;
-}
 
 impl Routable for GetAccountState {
     fn route(&self) -> Route { Route::Latest }
@@ -207,10 +187,6 @@ pub type RawTransactions = tl::RawTransactions;
 
 pub type GetMasterchainInfo = tl::BlocksGetMasterchainInfo;
 
-impl Requestable for GetMasterchainInfo {
-    type Response = MasterchainInfo;
-}
-
 impl Routable for GetMasterchainInfo {
     fn route(&self) -> Route {
         Route::Latest
@@ -218,10 +194,6 @@ impl Routable for GetMasterchainInfo {
 }
 
 pub type BlocksLookupBlock = tl::BlocksLookupBlock;
-
-impl Requestable for BlocksLookupBlock {
-    type Response = BlockIdExt;
-}
 
 impl Routable for BlocksLookupBlock {
     fn route(&self) -> Route {
@@ -245,10 +217,6 @@ impl BlocksLookupBlock {
 }
 
 pub type BlocksGetShards = tl::BlocksGetShards;
-
-impl Requestable for BlocksGetShards {
-    type Response = BlocksShards;
-}
 
 impl Routable for BlocksGetShards {
     fn route(&self) -> Route {
@@ -289,10 +257,6 @@ impl BlocksGetTransactions {
     }
 }
 
-impl Requestable for BlocksGetTransactions {
-    type Response = BlocksTransactions;
-}
-
 impl Routable for BlocksGetTransactions {
     fn route(&self) -> Route {
         Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
@@ -317,19 +281,11 @@ impl From<&ShortTxId> for AccountTransactionId {
 
 pub type RawSendMessage = tl::RawSendMessage;
 
-impl Requestable for RawSendMessage {
-    type Response = tl::Ok;
-}
-
 impl Routable for RawSendMessage {
     fn route(&self) -> Route { Route::Latest }
 }
 
 pub type RawSendMessageReturnHash = tl::RawSendMessageReturnHash;
-
-impl Requestable for RawSendMessageReturnHash {
-    type Response = RawExtMessageInfo;
-}
 
 impl Routable for RawSendMessageReturnHash {
     fn route(&self) -> Route { Route::Latest }
@@ -338,19 +294,12 @@ impl Routable for RawSendMessageReturnHash {
 pub type RawExtMessageInfo = tl::RawExtMessageInfo;
 pub type SmcLoad = tl::SmcLoad;
 
-impl Requestable for SmcLoad {
-    type Response = SmcInfo;
-}
-
 impl Routable for SmcLoad {
     fn route(&self) -> Route { Route::Latest }
 }
 
 pub type SmcRunGetMethod = tl::SmcRunGetMethod;
 
-impl Requestable for SmcRunGetMethod {
-    type Response = Value;
-}
 pub type SmcMethodId = tl::SmcBoxedMethodId;
 
 impl SmcMethodId {
@@ -366,8 +315,11 @@ pub type StackEntry = tl::TvmBoxedStackEntry;
 pub type SmcInfo = tl::SmcInfo;
 pub type RawGetTransactionsV2 = tl::RawGetTransactionsV2;
 
-impl Requestable for RawGetTransactionsV2 {
-    type Response = RawTransactions;
+impl<T> Requestable for T
+    where T : Functional + Serialize + Send + std::marker::Sync,
+        T::Result: DeserializeOwned + Send + std::marker::Sync + 'static,
+{
+    type Response = T::Result;
 }
 
 impl Routable for RawGetTransactionsV2 {

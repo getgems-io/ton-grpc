@@ -99,6 +99,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_type("raw.sendMessageReturnHash", vec!["Serialize", "new"])
         .add_type("smc.load", vec!["Clone", "Serialize", "new"])
         .add_type("smc.runGetMethod", vec!["Clone", "Serialize", "new"])
+        .add_type("smc.runResult", vec!["Deserialize"])
+        .add_type("fullAccountState", vec!["Deserialize"])
+        .add_type("uninited.accountState", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("pchan.accountState", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("rwallet.limit", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("rwallet.config", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("rwallet.accountState", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("dns.accountState", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("wallet.highload.v1.accountState", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("wallet.highload.v2.accountState", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("wallet.v3.accountState", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("raw.accountState", vec!["Clone", "Serialize", "Deserialize"])
+
+        .add_type("pchan.stateInit", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("pchan.stateClose", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("pchan.statePayout", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("pchan.config", vec!["Clone", "Serialize", "Deserialize"])
+
         .add_type_full("raw.getTransactionsV2", configure_type().derives(vec!["Clone", "Serialize", "new"])
             .field("private_key", configure_field().skip().build())
             .build()
@@ -112,6 +130,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_boxed_type("tvm.List")
         .add_boxed_type("smc.MethodId")
         .add_boxed_type("ton.BlockIdExt")
+        .add_boxed_type("raw.Transactions")
+        .add_boxed_type("smc.RunResult")
+        .add_boxed_type("smc.Info")
+        .add_boxed_type("raw.ExtMessageInfo")
+        .add_boxed_type("Ok")
+        .add_boxed_type("blocks.Transactions")
+        .add_boxed_type("blocks.Shards")
+        .add_boxed_type("blocks.Header")
+        .add_boxed_type("blocks.MasterchainInfo")
+        .add_boxed_type("FullAccountState")
+        .add_boxed_type("raw.FullAccountState")
+        .add_boxed_type("AccountState")
+        .add_boxed_type("pchan.State")
+
+        .add_boxed_type("tvm.Cell")
 
         .generate()?;
 
@@ -347,8 +380,11 @@ impl Generator {
             }).collect();
 
             let traits = if definition.is_functional() {
+                let result_name = format_ident!("{}", generate_type_name(definition.result_type()));
                 quote! {
-                    impl Functional for #struct_name {}
+                    impl Functional for #struct_name {
+                        type Result = #result_name;
+                    }
                 }
             } else {
                 quote! {}

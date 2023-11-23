@@ -24,6 +24,7 @@ use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
 use crate::router::{BlockCriteria, Route, Router};
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, StackEntry};
+use crate::block::tl::{FullAccountState, SmcRunResult};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
 use crate::helper::Side;
@@ -332,7 +333,7 @@ impl TonClient {
             .await
     }
 
-    pub async fn get_account_state(&self, address: &str) -> anyhow::Result<Value> {
+    pub async fn get_account_state(&self, address: &str) -> anyhow::Result<FullAccountState> {
         let account_address = AccountAddress::new(address)?;
 
         self.client
@@ -640,7 +641,7 @@ impl TonClient {
         }).try_flatten()
     }
 
-    pub async fn run_get_method(&self, address: String, method: String, stack: Vec<StackEntry>) -> anyhow::Result<Value> {
+    pub async fn run_get_method(&self, address: String, method: String, stack: Vec<StackEntry>) -> anyhow::Result<SmcRunResult> {
         let address = AccountAddress::new(&address)?;
         let method = SmcMethodId::by_name(&method);
 
