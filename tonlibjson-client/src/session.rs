@@ -4,7 +4,7 @@ use futures::TryFutureExt;
 use futures::FutureExt;
 use tower::{Service, ServiceExt};
 use crate::router::Route;
-use crate::block::{AccountAddress, SmcLoad, SmcMethodId, SmcRunGetMethod, SmcStack};
+use crate::block::{AccountAddress, SmcLoad, SmcMethodId, SmcRunGetMethod, StackEntry};
 use crate::error::Error;
 use crate::request::{Requestable, Callable};
 use crate::router::Routable;
@@ -13,7 +13,7 @@ use crate::router::Routable;
 pub struct RunGetMethod {
     address: AccountAddress,
     method: SmcMethodId,
-    stack: SmcStack
+    stack: Vec<StackEntry>
 }
 
 impl<S, E: Into<Error> + Send + 'static> Callable<S> for RunGetMethod

@@ -175,12 +175,7 @@ impl AccountAddress {
     }
 }
 
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "getShardAccountCell")]
-pub struct GetShardAccountCell {
-    pub account_address: AccountAddress
-}
+pub type GetShardAccountCell = tl::GetShardAccountCell;
 
 impl Requestable for GetShardAccountCell {
     type Response = Cell;
@@ -190,13 +185,7 @@ impl Routable for GetShardAccountCell {
     fn route(&self) -> Route { Route::Latest }
 }
 
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "getShardAccountCellByTransaction")]
-pub struct GetShardAccountCellByTransaction {
-    pub account_address: AccountAddress,
-    pub transaction_id: InternalTransactionId
-}
+pub type GetShardAccountCellByTransaction = tl::GetShardAccountCellByTransaction;
 
 impl Requestable for GetShardAccountCellByTransaction {
     type Response = Cell;
@@ -208,13 +197,8 @@ impl Routable for GetShardAccountCellByTransaction {
     }
 }
 
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "raw.getAccountState")]
-pub struct RawGetAccountState {
-    account_address: AccountAddress
-}
 pub type RawFullAccountState = tl::RawFullAccountState;
+pub type RawGetAccountState = tl::RawGetAccountState;
 
 impl Requestable for RawGetAccountState {
     type Response = RawFullAccountState;
@@ -226,13 +210,7 @@ impl Routable for RawGetAccountState {
     }
 }
 
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "raw.getAccountStateByTransaction")]
-pub struct RawGetAccountStateByTransaction {
-    account_address: AccountAddress,
-    transaction_id: InternalTransactionId
-}
+pub type RawGetAccountStateByTransaction = tl::RawGetAccountStateByTransaction;
 
 impl Requestable for RawGetAccountStateByTransaction {
     type Response = RawFullAccountState;
@@ -244,12 +222,7 @@ impl Routable for RawGetAccountStateByTransaction {
     }
 }
 
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "getAccountState")]
-pub struct GetAccountState {
-    account_address: AccountAddress
-}
+pub type GetAccountState = tl::GetAccountState;
 
 impl Requestable for GetAccountState {
     type Response = Value;
@@ -264,9 +237,7 @@ pub type RawMessage = tl::RawMessage;
 pub type RawTransaction = tl::RawTransaction;
 pub type RawTransactions = tl::RawTransactions;
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
-#[serde(tag = "@type", rename = "blocks.getMasterchainInfo")]
-pub struct GetMasterchainInfo {}
+pub type GetMasterchainInfo = tl::BlocksGetMasterchainInfo;
 
 impl Requestable for GetMasterchainInfo {
     type Response = MasterchainInfo;
@@ -278,14 +249,7 @@ impl Routable for GetMasterchainInfo {
     }
 }
 
-#[derive(Debug, Serialize, Clone, Hash, Eq, PartialEq)]
-#[serde(tag = "@type", rename = "blocks.lookupBlock")]
-pub struct BlocksLookupBlock {
-    pub mode: i32,
-    pub id: BlockId,
-    pub lt: i64,
-    pub utime: i32
-}
+pub type BlocksLookupBlock = tl::BlocksLookupBlock;
 
 impl Requestable for BlocksLookupBlock {
     type Response = BlockIdExt;
@@ -294,9 +258,8 @@ impl Requestable for BlocksLookupBlock {
 impl Routable for BlocksLookupBlock {
     fn route(&self) -> Route {
         let criteria = match self.mode {
-            1 => BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno },
             2 => BlockCriteria::LogicalTime(self.lt),
-            _ => BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno }
+            1 | _ => BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno }
         };
 
         Route::Block { chain: self.id.workchain, criteria }
@@ -305,33 +268,15 @@ impl Routable for BlocksLookupBlock {
 
 impl BlocksLookupBlock {
     pub fn seqno(id: BlockId) -> Self {
-        let mode = 1;
-
-        Self {
-            mode,
-            id,
-            lt: 0,
-            utime: 0
-        }
+        Self { mode: 1, id, lt: 0, utime: 0 }
     }
 
     pub fn logical_time(id: BlockId, lt: i64) -> Self {
-        let mode = 2;
-
-        Self {
-            mode,
-            id,
-            lt,
-            utime: 0
-        }
+        Self { mode: 2, id, lt, utime: 0 }
     }
 }
 
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type", rename = "blocks.getShards")]
-pub struct BlocksGetShards {
-    pub id: BlockIdExt
-}
+pub type BlocksGetShards = tl::BlocksGetShards;
 
 impl Requestable for BlocksGetShards {
     type Response = BlocksShards;
@@ -344,16 +289,7 @@ impl Routable for BlocksGetShards {
 }
 
 pub type BlocksShards = tl::BlocksShards;
-
-#[derive(Debug, Serialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "blocks.getTransactions")]
-pub struct BlocksGetTransactions {
-    id: BlockIdExt,
-    mode: i32,
-    count: i32,
-    after: AccountTransactionId
-}
+pub type BlocksGetTransactions = tl::BlocksGetTransactions;
 
 impl BlocksGetTransactions {
     pub fn unverified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool, count: i32) -> Self {
@@ -401,44 +337,27 @@ pub type AccountTransactionId = tl::BlocksAccountTransactionId;
 
 impl Default for AccountTransactionId {
     fn default() -> Self {
-        Self {
-            account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(),
-            lt: 0,
-        }
+        Self { account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(), lt: 0, }
     }
 }
 
 impl From<&ShortTxId> for AccountTransactionId {
     fn from(v: &ShortTxId) -> Self {
-        AccountTransactionId {
-            account: v.account.to_string(),
-            lt: v.lt,
-        }
+        AccountTransactionId { account: v.account.to_string(), lt: v.lt }
     }
 }
 
-#[derive(new, Debug, Serialize, Deserialize)]
-#[serde(tag = "@type", rename = "raw.sendMessage")]
-pub struct RawSendMessage {
-    pub body: String,
-}
+pub type RawSendMessage = tl::RawSendMessage;
 
 impl Requestable for RawSendMessage {
-    // TODO[akostylev0]
-    type Response = Value;
+    type Response = tl::Ok;
 }
 
 impl Routable for RawSendMessage {
-    fn route(&self) -> Route {
-        Route::Latest
-    }
+    fn route(&self) -> Route { Route::Latest }
 }
 
-#[derive(new, Debug, Serialize, Deserialize)]
-#[serde(tag = "@type", rename = "raw.sendMessageReturnHash")]
-pub struct RawSendMessageReturnHash {
-    pub body: String,
-}
+pub type RawSendMessageReturnHash = tl::RawSendMessageReturnHash;
 
 impl Requestable for RawSendMessageReturnHash {
     type Response = RawExtMessageInfo;
@@ -449,12 +368,7 @@ impl Routable for RawSendMessageReturnHash {
 }
 
 pub type RawExtMessageInfo = tl::RawExtMessageInfo;
-
-#[derive(Debug, Serialize, Clone)]
-#[serde(tag = "@type", rename = "smc.load")]
-pub struct SmcLoad {
-    pub account_address: AccountAddress
-}
+pub type SmcLoad = tl::SmcLoad;
 
 impl Requestable for SmcLoad {
     type Response = SmcInfo;
@@ -464,27 +378,11 @@ impl Routable for SmcLoad {
     fn route(&self) -> Route { Route::Latest }
 }
 
-impl SmcLoad {
-    pub fn new(address: AccountAddress) -> Self {
-        Self {
-            account_address: address
-        }
-    }
-}
-
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type", rename = "smc.runGetMethod")]
-pub struct SmcRunGetMethod {
-    id: i64,
-    method: SmcMethodId,
-    stack: SmcStack
-}
+pub type SmcRunGetMethod = tl::SmcRunGetMethod;
 
 impl Requestable for SmcRunGetMethod {
     type Response = Value;
 }
-
-pub type SmcStack = Vec<StackEntry>;
 pub type SmcMethodId = tl::SmcBoxedMethodId;
 
 impl SmcMethodId {
@@ -498,18 +396,7 @@ pub type Tuple = tl::TvmTuple;
 pub type List = tl::TvmList;
 pub type StackEntry = tl::TvmBoxedStackEntry;
 pub type SmcInfo = tl::SmcInfo;
-
-#[derive(new, Debug, Serialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "raw.getTransactionsV2")]
-pub struct RawGetTransactionsV2 {
-    pub account_address: AccountAddress,
-    from_transaction_id: InternalTransactionId,
-    #[new(value = "16")]
-    count: i8,
-    #[new(value = "false")]
-    try_decode_messages: bool
-}
+pub type RawGetTransactionsV2 = tl::RawGetTransactionsV2;
 
 impl Requestable for RawGetTransactionsV2 {
     type Response = RawTransactions;

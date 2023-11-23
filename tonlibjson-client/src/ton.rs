@@ -23,7 +23,7 @@ use tower::util::Either;
 use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
 use crate::router::{BlockCriteria, Route, Router};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, SmcStack, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, MasterchainInfo, BlocksShards, BlockIdExt, AccountTransactionId, BlocksTransactions, ShortTxId, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlockId, BlocksGetShards, BlocksGetBlockHeader, BlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetMasterchainInfo, SmcMethodId, GetShardAccountCell, Cell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, StackEntry};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
 use crate::helper::Side;
@@ -351,7 +351,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(RawGetTransactionsV2::new(address, from_tx.clone()))
+            .oneshot(RawGetTransactionsV2::new(address, from_tx.clone(), 16, false))
             .await
     }
 
@@ -391,11 +391,13 @@ impl TonClient {
             .await
     }
 
-    pub async fn send_message(&self, message: &str) -> anyhow::Result<Value> {
+    pub async fn send_message(&self, message: &str) -> anyhow::Result<()> {
         self.client
             .clone()
             .oneshot(RawSendMessage::new(message.to_string()))
-            .await
+            .await?;
+
+        Ok(())
     }
 
     pub async fn send_message_returning_hash(&self, message: &str) -> anyhow::Result<String> {
@@ -638,7 +640,7 @@ impl TonClient {
         }).try_flatten()
     }
 
-    pub async fn run_get_method(&self, address: String, method: String, stack: SmcStack) -> anyhow::Result<Value> {
+    pub async fn run_get_method(&self, address: String, method: String, stack: Vec<StackEntry>) -> anyhow::Result<Value> {
         let address = AccountAddress::new(&address)?;
         let method = SmcMethodId::by_name(&method);
 

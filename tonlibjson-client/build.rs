@@ -16,8 +16,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed={}", scheme_path.to_string_lossy());
 
     Generator::from(scheme_path, "generated.rs")
+        .add_type("ok", vec!["Deserialize"])
         .add_type_full("accountAddress", configure_type()
-            .derives(vec!["Deserialize", "Serialize"])
+            .derives(vec!["Clone", "Deserialize", "Serialize"])
             .field("account_address", configure_field()
                 .optional()
                 .serialize_with("serialize_none_as_empty")
@@ -25,12 +26,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .build())
             .build()
         )
-        .add_type("ton.blockId", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
-        .add_type("ton.blockIdExt", vec!["Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
-        .add_type("blocks.header", vec!["Deserialize"])
-        .add_type("blocks.shortTxId", vec!["Deserialize"])
-        .add_type("blocks.masterchainInfo", vec!["Deserialize", "Eq", "PartialEq"])
-        .add_type("internal.transactionId", vec!["Serialize", "Deserialize", "Eq", "PartialEq"])
+        .add_type("ton.blockId", vec!["Clone", "Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
+        .add_type("ton.blockIdExt", vec!["Clone", "Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
+        .add_type("blocks.header", vec!["Clone", "Deserialize"])
+        .add_type("blocks.shortTxId", vec!["Clone", "Deserialize"])
+        .add_type("blocks.masterchainInfo", vec!["Clone", "Deserialize", "Eq", "PartialEq"])
+        .add_type("internal.transactionId", vec!["Clone", "Serialize", "Deserialize", "Eq", "PartialEq"])
         .add_type_full("raw.transactions", configure_type()
             .derives(vec!["Deserialize"])
             .field("previous_transaction_id", configure_field()
@@ -54,37 +55,53 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .build()
         )
-        .add_type("blocks.accountTransactionId", vec!["Serialize", "Deserialize"])
-        .add_type("blocks.shards", vec!["Deserialize"])
+        .add_type("blocks.accountTransactionId", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("blocks.shards", vec!["Clone", "Deserialize"])
         .add_type("blocks.transactions", vec!["Deserialize"])
 
-        .add_type("msg.dataEncrypted", vec!["Serialize", "Deserialize"])
+        .add_type("msg.dataEncrypted", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("msg.dataRaw", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("msg.dataText", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("msg.dataDecryptedText", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("msg.dataEncryptedText", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("msg.decryptWithProof", vec!["Clone", "Serialize", "Deserialize"])
 
-        .add_type("msg.dataRaw", vec!["Serialize", "Deserialize"])
-        .add_type("msg.dataText", vec!["Serialize", "Deserialize"])
-        .add_type("msg.dataDecryptedText", vec!["Serialize", "Deserialize"])
-        .add_type("msg.dataEncryptedText", vec!["Serialize", "Deserialize"])
-        .add_type("msg.decryptWithProof", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.slice", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.cell", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.numberDecimal", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.tuple", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.list", vec!["Clone", "Serialize", "Deserialize"])
 
-        .add_type("tvm.slice", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.cell", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.numberDecimal", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.tuple", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.list", vec!["Serialize", "Deserialize"])
-
-        .add_type("tvm.stackEntrySlice", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.stackEntryCell", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.stackEntryNumber", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.stackEntryTuple", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.stackEntryList", vec!["Serialize", "Deserialize"])
-        .add_type("tvm.stackEntryUnsupported", vec!["Serialize", "Deserialize"])
+        .add_type("tvm.stackEntrySlice", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryCell", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryNumber", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryTuple", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryList", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("tvm.stackEntryUnsupported", vec!["Clone", "Serialize", "Deserialize"])
 
         .add_type("smc.info", vec!["Deserialize"])
-        .add_type("smc.methodIdNumber", vec!["Serialize", "Deserialize"])
-        .add_type("smc.methodIdName", vec!["Serialize", "Deserialize"])
+        .add_type("smc.methodIdNumber", vec!["Clone", "Serialize", "Deserialize"])
+        .add_type("smc.methodIdName", vec!["Clone", "Serialize", "Deserialize"])
 
         .add_type("sync", vec!["Default", "Serialize"])
-        .add_type("blocks.getBlockHeader", vec!["Serialize", "Hash", "PartialEq", "Eq", "new"])
+        .add_type("blocks.getBlockHeader", vec!["Clone", "Serialize", "Hash", "PartialEq", "Eq", "new"])
+        .add_type("getShardAccountCell", vec!["Clone", "Serialize", "new"])
+        .add_type("getShardAccountCellByTransaction", vec!["Clone", "Serialize", "new"])
+        .add_type("raw.getAccountState", vec!["Clone", "Serialize", "new"])
+        .add_type("raw.getAccountStateByTransaction", vec!["Clone", "Serialize", "new"])
+        .add_type("getAccountState", vec!["Clone", "Serialize", "new"])
+        .add_type("blocks.getMasterchainInfo", vec!["Clone", "Default", "Serialize", "new"])
+        .add_type("blocks.lookupBlock", vec!["Clone", "Serialize", "new", "Hash", "Eq", "PartialEq"])
+        .add_type("blocks.getShards", vec!["Clone", "Serialize", "new"])
+        .add_type("blocks.getTransactions", vec!["Clone", "Serialize", "new"])
+        .add_type("raw.sendMessage", vec!["Serialize", "new"])
+        .add_type("raw.sendMessageReturnHash", vec!["Serialize", "new"])
+        .add_type("smc.load", vec!["Clone", "Serialize", "new"])
+        .add_type("smc.runGetMethod", vec!["Clone", "Serialize", "new"])
+        .add_type_full("raw.getTransactionsV2", configure_type().derives(vec!["Clone", "Serialize", "new"])
+            .field("private_key", configure_field().skip().build())
+            .build()
+        )
 
         .add_boxed_type("msg.Data")
         .add_boxed_type("tvm.StackEntry")
@@ -123,6 +140,7 @@ struct TypeConfiguration {
 
 #[derive(Default)]
 struct FieldConfigurationBuilder {
+    skip: bool,
     optional: bool,
     deserialize_with: Option<String>,
     serialize_with: Option<String>
@@ -130,12 +148,18 @@ struct FieldConfigurationBuilder {
 
 #[derive(Default)]
 struct FieldConfiguration {
+    pub skip: bool,
     pub optional: bool,
     pub deserialize_with: Option<String>,
     pub serialize_with: Option<String>
 }
 
 impl FieldConfigurationBuilder {
+    fn skip(mut self) -> Self {
+        self.skip = true;
+
+        self
+    }
     fn optional(mut self) -> Self {
         self.optional = true;
 
@@ -155,7 +179,7 @@ impl FieldConfigurationBuilder {
     }
 
     fn build(self) -> FieldConfiguration {
-        FieldConfiguration { optional: self.optional, deserialize_with: self.deserialize_with, serialize_with: self.serialize_with }
+        FieldConfiguration { skip: self.skip, optional: self.optional, deserialize_with: self.deserialize_with, serialize_with: self.serialize_with }
     }
 }
 
@@ -232,7 +256,7 @@ impl Generator {
             let id = definition.id();
             let struct_name = structure_ident(definition.id());
 
-            let mut traits = vec!["Debug".to_owned(), "Clone".to_owned()];
+            let mut traits = vec!["Debug".to_owned()];
             traits.extend(configuration.derives);
 
             let derives = format!("derive({})", traits.join(","));
@@ -242,10 +266,19 @@ impl Generator {
 
             // let derives: Vec<syn::Ident> = derives.into_iter().map(|d| format_ident!("{}", d)).collect();
 
-            let fields: Vec<_> = definition.fields().iter().map(|field| {
-                let default_configuration = &FieldConfiguration::default();
+            let fields: Vec<_> = definition.fields()
+                .iter()
+                .filter(|field| {
+                    let default_configuration = FieldConfiguration::default();
+                    let field_name = field.id().clone().unwrap();
+                    let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+
+                    !field_configuration.skip
+                })
+                .map(|field| {
+                let default_configuration = FieldConfiguration::default();
                 let field_name = field.id().clone().unwrap();
-                let field_configuration = configuration.fields.get(&field_name).unwrap_or(default_configuration);
+                let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
 
                 eprintln!("field = {:?}", field);
                 let field_name = format_ident!("{}", &field_name);
