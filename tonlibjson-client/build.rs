@@ -1,9 +1,10 @@
 use std::collections::{HashMap, HashSet};
 use std::{env, fs};
 use std::path::{Path, PathBuf};
-use anyhow::bail;
-use quote::{format_ident, quote, ToTokens};
 use syn::{GenericArgument, Ident, MetaList};
+use quote::{format_ident, quote, ToTokens};
+use convert_case::{Case, Casing};
+use convert_case::Case::UpperCamel;
 use tl_parser::Combinator;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -143,7 +144,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .add_boxed_type("raw.FullAccountState")
         .add_boxed_type("AccountState")
         .add_boxed_type("pchan.State")
-
         .add_boxed_type("tvm.Cell")
 
         .generate()?;
@@ -157,7 +157,6 @@ struct Generator {
     types: Vec<(String, TypeConfiguration)>,
     boxed_types: Vec<String>,
 }
-
 
 fn configure_type() -> TypeConfigurationBuilder { Default::default() }
 fn configure_field() -> FieldConfigurationBuilder { Default::default() }
@@ -264,7 +263,7 @@ impl Generator {
     }
 
     fn generate(self) -> anyhow::Result<()> {
-        let content = std::fs::read_to_string(self.input)?;
+        let content = fs::read_to_string(self.input)?;
 
         let combinators = tl_parser::parse(&content)?;
 
@@ -312,7 +311,7 @@ impl Generator {
                 })
                 .map(|field| {
                 let default_configuration = FieldConfiguration::default();
-                let field_name = field.id().clone().unwrap();
+                let field_name = field.id().clone().unwrap().to_case(Case::Snake);
                 let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
 
                 eprintln!("field = {:?}", field);
@@ -472,23 +471,13 @@ fn generate_type_name(s: &str) -> String {
     } else { "" };
 
     let ns_prefix = ns.split('.')
-        .map(uppercase_first_letter)
+        .map(|f| f.to_case(UpperCamel))
         .collect::<Vec<_>>()
         .join("");
 
-    let name = uppercase_first_letter(name);
-
-    format!("{}{}{}", ns_prefix, boxed_prefix, name)
+    format!("{}{}{}", ns_prefix, boxed_prefix, name.to_case(UpperCamel))
 }
 
 fn structure_ident(s: &str) -> Ident {
     format_ident!("{}", generate_type_name(s))
-}
-
-fn uppercase_first_letter(s: &str) -> String {
-    let mut c = s.chars();
-    match c.next() {
-        None => String::new(),
-        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-    }
 }
