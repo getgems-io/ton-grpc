@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::{env, fs};
 use std::path::{Path, PathBuf};
+use anyhow::bail;
 use quote::{format_ident, quote, ToTokens};
 use syn::{GenericArgument, Ident, MetaList};
 use tl_parser::Combinator;
@@ -102,6 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             .field("private_key", configure_field().skip().build())
             .build()
         )
+        // .add_type("withBlock", vec!["Clone", "Serialize", "new"])
 
         .add_boxed_type("msg.Data")
         .add_boxed_type("tvm.StackEntry")
@@ -344,12 +346,22 @@ impl Generator {
                }
             }).collect();
 
+            let traits = if definition.is_functional() {
+                quote! {
+                    impl Functional for #struct_name {}
+                }
+            } else {
+                quote! {}
+            };
+
             let output = quote! {
                 #[#t]
                 #[serde(tag = "@type", rename = #id)]
                 pub struct #struct_name {
                     #(#fields),*
                 }
+
+                #traits
             };
 
             let syntax_tree = syn::parse2(output.clone()).unwrap();

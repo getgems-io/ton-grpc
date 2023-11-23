@@ -15,46 +15,14 @@ pub mod tl {
     use derive_new::new;
     use serde::{Serialize, Deserialize};
     use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, serialize_none_as_empty, deserialize_empty_as_none};
-
-    /**
-    double ? = Double;
-    string ? = String;
-
-    int32 = Int32;
-    int53 = Int53;
-    int64 = Int64;
-    int256 8*[ int32 ] = Int256;
-    bytes = Bytes;
-    secureString = SecureString;
-    secureBytes = SecureBytes;
-
-    object ? = Object;
-    function ? = Function;
-
-    boolFalse = Bool;
-    boolTrue = Bool;
-
-    vector {t:Type} # [ t ] = Vector t;
-
-     **/
-
-    // type Double = f64;
-    // type String = String;
+    pub trait Functional {}
 
     type Int31 = i32; // "#" / nat type
     type Int32 = i32;
     type Int53 = i64;
     type Int64 = i64;
-
-    /* enum BoxedBool {
-        BoolFalse,
-        BoolTrue
-    } */
-
     type BoxedBool = bool;
-
     type Bytes = String;
-
     type Vector<T> = Vec<T>;
 
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
@@ -434,18 +402,17 @@ impl Error for TonError {
 }
 
 #[derive(new, Serialize, Clone)]
-#[serde(tag = "@type")]
-#[serde(rename = "withBlock")]
-pub struct WithBlock<T> {
+#[serde(tag = "@type", rename = "withBlock")]
+pub struct WithBlock<T> where T : tl::Functional {
     pub id: BlockIdExt,
     pub function: T
 }
 
-impl<T> Requestable for WithBlock<T> where T : Requestable {
+impl<T: tl::Functional> Requestable for WithBlock<T> where T : Requestable {
     type Response = T::Response;
 }
 
-impl<T> Routable for WithBlock<T> {
+impl<T: tl::Functional> Routable for WithBlock<T> {
     fn route(&self) -> Route {
         Route::Block {
             chain: self.id.workchain,

@@ -831,4 +831,15 @@ d = !D;";
             Combinator::new("d", "D").functional()
         ]);
     }
+
+    #[test]
+    fn functional_combinator_ok_test() {
+        let input = "ok = Ok;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("ok", "Ok"),
+        ]);
+    }
 }
