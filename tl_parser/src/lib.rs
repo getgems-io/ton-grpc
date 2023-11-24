@@ -38,6 +38,10 @@ impl Combinator {
     pub fn is_functional(&self) -> bool {
         self.functional
     }
+
+    pub fn is_builtin(&self) -> bool {
+        self.builtin
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -69,8 +73,11 @@ impl Field {
             return Some(name.as_str());
         }
 
-        let (left, _) = name.split_once('<').unwrap();
+        if let Some((left, _)) = name.split_once('<') {
+            return Some(left)
+        }
 
+        let (left, _) = name.split_once(' ').unwrap();
         Some(left)
     }
 
@@ -87,7 +94,7 @@ impl Field {
             return false
         };
 
-        name.contains('<')
+        name.contains('<') || name.contains(' ')
     }
 
     pub fn type_variables(&self) -> Option<Vec<String>> {
@@ -95,11 +102,19 @@ impl Field {
             return None
         };
 
-        let Some((_, tail)) = name.split_once('<') else {
-            return Some(vec![])
-        };
+        if name.contains(' ') {
+            let Some((_, tail)) = name.split_once(' ') else {
+                return Some(vec![])
+            };
 
-        Some(tail.replace('>', "").split(',').map(|s| s.trim().to_owned()).collect())
+            Some(tail.split(' ').map(|s| s.trim().to_owned()).collect())
+        } else {
+            let Some((_, tail)) = name.split_once('<') else {
+                return Some(vec![])
+            };
+
+            Some(tail.replace('>', "").split(',').map(|s| s.trim().to_owned()).collect())
+        }
     }
 }
 
@@ -840,6 +855,24 @@ d = !D;";
 
         assert_eq!(output, vec![
             Combinator::new("ok", "Ok"),
+        ]);
+    }
+
+    #[test]
+    fn vector_parse_test() {
+        let input = "blocks.shardBlockProof from:ton.blockIdExt mc_id:ton.blockIdExt links:(vector blocks.shardBlockLink) mc_proof:(vector blocks.blockLinkBack) = blocks.ShardBlockProof;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("blocks.shardBlockProof", "blocks.ShardBlockProof").with_fields(
+                vec![
+                    Field::plain("from", "ton.blockIdExt"),
+                    Field::plain("mc_id", "ton.blockIdExt"),
+                    Field::plain("links", "vector blocks.shardBlockLink"),
+                    Field::plain("mc_proof", "vector blocks.blockLinkBack"),
+                ]
+            ),
         ]);
     }
 }

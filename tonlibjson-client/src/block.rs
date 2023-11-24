@@ -20,12 +20,16 @@ pub mod tl {
         type Result;
     }
 
+    type Double = f64;
     type Int31 = i32; // "#" / nat type
     type Int32 = i32;
     type Int53 = i64;
     type Int64 = i64;
+    type Int256 = String; // TODO[akostylev0] idk actually
     type BoxedBool = bool;
     type Bytes = String;
+    type SecureString = String;
+    type SecureBytes = String;
     type Vector<T> = Vec<T>;
 
     include!(concat!(env!("OUT_DIR"), "/generated.rs"));
