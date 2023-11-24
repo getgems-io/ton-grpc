@@ -138,9 +138,7 @@ impl AccountAddress {
 
 pub type GetShardAccountCell = tl::GetShardAccountCell;
 
-impl Routable for GetShardAccountCell {
-    fn route(&self) -> Route { Route::Latest }
-}
+impl Routable for GetShardAccountCell {}
 
 pub type GetShardAccountCellByTransaction = tl::GetShardAccountCellByTransaction;
 
@@ -153,11 +151,7 @@ impl Routable for GetShardAccountCellByTransaction {
 pub type RawFullAccountState = tl::RawFullAccountState;
 pub type RawGetAccountState = tl::RawGetAccountState;
 
-impl Routable for RawGetAccountState {
-    fn route(&self) -> Route {
-        Route::Latest
-    }
-}
+impl Routable for RawGetAccountState {}
 
 pub type RawGetAccountStateByTransaction = tl::RawGetAccountStateByTransaction;
 
@@ -168,22 +162,14 @@ impl Routable for RawGetAccountStateByTransaction {
 }
 
 pub type GetAccountState = tl::GetAccountState;
-
-impl Routable for GetAccountState {
-    fn route(&self) -> Route { Route::Latest }
-}
+impl Routable for GetAccountState {}
 
 pub type MessageData = tl::MsgBoxedData;
 pub type RawMessage = tl::RawMessage;
 pub type RawTransaction = tl::RawTransaction;
 pub type RawTransactions = tl::RawTransactions;
 pub type GetMasterchainInfo = tl::BlocksGetMasterchainInfo;
-
-impl Routable for GetMasterchainInfo {
-    fn route(&self) -> Route {
-        Route::Latest
-    }
-}
+impl Routable for GetMasterchainInfo {}
 
 pub type BlocksLookupBlock = tl::BlocksLookupBlock;
 
@@ -271,23 +257,14 @@ impl From<&ShortTxId> for AccountTransactionId {
 }
 
 pub type RawSendMessage = tl::RawSendMessage;
-
-impl Routable for RawSendMessage {
-    fn route(&self) -> Route { Route::Latest }
-}
+impl Routable for RawSendMessage {}
 
 pub type RawSendMessageReturnHash = tl::RawSendMessageReturnHash;
-
-impl Routable for RawSendMessageReturnHash {
-    fn route(&self) -> Route { Route::Latest }
-}
+impl Routable for RawSendMessageReturnHash {}
 
 pub type RawExtMessageInfo = tl::RawExtMessageInfo;
 pub type SmcLoad = tl::SmcLoad;
-
-impl Routable for SmcLoad {
-    fn route(&self) -> Route { Route::Latest }
-}
+impl Routable for SmcLoad {}
 
 pub type SmcRunGetMethod = tl::SmcRunGetMethod;
 pub type SmcMethodId = tl::SmcBoxedMethodId;

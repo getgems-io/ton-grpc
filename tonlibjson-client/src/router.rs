@@ -15,7 +15,7 @@ use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 
 pub(crate) trait Routable {
-    fn route(&self) -> Route;
+    fn route(&self) -> Route { Route::Latest }
 }
 
 pub(crate) struct Router {
