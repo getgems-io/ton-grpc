@@ -177,7 +177,7 @@ mod tests {
     use tower::ServiceExt;
     use tracing_test::traced_test;
     use uuid::Uuid;
-    use crate::block::GetMasterchainInfo;
+    use crate::block::BlocksGetMasterchainInfo;
     use crate::client::{Client, Request};
 
     #[tokio::test]
@@ -185,7 +185,7 @@ mod tests {
     async fn not_initialized_call() {
         let mut client = Client::default();
 
-        let resp = (&mut client).oneshot(GetMasterchainInfo::default()).await;
+        let resp = (&mut client).oneshot(BlocksGetMasterchainInfo::default()).await;
 
         assert_eq!("Ton error occurred with code 400, message library is not inited", resp.unwrap_err().to_string())
     }

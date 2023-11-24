@@ -6,7 +6,7 @@ use anyhow::Result;
 use futures::{Stream, StreamExt, try_join, TryStreamExt, TryFutureExt};
 use derive_new::new;
 use tonlibjson_client::address::AccountAddressData;
-use tonlibjson_client::block::{BlockIdExt, Cell, RawFullAccountState};
+use tonlibjson_client::block::{RawFullAccountState, TonBlockIdExt, TvmCell};
 use crate::helpers::{extend_block_id, extend_from_tx_id, extend_to_tx_id};
 use crate::ton::account_service_server::AccountService as BaseAccountService;
 use crate::ton::{GetAccountStateRequest, GetAccountStateResponse, GetAccountTransactionsRequest, GetShardAccountCellRequest, GetShardAccountCellResponse, Transaction};
@@ -130,7 +130,7 @@ impl AccountService {
         Ok(state)
     }
 
-    async fn fetch_shard_account_cell(&self, msg: &GetShardAccountCellRequest) -> Result<(BlockIdExt, Cell)> {
+    async fn fetch_shard_account_cell(&self, msg: &GetShardAccountCellRequest) -> Result<(TonBlockIdExt, TvmCell)> {
         let (block_id, cell) = match &msg.criteria {
             None => {
                 let block_id = self.client.get_masterchain_info().await?.last;

@@ -1,6 +1,6 @@
 use std::any::{TypeId};
 use std::cmp::Ordering;
-use std::error::Error;
+use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use std::str::FromStr;
@@ -8,35 +8,27 @@ use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
 use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
-use crate::block::tl::{Functional, SmcMethodIdName};
 use crate::router::{BlockCriteria, Route, Routable};
 use crate::request::Requestable;
+use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, serialize_none_as_empty, deserialize_empty_as_none};
 
-pub mod tl {
-    use derive_new::new;
-    use serde::{Serialize, Deserialize};
-    use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, serialize_none_as_empty, deserialize_empty_as_none};
-    pub trait Functional {
-        type Result;
-    }
-
-    type Double = f64;
-    type Int31 = i32; // "#" / nat type
-    type Int32 = i32;
-    type Int53 = i64;
-    type Int64 = i64;
-    type Int256 = String; // TODO[akostylev0] idk actually
-    type BoxedBool = bool;
-    type Bytes = String;
-    type SecureString = String;
-    type SecureBytes = String;
-    type Vector<T> = Vec<T>;
-
-    include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+pub trait Functional {
+    type Result;
 }
 
-pub type Sync = tl::Sync;
-pub type BlocksGetBlockHeader = tl::BlocksGetBlockHeader;
+type Double = f64;
+type Int31 = i32; // "#" / nat type
+type Int32 = i32;
+type Int53 = i64;
+type Int64 = i64;
+type Int256 = String; // TODO[akostylev0] idk actually
+type BoxedBool = bool;
+type Bytes = String;
+type SecureString = String;
+type SecureBytes = String;
+type Vector<T> = Vec<T>;
+
+include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 impl Routable for BlocksGetBlockHeader {
     fn route(&self) -> Route {
@@ -44,12 +36,9 @@ impl Routable for BlocksGetBlockHeader {
     }
 }
 
-pub type BlockIdExt = tl::TonBlockIdExt;
-pub type BlockId = tl::TonBlockId;
-
-impl From<BlockIdExt> for BlockId {
-    fn from(block: BlockIdExt) -> Self {
-        BlockId {
+impl From<TonBlockIdExt> for TonBlockId {
+    fn from(block: TonBlockIdExt) -> Self {
+        TonBlockId {
             workchain: block.workchain,
             shard: block.shard,
             seqno: block.seqno
@@ -57,11 +46,9 @@ impl From<BlockIdExt> for BlockId {
     }
 }
 
-pub type BlockHeader = tl::BlocksHeader;
-
-impl From<BlockHeader> for BlockId {
-    fn from(header: BlockHeader) -> Self {
-        BlockId {
+impl From<BlocksHeader> for TonBlockId {
+    fn from(header: BlocksHeader) -> Self {
+        TonBlockId {
             workchain: header.id.workchain,
             shard: header.id.shard,
             seqno: header.id.seqno
@@ -69,9 +56,7 @@ impl From<BlockHeader> for BlockId {
     }
 }
 
-pub type ShortTxId = tl::BlocksShortTxId;
-
-impl ShortTxId {
+impl BlocksShortTxId {
     pub fn account(&self) -> &str {
         &self.account
     }
@@ -85,38 +70,29 @@ impl ShortTxId {
     }
 }
 
-impl PartialEq for ShortTxId {
+impl PartialEq for BlocksShortTxId {
     fn eq(&self, other: &Self) -> bool {
         self.account == other.account && self.hash == other.hash && self.lt == other.lt
     }
 }
 
-pub type MasterchainInfo = tl::BlocksMasterchainInfo;
-
-impl PartialOrd for MasterchainInfo {
+impl PartialOrd for BlocksMasterchainInfo {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for MasterchainInfo {
+impl Ord for BlocksMasterchainInfo {
     fn cmp(&self, other: &Self) -> Ordering {
         self.last.seqno.cmp(&other.last.seqno)
     }
 }
 
-pub type InternalTransactionId = tl::InternalTransactionId;
-
 impl Default for InternalTransactionId {
     fn default() -> Self {
-        Self {
-            hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_owned(),
-            lt: 0
-        }
+        Self { hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_owned(), lt: 0 }
     }
 }
-
-pub type AccountAddress = tl::AccountAddress;
 
 impl AccountAddress {
     // TODO[akostylev0]
@@ -136,43 +112,20 @@ impl AccountAddress {
     }
 }
 
-pub type GetShardAccountCell = tl::GetShardAccountCell;
-
 impl Routable for GetShardAccountCell {}
-
-pub type GetShardAccountCellByTransaction = tl::GetShardAccountCellByTransaction;
-
 impl Routable for GetShardAccountCellByTransaction {
     fn route(&self) -> Route {
         Route::Block { chain: self.account_address.chain_id(), criteria: BlockCriteria::LogicalTime(self.transaction_id.lt) }
     }
 }
-
-pub type RawFullAccountState = tl::RawFullAccountState;
-pub type RawGetAccountState = tl::RawGetAccountState;
-
 impl Routable for RawGetAccountState {}
-
-pub type RawGetAccountStateByTransaction = tl::RawGetAccountStateByTransaction;
-
 impl Routable for RawGetAccountStateByTransaction {
     fn route(&self) -> Route {
         Route::Block { chain: self.account_address.chain_id(), criteria: BlockCriteria::LogicalTime(self.transaction_id.lt)  }
     }
 }
-
-pub type GetAccountState = tl::GetAccountState;
 impl Routable for GetAccountState {}
-
-pub type MessageData = tl::MsgBoxedData;
-pub type RawMessage = tl::RawMessage;
-pub type RawTransaction = tl::RawTransaction;
-pub type RawTransactions = tl::RawTransactions;
-pub type GetMasterchainInfo = tl::BlocksGetMasterchainInfo;
-impl Routable for GetMasterchainInfo {}
-
-pub type BlocksLookupBlock = tl::BlocksLookupBlock;
-
+impl Routable for BlocksGetMasterchainInfo {}
 impl Routable for BlocksLookupBlock {
     fn route(&self) -> Route {
         let criteria = match self.mode {
@@ -185,16 +138,14 @@ impl Routable for BlocksLookupBlock {
 }
 
 impl BlocksLookupBlock {
-    pub fn seqno(id: BlockId) -> Self {
+    pub fn seqno(id: TonBlockId) -> Self {
         Self { mode: 1, id, lt: 0, utime: 0 }
     }
 
-    pub fn logical_time(id: BlockId, lt: i64) -> Self {
+    pub fn logical_time(id: TonBlockId, lt: i64) -> Self {
         Self { mode: 2, id, lt, utime: 0 }
     }
 }
-
-pub type BlocksGetShards = tl::BlocksGetShards;
 
 impl Routable for BlocksGetShards {
     fn route(&self) -> Route {
@@ -202,11 +153,8 @@ impl Routable for BlocksGetShards {
     }
 }
 
-pub type BlocksShards = tl::BlocksShards;
-pub type BlocksGetTransactions = tl::BlocksGetTransactions;
-
 impl BlocksGetTransactions {
-    pub fn unverified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool, count: i32) -> Self {
+    pub fn unverified(block_id: TonBlockIdExt, after: Option<BlocksAccountTransactionId>, reverse: bool, count: i32) -> Self {
         let count = if count > 256 { 256 } else { count };
         let mode = 1 + 2 + 4
             + if after.is_some() { 128 } else { 0 }
@@ -220,7 +168,7 @@ impl BlocksGetTransactions {
         }
     }
 
-    pub fn verified(block_id: BlockIdExt, after: Option<AccountTransactionId>, reverse: bool, count: i32) -> Self {
+    pub fn verified(block_id: TonBlockIdExt, after: Option<BlocksAccountTransactionId>, reverse: bool, count: i32) -> Self {
         let count = if count > 256 { 256 } else { count };
         let mode = 32 + 1 + 2 + 4
             + if after.is_some() { 128 } else { 0 }
@@ -241,46 +189,24 @@ impl Routable for BlocksGetTransactions {
     }
 }
 
-pub type BlocksTransactions = tl::BlocksTransactions;
-pub type AccountTransactionId = tl::BlocksAccountTransactionId;
-
-impl Default for AccountTransactionId {
+impl Default for BlocksAccountTransactionId {
     fn default() -> Self {
         Self { account: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=".to_string(), lt: 0, }
     }
 }
 
-impl From<&ShortTxId> for AccountTransactionId {
-    fn from(v: &ShortTxId) -> Self {
-        AccountTransactionId { account: v.account.to_string(), lt: v.lt }
+impl From<&BlocksShortTxId> for BlocksAccountTransactionId {
+    fn from(v: &BlocksShortTxId) -> Self {
+        Self { account: v.account.to_string(), lt: v.lt }
     }
 }
-
-pub type RawSendMessage = tl::RawSendMessage;
 impl Routable for RawSendMessage {}
-
-pub type RawSendMessageReturnHash = tl::RawSendMessageReturnHash;
 impl Routable for RawSendMessageReturnHash {}
-
-pub type RawExtMessageInfo = tl::RawExtMessageInfo;
-pub type SmcLoad = tl::SmcLoad;
 impl Routable for SmcLoad {}
 
-pub type SmcRunGetMethod = tl::SmcRunGetMethod;
-pub type SmcMethodId = tl::SmcBoxedMethodId;
-
-impl SmcMethodId {
+impl SmcBoxedMethodId {
     pub fn by_name(name: &str) -> Self { Self::SmcMethodIdName(SmcMethodIdName { name: name.to_owned() })}
 }
-
-pub type Slice = tl::TvmSlice;
-pub type Cell = tl::TvmCell;
-pub type Number = tl::TvmNumberDecimal;
-pub type Tuple = tl::TvmTuple;
-pub type List = tl::TvmList;
-pub type StackEntry = tl::TvmBoxedStackEntry;
-pub type SmcInfo = tl::SmcInfo;
-pub type RawGetTransactionsV2 = tl::RawGetTransactionsV2;
 
 
 // TODO[akostylev0]
@@ -321,25 +247,25 @@ impl Display for TonError {
     }
 }
 
-impl Error for TonError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
+impl StdError for TonError {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
         None
     }
 }
 
 #[derive(new, Serialize, Clone)]
 #[serde(tag = "@type", rename = "withBlock")]
-pub struct WithBlock<T> where T : tl::Functional {
-    pub id: BlockIdExt,
+pub struct WithBlock<T> where T : Functional {
+    pub id: TonBlockIdExt,
     pub function: T
 }
 
-impl<T: tl::Functional> Requestable for WithBlock<T> where T : Requestable {
+impl<T: Functional> Requestable for WithBlock<T> where T : Requestable {
     type Response = T::Response;
     fn timeout(&self) -> Duration { self.function.timeout() }
 }
 
-impl<T: tl::Functional> Routable for WithBlock<T> {
+impl<T: Functional> Routable for WithBlock<T> {
     fn route(&self) -> Route {
         Route::Block {
             chain: self.id.workchain,
@@ -350,10 +276,9 @@ impl<T: tl::Functional> Routable for WithBlock<T> {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::{Cell, Number, Slice, StackEntry,SmcMethodId, AccountAddress};
+    use super::*;
     use serde_json::json;
     use tracing_test::traced_test;
-    use crate::block::tl::{SmcMethodIdName, SmcMethodIdNumber, TvmList, TvmNumberDecimal, TvmStackEntryCell, TvmStackEntryList, TvmStackEntryNumber, TvmStackEntrySlice, TvmStackEntryTuple, TvmTuple};
 
     #[test]
     fn deserialize_account_address_empty() {
@@ -390,32 +315,32 @@ mod tests {
 
     #[test]
     fn slice_correct_json() {
-        let slice = Slice { bytes: "test".to_string() };
+        let slice = TvmSlice { bytes: "test".to_string() };
 
         assert_eq!(serde_json::to_string(&slice).unwrap(), "{\"@type\":\"tvm.slice\",\"bytes\":\"test\"}")
     }
 
     #[test]
     fn cell_correct_json() {
-        let cell = Cell { bytes: "test".to_string() };
+        let cell = TvmCell { bytes: "test".to_string() };
 
         assert_eq!(serde_json::to_string(&cell).unwrap(), "{\"@type\":\"tvm.cell\",\"bytes\":\"test\"}")
     }
 
     #[test]
     fn number_correct_json() {
-        let number = Number { number: "100.2".to_string() };
+        let number = TvmNumberDecimal { number: "100.2".to_string() };
 
         assert_eq!(serde_json::to_string(&number).unwrap(), "{\"@type\":\"tvm.numberDecimal\",\"number\":\"100.2\"}")
     }
 
     #[test]
     fn stack_entry_correct_json() {
-        let slice = StackEntry::TvmStackEntrySlice(TvmStackEntrySlice { slice: Slice { bytes: "test".to_string() } });
-        let cell = StackEntry::TvmStackEntryCell(TvmStackEntryCell { cell: Cell { bytes: "test".to_string() } });
-        let number = StackEntry::TvmStackEntryNumber(TvmStackEntryNumber { number: TvmNumberDecimal { number: "123".to_string() } });
-        let tuple = StackEntry::TvmStackEntryTuple(TvmStackEntryTuple { tuple: TvmTuple { elements: vec![slice.clone(), cell.clone()] } });
-        let list = StackEntry::TvmStackEntryList(TvmStackEntryList { list: TvmList { elements: vec![slice.clone(), tuple.clone()] } });
+        let slice = TvmBoxedStackEntry::TvmStackEntrySlice(TvmStackEntrySlice { slice: TvmSlice { bytes: "test".to_string() } });
+        let cell = TvmBoxedStackEntry::TvmStackEntryCell(TvmStackEntryCell { cell: TvmCell { bytes: "test".to_string() } });
+        let number = TvmBoxedStackEntry::TvmStackEntryNumber(TvmStackEntryNumber { number: TvmNumberDecimal { number: "123".to_string() } });
+        let tuple = TvmBoxedStackEntry::TvmStackEntryTuple(TvmStackEntryTuple { tuple: TvmTuple { elements: vec![slice.clone(), cell.clone()] } });
+        let list = TvmBoxedStackEntry::TvmStackEntryList(TvmStackEntryList { list: TvmList { elements: vec![slice.clone(), tuple.clone()] } });
 
         assert_eq!(serde_json::to_string(&slice).unwrap(), "{\"@type\":\"tvm.stackEntrySlice\",\"slice\":{\"@type\":\"tvm.slice\",\"bytes\":\"test\"}}");
         assert_eq!(serde_json::to_string(&cell).unwrap(), "{\"@type\":\"tvm.stackEntryCell\",\"cell\":{\"@type\":\"tvm.cell\",\"bytes\":\"test\"}}");
@@ -426,8 +351,8 @@ mod tests {
 
     #[test]
     fn smc_method_id() {
-        let number = SmcMethodId::SmcMethodIdNumber(SmcMethodIdNumber { number: 123 }) ;
-        let name = SmcMethodId::SmcMethodIdName(SmcMethodIdName { name: "getOwner".to_owned() });
+        let number = SmcBoxedMethodId::SmcMethodIdNumber(SmcMethodIdNumber { number: 123 }) ;
+        let name = SmcBoxedMethodId::SmcMethodIdName(SmcMethodIdName { name: "getOwner".to_owned() });
 
         assert_eq!(serde_json::to_value(number).unwrap(), json!({
             "@type": "smc.methodIdNumber",

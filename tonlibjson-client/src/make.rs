@@ -6,7 +6,7 @@ use tower::limit::ConcurrencyLimitLayer;
 use tower::{Layer, Service, ServiceExt};
 use tower::load::PeakEwma;
 use tracing::debug;
-use crate::block::GetMasterchainInfo;
+use crate::block::BlocksGetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::shared::SharedLayer;
@@ -31,7 +31,7 @@ impl Service<TonConfig> for ClientFactory {
                 .build()
                 .await?;
 
-            let _ = (&mut client).oneshot(GetMasterchainInfo::default()).await?;
+            let _ = (&mut client).oneshot(BlocksGetMasterchainInfo::default()).await?;
 
             Ok(client)
         })

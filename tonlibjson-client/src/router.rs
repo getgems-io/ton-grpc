@@ -10,7 +10,7 @@ use itertools::Itertools;
 use tokio::select;
 use tokio_stream::StreamMap;
 use tokio_stream::wrappers::WatchStream;
-use crate::block::MasterchainInfo;
+use crate::block::BlocksMasterchainInfo;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 
@@ -21,7 +21,7 @@ pub(crate) trait Routable {
 pub(crate) struct Router {
     discover: CursorClientDiscover,
     services: DashMap<String, CursorClient>,
-    last_block: MergeStreamMap<MasterchainInfo>
+    last_block: MergeStreamMap<BlocksMasterchainInfo>
 }
 
 impl Router {

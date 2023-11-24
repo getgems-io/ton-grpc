@@ -23,8 +23,8 @@ use tracing::{instrument, trace};
 use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::router::BlockCriteria;
-use crate::block::{BlockIdExt, BlocksGetShards, BlocksShards, Sync};
-use crate::block::{BlockHeader, BlockId, BlocksLookupBlock, BlocksGetBlockHeader, GetMasterchainInfo, MasterchainInfo};
+use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, BlocksShards, Sync, TonBlockId, TonBlockIdExt};
+use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
 use crate::request::{Specialized, Callable};
@@ -37,19 +37,19 @@ type ShardId = (i32, i64);
 type Seqno = i32;
 #[derive(Debug, Clone, Default)]
 struct ShardBounds {
-    left: Option<BlockHeader>,
-    right: Option<BlockHeader>
+    left: Option<BlocksHeader>,
+    right: Option<BlocksHeader>
 }
 
 impl ShardBounds {
-    fn left(left: BlockHeader) -> Self {
+    fn left(left: BlocksHeader) -> Self {
         Self {
             left: Some(left),
             right: None
         }
     }
 
-    fn right(right: BlockHeader) -> Self {
+    fn right(right: BlocksHeader) -> Self {
         Self {
             left: None,
             right: Some(right)
@@ -119,7 +119,7 @@ impl Registry {
             .and_then(|s| s.right.as_ref().map(|h| h.id.seqno))
     }
 
-    fn upsert_left(&self, header: &BlockHeader) {
+    fn upsert_left(&self, header: &BlocksHeader) {
         let shard_id = (header.id.workchain, header.id.shard);
 
         self.update_shard_registry(&shard_id);
@@ -132,7 +132,7 @@ impl Registry {
             .or_insert_with(|| ShardBounds::left(header.clone()));
     }
 
-    fn upsert_right(&self, header: &BlockHeader) {
+    fn upsert_right(&self, header: &BlocksHeader) {
         let shard_id = (header.id.workchain, header.id.shard);
 
         self.update_shard_registry(&shard_id);
@@ -236,12 +236,12 @@ pub(crate) struct CursorClient {
     id: Cow<'static, str>,
     client: InnerClient,
 
-    masterchain_info_rx: Receiver<Option<MasterchainInfo>>,
+    masterchain_info_rx: Receiver<Option<BlocksMasterchainInfo>>,
     registry: Arc<Registry>
 }
 
 impl CursorClient {
-    pub(crate) fn subscribe_masterchain_info(&self) -> Receiver<Option<MasterchainInfo>> {
+    pub(crate) fn subscribe_masterchain_info(&self) -> Receiver<Option<BlocksMasterchainInfo>> {
         self.masterchain_info_rx.clone()
     }
 
@@ -304,7 +304,7 @@ impl CursorClient {
         _self
     }
 
-    fn last_block_loop(&self, mtx: Sender<Option<MasterchainInfo>>) -> impl Future<Output = Infallible> {
+    fn last_block_loop(&self, mtx: Sender<Option<BlocksMasterchainInfo>>) -> impl Future<Output = Infallible> {
         let id = self.id.clone();
         let client = self.client.clone();
         let registry = self.registry.clone();
@@ -325,8 +325,8 @@ impl CursorClient {
     }
 }
 
-impl Service<Specialized<GetMasterchainInfo>> for CursorClient {
-    type Response = MasterchainInfo;
+impl Service<Specialized<BlocksGetMasterchainInfo>> for CursorClient {
+    type Response = BlocksMasterchainInfo;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -340,7 +340,7 @@ impl Service<Specialized<GetMasterchainInfo>> for CursorClient {
         }
     }
 
-    fn call(&mut self, _: Specialized<GetMasterchainInfo>) -> Self::Future {
+    fn call(&mut self, _: Specialized<BlocksGetMasterchainInfo>) -> Self::Future {
         let response = self.masterchain_info_rx.borrow().as_ref().unwrap().clone();
 
         return ready(Ok(response)).boxed()
@@ -366,7 +366,7 @@ impl Service<Specialized<BlocksGetShards>> for CursorClient {
 
 // TODO[akostylev0] generics
 impl Service<Specialized<BlocksLookupBlock>> for CursorClient {
-    type Response = BlockIdExt;
+    type Response = TonBlockIdExt;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -388,7 +388,7 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
         if self.edges_defined() {
-            return Service::<GetMasterchainInfo>::poll_ready(&mut self.client, cx);
+            return Service::<BlocksGetMasterchainInfo>::poll_ready(&mut self.client, cx);
         }
 
         cx.waker().wake_by_ref();
@@ -409,7 +409,7 @@ impl Load for CursorClient {
     }
 }
 
-async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> Result<(BlockHeader, Vec<BlockHeader>)> {
+async fn check_block_available(client: &mut InnerClient, block_id: TonBlockId) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
     let block_id = cached_block_id_ext(block_id, client).await?;
     let shards = cached_get_shards(&BlocksGetShards::new(block_id.clone()), client).await?;
 
@@ -426,7 +426,7 @@ async fn check_block_available(client: &mut InnerClient, block_id: BlockId) -> R
 }
 
 #[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlockHeader, Vec<BlockHeader>)> {
+async fn find_first_blocks(client: &mut InnerClient, start: &TonBlockIdExt, lhs: Option<i32>, cur: Option<i32>) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
     let length = start.seqno;
     let mut rhs = length;
     let mut lhs = lhs.unwrap_or(1);
@@ -435,7 +435,7 @@ async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Op
     let workchain = start.workchain;
     let shard = start.shard;
 
-    let mut block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
+    let mut block = check_block_available(client, TonBlockId::new(workchain, shard, cur)).await;
     let mut success = None;
 
     let mut hops = 0;
@@ -451,7 +451,7 @@ async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Op
         cur = (lhs + rhs) / 2;
         if cur == 0 { break; }
 
-        block = check_block_available(client, BlockId::new(workchain, shard, cur)).await;
+        block = check_block_available(client, TonBlockId::new(workchain, shard, cur)).await;
         if block.is_ok() {
             success = Some(block.as_ref().unwrap().clone());
         }
@@ -475,7 +475,7 @@ async fn find_first_blocks(client: &mut InnerClient, start: &BlockIdExt, lhs: Op
     Ok((master, work))
 }
 
-async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Vec<BlockHeader>)> {
+async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
     let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
     let shards = cached_get_shards(&BlocksGetShards::new(master_chain_last_block_id.clone()), client).await?;
@@ -494,8 +494,8 @@ async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlockHeader, Ve
 }
 
 
-fn shards_cache() -> &'static Cache<BlockIdExt, BlocksShards> {
-    static CACHE: OnceLock<Cache<BlockIdExt, BlocksShards>> = OnceLock::new();
+fn shards_cache() -> &'static Cache<TonBlockIdExt, BlocksShards> {
+    static CACHE: OnceLock<Cache<TonBlockIdExt, BlocksShards>> = OnceLock::new();
 
     CACHE.get_or_init(|| Cache::new(1024))
 }
@@ -505,33 +505,33 @@ async fn cached_get_shards(req: &BlocksGetShards, client: &mut InnerClient) -> R
     shards_cache().get_or_insert_async(&key, async { client.oneshot(req.clone()).await }).await
 }
 
-fn block_cache() -> &'static Cache<BlocksLookupBlock, BlockIdExt> {
-    static CACHE: OnceLock<Cache<BlocksLookupBlock, BlockIdExt>> = OnceLock::new();
+fn block_cache() -> &'static Cache<BlocksLookupBlock, TonBlockIdExt> {
+    static CACHE: OnceLock<Cache<BlocksLookupBlock, TonBlockIdExt>> = OnceLock::new();
 
     CACHE.get_or_init(|| Cache::new(1024))
 }
 
-async fn cached_block_id_ext(block_id: BlockId, client: &mut InnerClient) -> Result<BlockIdExt> {
+async fn cached_block_id_ext(block_id: TonBlockId, client: &mut InnerClient) -> Result<TonBlockIdExt> {
     let req = BlocksLookupBlock::seqno(block_id);
 
     cached_lookup_block(&req, client).await
 }
 
-async fn cached_lookup_block(req: &BlocksLookupBlock, client: &mut InnerClient) -> Result<BlockIdExt> {
+async fn cached_lookup_block(req: &BlocksLookupBlock, client: &mut InnerClient) -> Result<TonBlockIdExt> {
     block_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
 }
 
-fn block_header_cache() -> &'static Cache<BlocksGetBlockHeader, BlockHeader> {
-    static CACHE: OnceLock<Cache<BlocksGetBlockHeader, BlockHeader>> = OnceLock::new();
+fn block_header_cache() -> &'static Cache<BlocksGetBlockHeader, BlocksHeader> {
+    static CACHE: OnceLock<Cache<BlocksGetBlockHeader, BlocksHeader>> = OnceLock::new();
 
     CACHE.get_or_init(|| Cache::new(1024))
 }
 
-async fn cached_block_header(req: &BlocksGetBlockHeader, client: &mut InnerClient) -> Result<BlockHeader> {
+async fn cached_block_header(req: &BlocksGetBlockHeader, client: &mut InnerClient) -> Result<BlocksHeader> {
     block_header_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
 }
 
-async fn wait_for_block_header(block_id: BlockIdExt, client: InnerClient) -> Result<BlockHeader> {
+async fn wait_for_block_header(block_id: TonBlockIdExt, client: InnerClient) -> Result<BlocksHeader> {
     let retry = FibonacciBackoff::from_millis(512)
         .max_delay(Duration::from_millis(4096))
         .map(jitter)
@@ -549,12 +549,12 @@ struct FirstBlockDiscover {
     id: Cow<'static, str>,
     client: InnerClient,
     registry: Arc<Registry>,
-    rx: Receiver<Option<MasterchainInfo>>,
-    current: Option<BlockHeader>,
+    rx: Receiver<Option<BlocksMasterchainInfo>>,
+    current: Option<BlocksHeader>,
 }
 
 impl FirstBlockDiscover {
-    fn new(id: Cow<'static, str>, client: InnerClient, registry: Arc<Registry>, rx: Receiver<Option<MasterchainInfo>>) -> Self {
+    fn new(id: Cow<'static, str>, client: InnerClient, registry: Arc<Registry>, rx: Receiver<Option<BlocksMasterchainInfo>>) -> Self {
         Self {
             id,
             client,
@@ -582,7 +582,7 @@ impl FirstBlockDiscover {
         }
     }
 
-    async fn next(&mut self, start: BlockIdExt) -> Result<Option<BlockHeader>> {
+    async fn next(&mut self, start: TonBlockIdExt) -> Result<Option<BlocksHeader>> {
         if let Some(ref mfb) = self.current {
             if let Err(e) = (&mut self.client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
                 trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
@@ -612,8 +612,8 @@ struct LastBlockDiscover {
     id: Cow<'static, str>,
     client: InnerClient,
     registry: Arc<Registry>,
-    current: Option<MasterchainInfo>,
-    mtx: Sender<Option<MasterchainInfo>>
+    current: Option<BlocksMasterchainInfo>,
+    mtx: Sender<Option<BlocksMasterchainInfo>>
 }
 
 impl LastBlockDiscover {
@@ -621,7 +621,7 @@ impl LastBlockDiscover {
         let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-        let mut current: Option<MasterchainInfo> = None;
+        let mut current: Option<BlocksMasterchainInfo> = None;
         loop {
             timer.tick().await;
 
@@ -634,8 +634,8 @@ impl LastBlockDiscover {
         }
     }
 
-    async fn next(&mut self) -> Result<Option<MasterchainInfo>> {
-        let mut masterchain_info = (&mut self.client).oneshot(GetMasterchainInfo::default()).await?;
+    async fn next(&mut self) -> Result<Option<BlocksMasterchainInfo>> {
+        let mut masterchain_info = (&mut self.client).oneshot(BlocksGetMasterchainInfo::default()).await?;
         if let Some(ref current) = self.current {
             if current == &masterchain_info {
                 return Ok(None);

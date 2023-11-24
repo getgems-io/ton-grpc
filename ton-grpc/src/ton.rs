@@ -1,6 +1,6 @@
 use tonlibjson_client::address::AccountAddressData;
 use tonlibjson_client::block;
-use tonlibjson_client::block::MessageData;
+use tonlibjson_client::block::{MsgBoxedData, MsgDataDecryptedText, MsgDataEncryptedText, MsgDataRaw, MsgDataText};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;
 
@@ -8,8 +8,8 @@ tonic::include_proto!("ton");
 
 pub(crate) const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("ton_descriptor");
 
-impl From<block::BlockIdExt> for BlockIdExt {
-    fn from(value: block::BlockIdExt) -> Self {
+impl From<block::TonBlockIdExt> for BlockIdExt {
+    fn from(value: block::TonBlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
             shard: value.shard,
@@ -20,7 +20,7 @@ impl From<block::BlockIdExt> for BlockIdExt {
     }
 }
 
-impl From<BlockIdExt> for block::BlockIdExt {
+impl From<BlockIdExt> for block::TonBlockIdExt {
     fn from(value: BlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
@@ -32,8 +32,8 @@ impl From<BlockIdExt> for block::BlockIdExt {
     }
 }
 
-impl From<(i32, block::ShortTxId)> for TransactionId {
-    fn from((chain_id, value): (i32, block::ShortTxId)) -> Self {
+impl From<(i32, block::BlocksShortTxId)> for TransactionId {
+    fn from((chain_id, value): (i32, block::BlocksShortTxId)) -> Self {
         let address = value.clone().into_internal_string(chain_id);
 
         Self {
@@ -89,23 +89,22 @@ impl From<block::RawFullAccountState> for AccountState {
     }
 }
 
-impl From<block::Cell> for TvmCell {
-    fn from(value: block::Cell) -> Self {
+impl From<block::TvmCell> for TvmCell {
+    fn from(value: block::TvmCell) -> Self {
         Self {
             bytes: value.bytes
         }
     }
 }
 
-impl From<block::MessageData> for MsgData {
-    fn from(value: block::MessageData) -> Self {
-        use block::tl::{MsgDataRaw, MsgDataText, MsgDataDecryptedText, MsgDataEncryptedText};
+impl From<MsgBoxedData> for MsgData {
+    fn from(value: MsgBoxedData) -> Self {
 
         match value {
-            MessageData::MsgDataRaw(MsgDataRaw { body, init_state }) => { Self::Raw(MessageDataRaw { body, init_state })}
-            MessageData::MsgDataText(MsgDataText { text }) => { Self::Text(MessageDataText { text })}
-            MessageData::MsgDataDecryptedText(MsgDataDecryptedText { text }) => { Self::DecryptedText(MessageDataDecryptedText { text }) }
-            MessageData::MsgDataEncryptedText(MsgDataEncryptedText { text }) => { Self::EncryptedText(MessageDataEncryptedText { text }) }
+            MsgBoxedData::MsgDataRaw(MsgDataRaw { body, init_state }) => { Self::Raw(MessageDataRaw { body, init_state })}
+            MsgBoxedData::MsgDataText(MsgDataText { text }) => { Self::Text(MessageDataText { text })}
+            MsgBoxedData::MsgDataDecryptedText(MsgDataDecryptedText { text }) => { Self::DecryptedText(MessageDataDecryptedText { text }) }
+            MsgBoxedData::MsgDataEncryptedText(MsgDataEncryptedText { text }) => { Self::EncryptedText(MessageDataEncryptedText { text }) }
         }
     }
 }
