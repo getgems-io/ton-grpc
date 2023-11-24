@@ -1,0 +1,9 @@
+[package]
+name = "tl_parser"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+
+[dependencies]
+anyhow = { workspace = true }
+nom = "7.1.3"

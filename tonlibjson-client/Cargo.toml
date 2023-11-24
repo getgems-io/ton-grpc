@@ -38,5 +38,13 @@ metrics = "0.21.1"
 tracing-test = { workspace = true }
 serial_test = "2.0.0"
 
+[build-dependencies]
+tl_parser = { path = "../tl_parser" }
+anyhow = { workspace = true }
+quote = "1.0"
+syn = "2.0.39"
+prettyplease = "0.2.15"
+convert_case = "0.6.0"
+
 [features]
 testnet = ["tonlibjson-sys/testnet"]

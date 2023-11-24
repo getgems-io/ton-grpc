@@ -4,7 +4,7 @@ use futures::{TryFutureExt, FutureExt};
 use derive_new::new;
 use tower::{Service, ServiceExt};
 use tower::discover::ServiceList;
-use crate::block::{BlockIdExt, BlocksGetShards, BlocksLookupBlock, BlocksShards, GetMasterchainInfo, MasterchainInfo};
+use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksLookupBlock, BlocksMasterchainInfo, BlocksShards, TonBlockIdExt};
 use crate::cursor_client::InnerClient;
 use crate::error::ErrorService;
 use crate::request::{Callable, Specialized};
@@ -31,8 +31,8 @@ impl<R> Service<R> for Balance where R: Routable + Callable<InnerClient> {
     }
 }
 
-impl Service<Specialized<GetMasterchainInfo>> for Balance {
-    type Response = MasterchainInfo;
+impl Service<Specialized<BlocksGetMasterchainInfo>> for Balance {
+    type Response = BlocksMasterchainInfo;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -40,11 +40,11 @@ impl Service<Specialized<GetMasterchainInfo>> for Balance {
         self.router.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Specialized<GetMasterchainInfo>) -> Self::Future {
+    fn call(&mut self, req: Specialized<BlocksGetMasterchainInfo>) -> Self::Future {
         self.router
             .call(&req.route())
             .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
-                ServiceList::new::<Specialized<GetMasterchainInfo>>(svc))).oneshot(req))
+                ServiceList::new::<Specialized<BlocksGetMasterchainInfo>>(svc))).oneshot(req))
             .boxed()
     }
 }
@@ -70,7 +70,7 @@ impl Service<Specialized<BlocksGetShards>> for Balance {
 
 // TODO[akostylev0] generics
 impl Service<Specialized<BlocksLookupBlock>> for Balance {
-    type Response = BlockIdExt;
+    type Response = TonBlockIdExt;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 

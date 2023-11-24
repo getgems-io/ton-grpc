@@ -9,9 +9,9 @@ use crate::ton::get_account_transactions_request::bound::Bound::{BlockId, Transa
 use crate::ton::get_account_transactions_request::bound::Type;
 
 #[tracing::instrument(skip_all, err)]
-pub async fn extend_block_id(client: &TonClient, block_id: &ton::BlockId) -> Result<block::BlockIdExt> {
+pub async fn extend_block_id(client: &TonClient, block_id: &ton::BlockId) -> Result<block::TonBlockIdExt> {
     if let (Some(root_hash), Some(file_hash)) = (&block_id.root_hash, &block_id.file_hash) {
-        Ok(block::BlockIdExt::new(
+        Ok(block::TonBlockIdExt::new(
             block_id.workchain,
             block_id.shard,
             block_id.seqno,
@@ -24,7 +24,7 @@ pub async fn extend_block_id(client: &TonClient, block_id: &ton::BlockId) -> Res
 }
 
 #[tracing::instrument(skip_all, err)]
-pub async fn prev_block_id(client: &TonClient, block_id: &ton::BlockId) -> Result<block::BlockIdExt> {
+pub async fn prev_block_id(client: &TonClient, block_id: &ton::BlockId) -> Result<block::TonBlockIdExt> {
     client.look_up_block_by_seqno(block_id.workchain, block_id.shard, block_id.seqno - 1).await
 }
 

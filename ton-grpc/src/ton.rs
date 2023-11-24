@@ -1,5 +1,6 @@
 use tonlibjson_client::address::AccountAddressData;
 use tonlibjson_client::block;
+use tonlibjson_client::block::{MsgBoxedData, MsgDataDecryptedText, MsgDataEncryptedText, MsgDataRaw, MsgDataText};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;
 
@@ -7,8 +8,8 @@ tonic::include_proto!("ton");
 
 pub(crate) const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("ton_descriptor");
 
-impl From<block::BlockIdExt> for BlockIdExt {
-    fn from(value: block::BlockIdExt) -> Self {
+impl From<block::TonBlockIdExt> for BlockIdExt {
+    fn from(value: block::TonBlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
             shard: value.shard,
@@ -19,7 +20,7 @@ impl From<block::BlockIdExt> for BlockIdExt {
     }
 }
 
-impl From<BlockIdExt> for block::BlockIdExt {
+impl From<BlockIdExt> for block::TonBlockIdExt {
     fn from(value: BlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
@@ -31,9 +32,9 @@ impl From<BlockIdExt> for block::BlockIdExt {
     }
 }
 
-impl From<(i32, block::ShortTxId)> for TransactionId {
-    fn from((chain_id, value): (i32, block::ShortTxId)) -> Self {
-        let address = value.account.into_internal(chain_id).to_string();
+impl From<(i32, block::BlocksShortTxId)> for TransactionId {
+    fn from((chain_id, value): (i32, block::BlocksShortTxId)) -> Self {
+        let address = value.clone().into_internal_string(chain_id);
 
         Self {
             account_address: address,
@@ -73,14 +74,14 @@ impl From<PartialTransactionId> for block::InternalTransactionId {
 
 impl From<block::RawFullAccountState> for AccountState {
     fn from(value: block::RawFullAccountState) -> Self {
-        if value.code.is_some() {
+        if !value.code.is_empty() {
             AccountState::Active(ActiveAccountState {
-                code: value.code.unwrap_or_default(),
-                data: value.data.unwrap_or_default()
+                code: value.code,
+                data: value.data
             })
-        } else if value.frozen_hash.is_some() {
+        } else if !value.frozen_hash.is_empty() {
             AccountState::Frozen(FrozenAccountState {
-                frozen_hash: value.frozen_hash.unwrap_or_default()
+                frozen_hash: value.frozen_hash
             })
         } else {
             AccountState::Uninitialized(UninitializedAccountState {})
@@ -88,21 +89,22 @@ impl From<block::RawFullAccountState> for AccountState {
     }
 }
 
-impl From<block::Cell> for TvmCell {
-    fn from(value: block::Cell) -> Self {
+impl From<block::TvmCell> for TvmCell {
+    fn from(value: block::TvmCell) -> Self {
         Self {
             bytes: value.bytes
         }
     }
 }
 
-impl From<block::MessageData> for MsgData {
-    fn from(value: block::MessageData) -> Self {
+impl From<MsgBoxedData> for MsgData {
+    fn from(value: MsgBoxedData) -> Self {
+
         match value {
-            block::MessageData::Raw { body, init_state } => { Self::Raw(MessageDataRaw { body, init_state }) }
-            block::MessageData::Text { text } => { Self::Text(MessageDataText { text }) }
-            block::MessageData::DecryptedText { text } => { Self::DecryptedText(MessageDataDecryptedText { text }) }
-            block::MessageData::EncryptedText { text } => { Self::EncryptedText(MessageDataEncryptedText { text }) }
+            MsgBoxedData::MsgDataRaw(MsgDataRaw { body, init_state }) => { Self::Raw(MessageDataRaw { body, init_state })}
+            MsgBoxedData::MsgDataText(MsgDataText { text }) => { Self::Text(MessageDataText { text })}
+            MsgBoxedData::MsgDataDecryptedText(MsgDataDecryptedText { text }) => { Self::DecryptedText(MessageDataDecryptedText { text }) }
+            MsgBoxedData::MsgDataEncryptedText(MsgDataEncryptedText { text }) => { Self::EncryptedText(MessageDataEncryptedText { text }) }
         }
     }
 }
