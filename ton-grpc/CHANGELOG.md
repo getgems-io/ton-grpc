@@ -22,6 +22,13 @@
 
 
 
+## [0.7.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.6.2...ton-grpc-v0.7.0) (2023-11-27)
+
+
+### Features
+
+* TL parser and struct generator ([#555](https://github.com/getgems-io/ton-grpc/issues/555)) ([a4392d2](https://github.com/getgems-io/ton-grpc/commit/a4392d2e66223157a8af6dc48ab266aef7a6773f))
+
 ## [0.6.1](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.6.0...ton-grpc-v0.6.1) (2023-11-14)
 
 
