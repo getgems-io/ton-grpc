@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.12.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.11.0...tonlibjson-client-v0.12.0) (2023-11-27)
+
+
+### Features
+
+* TL parser and struct generator ([#555](https://github.com/getgems-io/ton-grpc/issues/555)) ([a4392d2](https://github.com/getgems-io/ton-grpc/commit/a4392d2e66223157a8af6dc48ab266aef7a6773f))
+
+
+### Bug Fixes
+
+* **deps:** bump uuid from 1.5.0 to 1.6.1 ([87c559f](https://github.com/getgems-io/ton-grpc/commit/87c559f10d1170bf7918a2255a989080676ae099))
+
 ## [0.11.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.10.0...tonlibjson-client-v0.11.0) (2023-11-15)
 
 
