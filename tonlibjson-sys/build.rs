@@ -15,7 +15,6 @@ fn main() {
                 .map(|lib| lib.link_paths.first().unwrap().display().to_string())
         ).unwrap();
 
-    let is_testnet = cfg!(feature = "testnet");
     let ton_dir = if cfg!(feature = "testnet") { "ton-testnet" } else { "ton" };
     let build_tonlibjson = cfg!(feature = "tonlibjson");
     let build_emulator = cfg!(feature = "tonemulator");
@@ -32,10 +31,8 @@ fn main() {
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
 
-    if is_testnet {
-        println!("cargo:rustc-link-lib=static=sodium");
-        println!("cargo:rustc-link-lib=static=secp256k1");
-    }
+    println!("cargo:rustc-link-lib=static=sodium");
+    println!("cargo:rustc-link-lib=static=secp256k1");
 
     let target_arch = "x86-64";
 
@@ -76,10 +73,8 @@ fn main() {
                 .build()
         };
 
-        if is_testnet {
-            println!("cargo:rustc-link-search=native={}/build/third-party/blst", dst.display());
-            println!("cargo:rustc-link-lib=static=blst");
-        }
+        println!("cargo:rustc-link-search=native={}/build/third-party/blst", dst.display());
+        println!("cargo:rustc-link-lib=static=blst");
 
         for item in ["tdnet", "keys", "tdactor", "tl-utils", "tdutils"] {
             println!("cargo:rustc-link-search=native={}/build/{}", dst.display(), item);
@@ -94,9 +89,8 @@ fn main() {
 
         println!("cargo:rustc-link-search=native={}/build/crypto", dst.display());
         println!("cargo:rustc-link-lib=static=ton_crypto");
-        if is_testnet {
-            println!("cargo:rustc-link-lib=static=ton_crypto_core");
-        }
+        println!("cargo:rustc-link-lib=static=ton_crypto_core");
+
         println!("cargo:rustc-link-lib=static=ton_block");
         println!("cargo:rustc-link-lib=static=smc-envelope");
 
@@ -164,10 +158,8 @@ fn main() {
                 .build()
         };
 
-        if is_testnet {
-            println!("cargo:rustc-link-search=native={}/build/third-party/blst", dst.display());
-            println!("cargo:rustc-link-lib=static=blst");
-        }
+        println!("cargo:rustc-link-search=native={}/build/third-party/blst", dst.display());
+        println!("cargo:rustc-link-lib=static=blst");
 
         println!("cargo:rustc-link-search=native={}/build/crypto", dst.display());
         println!("cargo:rustc-link-lib=static=ton_crypto");
