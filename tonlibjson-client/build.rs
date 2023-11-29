@@ -337,6 +337,7 @@ impl Generator {
                     if deserialize_number_from_string && deserialize_with.is_empty() {
                         quote! {
                             #serialize_with
+                            #[serde(default)]
                             #[serde(deserialize_with = "deserialize_number_from_string")]
                             pub #field_name: #field_type
                         }

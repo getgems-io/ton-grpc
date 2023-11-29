@@ -119,7 +119,9 @@ impl<R : Requestable> Service<R> for Client {
 
                 bail!(error)
             } else {
-                let response = serde_json::from_value::<R::Response>(response.data)?;
+                let data = response.data.clone();
+                let response = serde_json::from_value::<R::Response>(response.data)
+                    .map_err(|e| anyhow!("deserialization error: {:?}, data: {:?}", e, data))?;
 
                 Ok(response)
             }
