@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.2](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.1...charts/ton-grpc-v0.5.2) (2023-11-29)
+
+
+### Bug Fixes
+
+* override servicemonitor selector ([1f32aae](https://github.com/getgems-io/ton-grpc/commit/1f32aaef27f1eaf5efc492e0a394debc89628ec1))
+
 ## [0.5.1](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.0...charts/ton-grpc-v0.5.1) (2023-11-10)
 
 
