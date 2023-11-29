@@ -1935,7 +1935,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "clap",
