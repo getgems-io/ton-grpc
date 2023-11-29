@@ -289,6 +289,7 @@ impl CursorClient {
         let id = Cow::from(id);
         let client = ConcurrencyMetric::new(client, id.clone());
         let (mtx, mrx) = tokio::sync::watch::channel(None);
+        let mut mc_watcher = mtx.subscribe();
 
         let _self = Self {
             id,
@@ -299,7 +300,12 @@ impl CursorClient {
         };
 
         tokio::spawn(_self.last_block_loop(mtx));
-        tokio::spawn(_self.first_block_loop());
+        let inner = _self.first_block_loop();
+        tokio::spawn(async move {
+            mc_watcher.changed().await.unwrap();
+
+            inner.await;
+        });
 
         _self
     }
