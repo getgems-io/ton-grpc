@@ -29,8 +29,12 @@ spec:
       metricRelabelings: {{- include .Values.metrics.serviceMonitor.metricRelabelings . | nindent 8 }}
       {{- end }}
   selector:
-    matchLabels: {{- include "ton-grpc.labels" . | nindent 6 }}
+    matchLabels:
+      {{- if .Values.metrics.serviceMonitor.selector }}
       {{- with .Values.metrics.serviceMonitor.selector }}
       {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{ else }}
+      {{- include "ton-grpc.selectorLabels" . | nindent 6 }}
       {{- end }}
 {{- end -}}
