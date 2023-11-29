@@ -1935,7 +1935,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -2030,7 +2030,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "async-stream",
