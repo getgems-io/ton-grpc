@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.12.0...tonlibjson-client-v0.12.1) (2023-11-29)
+
+
+### Bug Fixes
+
+* broken deseriealization ([86139be](https://github.com/getgems-io/ton-grpc/commit/86139bee7b454bc8c8efe544330be93a03b3a859))
+
 ## [0.12.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.11.0...tonlibjson-client-v0.12.0) (2023-11-27)
 
 
