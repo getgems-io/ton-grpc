@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.3](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.2...charts/ton-grpc-v0.5.3) (2023-11-30)
+
+
+### Bug Fixes
+
+* hpa ([2f566d7](https://github.com/getgems-io/ton-grpc/commit/2f566d7882a9a5cd6fe1546cefbc2aa57f5595df))
+
 ## [0.5.2](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.1...charts/ton-grpc-v0.5.2) (2023-11-29)
 
 

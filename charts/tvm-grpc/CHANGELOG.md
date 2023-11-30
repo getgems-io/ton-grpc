@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.4.2...charts/tvm-grpc-v0.4.3) (2023-11-30)
+
+
+### Bug Fixes
+
+* hpa ([2f566d7](https://github.com/getgems-io/ton-grpc/commit/2f566d7882a9a5cd6fe1546cefbc2aa57f5595df))
+
 ## [0.4.2](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.4.1...charts/tvm-grpc-v0.4.2) (2023-11-10)
 
 
