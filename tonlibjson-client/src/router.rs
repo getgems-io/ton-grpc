@@ -27,6 +27,7 @@ pub(crate) struct Router {
 impl Router {
     pub(crate) fn new(discover: CursorClientDiscover) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
+        metrics::describe_counter!("ton_router_fallback_hit_count", "Count of fallback request hits in router");
         metrics::describe_counter!("ton_router_delayed_count", "Count of delayed requests in router");
         metrics::describe_counter!("ton_router_delayed_hit_count", "Count of delayed request hits in router");
         metrics::describe_counter!("ton_router_delayed_miss_count", "Count of delayed request misses in router");
@@ -101,7 +102,8 @@ impl Service<&Route> for Router {
         metrics::increment_counter!("ton_router_miss_count");
 
         if let Route::Block { chain, criteria } = req {
-            if self.distance_to(chain, criteria).is_some_and(|d| d <= 1) {
+            let distance = self.distance_to(chain, criteria);
+            if distance.is_some_and(|d| d <= 1) {
                 metrics::increment_counter!("ton_router_delayed_count");
 
                 let req = *req;
@@ -120,6 +122,12 @@ impl Service<&Route> for Router {
                         }
                     }
                 }.boxed();
+            } else if distance.is_none() {
+                let services = Route::Latest.choose(&self.services);
+                if !services.is_empty() {
+                    metrics::increment_counter!("ton_router_fallback_hit_count");
+                    return std::future::ready(Ok(services)).boxed();
+                }
             }
         }
 
