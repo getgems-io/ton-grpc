@@ -236,6 +236,13 @@ impl From<&BlocksShortTxId> for BlocksAccountTransactionId {
         Self { account: v.account.to_string(), lt: v.lt }
     }
 }
+
+impl From<&RawTransaction> for BlocksAccountTransactionId {
+    fn from(v: &RawTransaction) -> Self {
+        Self { account: v.address.account_address.clone().unwrap(), lt: v.transaction_id.lt }
+    }
+}
+
 impl Routable for RawSendMessage {}
 impl Routable for RawSendMessageReturnHash {}
 impl Routable for SmcLoad {}

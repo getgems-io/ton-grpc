@@ -448,6 +448,56 @@ impl TonClient {
         }
     }
 
+    pub fn get_block_tx_stream(
+        &self,
+        block: &TonBlockIdExt,
+        reverse: bool
+    ) -> impl Stream<Item=anyhow::Result<RawTransaction>> + 'static {
+        struct State {
+            last_tx: Option<BlocksAccountTransactionId>,
+            incomplete: bool,
+            block: TonBlockIdExt,
+            this: TonClient,
+            exp: u32
+        }
+
+        stream::try_unfold(
+            State {
+                last_tx: None,
+                incomplete: true,
+                block: block.clone(),
+                this: self.clone(),
+                exp: 5
+            },
+            move |state| {
+                async move {
+                    if !state.incomplete {
+                        return anyhow::Ok(None);
+                    }
+
+                    let txs = state.this.blocks_get_transactions_ext(&state.block, state.last_tx, reverse, 2_i32.pow(state.exp)).await?;
+
+                    tracing::debug!("got {} transactions", txs.transactions.len());
+
+                    let last_tx = txs.transactions.last()
+                        .map(|t| t.into());
+
+                    anyhow::Ok(Some((
+                        stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
+                        State {
+                            last_tx,
+                            incomplete: txs.incomplete,
+                            block: state.block,
+                            this: state.this,
+                            exp: min(8, state.exp + 1)
+                        },
+                    )))
+                }
+            },
+        )
+            .try_flatten()
+    }
+
     pub fn get_block_tx_id_stream(
         &self,
         block: &TonBlockIdExt,
