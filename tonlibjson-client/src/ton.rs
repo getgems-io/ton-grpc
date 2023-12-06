@@ -475,6 +475,8 @@ impl TonClient {
                         return anyhow::Ok(None);
                     }
 
+                    tracing::info!(last_tx = ?state.last_tx);
+
                     let txs = state.this.blocks_get_transactions_ext(&state.block, state.last_tx, reverse, 2_i32.pow(state.exp)).await?;
 
                     tracing::debug!("got {} transactions", txs.transactions.len());

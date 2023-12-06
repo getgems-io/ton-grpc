@@ -1,5 +1,6 @@
-use tonlibjson_client::address::AccountAddressData;
-use tonlibjson_client::block;
+use std::str::FromStr;
+use tonlibjson_client::address::{AccountAddressData, ShardContextAccountAddress};
+use tonlibjson_client::{address, block};
 use tonlibjson_client::block::{MsgBoxedData, MsgDataDecryptedText, MsgDataEncryptedText, MsgDataRaw, MsgDataText};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;
@@ -128,6 +129,24 @@ impl From<(&AccountAddressData, block::RawTransaction)> for Transaction {
     fn from((address, value): (&AccountAddressData, block::RawTransaction)) -> Self {
         Self {
             id: Some((address, value.transaction_id).into()),
+            utime: value.utime,
+            data: value.data.clone(),
+            fee: value.fee,
+            storage_fee: value.storage_fee,
+            other_fee: value.other_fee,
+            in_msg: Some(value.in_msg.into()),
+            out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<(i32, block::RawTransaction)> for Transaction {
+    fn from((chain_id, value): (i32, block::RawTransaction)) -> Self {
+        let mut address = AccountAddressData::from_str(&value.address.account_address.unwrap()).unwrap();
+        address.chain_id = chain_id;
+
+        Self {
+            id: Some((&address, value.transaction_id).into()),
             utime: value.utime,
             data: value.data.clone(),
             fee: value.fee,

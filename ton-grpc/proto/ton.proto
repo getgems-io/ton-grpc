@@ -164,6 +164,7 @@ service BlockService {
   rpc GetBlock (BlockId) returns (BlockIdExt);
   rpc GetShards (BlockId) returns (GetShardsResponse);
   rpc GetTransactionIds (GetTransactionIdsRequest) returns (stream TransactionId);
+  rpc GetTransactions (GetTransactionsRequest) returns (stream Transaction);
   rpc GetAccountAddresses (BlockId) returns (stream AccountAddress);
 }
 
@@ -198,4 +199,8 @@ message SendRequest {
 
 message SendResponse {
   string hash = 1;
+}
+
+message GetTransactionsRequest {
+  BlockId block_id = 1;
 }

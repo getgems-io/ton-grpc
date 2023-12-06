@@ -1,12 +1,13 @@
 use anyhow::Context;
 use futures::stream::BoxStream;
-use futures::{StreamExt, TryStreamExt};
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use tonic::{async_trait, Request, Response, Status};
 use derive_new::new;
+use tonlibjson_client::address::AccountAddressData;
 use tonlibjson_client::ton::TonClient;
 use crate::helpers::extend_block_id;
 use crate::ton::block_service_server::BlockService as BaseBlockService;
-use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, TransactionId};
+use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, TransactionId, GetTransactionsRequest, Transaction};
 use crate::ton::get_transaction_ids_request::Order;
 
 #[derive(new)]
@@ -83,6 +84,28 @@ impl BaseBlockService for BlockService {
 
         let stream = self.client.get_accounts_in_block_stream(&block_id)
             .map_ok(|a| AccountAddress { address: a.to_string() })
+            .map_err(|e| Status::internal(e.to_string()))
+            .boxed();
+
+        Ok(Response::new(stream))
+    }
+
+    type GetTransactionsStream = BoxStream<'static, Result<Transaction, Status>>;
+
+    async fn get_transactions(&self, request: Request<GetTransactionsRequest>) -> Result<Response<Self::GetTransactionsStream>, Status> {
+        let msg = request.into_inner();
+
+        let block_id = msg.block_id.context("block id is required")
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        let chain_id = block_id.workchain;
+        let block_id = extend_block_id(&self.client, &block_id).await
+            .map_err(|e| Status::internal(e.to_string()))?;
+
+        let stream = self.client.get_block_tx_stream(&block_id, false).boxed();
+
+        let stream = stream
+            .map_ok(move |tx| (chain_id, tx).into())
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
 
