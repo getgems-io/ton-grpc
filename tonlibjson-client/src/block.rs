@@ -153,6 +153,42 @@ impl Routable for BlocksGetShards {
     }
 }
 
+impl BlocksGetTransactionsExt {
+    pub fn unverified(block_id: TonBlockIdExt, after: Option<BlocksAccountTransactionId>, reverse: bool, count: i32) -> Self {
+        let count = if count > 256 { 256 } else { count };
+        let mode = 1 + 2 + 4
+            + if after.is_some() { 128 } else { 0 }
+            + if reverse { 64 } else { 0 };
+
+        Self {
+            id: block_id,
+            mode,
+            count,
+            after: after.unwrap_or_default(),
+        }
+    }
+
+    pub fn verified(block_id: TonBlockIdExt, after: Option<BlocksAccountTransactionId>, reverse: bool, count: i32) -> Self {
+        let count = if count > 256 { 256 } else { count };
+        let mode = 32 + 1 + 2 + 4
+            + if after.is_some() { 128 } else { 0 }
+            + if reverse { 64 } else { 0 };
+
+        Self {
+            id: block_id,
+            mode,
+            count,
+            after: after.unwrap_or_default(),
+        }
+    }
+}
+
+impl Routable for BlocksGetTransactionsExt {
+    fn route(&self) -> Route {
+        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
+    }
+}
+
 impl BlocksGetTransactions {
     pub fn unverified(block_id: TonBlockIdExt, after: Option<BlocksAccountTransactionId>, reverse: bool, count: i32) -> Self {
         let count = if count > 256 { 256 } else { count };

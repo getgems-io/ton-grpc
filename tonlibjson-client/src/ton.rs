@@ -23,7 +23,7 @@ use tower::util::Either;
 use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
 use crate::router::{BlockCriteria, Route, Router};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell, BlocksGetTransactionsExt, BlocksTransactionsExt};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
 use crate::helper::Side;
@@ -352,6 +352,24 @@ impl TonClient {
         self.client
             .clone()
             .oneshot(RawGetTransactionsV2::new(address, from_tx.clone(), 16, false))
+            .await
+    }
+
+    pub async fn blocks_get_transactions_ext(
+        &self,
+        block: &TonBlockIdExt,
+        tx: Option<BlocksAccountTransactionId>,
+        reverse: bool,
+        count: i32
+    ) -> anyhow::Result<BlocksTransactionsExt> {
+        self.client
+            .clone()
+            .oneshot(BlocksGetTransactionsExt::unverified(
+                block.to_owned(),
+                tx,
+                reverse,
+                count
+            ))
             .await
     }
 
