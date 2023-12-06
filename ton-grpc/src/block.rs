@@ -61,8 +61,8 @@ impl BaseBlockService for BlockService {
 
         let stream = match order {
             Order::Unordered => self.client.get_block_tx_stream_unordered(&block_id).boxed(),
-            Order::Asc => self.client.get_block_tx_stream(&block_id, false).boxed(),
-            Order::Desc => self.client.get_block_tx_stream(&block_id, true).boxed(),
+            Order::Asc => self.client.get_block_tx_id_stream(&block_id, false).boxed(),
+            Order::Desc => self.client.get_block_tx_id_stream(&block_id, true).boxed(),
         };
 
         let stream = stream

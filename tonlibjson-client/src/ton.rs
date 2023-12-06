@@ -410,7 +410,7 @@ impl TonClient {
 
     pub fn get_block_tx_stream_unordered(&self, block: &TonBlockIdExt) -> impl Stream<Item=anyhow::Result<BlocksShortTxId>> + 'static {
         let streams = Side::values().map(move |side| {
-            (side, self.get_block_tx_stream(block, side.is_right()).boxed())
+            (side, self.get_block_tx_id_stream(block, side.is_right()).boxed())
         });
         let stream_map = StreamMap::from_iter(streams);
 
@@ -430,7 +430,7 @@ impl TonClient {
         }
     }
 
-    pub fn get_block_tx_stream(
+    pub fn get_block_tx_id_stream(
         &self,
         block: &TonBlockIdExt,
         reverse: bool
@@ -691,7 +691,7 @@ impl TonClient {
     pub fn get_accounts_in_block_stream(&self, block: &TonBlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
         let chain = block.workchain;
         let streams = Side::values().map(move |side| {
-            (side, self.get_block_tx_stream(block, side.is_right()).boxed())
+            (side, self.get_block_tx_id_stream(block, side.is_right()).boxed())
         });
         let stream_map = StreamMap::from_iter(streams);
 
