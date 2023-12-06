@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.2](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.12.1...tonlibjson-client-v0.12.2) (2023-12-06)
+
+
+### Bug Fixes
+
+* add fallback for router ([b663485](https://github.com/getgems-io/ton-grpc/commit/b6634850081689186e7293a6607bfea922e65bf6))
+
 ## [0.12.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.12.0...tonlibjson-client-v0.12.1) (2023-11-29)
 
 
