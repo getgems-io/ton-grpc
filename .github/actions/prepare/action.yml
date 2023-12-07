@@ -21,6 +21,7 @@ runs:
       with:
         version: "${{ steps.llvm_setup.outputs.LLVM_VERSION }}"
         force-version: true
+        ubuntu-version: 22.04
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: libsecp256k1-dev libsodium-dev
