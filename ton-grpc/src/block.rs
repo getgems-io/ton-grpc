@@ -94,6 +94,8 @@ impl BaseBlockService for BlockService {
     async fn get_transactions(&self, request: Request<GetTransactionsRequest>) -> Result<Response<Self::GetTransactionsStream>, Status> {
         let msg = request.into_inner();
 
+        // TODO[akostylev0]
+        let _order = msg.order();
         let block_id = msg.block_id.context("block id is required")
             .map_err(|e| Status::internal(e.to_string()))?;
 

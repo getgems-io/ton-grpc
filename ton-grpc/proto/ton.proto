@@ -202,5 +202,12 @@ message SendResponse {
 }
 
 message GetTransactionsRequest {
+  enum Order {
+    UNORDERED = 0;
+    ASC = 1;
+//    DESC = 2;
+  }
+
   BlockId block_id = 1;
+  Order order = 2;
 }
