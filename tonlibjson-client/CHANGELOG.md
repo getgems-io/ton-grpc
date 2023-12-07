@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.12.2...tonlibjson-client-v0.13.0) (2023-12-07)
+
+
+### Features
+
+* Get all txs from block grpc method ([#580](https://github.com/getgems-io/ton-grpc/issues/580)) ([69f4d46](https://github.com/getgems-io/ton-grpc/commit/69f4d46b3d39f7672c3037000c2067ac4dc834a7))
+
 ## [0.12.2](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.12.1...tonlibjson-client-v0.12.2) (2023-12-06)
 
 

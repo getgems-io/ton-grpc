@@ -26,6 +26,13 @@
 
 
 
+## [0.8.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.7.3...ton-grpc-v0.8.0) (2023-12-07)
+
+
+### Features
+
+* Get all txs from block grpc method ([#580](https://github.com/getgems-io/ton-grpc/issues/580)) ([69f4d46](https://github.com/getgems-io/ton-grpc/commit/69f4d46b3d39f7672c3037000c2067ac4dc834a7))
+
 ## [0.7.2](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.7.1...ton-grpc-v0.7.2) (2023-11-29)
 
 
