@@ -26,6 +26,13 @@
 
 
 
+## [0.8.3](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.8.2...ton-grpc-v0.8.3) (2023-12-07)
+
+
+### Bug Fixes
+
+* fix build ([#587](https://github.com/getgems-io/ton-grpc/issues/587)) ([c7ad163](https://github.com/getgems-io/ton-grpc/commit/c7ad1638bdfc510e7a26cc42cbd7a3d740cabfe6))
+
 ## [0.8.2](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.8.1...ton-grpc-v0.8.2) (2023-12-07)
 
 
