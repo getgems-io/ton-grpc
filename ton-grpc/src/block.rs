@@ -106,7 +106,10 @@ impl BaseBlockService for BlockService {
         let stream = self.client.get_block_tx_stream(&block_id, false).boxed();
 
         let stream = stream
-            .map_ok(move |tx| (chain_id, tx).into())
+            .map(move |tx| match tx {
+                Ok(tx) => (chain_id, tx).try_into(),
+                Err(e) => Err(e)
+            })
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
 
