@@ -14,24 +14,26 @@ runs:
       id: llvm_setup
       shell: bash
       run: |
-        LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+')
-        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-        sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main"
-        sudo apt-get update
+        LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+\.\d+.\d+')
         echo "LLVM_VERSION=$LLVM_VERSION" >> $GITHUB_OUTPUT
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        version: "${{ steps.llvm_setup.outputs.LLVM_VERSION }}"
+        force-version: true
+        ubuntu-version: 22.04
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: libsecp256k1-dev libsodium-dev
+#    - shell: bash
+#      run: |
+#        sudo apt install --yes libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
     - uses: arduino/setup-protoc@v2
       with:
         repo-token: ${{ inputs.token }}
-    - shell: bash
-      run: |
-        sudo apt update
-        sudo apt install --yes libsecp256k1-dev libsodium-dev clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_VERSION }} clangd-${{ steps.llvm_setup.outputs.LLVM_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
-#    - uses: awalsh128/cache-apt-pkgs-action@latest
-#      with:
-#        packages: libsecp256k1-dev libsodium-dev clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_VERSION }} clangd-${{ steps.llvm_setup.outputs.LLVM_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
-    - shell: bash
-      run: | 
-        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
-        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
+#    - shell: bash
+#      run: |
+#        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
+#        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
     - name: Run sccache-cache
       uses: mozilla-actions/sccache-action@v0.0.3
