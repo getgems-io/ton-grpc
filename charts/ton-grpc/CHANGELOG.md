@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.4](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.3...charts/ton-grpc-v0.5.4) (2023-12-07)
+
+
+### Bug Fixes
+
+* tonConfigUrl helm param ([4a36099](https://github.com/getgems-io/ton-grpc/commit/4a36099f9b7a3199cbce2f1773e5c6c102667653))
+
 ## [0.5.3](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.2...charts/ton-grpc-v0.5.3) (2023-11-30)
 
 
