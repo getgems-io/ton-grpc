@@ -1,4 +1,6 @@
-use tonlibjson_client::address::AccountAddressData;
+use std::str::FromStr;
+use anyhow::anyhow;
+use tonlibjson_client::address::{AccountAddressData};
 use tonlibjson_client::block;
 use tonlibjson_client::block::{MsgBoxedData, MsgDataDecryptedText, MsgDataEncryptedText, MsgDataRaw, MsgDataText};
 use crate::ton::get_account_state_response::AccountState;
@@ -136,5 +138,28 @@ impl From<(&AccountAddressData, block::RawTransaction)> for Transaction {
             in_msg: Some(value.in_msg.into()),
             out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
         }
+    }
+}
+
+impl TryFrom<(i32, block::RawTransaction)> for Transaction {
+    type Error = anyhow::Error;
+
+    fn try_from((chain_id, value): (i32, block::RawTransaction)) -> Result<Self, Self::Error> {
+        let address = value.address.account_address
+            .as_ref()
+            .ok_or(anyhow!("empty address"))
+            .and_then(|f| AccountAddressData::from_str(f))?
+            .with_chain_id(chain_id);
+
+        Ok(Self {
+            id: Some((&address, value.transaction_id).into()),
+            utime: value.utime,
+            data: value.data.clone(),
+            fee: value.fee,
+            storage_fee: value.storage_fee,
+            other_fee: value.other_fee,
+            in_msg: Some(value.in_msg.into()),
+            out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
+        })
     }
 }

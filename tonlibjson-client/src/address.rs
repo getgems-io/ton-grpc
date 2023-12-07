@@ -97,6 +97,12 @@ impl Display for AccountAddressData {
 }
 
 impl AccountAddressData {
+    pub fn with_chain_id(mut self, chain_id: i32) -> Self {
+        self.chain_id = chain_id;
+
+        self
+    }
+
     pub fn bounceable(&self) -> Self {
         Self {
             flags: Some(BOUNCABLE),
@@ -111,6 +117,10 @@ impl AccountAddressData {
             chain_id: self.chain_id,
             bytes: self.bytes
         }
+    }
+
+    pub fn into_shard_context(self) -> ShardContextAccountAddress {
+        ShardContextAccountAddress { bytes: self.bytes }
     }
 
     pub fn to_raw_string(&self) -> String {

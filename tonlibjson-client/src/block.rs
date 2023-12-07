@@ -4,6 +4,7 @@ use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use std::str::FromStr;
+use anyhow::anyhow;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
@@ -153,6 +154,42 @@ impl Routable for BlocksGetShards {
     }
 }
 
+impl BlocksGetTransactionsExt {
+    pub fn unverified(block_id: TonBlockIdExt, after: Option<BlocksAccountTransactionId>, reverse: bool, count: i32) -> Self {
+        let count = if count > 256 { 256 } else { count };
+        let mode = 1 + 2 + 4
+            + if after.is_some() { 128 } else { 0 }
+            + if reverse { 64 } else { 0 };
+
+        Self {
+            id: block_id,
+            mode,
+            count,
+            after: after.unwrap_or_default(),
+        }
+    }
+
+    pub fn verified(block_id: TonBlockIdExt, after: Option<BlocksAccountTransactionId>, reverse: bool, count: i32) -> Self {
+        let count = if count > 256 { 256 } else { count };
+        let mode = 32 + 1 + 2 + 4
+            + if after.is_some() { 128 } else { 0 }
+            + if reverse { 64 } else { 0 };
+
+        Self {
+            id: block_id,
+            mode,
+            count,
+            after: after.unwrap_or_default(),
+        }
+    }
+}
+
+impl Routable for BlocksGetTransactionsExt {
+    fn route(&self) -> Route {
+        Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
+    }
+}
+
 impl BlocksGetTransactions {
     pub fn unverified(block_id: TonBlockIdExt, after: Option<BlocksAccountTransactionId>, reverse: bool, count: i32) -> Self {
         let count = if count > 256 { 256 } else { count };
@@ -200,6 +237,20 @@ impl From<&BlocksShortTxId> for BlocksAccountTransactionId {
         Self { account: v.account.to_string(), lt: v.lt }
     }
 }
+
+impl TryFrom<&RawTransaction> for BlocksAccountTransactionId {
+    type Error = anyhow::Error;
+
+    fn try_from(v: &RawTransaction) -> Result<Self, Self::Error> {
+        let address_data = v.address.account_address
+            .as_ref()
+            .ok_or(anyhow!("empty address"))
+            .and_then(|s| AccountAddressData::from_str(s))?;
+
+        Ok(Self { account: address_data.into_shard_context().to_string(), lt: v.transaction_id.lt })
+    }
+}
+
 impl Routable for RawSendMessage {}
 impl Routable for RawSendMessageReturnHash {}
 impl Routable for SmcLoad {}

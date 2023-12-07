@@ -23,7 +23,7 @@ use tower::util::Either;
 use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
 use crate::router::{BlockCriteria, Route, Router};
-use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell};
+use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell, BlocksGetTransactionsExt, BlocksTransactionsExt};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
 use crate::helper::Side;
@@ -355,6 +355,24 @@ impl TonClient {
             .await
     }
 
+    pub async fn blocks_get_transactions_ext(
+        &self,
+        block: &TonBlockIdExt,
+        tx: Option<BlocksAccountTransactionId>,
+        reverse: bool,
+        count: i32
+    ) -> anyhow::Result<BlocksTransactionsExt> {
+        self.client
+            .clone()
+            .oneshot(BlocksGetTransactionsExt::unverified(
+                block.to_owned(),
+                tx,
+                reverse,
+                count
+            ))
+            .await
+    }
+
     pub async fn blocks_get_transactions(
         &self,
         block: &TonBlockIdExt,
@@ -410,7 +428,7 @@ impl TonClient {
 
     pub fn get_block_tx_stream_unordered(&self, block: &TonBlockIdExt) -> impl Stream<Item=anyhow::Result<BlocksShortTxId>> + 'static {
         let streams = Side::values().map(move |side| {
-            (side, self.get_block_tx_stream(block, side.is_right()).boxed())
+            (side, self.get_block_tx_id_stream(block, side.is_right()).boxed())
         });
         let stream_map = StreamMap::from_iter(streams);
 
@@ -431,6 +449,56 @@ impl TonClient {
     }
 
     pub fn get_block_tx_stream(
+        &self,
+        block: &TonBlockIdExt,
+        reverse: bool
+    ) -> impl Stream<Item=anyhow::Result<RawTransaction>> + 'static {
+        struct State {
+            last_tx: Option<BlocksAccountTransactionId>,
+            incomplete: bool,
+            block: TonBlockIdExt,
+            this: TonClient,
+            exp: u32
+        }
+
+        stream::try_unfold(
+            State {
+                last_tx: None,
+                incomplete: true,
+                block: block.clone(),
+                this: self.clone(),
+                exp: 5
+            },
+            move |state| {
+                async move {
+                    if !state.incomplete {
+                        return anyhow::Ok(None);
+                    }
+
+                    let txs = state.this.blocks_get_transactions_ext(&state.block, state.last_tx, reverse, 2_i32.pow(state.exp)).await?;
+
+                    tracing::debug!("got {} transactions", txs.transactions.len());
+
+                    let last_tx = txs.transactions.last()
+                        .map(|t| t.try_into()).transpose()?;
+
+                    anyhow::Ok(Some((
+                        stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
+                        State {
+                            last_tx,
+                            incomplete: txs.incomplete,
+                            block: state.block,
+                            this: state.this,
+                            exp: min(8, state.exp + 1)
+                        },
+                    )))
+                }
+            },
+        )
+            .try_flatten()
+    }
+
+    pub fn get_block_tx_id_stream(
         &self,
         block: &TonBlockIdExt,
         reverse: bool
@@ -691,7 +759,7 @@ impl TonClient {
     pub fn get_accounts_in_block_stream(&self, block: &TonBlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
         let chain = block.workchain;
         let streams = Side::values().map(move |side| {
-            (side, self.get_block_tx_stream(block, side.is_right()).boxed())
+            (side, self.get_block_tx_id_stream(block, side.is_right()).boxed())
         });
         let stream_map = StreamMap::from_iter(streams);
 
