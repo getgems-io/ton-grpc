@@ -20,6 +20,7 @@ runs:
       uses: KyleMayes/install-llvm-action@v1
       with:
         version: "${{ steps.llvm_setup.outputs.LLVM_VERSION }}"
+        force-version: true
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: libsecp256k1-dev libsodium-dev
