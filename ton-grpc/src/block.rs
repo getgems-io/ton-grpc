@@ -1,9 +1,8 @@
 use anyhow::Context;
 use futures::stream::BoxStream;
-use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use tonic::{async_trait, Request, Response, Status};
 use derive_new::new;
-use tonlibjson_client::address::AccountAddressData;
 use tonlibjson_client::ton::TonClient;
 use crate::helpers::extend_block_id;
 use crate::ton::block_service_server::BlockService as BaseBlockService;

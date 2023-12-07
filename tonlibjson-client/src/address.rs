@@ -113,6 +113,10 @@ impl AccountAddressData {
         }
     }
 
+    pub fn into_shard_context(self) -> ShardContextAccountAddress {
+        ShardContextAccountAddress { bytes: self.bytes }
+    }
+
     pub fn to_raw_string(&self) -> String {
         format!("{}:{}", self.chain_id, hex::encode(self.bytes))
     }

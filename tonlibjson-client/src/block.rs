@@ -4,6 +4,7 @@ use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::time::Duration;
 use std::str::FromStr;
+use anyhow::anyhow;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
@@ -237,9 +238,16 @@ impl From<&BlocksShortTxId> for BlocksAccountTransactionId {
     }
 }
 
-impl From<&RawTransaction> for BlocksAccountTransactionId {
-    fn from(v: &RawTransaction) -> Self {
-        Self { account: v.address.account_address.clone().unwrap(), lt: v.transaction_id.lt }
+impl TryFrom<&RawTransaction> for BlocksAccountTransactionId {
+    type Error = anyhow::Error;
+
+    fn try_from(v: &RawTransaction) -> Result<Self, Self::Error> {
+        let address_data = v.address.account_address
+            .as_ref()
+            .ok_or(anyhow!("empty address"))
+            .and_then(|s| AccountAddressData::from_str(s))?;
+
+        Ok(Self { account: address_data.into_shard_context().to_string(), lt: v.transaction_id.lt })
     }
 }
 

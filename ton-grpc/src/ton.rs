@@ -1,6 +1,6 @@
 use std::str::FromStr;
-use tonlibjson_client::address::{AccountAddressData, ShardContextAccountAddress};
-use tonlibjson_client::{address, block};
+use tonlibjson_client::address::{AccountAddressData};
+use tonlibjson_client::block;
 use tonlibjson_client::block::{MsgBoxedData, MsgDataDecryptedText, MsgDataEncryptedText, MsgDataRaw, MsgDataText};
 use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;

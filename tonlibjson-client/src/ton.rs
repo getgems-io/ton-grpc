@@ -475,14 +475,12 @@ impl TonClient {
                         return anyhow::Ok(None);
                     }
 
-                    tracing::info!(last_tx = ?state.last_tx);
-
                     let txs = state.this.blocks_get_transactions_ext(&state.block, state.last_tx, reverse, 2_i32.pow(state.exp)).await?;
 
                     tracing::debug!("got {} transactions", txs.transactions.len());
 
                     let last_tx = txs.transactions.last()
-                        .map(|t| t.into());
+                        .map(|t| t.try_into()).transpose()?;
 
                     anyhow::Ok(Some((
                         stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
