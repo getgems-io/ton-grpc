@@ -15,9 +15,6 @@ runs:
       shell: bash
       run: |
         LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+\.\d+.\d+')
-        wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key | sudo tee /etc/apt/trusted.gpg.d/apt.llvm.org.asc
-        sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main"
-        sudo apt-get update
         echo "LLVM_VERSION=$LLVM_VERSION" >> $GITHUB_OUTPUT
     - name: Install LLVM and Clang
       uses: KyleMayes/install-llvm-action@v1
