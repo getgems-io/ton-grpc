@@ -16,12 +16,16 @@ runs:
         sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-$LLVM_VERSION main"
         sudo apt-get update
         echo "LLVM_VERSION=$LLVM_VERSION" >> $GITHUB_OUTPUT
-    - uses: awalsh128/cache-apt-pkgs-action@latest
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1
       with:
-        packages: libsecp256k1-dev libsodium-dev clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_VERSION }} clangd-${{ steps.llvm_setup.outputs.LLVM_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
-    - shell: bash
-      run: |
-        sudo apt install --yes libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
+        version: "${{ steps.llvm_setup.outputs.LLVM_VERSION }}"
+#    - uses: awalsh128/cache-apt-pkgs-action@latest
+#      with:
+#        packages: libsecp256k1-dev libsodium-dev clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_VERSION }} clangd-${{ steps.llvm_setup.outputs.LLVM_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
+#    - shell: bash
+#      run: |
+#        sudo apt install --yes libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
     - uses: arduino/setup-protoc@v2
       with:
         repo-token: ${{ inputs.token }}
