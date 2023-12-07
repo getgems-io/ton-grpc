@@ -7,9 +7,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: x86_64-unknown-linux-gnu
     - name: Install LLVM and Clang
       id: llvm_setup
       shell: bash
@@ -24,10 +21,13 @@ runs:
         packages: libsecp256k1-dev libsodium-dev clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_VERSION }} clangd-${{ steps.llvm_setup.outputs.LLVM_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
     - shell: bash
       run: |
-        sudo apt install --yes libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
+        sudo apt install --yes libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
     - uses: arduino/setup-protoc@v2
       with:
         repo-token: ${{ inputs.token }}
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: x86_64-unknown-linux-gnu
     - shell: bash
       run: | 
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
