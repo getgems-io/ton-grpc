@@ -45,7 +45,8 @@ spec:
             - --enable-metrics
             {{- end }}
             {{- if .Values.tonConfigUrl }}
-            - --ton-config-url="{{ .Values.tonConfigUrl }}"
+            - --ton-config-url
+            - {{ .Values.tonConfigUrl }}
             {{- end }}
           ports:
             - name: http
