@@ -122,7 +122,7 @@ impl Service<&Route> for Router {
                         }
                     }
                 }.boxed();
-            } else if distance.is_none() {
+            } else {
                 let services = Route::Latest.choose(&self.services);
                 if !services.is_empty() {
                     metrics::increment_counter!("ton_router_fallback_hit_count");
