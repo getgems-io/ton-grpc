@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.13.0...tonlibjson-client-v0.13.1) (2023-12-12)
+
+
+### Bug Fixes
+
+* always fallback to latest servers ([#593](https://github.com/getgems-io/ton-grpc/issues/593)) ([5f7f0e2](https://github.com/getgems-io/ton-grpc/commit/5f7f0e28e63edf38e4453148ecc6598c6e8b9682))
+
 ## [0.13.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.12.2...tonlibjson-client-v0.13.0) (2023-12-07)
 
 
