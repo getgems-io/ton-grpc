@@ -135,7 +135,7 @@ impl From<(&AccountAddressData, block::RawTransaction)> for Transaction {
             fee: value.fee,
             storage_fee: value.storage_fee,
             other_fee: value.other_fee,
-            in_msg: Some(value.in_msg.into()),
+            in_msg: value.in_msg.map(|m| m.into()),
             out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
         }
     }
@@ -158,7 +158,7 @@ impl TryFrom<(i32, block::RawTransaction)> for Transaction {
             fee: value.fee,
             storage_fee: value.storage_fee,
             other_fee: value.other_fee,
-            in_msg: Some(value.in_msg.into()),
+            in_msg: value.in_msg.map(|m| m.into()),
             out_msgs: value.out_msgs.into_iter().map(Into::into).collect(),
         })
     }
