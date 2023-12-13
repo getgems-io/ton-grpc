@@ -6,14 +6,14 @@ use std::sync::{Arc, OnceLock};
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
-use anyhow::Result;
+use anyhow::{anyhow, bail, Result};
 use dashmap::{DashMap, DashSet};
 use futures::{FutureExt,try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
 use tokio::sync::watch::{Receiver, Sender};
 use tokio::time::{interval, MissedTickBehavior};
-use tokio_retry::Retry;
+use tokio_retry::{Retry, RetryIf};
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
@@ -56,6 +56,14 @@ impl ShardBounds {
             left: None,
             right_discovered: Some(right.id.clone()),
             right: Some(right)
+        }
+    }
+
+    fn right_discovered(right: TonBlockIdExt) -> Self {
+        Self {
+            left: None,
+            right_discovered: Some(right),
+            right: None
         }
     }
 
@@ -145,10 +153,32 @@ impl Registry {
         self.shard_bounds_registry
             .entry(shard_id)
             .and_modify(|b| {
-                b.right_discovered.replace(header.id.clone());
-                b.right.replace(header.clone());
+                tracing::warn!(chain = header.id.workchain, shard = header.id.shard, seqno = header.id.seqno);
+
+                if b.right_discovered.is_none() || b.right_discovered.as_ref().is_some_and(|r| header.id.seqno > r.seqno) {
+                    b.right_discovered.replace(header.id.clone());
+                }
+
+                if b.right.is_none() || b.right.as_ref().is_some_and(|r| header.id.seqno > r.id.seqno) {
+                    b.right.replace(header.clone());
+                }
             })
             .or_insert_with(|| ShardBounds::right(header.clone()));
+    }
+
+    fn upsert_right_discovered(&self, id: &TonBlockIdExt) {
+        let shard_id = (id.workchain, id.shard);
+
+        self.update_shard_registry(&shard_id);
+
+        trace!(chaid_id = id.workchain, shard_id = id.shard, seqno = id.seqno, "right block dicovered");
+
+        self.shard_bounds_registry
+            .entry(shard_id)
+            .and_modify(|b| {
+                b.right_discovered.replace(id.clone());
+            })
+            .or_insert_with(|| ShardBounds::right_discovered(id.clone()));
     }
 
     fn update_shard_registry(&self, shard_id: &ShardId) {
@@ -487,25 +517,6 @@ async fn find_first_blocks(client: &mut InnerClient, start: &TonBlockIdExt, lhs:
     Ok((master, work))
 }
 
-async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
-    let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
-
-    let shards = cached_get_shards(&BlocksGetShards::new(master_chain_last_block_id.clone()), client).await?;
-
-    let clone = client.clone();
-    let requests = shards.shards
-        .into_iter()
-        .map(|s| wait_for_block_header(s, clone.clone()));
-
-    let masterchain_header = BlocksGetBlockHeader::new(master_chain_last_block_id);
-
-    Ok(try_join!(
-        cached_block_header(&masterchain_header, client),
-        futures::future::try_join_all(requests)
-    )?)
-}
-
-
 fn shards_cache() -> &'static Cache<TonBlockIdExt, BlocksShards> {
     static CACHE: OnceLock<Cache<TonBlockIdExt, BlocksShards>> = OnceLock::new();
 
@@ -531,30 +542,6 @@ async fn cached_block_id_ext(block_id: TonBlockId, client: &mut InnerClient) -> 
 
 async fn cached_lookup_block(req: &BlocksLookupBlock, client: &mut InnerClient) -> Result<TonBlockIdExt> {
     block_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
-}
-
-fn block_header_cache() -> &'static Cache<BlocksGetBlockHeader, BlocksHeader> {
-    static CACHE: OnceLock<Cache<BlocksGetBlockHeader, BlocksHeader>> = OnceLock::new();
-
-    CACHE.get_or_init(|| Cache::new(1024))
-}
-
-async fn cached_block_header(req: &BlocksGetBlockHeader, client: &mut InnerClient) -> Result<BlocksHeader> {
-    block_header_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
-}
-
-async fn wait_for_block_header(block_id: TonBlockIdExt, client: InnerClient) -> Result<BlocksHeader> {
-    let retry = FibonacciBackoff::from_millis(512)
-        .max_delay(Duration::from_millis(4096))
-        .map(jitter)
-        .take(16);
-
-    Retry::spawn(retry, || {
-        let block_id = block_id.clone();
-        let client = client.clone();
-
-        client.oneshot(BlocksGetBlockHeader::new(block_id))
-    }).await
 }
 
 struct FirstBlockDiscover {
@@ -633,14 +620,13 @@ impl LastBlockDiscover {
         let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-        let mut current: Option<BlocksMasterchainInfo> = None;
         loop {
             timer.tick().await;
 
             gauge!("ton_liteserver_requests", self.client.load() as f64, "liteserver_id" => self.id.clone());
 
             match self.next().await {
-                Ok(Some(masterchain_info)) => { current.replace(masterchain_info); },
+                Ok(Some(masterchain_info)) => { self.current.replace(masterchain_info); },
                 Ok(None) | Err(_) => {}
             }
         }
@@ -654,18 +640,48 @@ impl LastBlockDiscover {
             }
         }
 
+        self.registry.upsert_right_discovered(&masterchain_info.last);
         absolute_counter!("ton_liteserver_last_seqno", masterchain_info.last.seqno as u64, "liteserver_id" => self.id.clone());
 
-        let (master_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
-        absolute_counter!("ton_liteserver_synced_seqno", master_header.id.seqno as u64, "liteserver_id" => self.id.clone());
+        let master_chain_last_block_id = (&mut self.client).oneshot(Sync::default()).await?;
+        let header = (&mut self.client).oneshot(BlocksGetBlockHeader::new(master_chain_last_block_id.clone())).await?;
+        self.registry.upsert_right(&header);
+        let _ = self.mtx.send(Some(masterchain_info.clone()));
+        absolute_counter!("ton_liteserver_synced_seqno", master_chain_last_block_id.seqno as u64, "liteserver_id" => self.id.clone());
 
-        self.registry.upsert_right(&master_header);
-        for header in &last_work_chain_header {
-            self.registry.upsert_right(header);
+        let shards = (&mut self.client).oneshot(BlocksGetShards::new(master_chain_last_block_id.clone())).await?;
+        for shard in shards.shards {
+            self.registry.upsert_right_discovered(&shard);
+
+            let client = self.client.clone();
+            let registry = self.registry.clone();
+
+            let _ = tokio::spawn(async move {
+                let retry = FibonacciBackoff::from_millis(512)
+                    .max_delay(Duration::from_millis(4096))
+                    .map(jitter)
+                    .take(16);
+
+                let Ok(block) = RetryIf::spawn(retry, || {
+                    let block_id = shard.clone();
+                    let client = client.clone();
+
+                    if registry.get_last_seqno(&(shard.workchain, shard.shard)).is_some_and(|seqno| seqno >= block_id.seqno) {
+                        std::future::ready(Err(anyhow!("block is already in registry seqno={}", shard.seqno))).boxed()
+                    } else {
+                        client.oneshot(BlocksGetBlockHeader::new(block_id)).boxed()
+                    }
+                }, |e: &anyhow::Error| !e.to_string().contains("block is already in registry")).await.map_err(|e| {
+                    tracing::error!(shard = ?shard, error = ?e, "sync shard skipped");
+
+                    e
+                }) else { return; };
+
+                registry.upsert_right(&block)
+            });
         }
 
-        masterchain_info.last = master_header.id.clone();
-        let _ = self.mtx.send(Some(masterchain_info.clone()));
+        masterchain_info.last = master_chain_last_block_id;
 
         Ok(Some(masterchain_info))
     }
