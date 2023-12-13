@@ -38,13 +38,15 @@ type Seqno = i32;
 #[derive(Debug, Clone, Default)]
 struct ShardBounds {
     left: Option<BlocksHeader>,
-    right: Option<BlocksHeader>
+    right_discovered: Option<TonBlockIdExt>,
+    right: Option<BlocksHeader>,
 }
 
 impl ShardBounds {
     fn left(left: BlocksHeader) -> Self {
         Self {
             left: Some(left),
+            right_discovered: None,
             right: None
         }
     }
@@ -52,6 +54,7 @@ impl ShardBounds {
     fn right(right: BlocksHeader) -> Self {
         Self {
             left: None,
+            right_discovered: Some(right.id.clone()),
             right: Some(right)
         }
     }
@@ -141,7 +144,10 @@ impl Registry {
 
         self.shard_bounds_registry
             .entry(shard_id)
-            .and_modify(|b| { b.right.replace(header.clone()); })
+            .and_modify(|b| {
+                b.right_discovered.replace(header.id.clone());
+                b.right.replace(header.clone());
+            })
             .or_insert_with(|| ShardBounds::right(header.clone()));
     }
 
