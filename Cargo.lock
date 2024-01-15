@@ -2034,7 +2034,6 @@ version = "0.13.1"
 dependencies = [
  "anyhow",
  "async-stream",
- "async-trait",
  "base64",
  "bytes",
  "config",
