@@ -25,15 +25,15 @@ impl TonConfig {
 #[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct LiteserverId {
     #[serde(rename = "@type")]
-    typ: String,
-    key: String,
+    pub typ: String,
+    pub key: String,
 }
 
 #[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct Liteserver {
-    id: LiteserverId,
-    ip: i32,
-    port: u16,
+    pub id: LiteserverId,
+    pub ip: u32,
+    pub port: u16,
 }
 
 impl Liteserver {

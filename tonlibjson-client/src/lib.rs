@@ -18,4 +18,4 @@ pub mod address;
 mod helper;
 mod metric;
 mod router;
-mod dns_discover;
+pub mod dns_discover;
