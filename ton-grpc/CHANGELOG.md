@@ -28,6 +28,20 @@
 
 
 
+## [0.9.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.8.4...ton-grpc-v0.9.0) (2024-01-19)
+
+
+### Features
+
+* k8s dns resolv ([76ffcb1](https://github.com/getgems-io/ton-grpc/commit/76ffcb14c593b13fa493d280841d9e6aae031070))
+
+
+### Bug Fixes
+
+* **deps:** bump clap from 4.4.10 to 4.4.16 ([d823843](https://github.com/getgems-io/ton-grpc/commit/d8238434c635f224d686798c445e6367d089e812))
+* **deps:** bump metrics-exporter-prometheus from 0.12.1 to 0.12.2 ([d48f0c7](https://github.com/getgems-io/ton-grpc/commit/d48f0c7a9c1763de6a28f0420994db2745a333b7))
+* optional in_msg ([f1f1b2e](https://github.com/getgems-io/ton-grpc/commit/f1f1b2ecdc6ac8c3fe79a6aae26c6687e4f2b312))
+
 ## [0.8.3](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.8.2...ton-grpc-v0.8.3) (2023-12-07)
 
 
