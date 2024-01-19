@@ -42,7 +42,7 @@ impl DnsResolverDiscover {
 
                 match resolver.lookup_ip(&host).await {
                     Ok(records) => {
-                        let new_state = HashSet::from_iter(records.into_iter());
+                        let new_state = HashSet::from_iter(records);
 
                         let new = new_state.difference(&state);
                         let drop = state.difference(&new_state);
