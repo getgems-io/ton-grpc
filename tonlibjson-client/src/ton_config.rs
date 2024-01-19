@@ -32,7 +32,7 @@ pub struct LiteserverId {
 #[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct Liteserver {
     pub id: LiteserverId,
-    pub ip: u32,
+    pub ip: i32,
     pub port: u16,
 }
 
