@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.14.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.13.1...tonlibjson-client-v0.14.0) (2024-01-19)
+
+
+### Features
+
+* k8s dns resolv ([76ffcb1](https://github.com/getgems-io/ton-grpc/commit/76ffcb14c593b13fa493d280841d9e6aae031070))
+
+
+### Bug Fixes
+
+* **deps:** bump prettyplease from 0.2.15 to 0.2.16 ([10872a4](https://github.com/getgems-io/ton-grpc/commit/10872a45e3820b5a4628cdc8fd7284cc858e7e92))
+* **deps:** bump syn from 2.0.39 to 2.0.41 ([ca7e9db](https://github.com/getgems-io/ton-grpc/commit/ca7e9db737b79d6b5b30a0f147b8bb80fe70ea25))
+* optional in_msg ([f1f1b2e](https://github.com/getgems-io/ton-grpc/commit/f1f1b2ecdc6ac8c3fe79a6aae26c6687e4f2b312))
+
 ## [0.13.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.13.0...tonlibjson-client-v0.13.1) (2023-12-12)
 
 
