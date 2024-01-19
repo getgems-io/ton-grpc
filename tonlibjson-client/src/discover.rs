@@ -1,6 +1,6 @@
 use crate::make::{CursorClientFactory, ClientFactory};
 use crate::ton_config::{load_ton_config, read_ton_config, TonConfig};
-use async_stream::try_stream;
+use async_stream::{stream, try_stream};
 use reqwest::Url;
 use std::time::Duration;
 use std::{
@@ -9,7 +9,7 @@ use std::{
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
-use futures::TryFutureExt;
+use futures::{StreamExt, TryFutureExt};
 use tokio_stream::Stream;
 use tower::discover::Change;
 use tower::load::PeakEwmaDiscover;
@@ -18,7 +18,10 @@ use tower::ServiceExt;
 use tower::Service;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
+use crate::dns_discover::DnsResolverDiscover;
 use crate::ton_config::Liteserver;
+
+// TODO[akostylev0] rework
 
 type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 
@@ -42,6 +45,32 @@ impl ClientDiscover {
         Ok(Self {
             changes: Box::pin(stream),
         })
+    }
+
+    pub(crate) async fn dsn_resolve(url: Url, host: String, key: String) -> anyhow::Result<Self> {
+        // TODO[akostylev0] base config ttl
+        let config = config(url.clone(), None).await?;
+        let mut dns_discovery = DnsResolverDiscover::new(&host, &key);
+
+        let stream = stream! {
+            while let Some(change) = dns_discovery.next().await {
+                match change {
+                    Ok(change) => {
+                        match change {
+                            Change::Insert(id, ls) => {
+                                if let Ok(client) = ClientFactory.ready().await?.call(config.with_liteserver(&ls)).await {
+                                    yield Ok(Change::Insert(id, client));
+                                }
+                            },
+                            Change::Remove(id) => { yield Ok(Change::Remove(id)); },
+                        }
+                    },
+                    Err(_) => { continue; }
+                };
+            }
+        };
+
+        Ok(Self { changes: Box::pin(stream) })
     }
 
     pub(crate) async fn new(url: Url, period: Duration, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
@@ -116,13 +145,9 @@ impl Stream for ClientDiscover {
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let c = &mut self.changes;
+
         match Pin::new(&mut *c).poll_next(cx) {
-            Poll::Ready(Some(Ok(change))) => match change {
-                Change::Insert(k, client) => Poll::Ready(Some(Ok(
-                    Change::Insert(k, client)
-                ))),
-                Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
-            },
+            Poll::Ready(Some(Ok(change))) => Poll::Ready(Some(Ok(change))),
             _ => Poll::Pending
         }
     }
