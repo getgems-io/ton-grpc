@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.4...charts/ton-grpc-v0.6.0) (2024-01-21)
+
+
+### Features
+
+* support dns resolving at helm chart ([fe1ec5d](https://github.com/getgems-io/ton-grpc/commit/fe1ec5d3614e75aeba9a1b4405b173ec747c6bfa))
+
 ## [0.5.4](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.3...charts/ton-grpc-v0.5.4) (2023-12-07)
 
 
