@@ -48,6 +48,12 @@ spec:
             - --ton-config-url
             - {{ .Values.tonConfigUrl }}
             {{- end }}
+            {{- if .Values.dnsResolve.host }}
+            - --dns-host
+            - {{ .Values.dnsResolve.host }}
+            - --dns-key
+            - {{ .Values.dnsResolve.key }}
+            {{- end }}
           ports:
             - name: http
               containerPort: 50052
