@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.14.0...tonlibjson-client-v0.14.1) (2024-01-22)
+
+
+### Bug Fixes
+
+* **deps:** bump metrics from 0.21.1 to 0.22.0 ([4fa411a](https://github.com/getgems-io/ton-grpc/commit/4fa411ab11d9db701cb40619801dfcec3b853853))
+* **deps:** bump serial_test from 2.0.0 to 3.0.0 ([4a19742](https://github.com/getgems-io/ton-grpc/commit/4a19742d1ffd4b4ca5d0ceaa8222eb6004f9af7a))
+
 ## [0.14.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.13.1...tonlibjson-client-v0.14.0) (2024-01-19)
 
 
