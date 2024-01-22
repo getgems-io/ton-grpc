@@ -3,7 +3,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use metrics::counter;
 use tower::Service;
 use pin_project::{pin_project, pinned_drop};
 use tower::load::Load;
@@ -75,7 +74,7 @@ impl<S, Request> Service<Request> for ConcurrencyMetric<S>
     fn call(&mut self, req: Request) -> Self::Future {
         let req_type = std::any::type_name::<Request>();
 
-        counter!("ton_liteserver_requests_total", 1, "liteserver_id" => self.liteserver_id.clone(), r"request_type" => req_type);
+        metrics::counter!("ton_liteserver_requests_total", "liteserver_id" => self.liteserver_id.clone(), r"request_type" => req_type).increment(1);
 
         let future = self.inner.call(req);
 

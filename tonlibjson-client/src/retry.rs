@@ -59,7 +59,7 @@ impl<T: Clone, Res, E> Policy<T, Res, E> for RetryPolicy {
 
                 match self.budget.withdraw() {
                     Ok(_) => {
-                        metrics::increment_counter!("ton_retry_budget_withdraw_success", "request_type" => request_type);
+                        metrics::counter!("ton_retry_budget_withdraw_success", "request_type" => request_type).increment(1);
 
                         Some({
                             let mut pol = self.clone();
@@ -77,7 +77,7 @@ impl<T: Clone, Res, E> Policy<T, Res, E> for RetryPolicy {
                             }.boxed()
                     }) },
                     Err(_) => {
-                        metrics::increment_counter!("ton_retry_budget_withdraw_fail", "request_type" => request_type);
+                        metrics::counter!("ton_retry_budget_withdraw_fail", "request_type" => request_type).increment(1);
 
                         None
                     }
