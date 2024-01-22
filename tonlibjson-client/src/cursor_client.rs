@@ -20,7 +20,6 @@ use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
 use tracing::{instrument, trace};
-use metrics::{absolute_counter, describe_counter, describe_gauge, gauge};
 use quick_cache::sync::Cache;
 use crate::router::BlockCriteria;
 use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, BlocksShards, Sync, TonBlockId, TonBlockIdExt};
@@ -280,11 +279,11 @@ impl CursorClient {
     }
 
     pub(crate) fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
-        describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
-        describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
-        describe_counter!("ton_liteserver_first_seqno", "The seqno of the first block that is available for the liteserver to request");
-        describe_gauge!("ton_liteserver_requests_total", "Total count of requests");
-        describe_gauge!("ton_liteserver_requests", "Number of concurrent requests");
+        metrics::describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
+        metrics::describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
+        metrics::describe_counter!("ton_liteserver_first_seqno", "The seqno of the first block that is available for the liteserver to request");
+        metrics::describe_gauge!("ton_liteserver_requests_total", "Total count of requests");
+        metrics::describe_gauge!("ton_liteserver_requests", "Number of concurrent requests");
 
         let id = Cow::from(id);
         let client = ConcurrencyMetric::new(client, id.clone());
@@ -603,7 +602,7 @@ impl FirstBlockDiscover {
         let cur = self.current.as_ref().map(|n| n.id.seqno + 32);
         let (mfb, wfb) = find_first_blocks(&mut self.client, &start, lhs, cur).await?;
 
-        absolute_counter!("ton_liteserver_first_seqno", mfb.id.seqno as u64, "liteserver_id" => self.id.clone());
+        metrics::counter!("ton_liteserver_first_seqno", "liteserver_id" => self.id.clone()).absolute(mfb.id.seqno as u64);
 
         self.registry.upsert_left(&mfb);
         for header in &wfb {
@@ -631,7 +630,7 @@ impl LastBlockDiscover {
         loop {
             timer.tick().await;
 
-            gauge!("ton_liteserver_requests", self.client.load() as f64, "liteserver_id" => self.id.clone());
+            metrics::gauge!("ton_liteserver_requests", "liteserver_id" => self.id.clone()).set(self.client.load() as f64);
 
             match self.next().await {
                 Ok(Some(masterchain_info)) => { current.replace(masterchain_info); },
@@ -648,10 +647,10 @@ impl LastBlockDiscover {
             }
         }
 
-        absolute_counter!("ton_liteserver_last_seqno", masterchain_info.last.seqno as u64, "liteserver_id" => self.id.clone());
+        metrics::counter!("ton_liteserver_last_seqno", "liteserver_id" => self.id.clone()).absolute(masterchain_info.last.seqno as u64);
 
         let (master_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
-        absolute_counter!("ton_liteserver_synced_seqno", master_header.id.seqno as u64, "liteserver_id" => self.id.clone());
+        metrics::counter!("ton_liteserver_synced_seqno", "liteserver_id" => self.id.clone()).absolute(master_header.id.seqno as u64);
 
         self.registry.upsert_right(&master_header);
         for header in &last_work_chain_header {

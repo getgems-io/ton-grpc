@@ -99,12 +99,12 @@ impl Service<&Route> for Router {
             return std::future::ready(Ok(services)).boxed();
         }
 
-        metrics::increment_counter!("ton_router_miss_count");
+        metrics::counter!("ton_router_miss_count").increment(1);
 
         if let Route::Block { chain, criteria } = req {
             let distance = self.distance_to(chain, criteria);
             if distance.is_some_and(|d| d <= 1) {
-                metrics::increment_counter!("ton_router_delayed_count");
+                metrics::counter!("ton_router_delayed_count").increment(1);
 
                 let req = *req;
                 let svcs = self.services.clone();
@@ -116,7 +116,7 @@ impl Service<&Route> for Router {
 
                         let services = req.choose(&svcs);
                         if !services.is_empty() {
-                            metrics::increment_counter!("ton_router_delayed_hit_count");
+                            metrics::counter!("ton_router_delayed_hit_count").increment(1);
 
                             return Ok(services)
                         }
@@ -125,7 +125,7 @@ impl Service<&Route> for Router {
             } else {
                 let services = Route::Latest.choose(&self.services);
                 if !services.is_empty() {
-                    metrics::increment_counter!("ton_router_fallback_hit_count");
+                    metrics::counter!("ton_router_fallback_hit_count").increment(1);
                     return std::future::ready(Ok(services)).boxed();
                 }
             }
