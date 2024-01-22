@@ -36,7 +36,7 @@ metrics = "0.21.1"
 
 [dev-dependencies]
 tracing-test = { workspace = true }
-serial_test = "2.0.0"
+serial_test = "3.0.0"
 
 [build-dependencies]
 tl_parser = { path = "../tl_parser" }
