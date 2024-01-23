@@ -36,21 +36,44 @@ type Seqno = i32;
 #[derive(Debug, Clone, Default)]
 struct ShardBounds {
     left: Option<BlocksHeader>,
-    right: Option<BlocksHeader>
+    right: Option<BlocksHeader>,
+    right_end: Option<Seqno>
 }
 
 impl ShardBounds {
     fn left(left: BlocksHeader) -> Self {
         Self {
             left: Some(left),
-            right: None
+            right: None,
+            right_end: None
         }
     }
 
     fn right(right: BlocksHeader) -> Self {
         Self {
             left: None,
-            right: Some(right)
+            right_end: Some(right.id.seqno),
+            right: Some(right),
+        }
+    }
+
+    fn right_end(right_end: Seqno) -> Self {
+        Self {
+            left: None,
+            right_end: Some(right_end),
+            right: None,
+        }
+    }
+
+    fn right_next(&self) -> Option<Seqno> {
+        let Some(seqno) = self.right_end else {
+            return None;
+        };
+
+        match self.right {
+            None => Some(seqno),
+            Some(ref right) if right.id.seqno < seqno => Some(right.id.seqno + 1),
+            _ => None,
         }
     }
 
@@ -79,6 +102,12 @@ struct Registry {
 }
 
 impl Registry {
+    fn right_next(&self, shard_id: ShardId) -> Option<Seqno> {
+        self.shard_bounds_registry
+            .get(&shard_id)
+            .and_then(|s| s.right_next())
+    }
+
     fn get_last_seqno(&self, shard_id: &ShardId) -> Option<Seqno> {
         self.shard_bounds_registry
             .get(shard_id)
@@ -109,6 +138,19 @@ impl Registry {
             .entry(shard_id)
             .and_modify(|b| { b.right.replace(header.clone()); })
             .or_insert_with(|| ShardBounds::right(header.clone()));
+    }
+
+    fn upsert_right_end(&self, block_id: &TonBlockIdExt) {
+        let shard_id = (block_id.workchain, block_id.shard);
+
+        self.update_shard_registry(&shard_id);
+
+        trace!(chaid_id = block_id.workchain, shard_id = block_id.shard, seqno = block_id.seqno, "right end block");
+
+        self.shard_bounds_registry
+            .entry(shard_id)
+            .and_modify(|b| { b.right_end.replace(block_id.seqno); })
+            .or_insert_with(|| ShardBounds::right_end(block_id.seqno));
     }
 
     fn update_shard_registry(&self, shard_id: &ShardId) {
@@ -354,22 +396,6 @@ async fn find_first_blocks(client: &mut InnerClient, start: &TonBlockIdExt, lhs:
     Ok((master, work))
 }
 
-async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
-    let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
-
-    let shards = client.oneshot(BlocksGetShards::new(master_chain_last_block_id.clone())).await?;
-
-    let clone = client.clone();
-    let requests = shards.shards
-        .into_iter()
-        .map(|s| wait_for_block_header(s, clone.clone()));
-
-    Ok(try_join!(
-        client.oneshot(BlocksGetBlockHeader::new(master_chain_last_block_id)),
-        futures::future::try_join_all(requests)
-    )?)
-}
-
 async fn wait_for_block_header(block_id: TonBlockIdExt, client: InnerClient) -> Result<BlocksHeader> {
     let retry = FibonacciBackoff::from_millis(512)
         .max_delay(Duration::from_millis(4096))
@@ -457,43 +483,47 @@ struct LastBlockDiscover {
 
 impl LastBlockDiscover {
     async fn discover(mut self) -> Never {
-        let mut timer = interval(Duration::new(2, 1_000_000_000 / 2));
+        let mut timer = interval(Duration::from_secs(1));
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-        let mut current: Option<BlocksMasterchainInfo> = None;
         loop {
             timer.tick().await;
 
             metrics::gauge!("ton_liteserver_requests", "liteserver_id" => self.id.clone()).set(self.client.load() as f64);
 
             match self.next().await {
-                Ok(Some(masterchain_info)) => { current.replace(masterchain_info); },
-                Ok(None) | Err(_) => {}
+                Ok(Some(info)) => { self.current.replace(info); },
+                Ok(None) => {}
+                Err(e) => {}
             }
         }
     }
 
     async fn next(&mut self) -> Result<Option<BlocksMasterchainInfo>> {
-        let mut masterchain_info = (&mut self.client).oneshot(BlocksGetMasterchainInfo::default()).await?;
-        if let Some(ref current) = self.current {
-            if current == &masterchain_info {
-                return Ok(None);
-            }
+        let mut info = (&mut self.client).oneshot(BlocksGetMasterchainInfo::new()).await?;
+        if self.current.as_ref().is_some_and(|c| c == &info) {
+            return Ok(None);
         }
 
-        metrics::counter!("ton_liteserver_last_seqno", "liteserver_id" => self.id.clone()).absolute(masterchain_info.last.seqno as u64);
+        let last_block = (&mut self.client).oneshot(Sync::default()).await?;
+        metrics::counter!("ton_liteserver_synced_seqno", "liteserver_id" => self.id.clone()).absolute(last_block.seqno as u64);
+        self.registry.upsert_right_end(&last_block);
 
-        let (master_header, last_work_chain_header) = fetch_last_headers(&mut self.client).await?;
-        metrics::counter!("ton_liteserver_synced_seqno", "liteserver_id" => self.id.clone()).absolute(master_header.id.seqno as u64);
+        while let Some(seqno) = self.registry.right_next((last_block.workchain, last_block.shard)) {
+            let block_id = (&mut self.client).oneshot(BlocksLookupBlock::seqno(TonBlockId {
+                workchain: last_block.workchain,
+                shard: last_block.shard,
+                seqno
+            })).await?;
 
-        self.registry.upsert_right(&master_header);
-        for header in &last_work_chain_header {
-            self.registry.upsert_right(header);
+            let header = wait_for_block_header(block_id, self.client.clone()).await?;
+
+            self.registry.upsert_right(&header);
+
+            info.last = header.id;
+            let _ = self.mtx.send(Some(info.clone()));
         }
 
-        masterchain_info.last = master_header.id.clone();
-        let _ = self.mtx.send(Some(masterchain_info.clone()));
-
-        Ok(Some(masterchain_info))
+        Ok(Some(info))
     }
 }
