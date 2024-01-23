@@ -501,6 +501,7 @@ impl LastBlockDiscover {
 
     async fn next(&mut self) -> Result<Option<BlocksMasterchainInfo>> {
         let mut info = (&mut self.client).oneshot(BlocksGetMasterchainInfo::new()).await?;
+        metrics::counter!("ton_liteserver_last_seqno", "liteserver_id" => self.id.clone()).absolute(info.last.seqno as u64);
         if self.current.as_ref().is_some_and(|c| c == &info) {
             return Ok(None);
         }
