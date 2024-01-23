@@ -494,7 +494,7 @@ impl LastBlockDiscover {
             match self.next().await {
                 Ok(Some(info)) => { self.current.replace(info); },
                 Ok(None) => {}
-                Err(e) => {}
+                Err(_) => {}
             }
         }
     }
