@@ -243,7 +243,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(Specialized::new(BlocksLookupBlock::seqno(TonBlockId::new(chain, shard, seqno))))
+            .oneshot(BlocksLookupBlock::seqno(TonBlockId::new(chain, shard, seqno)))
             .await
     }
 
@@ -259,7 +259,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(Specialized::new(BlocksLookupBlock::logical_time(TonBlockId::new(chain, shard, 0), lt)))
+            .oneshot(BlocksLookupBlock::logical_time(TonBlockId::new(chain, shard, 0), lt))
             .await
     }
 
@@ -270,7 +270,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(Specialized::new(BlocksGetShards::new(block)))
+            .oneshot(BlocksGetShards::new(block))
             .await
     }
 
@@ -281,7 +281,7 @@ impl TonClient {
 
         self.client
             .clone()
-            .oneshot(Specialized::new(BlocksGetShards::new(block_id)))
+            .oneshot(BlocksGetShards::new(block_id))
             .map_ok(|res| res.shards)
             .await
     }

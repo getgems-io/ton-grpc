@@ -4,7 +4,7 @@ use futures::{TryFutureExt, FutureExt};
 use derive_new::new;
 use tower::{Service, ServiceExt};
 use tower::discover::ServiceList;
-use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksLookupBlock, BlocksMasterchainInfo, BlocksShards, TonBlockIdExt};
+use crate::block::{BlocksGetMasterchainInfo, BlocksMasterchainInfo};
 use crate::cursor_client::InnerClient;
 use crate::error::ErrorService;
 use crate::request::{Callable, Specialized};
@@ -45,44 +45,6 @@ impl Service<Specialized<BlocksGetMasterchainInfo>> for Balance {
             .call(&req.route())
             .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
                 ServiceList::new::<Specialized<BlocksGetMasterchainInfo>>(svc))).oneshot(req))
-            .boxed()
-    }
-}
-
-// TODO[akostylev0] generics
-impl Service<Specialized<BlocksGetShards>> for Balance {
-    type Response = BlocksShards;
-    type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.router.poll_ready(cx)
-    }
-
-    fn call(&mut self, req: Specialized<BlocksGetShards>) -> Self::Future {
-        self.router
-            .call(&req.route())
-            .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
-                ServiceList::new::<Specialized<BlocksGetShards>>(svc))).oneshot(req))
-            .boxed()
-    }
-}
-
-// TODO[akostylev0] generics
-impl Service<Specialized<BlocksLookupBlock>> for Balance {
-    type Response = TonBlockIdExt;
-    type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.router.poll_ready(cx)
-    }
-
-    fn call(&mut self, req: Specialized<BlocksLookupBlock>) -> Self::Future {
-        self.router
-            .call(&req.route())
-            .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
-                ServiceList::new::<Specialized<BlocksLookupBlock>>(svc))).oneshot(req))
             .boxed()
     }
 }

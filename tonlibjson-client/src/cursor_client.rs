@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service, ServiceExt};
@@ -20,9 +20,8 @@ use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
 use tracing::{instrument, trace};
-use quick_cache::sync::Cache;
 use crate::router::BlockCriteria;
-use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, BlocksShards, Sync, TonBlockId, TonBlockIdExt};
+use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
@@ -352,40 +351,6 @@ impl Service<Specialized<BlocksGetMasterchainInfo>> for CursorClient {
     }
 }
 
-// TODO[akostylev0] generics
-impl Service<Specialized<BlocksGetShards>> for CursorClient {
-    type Response = BlocksShards;
-    type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
-        Service::<BlocksGetShards>::poll_ready(self, cx)
-    }
-
-    fn call(&mut self, req: Specialized<BlocksGetShards>) -> Self::Future {
-        let mut client = self.client.clone();
-
-        async move { cached_get_shards(req.inner(), &mut client).await }.boxed()
-    }
-}
-
-// TODO[akostylev0] generics
-impl Service<Specialized<BlocksLookupBlock>> for CursorClient {
-    type Response = TonBlockIdExt;
-    type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
-
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
-        Service::<BlocksLookupBlock>::poll_ready(self, cx)
-    }
-
-    fn call(&mut self, req: Specialized<BlocksLookupBlock>) -> Self::Future {
-        let mut client = self.client.clone();
-
-        async move { cached_lookup_block(req.inner(), &mut client).await }.boxed()
-    }
-}
-
 impl<R : Callable<InnerClient>> Service<R> for CursorClient {
     type Response = R::Response;
     type Error = anyhow::Error;
@@ -415,8 +380,8 @@ impl Load for CursorClient {
 }
 
 async fn check_block_available(client: &mut InnerClient, block_id: TonBlockId) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
-    let block_id = cached_block_id_ext(block_id, client).await?;
-    let shards = cached_get_shards(&BlocksGetShards::new(block_id.clone()), client).await?;
+    let block_id = client.oneshot(BlocksLookupBlock::seqno(block_id)).await?;
+    let shards = client.oneshot(BlocksGetShards::new(block_id.clone())).await?;
 
     let clone = client.clone();
     let requests = shards.shards
@@ -483,57 +448,17 @@ async fn find_first_blocks(client: &mut InnerClient, start: &TonBlockIdExt, lhs:
 async fn fetch_last_headers(client: &mut InnerClient) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
     let master_chain_last_block_id = client.oneshot(Sync::default()).await?;
 
-    let shards = cached_get_shards(&BlocksGetShards::new(master_chain_last_block_id.clone()), client).await?;
+    let shards = client.oneshot(BlocksGetShards::new(master_chain_last_block_id.clone())).await?;
 
     let clone = client.clone();
     let requests = shards.shards
         .into_iter()
         .map(|s| wait_for_block_header(s, clone.clone()));
 
-    let masterchain_header = BlocksGetBlockHeader::new(master_chain_last_block_id);
-
     Ok(try_join!(
-        cached_block_header(&masterchain_header, client),
+        client.oneshot(BlocksGetBlockHeader::new(master_chain_last_block_id)),
         futures::future::try_join_all(requests)
     )?)
-}
-
-
-fn shards_cache() -> &'static Cache<TonBlockIdExt, BlocksShards> {
-    static CACHE: OnceLock<Cache<TonBlockIdExt, BlocksShards>> = OnceLock::new();
-
-    CACHE.get_or_init(|| Cache::new(1024))
-}
-async fn cached_get_shards(req: &BlocksGetShards, client: &mut InnerClient) -> Result<BlocksShards> {
-    let key = req.id.clone();
-
-    shards_cache().get_or_insert_async(&key, async { client.oneshot(req.clone()).await }).await
-}
-
-fn block_cache() -> &'static Cache<BlocksLookupBlock, TonBlockIdExt> {
-    static CACHE: OnceLock<Cache<BlocksLookupBlock, TonBlockIdExt>> = OnceLock::new();
-
-    CACHE.get_or_init(|| Cache::new(1024))
-}
-
-async fn cached_block_id_ext(block_id: TonBlockId, client: &mut InnerClient) -> Result<TonBlockIdExt> {
-    let req = BlocksLookupBlock::seqno(block_id);
-
-    cached_lookup_block(&req, client).await
-}
-
-async fn cached_lookup_block(req: &BlocksLookupBlock, client: &mut InnerClient) -> Result<TonBlockIdExt> {
-    block_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
-}
-
-fn block_header_cache() -> &'static Cache<BlocksGetBlockHeader, BlocksHeader> {
-    static CACHE: OnceLock<Cache<BlocksGetBlockHeader, BlocksHeader>> = OnceLock::new();
-
-    CACHE.get_or_init(|| Cache::new(1024))
-}
-
-async fn cached_block_header(req: &BlocksGetBlockHeader, client: &mut InnerClient) -> Result<BlocksHeader> {
-    block_header_cache().get_or_insert_async(req, async { client.oneshot(req.clone()).await }).await
 }
 
 async fn wait_for_block_header(block_id: TonBlockIdExt, client: InnerClient) -> Result<BlocksHeader> {

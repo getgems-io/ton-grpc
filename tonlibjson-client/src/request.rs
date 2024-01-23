@@ -74,12 +74,6 @@ pub(crate) struct Specialized<T> {
     inner: T
 }
 
-impl<T> Specialized<T> {
-    pub(crate) fn inner(&self) -> &T {
-        &self.inner
-    }
-}
-
 impl<T> Routable for Specialized<T> where T : Routable {
     fn route(&self) -> Route {
         self.inner.route()
