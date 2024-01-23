@@ -8,20 +8,22 @@ use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::Result;
 use dashmap::{DashMap, DashSet};
-use futures::{FutureExt,try_join, TryFutureExt};
+use futures::{FutureExt, SinkExt, try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
+use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::watch::{Receiver, Sender};
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
+use tokio_stream::StreamExt;
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
 use tracing::{instrument, trace};
 use crate::router::BlockCriteria;
-use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
+use crate::block::{BlocksBoxedShards, BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
@@ -264,7 +266,7 @@ impl CursorClient {
         let client = self.client.clone();
         let registry = self.registry.clone();
 
-        let discover = LastBlockDiscover { id, client, mtx, registry, current: None };
+        let discover = LastBlockDiscover::new(id, client, registry, mtx);
 
         discover.discover()
     }
@@ -478,10 +480,30 @@ struct LastBlockDiscover {
     client: InnerClient,
     registry: Arc<Registry>,
     current: Option<BlocksMasterchainInfo>,
-    mtx: Sender<Option<BlocksMasterchainInfo>>
+    mtx: Sender<Option<BlocksMasterchainInfo>>,
+    last_block_tx: UnboundedSender<TonBlockIdExt>
 }
 
 impl LastBlockDiscover {
+    fn new(id: Cow<'static, str>, client: InnerClient, registry: Arc<Registry>, mtx: Sender<Option<BlocksMasterchainInfo>>) -> Self {
+        let (last_block_tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<TonBlockIdExt>();
+
+        // TODO[akostylev0] find last available block
+        tokio::spawn({
+            let client = client.clone();
+            async move {
+                while let Some(block_id) = rx.recv().await {
+                    match client.oneshot(BlocksGetShards::new(block_id)).await {
+                        Ok(_) => {}
+                        Err(_) => {}
+                    }
+                }
+            }
+        });
+
+        Self { id, client, registry, current: None, mtx, last_block_tx }
+    }
+
     async fn discover(mut self) -> Never {
         let mut timer = interval(Duration::from_secs(1));
         timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
@@ -519,6 +541,7 @@ impl LastBlockDiscover {
 
             let header = wait_for_block_header(block_id, self.client.clone()).await?;
 
+            self.last_block_tx.send(last_block.clone())?;
             self.registry.upsert_right(&header);
 
             info.last = header.id;
