@@ -67,38 +67,6 @@ impl ShardBounds {
 
         left.start_lt <= lt && lt <= right.end_lt
     }
-
-    fn distance_seqno(&self, seqno: Seqno) -> Option<Seqno> {
-        let left = self.left.as_ref()?;
-        let right = self.right.as_ref()?;
-
-        if seqno < left.id.seqno {
-            Some(seqno - left.id.seqno)
-        } else if seqno > right.id.seqno {
-            Some(seqno - right.id.seqno)
-        } else {
-            Some(0)
-        }
-    }
-
-    fn distance_lt(&self, lt: i64) -> Option<i64> {
-        let left = self.left.as_ref()?;
-        let right = self.right.as_ref()?;
-
-        if lt < left.start_lt {
-            Some(lt - left.start_lt) // negative
-        } else if lt > right.end_lt {
-            Some(lt - right.end_lt) // positive
-        } else {
-            Some(0)
-        }
-    }
-
-    fn delta_lt(&self) -> Option<i64> {
-        let right = self.right.as_ref()?;
-
-        Some(right.end_lt - right.start_lt)
-    }
 }
 
 type ShardRegistry = DashMap<ChainId, DashSet<ShardId>>;
@@ -179,49 +147,6 @@ impl Registry {
         }
     }
 
-    fn waitable_distance(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
-        match criteria {
-            BlockCriteria::LogicalTime(lt) => {
-                self.shard_registry
-                    .get(chain)
-                    .and_then(|shard_ids| {
-                        let bounds = shard_ids.iter()
-                            .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id));
-
-                        let mut min_waitable_distance = None;
-                        let mut delta_lt = None;
-                        for bound in bounds {
-                            let Some(distance) = bound.distance_lt(*lt) else {
-                                continue;
-                            };
-
-                            if delta_lt.is_none() {
-                                if let Some(new_delta_lt) = bound.delta_lt() {
-                                    delta_lt.replace(new_delta_lt);
-                                }
-                            }
-
-                            if distance == 0 {
-                                return Some(0);
-                            } else if distance > 0 && distance < *min_waitable_distance.get_or_insert(distance) {
-                                min_waitable_distance.replace(distance);
-                            }
-                        }
-
-                        min_waitable_distance.zip(delta_lt)
-                            .map(|(lt_diff, lt_delta)| (lt_delta as f64 / lt_diff as f64).ceil() as Seqno)
-                    })
-            },
-
-            BlockCriteria::Seqno { shard, seqno} => {
-                let shard_id = (*chain, *shard);
-                let bounds = self.shard_bounds_registry.get(&shard_id)?;
-
-                bounds.distance_seqno(*seqno).filter(|d| *d >= 0)
-            }
-        }
-    }
-
     pub fn edges_defined(&self, shard_id: &ShardId) -> bool {
         let Some(shard_bounds) = self.shard_bounds_registry.get(shard_id) else { return false };
 
@@ -239,10 +164,6 @@ pub(crate) struct CursorClient {
 }
 
 impl CursorClient {
-    pub(crate) fn subscribe_masterchain_info(&self) -> Receiver<Option<BlocksMasterchainInfo>> {
-        self.masterchain_info_rx.clone()
-    }
-
     pub(crate) fn last_seqno(&self) -> Option<Seqno> {
         let master_shard_id = self.masterchain_info_rx
             .borrow()
@@ -254,18 +175,6 @@ impl CursorClient {
 
     pub(crate) fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
         self.registry.contains(chain, criteria)
-    }
-
-    pub(crate) fn distance_to(&self, chain: &ChainId, criteria: &BlockCriteria) -> Option<Seqno> {
-        let Some(distance) = self.registry.waitable_distance(chain, criteria) else {
-            return None;
-        };
-
-        if distance > 0 {
-            return Some(distance);
-        };
-
-        Some(0)
     }
 
     pub(crate) fn edges_defined(&self) -> bool {
