@@ -21,7 +21,7 @@ use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
-use tracing::{instrument, trace};
+use tracing::{instrument};
 use crate::router::BlockCriteria;
 use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
@@ -128,7 +128,7 @@ impl Registry {
 
         self.update_shard_registry(&shard_id);
 
-        trace!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "left block");
+        tracing::trace!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "left block");
 
         self.shard_bounds_registry
             .entry(shard_id)
@@ -141,7 +141,7 @@ impl Registry {
 
         self.update_shard_registry(&shard_id);
 
-        tracing::info!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "right block");
+        tracing::trace!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "right block");
 
         self.shard_bounds_registry
             .entry(shard_id)
@@ -154,7 +154,7 @@ impl Registry {
 
         self.update_shard_registry(&shard_id);
 
-        tracing::info!(chaid_id = block_id.workchain, shard_id = block_id.shard, seqno = block_id.seqno, "right end block");
+        tracing::trace!(chaid_id = block_id.workchain, shard_id = block_id.shard, seqno = block_id.seqno, "right end block");
 
         self.shard_bounds_registry
             .entry(shard_id)
@@ -171,7 +171,7 @@ impl Registry {
             return
         }
 
-        trace!(chaid_id = shard_id.0, shard_id = shard_id.1, "new shard");
+        tracing::trace!(chaid_id = shard_id.0, shard_id = shard_id.1, "new shard");
 
         entry.insert(*shard_id);
     }
@@ -400,7 +400,7 @@ async fn find_first_blocks(client: &mut InnerClient, start: &TonBlockIdExt, lhs:
         }
     };
 
-    trace!(hops = hops, seqno = master.id.seqno, "first seqno");
+    tracing::trace!(hops = hops, seqno = master.id.seqno, "first seqno");
 
     Ok((master, work))
 }
@@ -459,9 +459,9 @@ impl FirstBlockDiscover {
     async fn next(&mut self, start: TonBlockIdExt) -> Result<Option<BlocksHeader>> {
         if let Some(ref mfb) = self.current {
             if let Err(e) = (&mut self.client).oneshot(BlocksGetShards::new(mfb.id.clone())).await {
-                trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
+                tracing::trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
             } else {
-                trace!("first block still available");
+                tracing::trace!("first block still available");
 
                 return Ok(None);
             }
@@ -517,7 +517,7 @@ impl LastBlockDiscover {
                                 let tx = if let Some(tx) = channels.get_mut(&shard_id) { tx } else {
                                     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<TonBlockIdExt>();
 
-                                    tracing::error!(shard_id = ?shard_id, "spawn new channel for shard");
+                                    tracing::info!(shard_id = ?shard_id, "spawn new channel for shard");
                                     tokio::spawn({
                                         let client = client.clone();
                                         let registry = registry.clone();
