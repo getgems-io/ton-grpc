@@ -1,12 +1,14 @@
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 use futures::future::BoxFuture;
-use futures::{FutureExt};
+use futures::{FutureExt, TryFutureExt};
 use tower::discover::{Change, Discover};
 use tower::Service;
 use anyhow::anyhow;
 use dashmap::DashMap;
 use itertools::Itertools;
+use tokio_retry::Retry;
+use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 
@@ -75,27 +77,60 @@ impl Service<&Route> for Router {
     }
 
     fn call(&mut self, req: &Route) -> Self::Future {
-        let services = req.choose(&self.services);
-        if !services.is_empty() {
-            return std::future::ready(Ok(services)).boxed();
+        match req.choose(&self.services) {
+            Ok(services) => {
+                return std::future::ready(Ok(services)).boxed()
+            },
+            Err(RouterError::RouteUnknown) => {
+                metrics::counter!("ton_router_miss_count").increment(1);
+                std::future::ready(Err(anyhow!("no services available for {:?}", req))).boxed()
+            },
+            Err(RouterError::RouteNotAvailable) => {
+                metrics::counter!("ton_router_delayed_count").increment(1);
+
+                let req = *req;
+                let svcs = self.services.clone();
+                Retry::spawn(FibonacciBackoff::from_millis(32).map(jitter).take(10), move || {
+                    let req = req.clone();
+                    let svcs = svcs.clone();
+
+                    async move { req.choose(&svcs) }
+                })
+                    .map_err(move |_| anyhow!("no services available for {:?}", req))
+                    .boxed()
+            }
         }
-
-        metrics::counter!("ton_router_miss_count").increment(1);
-
-        std::future::ready(Err(anyhow!("no services available for {:?}", req))).boxed()
     }
 }
 
 
+#[derive(Debug, thiserror::Error)]
+enum RouterError {
+    #[error("route is not available at this moment")]
+    RouteNotAvailable,
+    #[error("route is unknown")]
+    RouteUnknown
+}
+
 impl Route {
-    fn choose(&self, services: &DashMap<String, CursorClient>) -> Vec<CursorClient> {
+    fn choose(&self, services: &DashMap<String, CursorClient>) -> Result<Vec<CursorClient>, RouterError> {
         match self {
             Route::Block { chain, criteria } => {
-                services
+                let clients: Vec<CursorClient> = services
                     .iter()
                     .filter(|s| s.contains(chain, criteria))
                     .map(|s| s.clone())
-                    .collect()
+                    .collect();
+
+                if clients.is_empty() {
+                    if services.iter().any(|s| s.contains_not_available(chain, criteria)) {
+                        Err(RouterError::RouteNotAvailable)
+                    } else {
+                        Err(RouterError::RouteUnknown)
+                    }
+                } else {
+                    Ok(clients)
+                }
             },
             Route::Latest => {
                 let groups = services
@@ -107,16 +142,16 @@ impl Route {
                 let mut idxs = vec![];
                 for (_, group) in &groups {
                     idxs = group.collect();
-
-                    // we need at least 3 nodes in group
-                    if idxs.len() > 2 {
-                        break;
-                    }
+                    break;
                 }
 
-                idxs.into_iter()
+                if idxs.is_empty() {
+                    return Err(RouterError::RouteUnknown);
+                }
+
+                Ok(idxs.into_iter()
                     .map(|(s, _)| s.clone())
-                    .collect()
+                    .collect())
             }
         }
     }
