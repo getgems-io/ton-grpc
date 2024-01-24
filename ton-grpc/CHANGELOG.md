@@ -28,6 +28,13 @@
 
 
 
+## [0.9.2](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.9.1...ton-grpc-v0.9.2) (2024-01-24)
+
+
+### Bug Fixes
+
+* **deps:** bump metrics-exporter-prometheus from 0.12.2 to 0.13.0 ([a9f0637](https://github.com/getgems-io/ton-grpc/commit/a9f063784333fddce47c845547a19712872c3dc9))
+
 ## [0.9.1](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.9.0...ton-grpc-v0.9.1) (2024-01-22)
 
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.15.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.14.1...tonlibjson-client-v0.15.0) (2024-01-24)
+
+
+### Features
+
+* wait for not available block ([da4047d](https://github.com/getgems-io/ton-grpc/commit/da4047d0e421da0873f11e0f4bfaa08813845bb4))
+* watch masterchain block availability ([c29d672](https://github.com/getgems-io/ton-grpc/commit/c29d67215e916118dc44d597f293f33d5b693866))
+
+
+### Bug Fixes
+
+* **deps:** bump uuid from 1.6.1 to 1.7.0 ([5249d97](https://github.com/getgems-io/ton-grpc/commit/5249d97a8be9dfcaa2dcb25476c8c6e4de097b3f))
+* drop internal caches ([24db23b](https://github.com/getgems-io/ton-grpc/commit/24db23bd98a2b7c613a779be2a02ef91cf933c8f))
+* drop waitable ([ad9035e](https://github.com/getgems-io/ton-grpc/commit/ad9035e7f160d45544912218fce1fc1fcd23ae74))
+
 ## [0.14.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.14.0...tonlibjson-client-v0.14.1) (2024-01-22)
 
 
