@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
@@ -8,22 +9,21 @@ use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::Result;
 use dashmap::{DashMap, DashSet};
-use futures::{FutureExt, SinkExt, try_join, TryFutureExt};
+use futures::{FutureExt, try_join, TryFutureExt};
 use futures::future::ready;
 use futures::never::Never;
-use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch::{Receiver, Sender};
 use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
-use tokio_stream::StreamExt;
 use tower::limit::ConcurrencyLimit;
 use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
 use tracing::{instrument, trace};
 use crate::router::BlockCriteria;
-use crate::block::{BlocksBoxedShards, BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
+use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
@@ -34,6 +34,13 @@ pub(crate) type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<P
 
 type ChainId = i32;
 type ShardId = (i32, i64);
+
+impl From<&TonBlockIdExt> for ShardId {
+    fn from(value: &TonBlockIdExt) -> Self {
+        (value.workchain, value.shard)
+    }
+}
+
 type Seqno = i32;
 #[derive(Debug, Clone, Default)]
 struct ShardBounds {
@@ -134,7 +141,7 @@ impl Registry {
 
         self.update_shard_registry(&shard_id);
 
-        trace!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "right block");
+        tracing::info!(chaid_id = header.id.workchain, shard_id = header.id.shard, seqno = header.id.seqno, "right block");
 
         self.shard_bounds_registry
             .entry(shard_id)
@@ -147,7 +154,7 @@ impl Registry {
 
         self.update_shard_registry(&shard_id);
 
-        trace!(chaid_id = block_id.workchain, shard_id = block_id.shard, seqno = block_id.seqno, "right end block");
+        tracing::info!(chaid_id = block_id.workchain, shard_id = block_id.shard, seqno = block_id.seqno, "right end block");
 
         self.shard_bounds_registry
             .entry(shard_id)
@@ -491,11 +498,54 @@ impl LastBlockDiscover {
         // TODO[akostylev0] find last available block
         tokio::spawn({
             let client = client.clone();
+            let registry = registry.clone();
+
             async move {
+                let mut channels: HashMap<ShardId, UnboundedSender<TonBlockIdExt>> = Default::default();
                 while let Some(block_id) = rx.recv().await {
-                    match client.oneshot(BlocksGetShards::new(block_id)).await {
-                        Ok(_) => {}
-                        Err(_) => {}
+                    let retry_strategy = FibonacciBackoff::from_millis(32).map(jitter).take(8);
+                    match Retry::spawn(retry_strategy, || { client.clone().oneshot(BlocksGetShards::new(block_id.clone())) }).await {
+                        Ok(shards) => {
+                            let actual_shards: HashSet<ShardId> = HashSet::from_iter(
+                                shards.shards.iter().map(|s| s.into())
+                            );
+
+                            for shard in shards.shards {
+                                registry.upsert_right_end(&shard);
+
+                                let shard_id: ShardId = (&shard).into();
+                                let tx = if let Some(tx) = channels.get_mut(&shard_id) { tx } else {
+                                    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<TonBlockIdExt>();
+
+                                    tracing::error!(shard_id = ?shard_id, "spawn new channel for shard");
+                                    tokio::spawn({
+                                        let client = client.clone();
+                                        let registry = registry.clone();
+
+                                        async move {
+                                            let registry = registry.clone();
+                                            while let Some(block_id) = rx.recv().await {
+                                                let retry_strategy = FibonacciBackoff::from_millis(32).map(jitter).take(16);
+                                                match Retry::spawn(retry_strategy, || { client.clone().oneshot(BlocksGetBlockHeader::new(block_id.clone())) }).await {
+                                                    Ok(header) => registry.upsert_right(&header),
+                                                    Err(e) => {
+                                                        tracing::warn!(error = ?e, "failed to get shard header");
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    });
+
+                                    channels.insert(shard_id, tx);
+                                    channels.get_mut(&shard_id).unwrap()
+                                };
+
+                                let _ = tx.send(shard);
+                            }
+
+                            channels.retain(|s, _| actual_shards.contains(s));
+                        }
+                        Err(error) => { tracing::warn!(error =?error, "get shards failed"); }
                     }
                 }
             }
