@@ -139,19 +139,14 @@ impl Route {
                     .sorted_unstable_by_key(|(_, seqno)| -seqno)
                     .group_by(|(_, seqno)| *seqno);
 
-                let mut idxs = vec![];
-                for (_, group) in &groups {
-                    idxs = group.collect();
-                    break;
+                if let Some((_, group)) = (&groups).into_iter().next() {
+                    return Ok(group
+                        .into_iter()
+                        .map(|(s, _)| s.clone())
+                        .collect());
                 }
 
-                if idxs.is_empty() {
-                    return Err(RouterError::RouteUnknown);
-                }
-
-                Ok(idxs.into_iter()
-                    .map(|(s, _)| s.clone())
-                    .collect())
+                return Err(RouterError::RouteUnknown);
             }
         }
     }
