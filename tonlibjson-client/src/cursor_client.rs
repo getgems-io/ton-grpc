@@ -582,7 +582,7 @@ impl LastBlockDiscover {
         metrics::counter!("ton_liteserver_synced_seqno", "liteserver_id" => self.id.clone()).absolute(last_block.seqno as u64);
         self.registry.upsert_right_end(&last_block);
 
-        while let Some(seqno) = self.registry.right_next((last_block.workchain, last_block.shard)) {
+        while let Some(seqno) = self.registry.right_next((&last_block).into()) {
             let block_id = (&mut self.client).oneshot(BlocksLookupBlock::seqno(TonBlockId {
                 workchain: last_block.workchain,
                 shard: last_block.shard,
