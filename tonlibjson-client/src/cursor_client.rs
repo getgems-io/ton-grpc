@@ -86,18 +86,26 @@ impl ShardBounds {
         }
     }
 
-    fn contains_seqno(&self, seqno: Seqno) -> bool {
+    fn contains_seqno(&self, seqno: Seqno, not_available: bool) -> bool {
         let Some(ref left) = self.left else { return false };
         let Some(ref right) = self.right else { return false };
 
-        left.id.seqno <= seqno && seqno <= right.id.seqno
+        if not_available {
+            left.id.seqno <= seqno && seqno <= self.right_end.unwrap_or(right.id.seqno)
+        } else {
+            left.id.seqno <= seqno && seqno <= right.id.seqno
+        }
     }
 
-    fn contains_lt(&self, lt: i64) -> bool {
+    fn contains_lt(&self, lt: i64, not_available: bool) -> bool {
         let Some(ref left) = self.left else { return false };
         let Some(ref right) = self.right else { return false };
 
-        left.start_lt <= lt && lt <= right.end_lt
+        if not_available {
+            left.start_lt <= lt && lt <= right.end_lt + (right.end_lt - right.start_lt)
+        } else {
+            left.start_lt <= lt && lt <= right.end_lt
+        }
     }
 }
 
@@ -176,7 +184,7 @@ impl Registry {
         entry.insert(*shard_id);
     }
 
-    fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+    fn contains(&self, chain: &ChainId, criteria: &BlockCriteria, not_available: bool) -> bool {
         match criteria {
             BlockCriteria::LogicalTime(lt) => {
                 self.shard_registry
@@ -184,7 +192,7 @@ impl Registry {
                     .map(|shard_ids| shard_ids
                         .iter()
                         .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id))
-                        .any(|bounds| bounds.contains_lt(*lt))
+                        .any(|bounds| bounds.contains_lt(*lt, not_available))
                     ).unwrap_or(false)
             },
             BlockCriteria::Seqno { shard, seqno } => {
@@ -193,7 +201,7 @@ impl Registry {
                     return false
                 };
 
-                bounds.contains_seqno(*seqno)
+                bounds.contains_seqno(*seqno, not_available)
             }
         }
     }
@@ -225,7 +233,11 @@ impl CursorClient {
     }
 
     pub(crate) fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
-        self.registry.contains(chain, criteria)
+        self.registry.contains(chain, criteria, false)
+    }
+
+    pub(crate) fn contains_not_available(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+        self.registry.contains(chain, criteria, true)
     }
 
     pub(crate) fn edges_defined(&self) -> bool {
