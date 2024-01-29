@@ -32,13 +32,23 @@ pub struct LiteserverId {
 #[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct Liteserver {
     pub id: LiteserverId,
-    pub ip: i32,
+    pub ip: Option<i32>,
+    pub host: Option<String>,
     pub port: u16,
 }
 
 impl Liteserver {
     pub fn id(&self) -> String {
         format!("{}:{}", self.id.typ, self.id.key)
+    }
+
+    pub fn with_ip(&self, ip: i32) -> Self {
+        Liteserver {
+            id: self.id.clone(),
+            ip: Some(ip),
+            host: self.host.clone(),
+            port: self.port,
+        }
     }
 }
 

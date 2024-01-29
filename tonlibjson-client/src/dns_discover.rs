@@ -10,8 +10,8 @@ use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::time::MissedTickBehavior;
 use tower::discover::Change;
 use pin_project::pin_project;
-use trust_dns_resolver::system_conf::read_system_conf;
-use trust_dns_resolver::TokioAsyncResolver;
+use hickory_resolver::system_conf::read_system_conf;
+use hickory_resolver::TokioAsyncResolver;
 use crate::ton_config::{Liteserver, LiteserverId};
 
 pub type DiscoverResult = Result<Change<String, Liteserver>, Never>;
@@ -59,8 +59,9 @@ impl DnsResolverDiscover {
                                     typ: "pub.ed25519".to_owned(),
                                     key: key.clone(),
                                 },
-                                ip: ip as i32,
+                                ip: Some(ip as i32),
                                 port: 43679,
+                                host: None
                             };
 
                             let _ = tx.send(Ok(Change::Insert(c.to_string(), ls)));
