@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.15.0...tonlibjson-client-v0.16.0) (2024-01-29)
+
+
+### Features
+
+* support host resolving from config ([f1850b7](https://github.com/getgems-io/ton-grpc/commit/f1850b78ba976a86debd137a31892748ece3caf8))
+
 ## [0.15.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.14.1...tonlibjson-client-v0.15.0) (2024-01-24)
 
 
