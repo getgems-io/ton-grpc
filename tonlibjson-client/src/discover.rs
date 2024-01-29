@@ -8,14 +8,16 @@ use std::{
     task::{Context, Poll},
 };
 use std::collections::HashSet;
+use std::net::IpAddr;
 use std::path::PathBuf;
 use futures::{StreamExt, TryFutureExt};
 use tokio_stream::Stream;
 use tower::discover::Change;
 use tower::load::PeakEwmaDiscover;
-use tracing::{debug, info};
 use tower::ServiceExt;
 use tower::Service;
+use hickory_resolver::system_conf::read_system_conf;
+use hickory_resolver::TokioAsyncResolver;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::dns_discover::DnsResolverDiscover;
@@ -78,28 +80,44 @@ impl ClientDiscover {
         let mut factory = ClientFactory;
         let mut interval = tokio::time::interval(period);
 
-        let stream = try_stream! {
-            interval.tick().await;
-            info!("first tick service discovery");
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
 
+        tokio::spawn(async move {
+            let dns = Self::dns_resolver();
+
+            interval.tick().await;
+            tracing::info!("first tick service discovery");
+
+            let mut liteservers = vec![];
             for ls in config.liteservers.iter() {
-                if let Ok(client) = factory.ready().await?.call(config.with_liteserver(ls)).await {
-                    yield Change::Insert(ls.id(), client);
+                let ls = if let Some(ls) = Self::dns_resolve(dns.clone(), ls.clone()).await { ls } else { ls.clone() };
+                liteservers.push(ls);
+            }
+
+            for ls in &liteservers {
+                if let Ok(client) = (&mut factory).oneshot(config.with_liteserver(&ls)).await {
+                    tracing::debug!("insert {:?}", ls.id());
+                    let _ = tx.send(Ok(Change::Insert(ls.id(), client)));
                 }
             }
 
-            let mut liteservers = HashSet::from_iter(config.liteservers.iter().cloned());
+            let mut liteservers = HashSet::from_iter(liteservers.iter().cloned());
 
             loop {
                 interval.tick().await;
-                info!("tick service discovery");
+                tracing::info!("tick service discovery");
 
-                let new_config = load_ton_config(url.clone()).await?;
-                if new_config == config {
+                let Ok(new_config) = load_ton_config(url.clone()).await else {
                     continue;
+                };
+
+                let mut new_liteservers = vec![];
+                for ls in new_config.liteservers.iter() {
+                    let ls = if let Some(ls) = Self::dns_resolve(dns.clone(), ls.clone()).await { ls } else { ls.clone() };
+                    new_liteservers.push(ls);
                 }
 
-                let liteserver_new: HashSet<Liteserver> = HashSet::from_iter(new_config.liteservers.iter().cloned());
+                let liteserver_new: HashSet<Liteserver> = HashSet::from_iter(new_liteservers.iter().cloned());
 
                 let (mut remove, mut insert) = if config.data == new_config.data {
                     (
@@ -113,18 +131,18 @@ impl ClientDiscover {
                     )
                 };
 
-                debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), remove.len(), insert.len());
+                tracing::debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), remove.len(), insert.len());
                 while !remove.is_empty() || !insert.is_empty() {
                     if let Some(ls) = remove.pop() {
-                        debug!("remove {:?}", ls.id());
-                        yield Change::Remove(ls.id());
+                        tracing::debug!("remove {:?}", ls.id());
+                        let _ = tx.send(Ok(Change::Remove(ls.id())));
                     }
 
                     if let Some(ls) = insert.pop() {
-                        debug!("insert {:?}", ls.id());
+                        tracing::debug!("insert {:?}", ls.id());
 
-                        if let Ok(client) = factory.ready().await?.call(new_config.with_liteserver(ls)).await {
-                            yield Change::Insert(ls.id(), client);
+                        if let Ok(client) = (&mut factory).oneshot(new_config.with_liteserver(ls)).await {
+                            let _ = tx.send(Ok(Change::Insert(ls.id(), client)));
                         }
                     }
                 }
@@ -132,11 +150,33 @@ impl ClientDiscover {
                 liteservers = liteserver_new.clone();
                 config = new_config;
             }
-        };
+        });
 
         Ok(Self {
-            changes: Box::pin(stream),
+            changes: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
         })
+    }
+
+    async fn dns_resolve(dns_resolver: TokioAsyncResolver, ls: Liteserver) -> Option<Liteserver> {
+        if let Some(host) = &ls.host {
+            let records = dns_resolver.lookup_ip(host).await.ok()?;
+
+            for record in records {
+                if let IpAddr::V4(ip) = record {
+                    return Some(ls.with_ip(Into::<u32>::into(ip) as i32));
+                }
+            }
+        }
+
+        None
+    }
+
+    fn dns_resolver() -> TokioAsyncResolver {
+        let (resolver_config, mut resolver_opts) = read_system_conf().unwrap();
+        resolver_opts.positive_max_ttl = Some(Duration::from_secs(1));
+        resolver_opts.negative_max_ttl = Some(Duration::from_secs(1));
+
+        TokioAsyncResolver::tokio(resolver_config, resolver_opts)
     }
 }
 

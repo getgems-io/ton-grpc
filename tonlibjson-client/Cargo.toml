@@ -24,7 +24,7 @@ dashmap = "5.5"
 uuid = { version = "1.7", features = ["v4", "fast-rng", "serde"] }
 pin-project = "1.1"
 reqwest = { version = "0.11", features = ["rustls-tls", "trust-dns"], default-features = false }
-trust-dns-resolver = { version = "0.23.2", features = ["tokio-runtime"] }
+hickory-resolver = { version = "0.24.0", features = ["tokio-runtime"] }
 config = { version = "0.13", default-features = false }
 rand = "0.8"
 itertools = "0.12"
