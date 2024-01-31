@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.16.0...tonlibjson-client-v0.16.1) (2024-01-31)
+
+
+### Bug Fixes
+
+* send request to latest ls when route is unknown ([434bc28](https://github.com/getgems-io/ton-grpc/commit/434bc28ab22a025ff03bf93b92f47295d11df835))
+
 ## [0.16.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.15.0...tonlibjson-client-v0.16.0) (2024-01-29)
 
 
