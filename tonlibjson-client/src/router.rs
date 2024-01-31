@@ -83,7 +83,10 @@ impl Service<&Route> for Router {
             },
             Err(RouterError::RouteUnknown) => {
                 metrics::counter!("ton_router_miss_count").increment(1);
-                std::future::ready(Err(anyhow!("no services available for {:?}", req))).boxed()
+                match Route::Latest.choose(&self.services) {
+                    Ok(services) => { std::future::ready(Ok(services)).boxed() }
+                    Err(_) => { std::future::ready(Err(anyhow!("no services available for {:?}", req))).boxed() }
+                }
             },
             Err(RouterError::RouteNotAvailable) => {
                 metrics::counter!("ton_router_delayed_count").increment(1);
