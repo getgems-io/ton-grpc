@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.6.0...charts/ton-grpc-v0.7.0) (2024-02-01)
+
+
+### Features
+
+* add GetAccountAddresses into ton-grpc ServiceProfile ([ef668a8](https://github.com/getgems-io/ton-grpc/commit/ef668a8fa6eaf1d29b2da21640c2c24daed09b2d))
+
 ## [0.6.0](https://github.com/getgems-io/ton-grpc/compare/charts/ton-grpc-v0.5.4...charts/ton-grpc-v0.6.0) (2024-01-21)
 
 
