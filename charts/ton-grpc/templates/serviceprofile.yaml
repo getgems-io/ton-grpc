@@ -19,10 +19,6 @@ spec:
     name: GetAccountTransactions
   - condition:
       method: POST
-      pathRegex: /ton\.BlockService/SubscribeLastBlock
-    name: SubscribeLastBlock
-  - condition:
-      method: POST
       pathRegex: /ton\.BlockService/GetLastBlock
     name: GetLastBlock
   - condition:
@@ -37,6 +33,10 @@ spec:
       method: POST
       pathRegex: /ton\.BlockService/GetTransactionIds
     name: GetTransactionIds
+  - condition:
+      method: POST
+      pathRegex: /ton\.BlockService/GetTransactions
+    name: GetTransactions
   - condition:
       method: POST
       pathRegex: /ton\.BlockService/GetAccountAddresses
