@@ -25,7 +25,7 @@ uuid = { version = "1.7", features = ["v4", "fast-rng", "serde"] }
 pin-project = "1.1"
 reqwest = { version = "0.11", features = ["rustls-tls", "trust-dns"], default-features = false }
 hickory-resolver = { version = "0.24.0", features = ["tokio-runtime"] }
-config = { version = "0.13", default-features = false }
+config = { version = "0.14", default-features = false }
 rand = "0.8"
 itertools = "0.12"
 derive-new = "0.6.0"
