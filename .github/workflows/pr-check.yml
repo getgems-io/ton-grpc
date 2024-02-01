@@ -30,7 +30,7 @@ jobs:
       - uses: awalsh128/cache-apt-pkgs-action@latest
         with:
           packages: libsecp256k1-dev libsodium-dev
-      - uses: arduino/setup-protoc@v2
+      - uses: arduino/setup-protoc@v3
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: x86_64-unknown-linux-gnu
