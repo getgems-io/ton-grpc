@@ -1,6 +1,5 @@
 use crate::make::{CursorClientFactory, ClientFactory};
 use crate::ton_config::{load_ton_config, read_ton_config, TonConfig};
-use async_stream::try_stream;
 use reqwest::Url;
 use std::time::Duration;
 use std::{
@@ -10,14 +9,14 @@ use std::{
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::path::PathBuf;
-use futures::TryFutureExt;
-use tokio_stream::Stream;
+use futures::{TryFutureExt};
+use tokio_stream::{Stream};
 use tower::discover::Change;
 use tower::load::PeakEwmaDiscover;
 use tower::ServiceExt;
-use tower::Service;
 use hickory_resolver::system_conf::read_system_conf;
 use hickory_resolver::TokioAsyncResolver;
+use tokio::sync::mpsc::UnboundedReceiver;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use crate::ton_config::Liteserver;
@@ -27,7 +26,7 @@ use crate::ton_config::Liteserver;
 type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 
 pub(crate) struct ClientDiscover {
-    changes: Pin<Box<dyn Stream<Item = DiscoverResult<Client>> + Send + Sync>>,
+    rx: UnboundedReceiver<DiscoverResult<Client>>,
 }
 
 impl ClientDiscover {
@@ -35,17 +34,16 @@ impl ClientDiscover {
         let config = read_ton_config(path).await?;
         let mut factory = ClientFactory;
 
-        let stream = try_stream! {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        tokio::spawn(async move {
             for ls in config.liteservers.iter() {
-                if let Ok(client) = factory.ready().await?.call(config.with_liteserver(ls)).await {
-                    yield Change::Insert(ls.id(), client);
+                if let Ok(client) = (&mut factory).oneshot(config.with_liteserver(ls)).await {
+                    let _ = tx.send(Ok(Change::Insert(ls.id(), client)));
                 }
             }
-        };
+        });
 
-        Ok(Self {
-            changes: Box::pin(stream),
-        })
+        Ok(Self { rx })
     }
 
     pub(crate) async fn new(url: Url, period: Duration, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
@@ -69,7 +67,7 @@ impl ClientDiscover {
 
             for ls in &liteservers {
                 if let Ok(client) = (&mut factory).oneshot(config.with_liteserver(&ls)).await {
-                    tracing::debug!("insert {:?}", ls.id());
+                    tracing::info!("insert {:?}", ls.id());
                     let _ = tx.send(Ok(Change::Insert(ls.id(), client)));
                 }
             }
@@ -104,15 +102,15 @@ impl ClientDiscover {
                     )
                 };
 
-                tracing::debug!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), remove.len(), insert.len());
+                tracing::info!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), remove.len(), insert.len());
                 while !remove.is_empty() || !insert.is_empty() {
                     if let Some(ls) = remove.pop() {
-                        tracing::debug!("remove {:?}", ls.id());
+                        tracing::info!("remove {:?}", ls.id());
                         let _ = tx.send(Ok(Change::Remove(ls.id())));
                     }
 
                     if let Some(ls) = insert.pop() {
-                        tracing::debug!("insert {:?}", ls.id());
+                        tracing::info!("insert {:?}", ls.id());
 
                         if let Ok(client) = (&mut factory).oneshot(new_config.with_liteserver(ls)).await {
                             let _ = tx.send(Ok(Change::Insert(ls.id(), client)));
@@ -125,9 +123,7 @@ impl ClientDiscover {
             }
         });
 
-        Ok(Self {
-            changes: Box::pin(tokio_stream::wrappers::UnboundedReceiverStream::new(rx)),
-        })
+        Ok(Self { rx })
     }
 
     async fn dns_resolve(dns_resolver: TokioAsyncResolver, ls: Liteserver) -> Option<Liteserver> {
@@ -157,9 +153,7 @@ impl Stream for ClientDiscover {
     type Item = DiscoverResult<Client>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let c = &mut self.changes;
-
-        match Pin::new(&mut *c).poll_next(cx) {
+        match self.rx.poll_recv(cx) {
             Poll::Ready(Some(Ok(change))) => Poll::Ready(Some(Ok(change))),
             _ => Poll::Pending
         }
