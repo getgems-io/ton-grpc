@@ -54,8 +54,7 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 
 enum ConfigSource {
     FromFile { path: PathBuf },
-    FromUrl { url: Url, interval: Duration, fallback_path: Option<PathBuf> },
-    FromDns { url: Url, host: String, key: String }
+    FromUrl { url: Url, interval: Duration, fallback_path: Option<PathBuf> }
 }
 
 pub struct TonClientBuilder {
@@ -93,13 +92,6 @@ impl TonClientBuilder {
         Self {
             config_source: ConfigSource::FromFile { path },
             .. Default::default()
-        }
-    }
-
-    pub fn from_dns(url: Url, host: String, key: String) -> Self {
-        Self {
-            config_source: ConfigSource::FromDns { url, host, key },
-         .. Default::default()
         }
     }
 
@@ -175,7 +167,6 @@ impl TonClientBuilder {
         let client_discover = match self.config_source {
             ConfigSource::FromFile { path } => { ClientDiscover::from_path(path).await? }
             ConfigSource::FromUrl { url, interval, fallback_path } => { ClientDiscover::new(url, interval, fallback_path).await? }
-            ConfigSource::FromDns { url, host, key } => { ClientDiscover::dsn_resolve(url, host, key).await? }
         };
 
         let ewma_discover = PeakEwmaDiscover::new::<Value>(

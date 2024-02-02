@@ -59,12 +59,7 @@ struct Args {
     #[clap(long, value_parser = humantime::parse_duration, default_value = "70ms")]
     ewma_default_rtt: Duration,
     #[clap(long, value_parser = humantime::parse_duration, default_value = "1ms")]
-    ewma_decay: Duration,
-
-    #[clap(long, requires = "dns_key")]
-    dns_host: Option<String>,
-    #[clap(long, requires = "dns_host")]
-    dns_key: Option<String>
+    ewma_decay: Duration
 }
 
 #[tokio::main]
@@ -87,11 +82,7 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("TON Config URL: {}", &args.ton_config_url);
 
-    let mut client = (if let Some(host) = args.dns_host {
-        TonClientBuilder::from_dns(args.ton_config_url, host, args.dns_key.unwrap())
-    } else {
-        TonClientBuilder::from_config_url(args.ton_config_url, Duration::from_secs(60))
-    }).set_timeout(args.ton_timeout)
+    let mut client = TonClientBuilder::from_config_url(args.ton_config_url, Duration::from_secs(60)).set_timeout(args.ton_timeout)
         .set_retry_budget_ttl(args.retry_budget_ttl)
         .set_retry_min_per_sec(args.retry_min_rps)
         .set_retry_percent(args.retry_withdraw_percent)

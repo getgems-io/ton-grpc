@@ -1,6 +1,6 @@
 use crate::make::{CursorClientFactory, ClientFactory};
 use crate::ton_config::{load_ton_config, read_ton_config, TonConfig};
-use async_stream::{stream, try_stream};
+use async_stream::try_stream;
 use reqwest::Url;
 use std::time::Duration;
 use std::{
@@ -10,7 +10,7 @@ use std::{
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::path::PathBuf;
-use futures::{StreamExt, TryFutureExt};
+use futures::TryFutureExt;
 use tokio_stream::Stream;
 use tower::discover::Change;
 use tower::load::PeakEwmaDiscover;
@@ -20,7 +20,6 @@ use hickory_resolver::system_conf::read_system_conf;
 use hickory_resolver::TokioAsyncResolver;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
-use crate::dns_discover::DnsResolverDiscover;
 use crate::ton_config::Liteserver;
 
 // TODO[akostylev0] rework
@@ -47,32 +46,6 @@ impl ClientDiscover {
         Ok(Self {
             changes: Box::pin(stream),
         })
-    }
-
-    pub(crate) async fn dsn_resolve(url: Url, host: String, key: String) -> anyhow::Result<Self> {
-        // TODO[akostylev0] base config ttl
-        let config = config(url.clone(), None).await?;
-        let mut dns_discovery = DnsResolverDiscover::new(&host, &key);
-
-        let stream = stream! {
-            while let Some(change) = dns_discovery.next().await {
-                match change {
-                    Ok(change) => {
-                        match change {
-                            Change::Insert(id, ls) => {
-                                if let Ok(client) = ClientFactory.ready().await?.call(config.with_liteserver(&ls)).await {
-                                    yield Ok(Change::Insert(id, client));
-                                }
-                            },
-                            Change::Remove(id) => { yield Ok(Change::Remove(id)); },
-                        }
-                    },
-                    Err(_) => { continue; }
-                };
-            }
-        };
-
-        Ok(Self { changes: Box::pin(stream) })
     }
 
     pub(crate) async fn new(url: Url, period: Duration, fallback_path: Option<PathBuf>) -> anyhow::Result<Self> {
