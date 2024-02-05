@@ -54,7 +54,7 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 
 enum ConfigSource {
     FromFile { path: PathBuf },
-    FromUrl { url: Url, interval: Duration, fallback_path: Option<PathBuf> }
+    FromUrl { url: Url, interval: Duration }
 }
 
 pub struct TonClientBuilder {
@@ -73,7 +73,7 @@ pub struct TonClientBuilder {
 impl Default for TonClientBuilder {
     fn default() -> Self {
         Self {
-            config_source: ConfigSource::FromUrl { url: default_ton_config_url(), interval: Duration::from_secs(60), fallback_path: None },
+            config_source: ConfigSource::FromUrl { url: default_ton_config_url(), interval: Duration::from_secs(60) },
             timeout: Duration::from_secs(10),
             ewma_default_rtt: Duration::from_millis(70),
             ewma_decay: Duration::from_millis(1),
@@ -97,14 +97,7 @@ impl TonClientBuilder {
 
     pub fn from_config_url(url: Url, interval: Duration) -> Self {
         Self {
-            config_source: ConfigSource::FromUrl { url, interval, fallback_path: None },
-            .. Default::default()
-        }
-    }
-
-    pub fn from_config_url_with_fallback(url: Url, interval: Duration, fallback_path: Option<PathBuf>) -> Self {
-        Self {
-            config_source: ConfigSource::FromUrl { url, interval, fallback_path },
+            config_source: ConfigSource::FromUrl { url, interval },
             .. Default::default()
         }
     }
@@ -166,7 +159,7 @@ impl TonClientBuilder {
     pub async fn build(self) -> anyhow::Result<TonClient> {
         let client_discover = match self.config_source {
             ConfigSource::FromFile { path } => { ClientDiscover::from_path(path).await? }
-            ConfigSource::FromUrl { url, interval, fallback_path } => { ClientDiscover::new(url, interval, fallback_path).await? }
+            ConfigSource::FromUrl { url, interval } => { ClientDiscover::new(url, interval).await? }
         };
 
         let ewma_discover = PeakEwmaDiscover::new::<Value>(
