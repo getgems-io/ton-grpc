@@ -1045,9 +1045,9 @@ dependencies = [
 
 [[package]]
 name = "metrics"
-version = "0.22.0"
+version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77b9e10a211c839210fd7f99954bda26e5f8e26ec686ad68da6a32df7c80e782"
+checksum = "cd71d9db2e4287c3407fa04378b8c2ee570aebe0854431562cdd89ca091854f4"
 dependencies = [
  "ahash",
  "portable-atomic",
