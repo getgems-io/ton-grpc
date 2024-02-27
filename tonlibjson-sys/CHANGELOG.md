@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.13](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.1.12...tonlibjson-sys-v0.1.13) (2024-02-27)
+
+
+### Bug Fixes
+
+* **deps:** bump tonlibjson-sys/ton from `73621f6` to `692211f` ([0c17b1c](https://github.com/getgems-io/ton-grpc/commit/0c17b1c13272b78c583acd853c9a499eb137bf6d))
+* **deps:** bump tonlibjson-sys/ton-testnet from `71c6506` to `310dd6d` ([968b14b](https://github.com/getgems-io/ton-grpc/commit/968b14b0305ac34871e1f208c50a44e38c4653e8))
+
 ## [0.1.12](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.1.11...tonlibjson-sys-v0.1.12) (2024-02-19)
 
 
