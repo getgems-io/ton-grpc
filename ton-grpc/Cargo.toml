@@ -27,7 +27,7 @@ prost = { workspace = true }
 url = { workspace = true }
 either = "1.10"
 derive-new = "0.6.0"
-clap = { version = "4.5.1", features = ["derive"] }
+clap = { version = "4.5.2", features = ["derive"] }
 metrics-exporter-prometheus = "0.13.1"
 humantime = "2.1.0"
 
