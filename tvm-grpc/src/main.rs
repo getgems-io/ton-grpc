@@ -43,6 +43,8 @@ async fn main() -> anyhow::Result<()> {
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
 
+    tracing::info!("Listening on {:?}", &addr);
+
     Server::builder()
         .tcp_keepalive(Some(Duration::from_secs(300)))
         .http2_keepalive_interval(Some(Duration::from_secs(120)))
