@@ -34,6 +34,13 @@
 
 
 
+## [0.9.7](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.9.6...ton-grpc-v0.9.7) (2024-03-15)
+
+
+### Bug Fixes
+
+* **deps:** bump clap from 4.5.1 to 4.5.2 ([d6dba95](https://github.com/getgems-io/ton-grpc/commit/d6dba95838679c63f49b882cfbc628262e1c7156))
+
 ## [0.9.5](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.9.4...ton-grpc-v0.9.5) (2024-02-19)
 
 

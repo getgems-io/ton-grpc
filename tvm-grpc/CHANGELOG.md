@@ -28,6 +28,14 @@
 
 
 
+## [0.4.10](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.4.9...tvm-grpc-v0.4.10) (2024-03-15)
+
+
+### Bug Fixes
+
+* **deps:** bump rayon from 1.8.1 to 1.9.0 ([34ab5b7](https://github.com/getgems-io/ton-grpc/commit/34ab5b729446a89292251d91a894db8bed78dfce))
+* **tvm:** print addr on start ([ba75428](https://github.com/getgems-io/ton-grpc/commit/ba7542822f2eaa60b768348094723a372c474c28))
+
 ## [0.4.0](https://github.com/getgems-io/tonlibjson/compare/tvm-grpc-v0.3.11...tvm-grpc-v0.4.0) (2023-11-03)
 
 
