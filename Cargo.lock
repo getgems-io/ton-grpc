@@ -2440,7 +2440,9 @@ version = "0.4.10"
 dependencies = [
  "anyhow",
  "async-stream",
+ "clap",
  "futures",
+ "humantime",
  "prost",
  "quick_cache",
  "rayon",
