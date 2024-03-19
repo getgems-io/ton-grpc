@@ -21,7 +21,7 @@ async-stream = { workspace = true }
 quick_cache = { workspace = true }
 url = { workspace = true }
 dashmap = "5.5"
-uuid = { version = "1.7", features = ["v4", "fast-rng", "serde"] }
+uuid = { version = "1.8", features = ["v4", "fast-rng", "serde"] }
 pin-project = "1.1"
 reqwest = { version = "0.11", features = ["rustls-tls", "trust-dns"], default-features = false }
 hickory-resolver = { version = "0.24.0", features = ["tokio-runtime"] }
@@ -32,7 +32,7 @@ derive-new = "0.6.0"
 tokio-retry = "0.3"
 bytes = "1.5"
 crc = "3.0.1"
-metrics = "0.22.1"
+metrics = "0.22.3"
 thiserror = "1.0.58"
 
 [dev-dependencies]
@@ -43,7 +43,7 @@ serial_test = "3.0.0"
 tl_parser = { path = "../tl_parser" }
 anyhow = { workspace = true }
 quote = "1.0"
-syn = "2.0.52"
+syn = "2.0.53"
 prettyplease = "0.2.16"
 convert_case = "0.6.0"
 
