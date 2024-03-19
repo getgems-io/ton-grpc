@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.4.3...charts/tvm-grpc-v0.5.0) (2024-03-19)
+
+
+### Features
+
+* tvm chart extra args ([89e5ed9](https://github.com/getgems-io/ton-grpc/commit/89e5ed91a72778b603a405d9c15626bd2cefea92))
+
 ## [0.4.3](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.4.2...charts/tvm-grpc-v0.4.3) (2023-11-30)
 
 
