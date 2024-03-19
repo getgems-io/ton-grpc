@@ -34,6 +34,19 @@
 
 
 
+## [0.10.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.9.7...ton-grpc-v0.10.0) (2024-03-19)
+
+
+### Features
+
+* args for setting grpc window sizes ([990bb31](https://github.com/getgems-io/ton-grpc/commit/990bb31b4ab8affbf76172989419a2dc712928be))
+
+
+### Bug Fixes
+
+* **deps:** bump clap from 4.5.2 to 4.5.3 ([cb10611](https://github.com/getgems-io/ton-grpc/commit/cb10611ae7b1bbdafd81cb193d7e313e7d60538d))
+* **deps:** bump metrics-exporter-prometheus from 0.13.1 to 0.14.0 ([4e2d1a3](https://github.com/getgems-io/ton-grpc/commit/4e2d1a37d5dd8cf6492b6dda9df99754042ee4bc))
+
 ## [0.9.7](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.9.6...ton-grpc-v0.9.7) (2024-03-15)
 
 

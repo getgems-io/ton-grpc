@@ -28,6 +28,13 @@
 
 
 
+## [0.5.0](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.4.10...tvm-grpc-v0.5.0) (2024-03-19)
+
+
+### Features
+
+* args for setting grpc window sizes ([990bb31](https://github.com/getgems-io/ton-grpc/commit/990bb31b4ab8affbf76172989419a2dc712928be))
+
 ## [0.4.10](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.4.9...tvm-grpc-v0.4.10) (2024-03-15)
 
 
