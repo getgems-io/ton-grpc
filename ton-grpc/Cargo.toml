@@ -25,11 +25,11 @@ tonic-reflection = { workspace = true }
 tonic-health = { workspace = true }
 prost = { workspace = true }
 url = { workspace = true }
+clap = { workspace = true }
+humantime = { workspace = true }
 either = "1.10"
 derive-new = "0.6.0"
-clap = { version = "4.5.3", features = ["derive"] }
 metrics-exporter-prometheus = "0.14.0"
-humantime = "2.1.0"
 
 [dev-dependencies]
 tracing-test = { workspace = true }

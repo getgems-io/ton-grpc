@@ -35,6 +35,10 @@ struct Args {
     http2_keepalive_interval: Duration,
     #[clap(long, value_parser = humantime::parse_duration, default_value = "20s")]
     http2_keepalive_timeout: Duration,
+    #[clap(long, default_value = "65535")]
+    initial_connection_window_size: u32,
+    #[clap(long, default_value = "65535")]
+    initial_stream_window_size: u32,
 
     #[clap(long)]
     enable_metrics: bool,
@@ -122,6 +126,8 @@ async fn main() -> anyhow::Result<()> {
         .tcp_keepalive(args.tcp_keepalive.into())
         .http2_keepalive_interval(args.http2_keepalive_interval.into())
         .http2_keepalive_timeout(args.http2_keepalive_timeout.into())
+        .initial_connection_window_size(args.initial_connection_window_size)
+        .initial_stream_window_size(args.initial_stream_window_size)
 
         .add_service(reflection)
         .add_service(health_server)
