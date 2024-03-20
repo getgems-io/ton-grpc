@@ -2317,7 +2317,7 @@ version = "0.16.5"
 dependencies = [
  "anyhow",
  "async-stream",
- "base64 0.21.7",
+ "base64 0.22.0",
  "bytes",
  "config",
  "convert_case",
