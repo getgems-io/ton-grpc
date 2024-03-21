@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.16.5...tonlibjson-client-v0.17.0) (2024-03-21)
+
+
+### Features
+
+* run tvm in separate thread ([338d222](https://github.com/getgems-io/ton-grpc/commit/338d222b9e5b2bc71b4367add93e7eb0b62507bf))
+
 ## [0.16.5](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.16.4...tonlibjson-client-v0.16.5) (2024-03-19)
 
 
