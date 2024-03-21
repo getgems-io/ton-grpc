@@ -53,7 +53,10 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
                             SetC7(req) => set_c7(&mut state, req).map(SetC7Response),
                         };
 
-                        oneshot.send(response).expect("failed to send response");
+                        if let Err(e) = oneshot.send(response) {
+                            tracing::error!(error = ?e, "failed to send response");
+                            break;
+                        }
                     },
                     Command::Drop => { break; }
                 }
