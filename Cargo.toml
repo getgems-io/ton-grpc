@@ -35,3 +35,4 @@ quick_cache = "0.4"
 url = { version = "2.5.0", features = ["serde"] }
 clap = { version = "4.5.2", features = ["derive"] }
 humantime = "2.1.0"
+uuid = { version = "1.8", features = ["v4", "fast-rng", "serde"] }

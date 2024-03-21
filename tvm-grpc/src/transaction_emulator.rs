@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -8,14 +9,17 @@ use anyhow::anyhow;
 use async_stream::stream;
 use tokio_stream::StreamExt;
 use quick_cache::sync::Cache;
-use crate::threaded::{Command, Stop};
+use tokio::sync::mpsc::UnboundedSender;
+use crate::threaded::{Command, Stop, StreamId};
 use crate::tvm::transaction_emulator_service_server::TransactionEmulatorService as BaseTransactionEmulatorService;
 use crate::tvm::{transaction_emulator_request, transaction_emulator_response, TransactionEmulatorEmulateRequest, TransactionEmulatorEmulateResponse, TransactionEmulatorPrepareRequest, TransactionEmulatorPrepareResponse, TransactionEmulatorRequest, TransactionEmulatorResponse, TransactionEmulatorSetConfigRequest, TransactionEmulatorSetConfigResponse, TransactionEmulatorSetIgnoreChksigRequest, TransactionEmulatorSetIgnoreChksigResponse, TransactionEmulatorSetLibsRequest, TransactionEmulatorSetLibsResponse, TransactionEmulatorSetLtRequest, TransactionEmulatorSetLtResponse, TransactionEmulatorSetRandSeedRequest, TransactionEmulatorSetRandSeedResponse, TransactionEmulatorSetUnixtimeRequest, TransactionEmulatorSetUnixtimeResponse, TvmResult};
 use crate::tvm::transaction_emulator_request::Request::*;
 use crate::tvm::transaction_emulator_response::Response::*;
 
-#[derive(Debug, Default)]
-pub struct TransactionEmulatorService;
+#[derive(Debug)]
+pub struct TransactionEmulatorService {
+    tx: UnboundedSender<Command<transaction_emulator_request::Request, transaction_emulator_response::Response>>
+}
 
 #[derive(Default)]
 struct State {
@@ -28,52 +32,66 @@ fn lru_cache() -> &'static Cache<String, Arc<String>> {
     LRU_CACHE.get_or_init(|| Cache::new(32))
 }
 
+impl Default for TransactionEmulatorService {
+    fn default() -> Self {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Command<transaction_emulator_request::Request, transaction_emulator_response::Response>>();
+
+        tokio::task::spawn_blocking(move || {
+            let mut states: HashMap<StreamId, State> = HashMap::default();
+
+            while let Some(command) = rx.blocking_recv() {
+                match command {
+                    Command::Request { stream_id, request, response: oneshot } => {
+                        let state = states.entry(stream_id).or_default();
+
+                        let response = match request {
+                            Prepare(req) => prepare(state, req).map(PrepareResponse),
+                            Emulate(req) => emulate(state, req).map(EmulateResponse),
+                            SetUnixtime(req) => set_unixtime(state, req).map(SetUnixtimeResponse),
+                            SetLt(req) => set_lt(state, req).map(SetLtResponse),
+                            SetRandSeed(req) => set_rand_seed(state, req).map(SetRandSeedResponse),
+                            SetIgnoreChksig(req) => set_ignore_chksig(state, req).map(SetIgnoreChksigResponse),
+                            SetConfig(req) => set_config(state, req).map(SetConfigResponse),
+                            SetLibs(req) => set_libs(state, req).map(SetLibsResponse),
+                        };
+
+                        if let Err(e) = oneshot.send(response) {
+                            tracing::error!(error = ?e, "failed to send response");
+                            states.remove(&stream_id);
+                        }
+                    }
+                    Command::Drop { stream_id } => {
+                        states.remove(&stream_id);
+                    }
+                }
+            }
+        });
+
+        Self { tx }
+    }
+}
+
 #[async_trait]
 impl BaseTransactionEmulatorService for TransactionEmulatorService {
     type ProcessStream = Pin<Box<dyn Stream<Item=Result<TransactionEmulatorResponse, Status>> + Send>>;
 
     async fn process(&self, request: Request<Streaming<TransactionEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
+        let stream_id = StreamId::new_v4();
         let stream = request.into_inner();
-
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Command<transaction_emulator_request::Request, transaction_emulator_response::Response>>();
-        let stop = Stop::new(tx.clone());
-
-        rayon::spawn(move || {
-            let mut state = State::default();
-
-            while let Some(command) = rx.blocking_recv() {
-                match command {
-                    Command::Request { request, response: oneshot } => {
-                        let response = match request {
-                            Prepare(req) => prepare(&mut state, req).map(PrepareResponse),
-                            Emulate(req) => emulate(&mut state, req).map(EmulateResponse),
-                            SetUnixtime(req) => set_unixtime(&mut state, req).map(SetUnixtimeResponse),
-                            SetLt(req) => set_lt(&mut state, req).map(SetLtResponse),
-                            SetRandSeed(req) => set_rand_seed(&mut state, req).map(SetRandSeedResponse),
-                            SetIgnoreChksig(req) => set_ignore_chksig(&mut state, req).map(SetIgnoreChksigResponse),
-                            SetConfig(req) => set_config(&mut state, req).map(SetConfigResponse),
-                            SetLibs(req) => set_libs(&mut state, req).map(SetLibsResponse),
-                        };
-
-                        if let Err(e) = oneshot.send(response) {
-                            tracing::error!(error = ?e, "failed to send response");
-                            break;
-                        }
-                    }
-                    Command::Drop => { break; }
-                }
-            }
-        });
-
         let stream = stream.timeout(Duration::from_secs(3));
+        let stop = Stop::new(stream_id, self.tx.clone());
+        let tx = self.tx.clone();
+
         let output = stream! {
             for await msg in stream {
                 match msg {
                     Ok(Ok(TransactionEmulatorRequest { request_id, request: Some(req) })) => {
                         let (to, ro) = tokio::sync::oneshot::channel();
 
-                        let _ = tx.send(Command::Request { request: req, response: to });
-                        let response = ro.await.expect("failed to receive response");
+                        let _ = tx.send(Command::Request { stream_id, request: req, response: to });
+                        let Ok(response) = ro.await else {
+                            break
+                        };
 
                         yield response.map(|r| TransactionEmulatorResponse { request_id, response: Some(r) })
                     },
