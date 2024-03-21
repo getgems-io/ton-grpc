@@ -57,17 +57,17 @@ async fn main() -> anyhow::Result<()> {
     health_reporter.set_serving::<TvmEmulatorServiceServer<TvmEmulatorService>>().await;
     health_reporter.set_serving::<TransactionEmulatorServiceServer<TransactionEmulatorService>>().await;
 
-    let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService)
+    let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default())
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
-    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService)
+    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default())
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
 
     tracing::info!("Listening on {:?}", &args.listen);
 
     Server::builder()
-        .timeout(args.timeout.into())
+        .timeout(args.timeout)
         .tcp_keepalive(args.tcp_keepalive.into())
         .http2_keepalive_interval(args.http2_keepalive_interval.into())
         .http2_keepalive_timeout(args.http2_keepalive_timeout.into())

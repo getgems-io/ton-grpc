@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -8,14 +9,55 @@ use tokio_stream::StreamExt;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::instrument;
 use quick_cache::sync::Cache;
-use crate::threaded::{Command, Stop};
+use tokio::sync::mpsc::UnboundedSender;
+use crate::threaded::{Command, Stop, StreamId};
 use crate::tvm::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::tvm::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
 use crate::tvm::tvm_emulator_service_server::TvmEmulatorService as BaseTvmEmulatorService;
 use crate::tvm::{tvm_emulator_request, tvm_emulator_response, TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetC7Request, TvmEmulatorSetC7Response, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse, TvmResult};
 
-#[derive(Debug, Default)]
-pub struct TvmEmulatorService;
+#[derive(Debug)]
+pub struct TvmEmulatorService {
+    tx: UnboundedSender<Command<tvm_emulator_request::Request, tvm_emulator_response::Response>>
+}
+
+impl Default for TvmEmulatorService {
+    fn default() -> Self {
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Command<tvm_emulator_request::Request, tvm_emulator_response::Response>>();
+
+        tokio::task::spawn_blocking(move || {
+            let mut states: HashMap<StreamId, State> = HashMap::default();
+
+            while let Some(command) = rx.blocking_recv() {
+                match command {
+                    Command::Request { stream_id, request, response: oneshot } => {
+                        let state = states.entry(stream_id).or_default();
+
+                        let response = match request {
+                            Prepare(req) => prepare_emu(state, req).map(PrepareResponse),
+                            RunGetMethod(req) => run_get_method(state, req).map(RunGetMethodResponse),
+                            SendExternalMessage(req) => send_external_message(state, req).map(SendExternalMessageResponse),
+                            SendInternalMessage(req) => send_internal_message(state, req).map(SendInternalMessageResponse),
+                            SetLibraries(req) => set_libraries(state, req).map(SetLibrariesResponse),
+                            SetGasLimit(req) => set_gas_limit(state, req).map(SetGasLimitResponse),
+                            SetC7(req) => set_c7(state, req).map(SetC7Response),
+                        };
+
+                        if let Err(e) = oneshot.send(response) {
+                            tracing::error!(error = ?e, "failed to send response");
+                            states.remove(&stream_id);
+                        }
+                    },
+                    Command::Drop { stream_id } => {
+                        states.remove(&stream_id);
+                    }
+                }
+            }
+        });
+
+        Self { tx }
+    }
+}
 
 #[derive(Default)]
 struct State {
@@ -33,45 +75,22 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
     type ProcessStream = Pin<Box<dyn Stream<Item=Result<TvmEmulatorResponse, Status>> + Send>>;
 
     async fn process(&self, request: Request<Streaming<TvmEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
+        let stream_id = StreamId::new_v4();
         let stream = request.into_inner();
-
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Command<tvm_emulator_request::Request, tvm_emulator_response::Response>>();
-        let stop = Stop::new(tx.clone());
-
-        rayon::spawn(move || {
-            let mut state = State::default();
-            while let Some(command) = rx.blocking_recv() {
-                match command {
-                    Command::Request { request, response: oneshot } => {
-                        let response = match request {
-                            Prepare(req) => prepare_emu(&mut state, req).map(PrepareResponse),
-                            RunGetMethod(req) => run_get_method(&mut state, req).map(RunGetMethodResponse),
-                            SendExternalMessage(req) => send_external_message(&mut state, req).map(SendExternalMessageResponse),
-                            SendInternalMessage(req) => send_internal_message(&mut state, req).map(SendInternalMessageResponse),
-                            SetLibraries(req) => set_libraries(&mut state, req).map(SetLibrariesResponse),
-                            SetGasLimit(req) => set_gas_limit(&mut state, req).map(SetGasLimitResponse),
-                            SetC7(req) => set_c7(&mut state, req).map(SetC7Response),
-                        };
-
-                        if let Err(e) = oneshot.send(response) {
-                            tracing::error!(error = ?e, "failed to send response");
-                            break;
-                        }
-                    },
-                    Command::Drop => { break; }
-                }
-            }
-        });
-
         let stream = stream.timeout(Duration::from_secs(3));
+        let stop = Stop::new(stream_id, self.tx.clone());
+        let tx = self.tx.clone();
+
         let output = stream! {
             for await msg in stream {
                 match msg {
                     Ok(Ok(TvmEmulatorRequest { request_id, request: Some(req)})) => {
                         let (to, ro) = tokio::sync::oneshot::channel();
 
-                        let _ = tx.send(Command::Request { request: req, response: to });
-                        let response = ro.await.expect("failed to receive response");
+                        let _ = tx.send(Command::Request { stream_id, request: req, response: to });
+                        let Ok(response) = ro.await else {
+                            break
+                        };
 
                         yield response.map(|r| TvmEmulatorResponse { request_id, response: Some(r) })
                     },

@@ -121,8 +121,6 @@ impl Drop for TransactionEmulator {
     }
 }
 
-unsafe impl Send for TransactionEmulator {}
-
 #[derive(Debug)]
 pub struct TvmEmulator {
     pointer: *mut c_void,
