@@ -28,6 +28,18 @@
 
 
 
+## [0.6.0](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.5.0...tvm-grpc-v0.6.0) (2024-03-21)
+
+
+### Features
+
+* run tvm in separate thread ([338d222](https://github.com/getgems-io/ton-grpc/commit/338d222b9e5b2bc71b4367add93e7eb0b62507bf))
+
+
+### Bug Fixes
+
+* panic on broken connection ([3f93d28](https://github.com/getgems-io/ton-grpc/commit/3f93d2802739498d0781f05e495e77a5c9953ff9))
+
 ## [0.5.0](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.4.10...tvm-grpc-v0.5.0) (2024-03-19)
 
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.1.14...tonlibjson-sys-v0.2.0) (2024-03-21)
+
+
+### Features
+
+* run tvm in separate thread ([338d222](https://github.com/getgems-io/ton-grpc/commit/338d222b9e5b2bc71b4367add93e7eb0b62507bf))
+
+
+### Bug Fixes
+
+* **deps:** bump tonlibjson-sys/ton from `200508c` to `dd5540d` ([5542e2a](https://github.com/getgems-io/ton-grpc/commit/5542e2aa98f99324b52466a60c8040ca305cb677))
+* **deps:** bump tonlibjson-sys/ton-testnet from `4969176` to `0feaaf5` ([38446f9](https://github.com/getgems-io/ton-grpc/commit/38446f92d0d36e602a7926d5e0b63533fad029d3))
+
 ## [0.1.14](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.1.13...tonlibjson-sys-v0.1.14) (2024-03-15)
 
 
