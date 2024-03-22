@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.5.0...charts/tvm-grpc-v0.6.0) (2024-03-22)
+
+
+### Features
+
+* **charts/tvm:** drop max_threads ([fc5dc13](https://github.com/getgems-io/ton-grpc/commit/fc5dc13f790e924b2c5b42232360abce3af0b7df))
+* **charts/tvm:** service annotations ([fbc78d7](https://github.com/getgems-io/ton-grpc/commit/fbc78d71510ed947805f752a6fec240efdc01566))
+
 ## [0.5.0](https://github.com/getgems-io/ton-grpc/compare/charts/tvm-grpc-v0.4.3...charts/tvm-grpc-v0.5.0) (2024-03-19)
 
 
