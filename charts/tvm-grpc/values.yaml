@@ -39,6 +39,7 @@ securityContext: {}
   # runAsUser: 1000
 
 service:
+  annotations: {}
   type: ClusterIP
   port: 80
 
@@ -80,7 +81,5 @@ nodeSelector: {}
 tolerations: []
 
 affinity: {}
-
-max_threads: "12"
 
 extraArgs: {}
