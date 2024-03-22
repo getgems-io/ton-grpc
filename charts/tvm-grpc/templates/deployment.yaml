@@ -52,8 +52,6 @@ spec:
           env:
             - name: RUST_LOG
               value: error,tvm_grpc=info
-            - name: RAYON_NUM_THREADS
-              value: "{{ .Values.max_threads }}"
           livenessProbe:
             grpc:
               port: 50052
