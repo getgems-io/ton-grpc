@@ -10,11 +10,12 @@ use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::instrument;
 use quick_cache::sync::Cache;
 use tokio::sync::mpsc::UnboundedSender;
+use tonlibjson_sys::emulate_run_method;
 use crate::threaded::{Command, Stop, StreamId};
 use crate::tvm::tvm_emulator_request::Request::{Prepare, RunGetMethod, SendExternalMessage, SendInternalMessage, SetC7, SetGasLimit, SetLibraries};
 use crate::tvm::tvm_emulator_response::Response::{PrepareResponse, RunGetMethodResponse, SendExternalMessageResponse, SendInternalMessageResponse, SetC7Response, SetGasLimitResponse, SetLibrariesResponse};
 use crate::tvm::tvm_emulator_service_server::TvmEmulatorService as BaseTvmEmulatorService;
-use crate::tvm::{tvm_emulator_request, tvm_emulator_response, TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetC7Request, TvmEmulatorSetC7Response, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse, TvmResult};
+use crate::tvm::{RunGetMethodRequest, tvm_emulator_request, tvm_emulator_response, TvmEmulatorPrepareRequest, TvmEmulatorPrepareResponse, TvmEmulatorRequest, TvmEmulatorResponse, TvmEmulatorRunGetMethodRequest, TvmEmulatorRunGetMethodResponse, TvmEmulatorSendExternalMessageRequest, TvmEmulatorSendExternalMessageResponse, TvmEmulatorSendInternalMessageRequest, TvmEmulatorSendInternalMessageResponse, TvmEmulatorSetC7Request, TvmEmulatorSetC7Response, TvmEmulatorSetGasLimitRequest, TvmEmulatorSetGasLimitResponse, TvmEmulatorSetLibrariesRequest, TvmEmulatorSetLibrariesResponse, TvmResult};
 
 #[derive(Debug)]
 pub struct TvmEmulatorService {
@@ -116,6 +117,14 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
         };
 
         Ok(Response::new(Box::pin(output)))
+    }
+
+    async fn run_get_method(&self, request: Request<RunGetMethodRequest>) -> Result<Response<crate::tvm::RunGetMethodResponse>, Status> {
+        let req = request.into_inner();
+
+        let result = emulate_run_method(&req.params_boc, req.gas_limit).map_err(|e| Status::internal(e.to_string()))?;
+
+        Ok(Response::new(crate::tvm::RunGetMethodResponse { result }))
     }
 }
 

@@ -40,6 +40,8 @@ extern {
     fn tvm_emulator_send_internal_message(p: *mut c_void, message_body_boc: *const c_char, amount: c_ulong) -> *const c_char;
 
     fn tvm_emulator_destroy(p: *mut c_void);
+
+    fn tvm_emulator_emulate_run_method(len: u32, params_boc: *const c_char, gas_limit: i64) -> *const c_char;
 }
 
 #[derive(Debug)]
@@ -227,10 +229,27 @@ impl Drop for TvmEmulator {
     }
 }
 
+pub fn emulate_run_method(params_boc: &str, gas_limit: i64) -> Result<String> {
+    let len = params_boc.len() as u32;
+    let params_boc = CString::new(params_boc)?;
+
+    unsafe {
+        let ptr = tvm_emulator_emulate_run_method(len, params_boc.as_ptr(), gas_limit);
+        if ptr.is_null() {
+            return Err(anyhow!("pointer is null"));
+        }
+
+        let response = CStr::from_ptr(ptr).to_string_lossy().to_string();
+        libc::free(ptr as *mut c_void);
+
+        Ok(response)
+    }
+}
+
 
 #[cfg(test)]
 pub mod tests {
-    use crate::tonemulator::{TransactionEmulator, TvmEmulator};
+    use crate::tonemulator::{emulate_run_method, TransactionEmulator, TvmEmulator};
 
     #[test]
     fn transaction_emulator_test() {
@@ -310,5 +329,16 @@ pub mod tests {
 
         println!("{:?}", result);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn emulate_run_method_fail_test() {
+        let params = "invalid boc";
+        let gas_limit = 1000000;
+
+        let result = emulate_run_method(params, gas_limit);
+
+        println!("{:?}", result);
+        assert!(result.is_err());
     }
 }
