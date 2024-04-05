@@ -11,3 +11,6 @@ pub use self::tonemulator::TvmEmulator;
 
 #[cfg(feature = "tonemulator")]
 pub use self::tonemulator::TransactionEmulator;
+
+#[cfg(feature = "tonemulator")]
+pub use self::tonemulator::emulate_run_method;
