@@ -24,7 +24,7 @@ runs:
         ubuntu-version: 22.04
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
-        packages: libsecp256k1-dev libsodium-dev
+        packages: libsecp256k1-dev libsodium-dev liblz4-dev
 #    - shell: bash
 #      run: |
 #        sudo apt install --yes libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
