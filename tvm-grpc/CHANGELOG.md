@@ -28,6 +28,13 @@
 
 
 
+## [0.7.0](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.6.0...tvm-grpc-v0.7.0) (2024-04-05)
+
+
+### Features
+
+* **tvm:** grpc method ([8ac5e04](https://github.com/getgems-io/ton-grpc/commit/8ac5e045ea531742deb04ba636059bae5dd441c4))
+
 ## [0.6.0](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.5.0...tvm-grpc-v0.6.0) (2024-03-21)
 
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.3.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.2.0...tonlibjson-sys-v0.3.0) (2024-04-05)
+
+
+### Features
+
+* **tvm:** add tvm_emulator_emulate_run_method ([9a87893](https://github.com/getgems-io/ton-grpc/commit/9a87893ec9e1167e09499e2d967c8a3c47ee7edc))
+* **tvm:** grpc method ([8ac5e04](https://github.com/getgems-io/ton-grpc/commit/8ac5e045ea531742deb04ba636059bae5dd441c4))
+
+
+### Bug Fixes
+
+* **deps:** bump tonlibjson-sys/ton-testnet from `0feaaf5` to `cc4244f` ([3d9ab77](https://github.com/getgems-io/ton-grpc/commit/3d9ab774e7ef3137b297b5dcad882dcc07b689c9))
+
 ## [0.2.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.1.14...tonlibjson-sys-v0.2.0) (2024-03-21)
 
 
