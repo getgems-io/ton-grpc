@@ -2187,7 +2187,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.10.1"
+version = "0.10.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -2282,7 +2282,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2324,7 +2324,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-sys"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "cmake",
@@ -2517,7 +2517,7 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tvm-grpc"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "async-stream",

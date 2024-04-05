@@ -2,7 +2,7 @@
 
 [package]
 name = "ton-grpc"
-version = "0.10.1"
+version = "0.10.2"
 edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
