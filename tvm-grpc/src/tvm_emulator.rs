@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+use anyhow::anyhow;
 use async_stream::stream;
 use futures::Stream;
 use tokio_stream::StreamExt;
@@ -121,7 +122,7 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
     async fn run_get_method(&self, request: Request<RunGetMethodRequest>) -> Result<Response<crate::tvm::RunGetMethodResponse>, Status> {
         let req = request.into_inner();
 
-        let result = emulate_run_method(&req.params, req.gas_limit).map_err(|e| Status::internal(e.to_string()))?;
+        let result = emulate_run_method(&req.params_boc, req.gas_limit).map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(crate::tvm::RunGetMethodResponse { result }))
     }
