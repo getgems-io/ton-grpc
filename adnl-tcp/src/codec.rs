@@ -137,6 +137,23 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    #[traced_test]
+    fn decode_empty_packet_partial() -> Result<()> {
+        let mut codec = given_codec_client();
+        let data = empty_packet_bytes();
+        let mut buf = BytesMut::with_capacity(68);
+        buf.put(&data[.. 4]);
+        let _ = codec.decode(&mut buf)?;
+
+        buf.put(&data[4 ..]);
+        let packet = codec.decode(&mut buf)?.unwrap();
+
+        assert_eq!(packet, empty_packet());
+
+        Ok(())
+    }
+
     fn empty_packet() -> Packet {
         Packet {
             nonce: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32],
