@@ -1,4 +1,4 @@
-use anyhow::{anyhow, bail};
+use anyhow::anyhow;
 use nom::{AsChar};
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till, take_until, take_while, take_while1, take_while_m_n};
@@ -125,29 +125,33 @@ pub struct OptionalField {
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
+    let mut input = input;
     let mut collect = Vec::new();
-    let (input, types) = opt(preceded(opt(tag("---types---")), many0(
-        delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
-    )))(input).map_err(|e| anyhow!("parse error: {}", e))?;
 
-    if let Some(types) = types {
-        collect.extend(types)
-    }
+    loop {
+        let types;
+        let funcs;
+        (input, types) = opt(preceded(opt(tag("---types---")), many0(
+            delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
+        )))(input).map_err(|e| anyhow!("parse error: {}", e))?;
 
-    let (input, funcs) = opt(preceded(
-        tag("---functions---"),
-        many0(
-            delimited(opt(space_or_comment), alt((functional_combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
-        )))(input).map_err(|e: nom::Err<Error<&str>>| anyhow!("parse error: {}", e))?;
+        if let Some(types) = types {
+            collect.extend(types)
+        }
 
-    if let Some(funcs) = funcs {
-        collect.extend(funcs);
-    }
+        (input, funcs) = opt(preceded(
+            tag("---functions---"),
+            many0(
+                delimited(opt(space_or_comment), alt((functional_combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
+            )))(input).map_err(|e: nom::Err<Error<&str>>| anyhow!("parse error: {}", e))?;
 
-    if input.is_empty() {
-        Ok(collect)
-    } else {
-        bail!("parse error: input is not empty: \"{}\"", input)
+        if let Some(funcs) = funcs {
+            collect.extend(funcs);
+        }
+
+        if input.is_empty() {
+            return Ok(collect)
+        }
     }
 }
 
@@ -867,8 +871,8 @@ d = !D;
 
         assert_eq!(output, vec![
             Combinator::new("a", "A"),
-            Combinator::new("c", "C").functional(),
             Combinator::new("b", "B").functional(),
+            Combinator::new("c", "C").functional(),
             Combinator::new("d", "D").functional()
         ]);
     }
