@@ -1,4 +1,6 @@
 pub mod packet;
+mod codec;
+mod crypto;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right

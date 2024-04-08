@@ -2,6 +2,7 @@ use std::fmt::{Debug, Formatter};
 use rand::random;
 use sha2::{Digest, Sha256, digest::Update};
 
+#[derive(PartialEq, Eq)]
 pub struct Packet {
     pub nonce: [u8; 32],
     pub checksum: [u8; 32],
