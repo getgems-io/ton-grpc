@@ -125,9 +125,14 @@ pub struct OptionalField {
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
-    let (input, mut types) = many0(
+    let mut collect = Vec::new();
+    let (input, types) = opt(preceded(opt(tag("---types---")), many0(
         delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
-    )(input).map_err(|e| anyhow!("parse error: {}", e))?;
+    )))(input).map_err(|e| anyhow!("parse error: {}", e))?;
+
+    if let Some(types) = types {
+        collect.extend(types)
+    }
 
     let (input, funcs) = opt(preceded(
         tag("---functions---"),
@@ -136,11 +141,11 @@ pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
         )))(input).map_err(|e: nom::Err<Error<&str>>| anyhow!("parse error: {}", e))?;
 
     if let Some(funcs) = funcs {
-        types.extend(funcs);
+        collect.extend(funcs);
     }
 
     if input.is_empty() {
-        Ok(types)
+        Ok(collect)
     } else {
         bail!("parse error: input is not empty: \"{}\"", input)
     }
@@ -836,6 +841,27 @@ c = !C;
 ---functions---
 b = B;
 d = !D;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("a", "A"),
+            Combinator::new("c", "C").functional(),
+            Combinator::new("b", "B").functional(),
+            Combinator::new("d", "D").functional()
+        ]);
+    }
+
+    #[test]
+    fn functional_combinator_types_test() {
+        let input = "a = A;
+---functions---
+b = B;
+---types---
+c = !C;
+---functions---
+d = !D;
+";
 
         let output = parse(input).unwrap();
 
