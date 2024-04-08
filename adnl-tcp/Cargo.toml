@@ -1,0 +1,7 @@
+[package]
+name = "adnl-tcp"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+
+[dependencies]
