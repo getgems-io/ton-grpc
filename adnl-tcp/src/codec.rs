@@ -91,6 +91,7 @@ impl PacketCodec {
         Self { cipher_recv, cipher_send, next_len: None }
     }
 
+    #[allow(dead_code)]
     pub fn from_bytes_as_server(bytes: &[u8; 160]) -> Self {
         let cipher_recv = Aes256Ctr::new(GenericArray::from_slice(&bytes[32..64]), GenericArray::from_slice(&bytes[80 .. 96]));
         let cipher_send = Aes256Ctr::new(GenericArray::from_slice(&bytes[0..32]), GenericArray::from_slice(&bytes[64 .. 80]));
