@@ -31,7 +31,7 @@ itertools = "0.12"
 derive-new = "0.6.0"
 tokio-retry = "0.3"
 bytes = "1.6"
-crc = "3.0.1"
+crc = "3.2.0"
 metrics = "0.22.3"
 thiserror = "1.0.58"
 
