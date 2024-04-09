@@ -42,12 +42,69 @@ impl Combinator {
     pub fn is_builtin(&self) -> bool {
         self.builtin
     }
+
+    pub fn constructor_number_form(&self) -> String {
+        let optional = self.optional_fields
+            .iter()
+            .map(OptionalField::constructor_number_form)
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let fields = self.fields
+            .iter()
+            .map(Field::constructor_number_form)
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let lhs = vec![self.id.as_str(), optional.as_str(), fields.as_str()]
+            .into_iter()
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        format!("{} = {}", lhs, self.result_type())
+    }
+
+    pub fn constructor_number_be(&self) -> u32 {
+        return self.constructor_number.unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes())).to_be()
+    }
+
+    pub fn constructor_number_le(&self) -> u32 {
+        return self.constructor_number.unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes()))
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum FieldType {
     Plain { name: String, condition: Option<String> },
     Repetition { multiplicity: Option<String>, fields: Vec<Field>, },
+}
+
+impl FieldType {
+    pub fn constructor_number_form(&self) -> String {
+        match self {
+            Plain { name, condition: None } => { format!("{}", name) }
+            Plain { name, condition: Some(condition) } => { format!("{}?{}", name, condition) }
+            Repetition { multiplicity: None, fields } => {
+                let fields = fields
+                    .iter()
+                    .map(Field::constructor_number_form)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                format!("[ {} ]", fields)
+            }
+            Repetition { multiplicity: Some(multiplicity), fields } => {
+                let fields = fields
+                    .iter()
+                    .map(Field::constructor_number_form)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                format!("{}*[ {} ]", multiplicity, fields)
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -116,12 +173,25 @@ impl Field {
             Some(tail.replace('>', "").split(',').map(|s| s.trim().to_owned()).collect())
         }
     }
+
+    pub fn constructor_number_form(&self) -> String {
+        match &self.name {
+            None => { format!("{}", self.r#type.constructor_number_form() )}
+            Some(name) => { format!("{}:{}", name, self.r#type.constructor_number_form() )}
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub struct OptionalField {
     name: String,
     r#type: String,
+}
+
+impl OptionalField {
+    pub fn constructor_number_form(&self) -> String {
+        format!("{}:{}", self.name, self.r#type)
+    }
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
@@ -286,12 +356,6 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (functional, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    let constructor_number = constructor_number.or_else(|| {
-        let input = format!("{} = {}", &combinator_id, &combinator_type);
-
-        Some(crc32fast::hash(input.as_bytes()))
-    });
-
     Ok((input, Combinator {
         id: combinator_id,
         r#type: combinator_type,
@@ -311,12 +375,6 @@ fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (_, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    let constructor_number = constructor_number.or_else(|| {
-        let input = format!("{} = {}", &combinator_id, &combinator_type);
-
-        Some(crc32fast::hash(input.as_bytes()))
-    });
-
     Ok((input, Combinator {
         id: combinator_id,
         r#type: combinator_type,
@@ -334,12 +392,6 @@ fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, _) = delimited(multispace0, tag("="), space_or_comment)(input)?;
     let (input, combinator_type) = boxed_type_ident(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
-
-    let constructor_number = constructor_number.or_else(|| {
-        let input = format!("{} = {}", combinator_id, combinator_type);
-
-        Some(crc32fast::hash(input.as_bytes()))
-    });
 
     Ok((input, Combinator {
         id: combinator_id,
@@ -978,12 +1030,44 @@ d = !D;
 
         let output = parse(input).unwrap();
 
+        assert_eq!(output[0].constructor_number_form(), "tcp.ping random_id:long = tcp.Pong");
+        assert_eq!(output[0].constructor_number_be(), 0x9a2b084d);
         assert_eq!(output, vec![
             Combinator::new("tcp.ping", "tcp.Pong")
-                .with_constructor_number(0x9a2b084d)
                 .with_fields(vec![
                     Field::plain("random_id", "long")
                 ])
         ]);
+    }
+
+    #[test]
+    // TODO[akostylev0] check that it is in use and correct
+    fn vector_constructor_number_form() {
+        let input = "vector {t:Type} # [ t ] = Vector t;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output[0].constructor_number_form(), "vector t:Type # [ t ] = Vector t");
+        assert_eq!(output[0].constructor_number_le(), 0x1cb5c415);
+    }
+
+    #[test]
+    fn liteserver_query_constructor_number_form() {
+        let input = "liteServer.query data:bytes = Object;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output[0].constructor_number_form(), "liteServer.query data:bytes = Object");
+        assert_eq!(output[0].constructor_number_be(), 0xdf068c79);
+    }
+
+    #[test]
+    fn adnl_query_constructor_number_form() {
+        let input = "adnl.message.query query_id:int256 query:bytes = adnl.Message;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output[0].constructor_number_form(), "adnl.message.query query_id:int256 query:bytes = adnl.Message");
+        assert_eq!(output[0].constructor_number_be(), 0x7af98bb4);
     }
 }
