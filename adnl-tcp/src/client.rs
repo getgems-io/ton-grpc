@@ -135,6 +135,24 @@ mod tests {
         Ok(())
     }
 
+    #[traced_test]
+    #[tokio::test]
+    async fn client_connect_wrong_key() -> anyhow::Result<()> {
+        let ip: i32 = -2018147075;
+        let ip = Ipv4Addr::from(ip as u32);
+        let port = 46529;
+        let key: ServerKey = (0..32).collect::<Vec<_>>().try_into().unwrap();
+
+        tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
+
+        let client = AdnlTcpClient::connect(SocketAddrV4::new(ip, port), &key).await;
+
+        assert!(client.is_err());
+        assert_eq!(client.err().unwrap().to_string(), "missed empty packet".to_string());
+
+        Ok(())
+    }
+
     async fn provided_client() -> anyhow::Result<AdnlTcpClient> {
         let ip: i32 = -2018147075;
         let ip = Ipv4Addr::from(ip as u32);
