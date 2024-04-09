@@ -279,6 +279,7 @@ impl Generator {
                     quote! {}
                 };
 
+                let crc32 = definition.
                 let output = quote! {
                 #[#t]
                 pub struct #struct_name {
@@ -286,6 +287,12 @@ impl Generator {
                 }
 
                 #traits
+
+                impl #struct_name {
+                    pub fn crc32(&self) -> u32 {
+
+                    }
+                }
             };
 
                 let syntax_tree = syn::parse2(output.clone()).unwrap();

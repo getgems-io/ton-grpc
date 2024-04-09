@@ -19,7 +19,7 @@ pub struct Combinator {
     r#type: String,
     constructor_number: Option<ConstructorNumber>,
     optional_fields: Vec<OptionalField>,
-    fields: Vec<Field>,
+    fields: Vec<Field>
 }
 
 impl Combinator {
@@ -286,8 +286,21 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (functional, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number,
-        fields: fields.into_iter().flatten().collect(), optional_fields: opts.unwrap_or_default(), functional }))
+    let constructor_number = constructor_number.or_else(|| {
+        let input = format!("{} = {}", &combinator_id, &combinator_type);
+
+        Some(crc32fast::hash(input.as_bytes()))
+    });
+
+    Ok((input, Combinator {
+        id: combinator_id,
+        r#type: combinator_type,
+        builtin: false,
+        constructor_number,
+        fields: fields.into_iter().flatten().collect(),
+        optional_fields: opts.unwrap_or_default(),
+        functional
+    }))
 }
 
 fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -298,8 +311,21 @@ fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (_, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number,
-        fields: fields.into_iter().flatten().collect(), optional_fields: opts.unwrap_or_default(), functional: true }))
+    let constructor_number = constructor_number.or_else(|| {
+        let input = format!("{} = {}", &combinator_id, &combinator_type);
+
+        Some(crc32fast::hash(input.as_bytes()))
+    });
+
+    Ok((input, Combinator {
+        id: combinator_id,
+        r#type: combinator_type,
+        builtin: false,
+        constructor_number,
+        fields: fields.into_iter().flatten().collect(),
+        optional_fields: opts.unwrap_or_default(),
+        functional: true,
+    }))
 }
 
 fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -309,7 +335,21 @@ fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, combinator_type) = boxed_type_ident(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number, fields: vec![], optional_fields: vec![], functional: false }))
+    let constructor_number = constructor_number.or_else(|| {
+        let input = format!("{} = {}", combinator_id, combinator_type);
+
+        Some(crc32fast::hash(input.as_bytes()))
+    });
+
+    Ok((input, Combinator {
+        id: combinator_id,
+        r#type: combinator_type,
+        builtin: true,
+        constructor_number,
+        fields: vec![],
+        optional_fields: vec![],
+        functional: false,
+    }))
 }
 
 fn var_ident(input: &str) -> nom::IResult<&str, String> {
@@ -929,6 +969,21 @@ d = !D;
                     Field::plain("max_pieces", "long"),
                 ]
             ),
+        ]);
+    }
+
+    #[test]
+    fn parse_ping_crc32() {
+        let input = "tcp.ping random_id:long = tcp.Pong;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("tcp.ping", "tcp.Pong")
+                .with_constructor_number(0x9a2b084d)
+                .with_fields(vec![
+                    Field::plain("random_id", "long")
+                ])
         ]);
     }
 }
