@@ -66,7 +66,7 @@ impl Decoder for PacketCodec {
 
         self.cipher_recv.apply_keystream(&mut src[0 .. length]);
         let sha256: [u8; 32] = Sha256::digest(&src[..length - 32]).into();
-        if sha256 != &src[length - 32..length] {
+        if sha256 != src[length - 32..length] {
             bail!("incorrect checksum for ADNL packet");
         }
 

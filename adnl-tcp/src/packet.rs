@@ -19,7 +19,7 @@ impl Packet {
         let data = data.to_vec();
 
         let checksum: [u8; 32] = Sha256::default()
-            .chain(&nonce)
+            .chain(nonce)
             .chain(&data)
             .finalize()
             .into();
@@ -39,7 +39,7 @@ impl Packet {
 impl Debug for Packet {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Packet")
-            .field("checksum", &hex::encode(&self.checksum))
+            .field("checksum", &hex::encode(self.checksum))
             .field("data", &hex::encode(&self.data))
             .field("length", &self.data.len())
             .finish()

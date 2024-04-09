@@ -80,7 +80,7 @@ impl AdnlTcpClient {
         let mut aes_basis = [0u8; 160];
         rand::thread_rng().fill(aes_basis.as_mut_slice());
 
-        let checksum = Sha256::digest(&aes_basis).into();
+        let checksum = Sha256::digest(aes_basis).into();
 
         (aes_basis, checksum)
     }
