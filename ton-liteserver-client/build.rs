@@ -279,7 +279,8 @@ impl Generator {
                     quote! {}
                 };
 
-                let crc32 = definition.
+                let constructor_number_le = definition.constructor_number_le();
+                let constructor_number_be = definition.constructor_number_be();
                 let output = quote! {
                 #[#t]
                 pub struct #struct_name {
@@ -289,9 +290,8 @@ impl Generator {
                 #traits
 
                 impl #struct_name {
-                    pub fn crc32(&self) -> u32 {
-
-                    }
+                    const CONSTRUCTOR_NUMBER_LE: u32 = #constructor_number_le;
+                    const CONSTRUCTOR_NUMBER_BE: u32 = #constructor_number_be;
                 }
             };
 
