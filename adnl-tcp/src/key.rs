@@ -25,7 +25,7 @@ impl Ed25519KeyId {
 
 pub struct Ed25519Key {
     id: Ed25519KeyId,
-    pub pub_key: VerifyingKey,
+    pub_key: VerifyingKey,
     exp_key: Option<ExpandedSecretKey>
 }
 
@@ -55,6 +55,10 @@ impl Ed25519Key {
 
     pub fn id(&self) -> &Ed25519KeyId {
         &self.id
+    }
+
+    pub fn public_key(&self) -> &VerifyingKey {
+        &self.pub_key
     }
 
     pub fn shared_key(&self, other: &Ed25519Key) -> anyhow::Result<[u8; 32]> {
