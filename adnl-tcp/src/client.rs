@@ -124,7 +124,9 @@ impl Stream for AdnlTcpClient {
 mod tests {
     use std::net::Ipv4Addr;
     use base64::Engine;
+    use futures::SinkExt;
     use tracing_test::traced_test;
+    use crate::ping::{is_pong_packet, ping_packet};
     use super::*;
 
     #[traced_test]
@@ -149,6 +151,20 @@ mod tests {
 
         assert!(client.is_err());
         assert_eq!(client.err().unwrap().to_string(), "missed empty packet".to_string());
+
+        Ok(())
+    }
+
+    #[traced_test]
+    #[tokio::test]
+    async fn client_ping() -> anyhow::Result<()> {
+        let mut client = provided_client().await?;
+
+        let sent = client.send(ping_packet()).await;
+        let received = client.next().await.unwrap()?;
+
+        assert!(sent.is_ok());
+        assert!(is_pong_packet(&received));
 
         Ok(())
     }
