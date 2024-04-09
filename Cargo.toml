@@ -5,7 +5,8 @@ members = [
     "tonlibjson-sys",
     "tonlibjson-client",
     "ton-grpc",
-    "tvm-grpc"
+    "tvm-grpc",
+    "adnl-tcp"
 ]
 
 [workspace.dependencies]

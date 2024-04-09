@@ -125,24 +125,40 @@ pub struct OptionalField {
 }
 
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
-    let (input, mut types) = many0(
-        delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
-    )(input).map_err(|e| anyhow!("parse error: {}", e))?;
+    let mut input = input;
+    let mut collect = Vec::new();
 
-    let (input, funcs) = opt(preceded(
-        tag("---functions---"),
-        many0(
-            delimited(opt(space_or_comment), alt((functional_combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
-        )))(input).map_err(|e: nom::Err<Error<&str>>| anyhow!("parse error: {}", e))?;
+    loop {
+        let prev = input.clone();
+        let types;
+        let funcs;
+        (input, types) = opt(preceded(
+            opt(delimited(opt(space_or_comment), tag("---types---"), opt(space_or_comment))),
+            many0(
+                delimited(opt(space_or_comment), alt((combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
+        )))(input).map_err(|e| anyhow!("parse error: {}", e))?;
 
-    if let Some(funcs) = funcs {
-        types.extend(funcs);
-    }
+        if let Some(types) = types {
+            collect.extend(types)
+        }
 
-    if input.is_empty() {
-        Ok(types)
-    } else {
-        bail!("parse error: input is not empty: \"{}\"", input)
+        (input, funcs) = opt(preceded(
+            opt(delimited(opt(space_or_comment), tag("---functions---"), opt(space_or_comment))),
+            many0(
+                delimited(opt(space_or_comment), alt((functional_combinator_decl, builtin_combinator_decl)), opt(space_or_comment))
+            )))(input).map_err(|e: nom::Err<Error<&str>>| anyhow!("parse error: {}", e))?;
+
+        if let Some(funcs) = funcs {
+            collect.extend(funcs);
+        }
+
+        if input.is_empty() {
+            return Ok(collect)
+        }
+
+        if prev == input {
+            bail!("infinity loop")
+        }
     }
 }
 
@@ -237,7 +253,7 @@ fn boxed_type_ident(input: &str) -> nom::IResult<&str, String> {
 fn result_type(input: &str) -> nom::IResult<&str, (bool, String)> {
     let (input, exclamation) = opt(tag("!"))(input)?;
     let (input, ident) = boxed_type_ident(input)?;
-    let (input, exprs) = many0(delimited(space0, subexpr, space0))(input)?;
+    let (input, exprs) = many0(delimited(space0, subexpr, space_or_comment))(input)?;
 
     if !exprs.is_empty() {
         Ok((input, (exclamation.is_some(), format!("{} {}", ident, exprs.join(" ")))))
@@ -255,8 +271,8 @@ fn type_expr(input: &str) -> nom::IResult<&str, String> {
 }
 
 fn opt_args(input: &str) -> nom::IResult<&str, Vec<OptionalField>> {
-    let (input, names) = preceded(tag("{"), many1(delimited(space0, var_ident, space0)))(input)?;
-    let (input, _) = delimited(space0, tag(":"), space0)(input)?;
+    let (input, names) = preceded(tag("{"), many1(delimited(space0, var_ident, space_or_comment)))(input)?;
+    let (input, _) = delimited(space0, tag(":"), space_or_comment)(input)?;
     let (input, type_name) = terminated(type_expr, tag("}"))(input)?;
 
     Ok((input, names.into_iter().map(|name| OptionalField { name, r#type: type_name.clone() }).collect()))
@@ -264,9 +280,9 @@ fn opt_args(input: &str) -> nom::IResult<&str, Vec<OptionalField>> {
 
 fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
-    let (input, opts) = opt(delimited(space0, opt_args, space0))(input)?;
-    let (input, fields) = many0(delimited(space0, args, space0))(input)?;
-    let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
+    let (input, opts) = opt(delimited(space0, opt_args, space_or_comment))(input)?;
+    let (input, fields) = many0(delimited(space0, args, space_or_comment))(input)?;
+    let (input, _) = delimited(multispace0, tag("="), space_or_comment)(input)?;
     let (input, (functional, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
@@ -276,8 +292,8 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
 
 fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
-    let (input, opts) = opt(delimited(space0, opt_args, space0))(input)?;
-    let (input, fields) = many0(delimited(space0, args, space0))(input)?;
+    let (input, opts) = opt(delimited(space_or_comment, opt_args, space_or_comment))(input)?;
+    let (input, fields) = many0(delimited(space_or_comment, args, space_or_comment))(input)?;
     let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
     let (input, (_, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
@@ -288,8 +304,8 @@ fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
 
 fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (combinator_id, constructor_number)) = preceded(multispace0, full_combinator_id)(input)?;
-    let (input, _) = delimited(multispace0, tag("?"), multispace0)(input)?;
-    let (input, _) = delimited(multispace0, tag("="), multispace0)(input)?;
+    let (input, _) = delimited(multispace0, tag("?"), space_or_comment)(input)?;
+    let (input, _) = delimited(multispace0, tag("="), space_or_comment)(input)?;
     let (input, combinator_type) = boxed_type_ident(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
@@ -848,6 +864,25 @@ d = !D;";
     }
 
     #[test]
+    fn functional_combinator_types_test() {
+        let input = "a = A;
+---functions---
+---types---
+c = !C;
+---functions---
+d = !D;
+";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("a", "A"),
+            Combinator::new("c", "C").functional(),
+            Combinator::new("d", "D").functional()
+        ]);
+    }
+
+    #[test]
     fn functional_combinator_ok_test() {
         let input = "ok = Ok;";
 
@@ -871,6 +906,27 @@ d = !D;";
                     Field::plain("mc_id", "ton.blockIdExt"),
                     Field::plain("links", "vector blocks.shardBlockLink"),
                     Field::plain("mc_proof", "vector blocks.blockLinkBack"),
+                ]
+            ),
+        ]);
+    }
+
+    #[test]
+    fn parse_multiline_test() {
+        let input = "storage.daemon.getTorrentPiecesInfo hash:int256
+    flags:# // 0 - with file ranges
+    offset:long max_pieces:long
+    = storage.daemon.TorrentPiecesInfo;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output, vec![
+            Combinator::new("storage.daemon.getTorrentPiecesInfo", "storage.daemon.TorrentPiecesInfo").with_fields(
+                vec![
+                    Field::plain("hash", "int256"),
+                    Field::plain("flags", "#"),
+                    Field::plain("offset", "long"),
+                    Field::plain("max_pieces", "long"),
                 ]
             ),
         ]);

@@ -22,6 +22,9 @@
     },
     "tonlibjson-client": {
       "release-type": "rust"
+    },
+    "adnl-tcp": {
+      "release-type": "rust"
     }
   }
 }
