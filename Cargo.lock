@@ -2470,6 +2470,17 @@ dependencies = [
 [[package]]
 name = "ton-liteserver-client"
 version = "0.1.0"
+dependencies = [
+ "adnl-tcp",
+ "anyhow",
+ "convert_case",
+ "prettyplease 0.2.17",
+ "quote",
+ "syn 2.0.58",
+ "tl_parser",
+ "tokio",
+ "tower",
+]
 
 [[package]]
 name = "tonic"
