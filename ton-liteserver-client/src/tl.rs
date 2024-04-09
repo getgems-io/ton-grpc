@@ -12,9 +12,9 @@ type Long = i64;
 type Int128 = i128;
 type Int256 = String;
 type BoxedBool = bool;
-type Bytes = String;
+type Bytes = Vec<u8>;
 type SecureString = String;
-type SecureBytes = String;
+type SecureBytes = Vec<u8>;
 type Vector<T> = Vec<T>;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
