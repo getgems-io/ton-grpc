@@ -40,7 +40,7 @@ impl AdnlTcpClient {
         tracing::debug!(aes_basis = ?aes_basis);
 
         let mut aes_basis_encrypted = [0u8; 160];
-        crate::crypto::aes256ctr::build_cipher(&shared_key, &aes_bases_checksum)
+        crate::codec::build_cipher(&shared_key, &aes_bases_checksum)
             .apply_keystream_b2b(&aes_basis, &mut aes_basis_encrypted)
             .map_err(|e| anyhow!(e))?;
 
