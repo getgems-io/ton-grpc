@@ -13,7 +13,7 @@ pub struct Deserializer {
 impl Deserializer {
     // TODO[akostylev0]
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        return Deserializer { input: bytes.into() }
+        Deserializer { input: bytes.into() }
     }
 
     pub fn verify_constructor_number(&mut self, crc32: u32) -> anyhow::Result<()> {
@@ -25,11 +25,11 @@ impl Deserializer {
     }
 
     pub fn parse_i32(&mut self) -> anyhow::Result<i32> {
-        return Ok(self.input.get_i32_le())
+        Ok(self.input.get_i32_le())
     }
 
     pub fn parse_i64(&mut self) -> anyhow::Result<i64> {
-        return Ok(self.input.get_i64_le())
+        Ok(self.input.get_i64_le())
     }
 
     pub fn parse_i256(&mut self) -> anyhow::Result<Int256> {
@@ -37,7 +37,7 @@ impl Deserializer {
         let mut result: [u8; 32] = [0; 32];
         needed.copy_to_slice(&mut result);
 
-        return Ok(result)
+        Ok(result)
     }
 
     pub fn parse_bytes(&mut self) -> anyhow::Result<crate::types::Bytes> {

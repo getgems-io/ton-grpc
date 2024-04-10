@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use adnl_tcp::deserializer::{Deserialize, Deserializer};
 use adnl_tcp::serializer::{Serialize, Serializer};
 pub use adnl_tcp::types::*;

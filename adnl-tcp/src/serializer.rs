@@ -1,5 +1,4 @@
-use std::error::Error;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use bytes::BufMut;
 use crate::types::{Bytes, Int256};
 
@@ -44,7 +43,7 @@ impl Serializer {
                 self.output.put_slice(val);
             }
         } else {
-            let mut padding = (val.len() + 4) % 4;
+            let padding = (val.len() + 4) % 4;
             if padding > 0 {
                 self.output.reserve(val.len() + 4 + 4 - padding);
                 self.output.put_u8(254);

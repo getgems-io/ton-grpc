@@ -4,13 +4,11 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use anyhow::{anyhow, Error};
+use anyhow::anyhow;
 use dashmap::DashMap;
 use tower::Service;
 use adnl_tcp::client::{AdnlTcpClient, ServerKey};
-use futures::sink::Sink;
 use futures::{FutureExt, SinkExt, StreamExt};
-use futures::stream::SplitSink;
 use rand::random;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::MissedTickBehavior;
@@ -89,7 +87,7 @@ impl<R : Requestable> Service<R> for LiteserverClient {
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.tx.is_closed() {
             return Poll::Ready(Err(anyhow!("inner channel is closed")))
         }
@@ -120,7 +118,7 @@ impl<R : Requestable> Service<R> for LiteserverClient {
 
             let response = from_bytes::<R::Response>(response)?;
 
-            return Ok(response)
+            Ok(response)
         }.boxed()
     }
 }
