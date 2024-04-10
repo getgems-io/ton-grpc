@@ -4,7 +4,7 @@ use bytes::BufMut;
 use crate::tl::{Bytes, Int256};
 
 pub trait Serialize {
-    fn serialize(&self, serializer: &mut Serializer) -> anyhow::Result<()>;
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()>;
 }
 
 #[derive(Debug)]
@@ -66,7 +66,6 @@ pub fn to_bytes<T>(value: &T) -> anyhow::Result<Vec<u8>>
 
 #[cfg(test)]
 mod tests {
-    use std::process::exit;
     use crate::tl::{AdnlMessageQuery, LiteServerQuery, Bytes, Int256, LiteServerGetMasterchainInfo};
     use super::*;
 

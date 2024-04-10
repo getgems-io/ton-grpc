@@ -1,3 +1,4 @@
+use crate::deserializer::Deserialize;
 use crate::serializer::{Serialize, Serializer};
 
 pub trait Functional {
@@ -24,29 +25,42 @@ include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 
 impl Serialize for AdnlMessageQuery {
-    fn serialize(&self, serializer: &mut Serializer) -> anyhow::Result<()> {
-        serializer.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
-        serializer.write_i256(&self.query_id);
-        serializer.write_bytes(&self.query);
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+        se.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
+        se.write_i256(&self.query_id);
+        se.write_bytes(&self.query);
 
         Ok(())
     }
 }
 
+impl Deserialize for AdnlMessageQuery {
+    fn deserialize(de: &mut crate::deserializer::Deserializer) -> anyhow::Result<Self> {
+        de.verify_constructor_number(Self::CONSTRUCTOR_NUMBER_BE)?;
+
+        let query_id = de.parse_i256()?;
+        let query = de.parse_bytes()?;
+
+        Ok(Self {
+            query_id,
+            query
+        })
+    }
+}
+
 impl Serialize for LiteServerQuery {
-    fn serialize(&self, serializer: &mut Serializer) -> anyhow::Result<()> {
-        serializer.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
-        serializer.write_bytes(&self.data);
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+        se.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
+        se.write_bytes(&self.data);
 
         Ok(())
     }
 }
 
 impl Serialize for LiteServerGetMasterchainInfo {
-    fn serialize(&self, serializer: &mut Serializer) -> anyhow::Result<()> {
-        serializer.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+        se.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
 
         Ok(())
     }
 }
-

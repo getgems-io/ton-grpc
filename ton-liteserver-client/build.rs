@@ -45,7 +45,7 @@ struct TypeConfiguration {
 
 impl Default for TypeConfiguration {
     fn default() -> Self {
-        Self { derives: vec!["Debug".to_owned(), "Clone".to_owned()], fields: HashMap::new() }
+        Self { derives: vec!["Debug".to_owned(), "Clone".to_owned(), "PartialEq".to_owned(), "Eq".to_owned()], fields: HashMap::new() }
     }
 }
 
@@ -182,7 +182,7 @@ impl Generator {
                     .collect();
 
                 quote! {
-                    #[derive(Clone, Debug)]
+                    #[derive(Clone, Debug, PartialEq, Eq)]
                     pub enum #struct_name {
                         #(#fields),*
                     }
