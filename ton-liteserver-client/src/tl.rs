@@ -6,7 +6,6 @@ pub trait Functional {
     type Result;
 }
 
-
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 // TODO[akostylev0] move writing/reading constructor number to boxed types
@@ -176,8 +175,8 @@ impl Deserialize for LiteServerGetMasterchainInfo {
 
 #[cfg(test)]
 mod tests {
-    use crate::deserializer::from_bytes;
-    use crate::serializer::to_bytes;
+    use adnl_tcp::deserializer::from_bytes;
+    use adnl_tcp::serializer::to_bytes;
     use super::*;
 
     #[test]
