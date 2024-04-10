@@ -14,6 +14,7 @@ impl Packet {
         Self::new(&[0u8; 0])
     }
 
+    // TODO[akostylev] Vec<u8> ?
     pub fn new(data: &[u8]) -> Self {
         let nonce: [u8; 32] = random();
         let data = data.to_vec();

@@ -17,7 +17,12 @@ anyhow = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
+dashmap = "5.5.3"
 bytes = "1.6.0"
+pin-project = "1.1.5"
+futures = "0.3.30"
+rand = "0.8.5"
+tokio-stream = "0.1.15"
 
 [dev-dependencies]
 hex = "0.4.3"
