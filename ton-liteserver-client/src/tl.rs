@@ -1,4 +1,4 @@
-use crate::serializer::serializer::{Serialize, Serializer};
+use crate::serializer::{Serialize, Serializer};
 
 pub trait Functional {
     type Result;
@@ -41,3 +41,12 @@ impl Serialize for LiteServerQuery {
         Ok(())
     }
 }
+
+impl Serialize for LiteServerGetMasterchainInfo {
+    fn serialize(&self, serializer: &mut Serializer) -> anyhow::Result<()> {
+        serializer.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
+
+        Ok(())
+    }
+}
+

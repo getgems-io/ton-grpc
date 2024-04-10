@@ -3,6 +3,10 @@ use std::fmt::{Debug, Display};
 use bytes::BufMut;
 use crate::tl::{Bytes, Int256};
 
+pub trait Serialize {
+    fn serialize(&self, serializer: &mut Serializer) -> anyhow::Result<()>;
+}
+
 #[derive(Debug)]
 pub struct Serializer {
     output: Vec<u8>,
@@ -11,6 +15,11 @@ pub struct Serializer {
 impl Serializer {
     pub fn write_constructor_number(&mut self, crc32: u32) {
         self.output.put_u32(crc32)
+    }
+
+    pub fn write_i256(&mut self, val: &Int256) {
+        self.output.reserve(32);
+        self.output.put_slice(val)
     }
 
     pub fn write_bytes(&mut self, val: &Bytes) {
@@ -43,15 +52,6 @@ impl Serializer {
             }
         }
     }
-
-    pub fn write_i256(&mut self, val: &Int256) {
-        self.output.reserve(32);
-        self.output.put_slice(val)
-    }
-}
-
-pub trait Serialize {
-    fn serialize(&self, serializer: &mut Serializer) -> anyhow::Result<()>;
 }
 
 pub fn to_bytes<T>(value: &T) -> anyhow::Result<Vec<u8>>
@@ -67,7 +67,7 @@ pub fn to_bytes<T>(value: &T) -> anyhow::Result<Vec<u8>>
 #[cfg(test)]
 mod tests {
     use std::process::exit;
-    use crate::tl::{AdnlMessageQuery, LiteServerQuery, Bytes, Int256};
+    use crate::tl::{AdnlMessageQuery, LiteServerQuery, Bytes, Int256, LiteServerGetMasterchainInfo};
     use super::*;
 
     #[test]
@@ -107,5 +107,14 @@ mod tests {
         let bytes = to_bytes(&query).unwrap();
 
         assert_eq!(bytes, hex::decode("df068c79042ee6b589000000").unwrap())
+    }
+
+    #[test]
+    fn serialize_get_masterchain_info_test() {
+        let s = LiteServerGetMasterchainInfo {};
+
+        let bytes = to_bytes(&s).unwrap();
+
+        assert_eq!(bytes, hex::decode("2ee6b589").unwrap())
     }
 }
