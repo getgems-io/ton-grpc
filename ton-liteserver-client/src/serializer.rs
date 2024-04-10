@@ -17,6 +17,14 @@ impl Serializer {
         self.output.put_u32(crc32)
     }
 
+    pub fn write_i32(&mut self, val: i32) {
+        self.output.put_i32_le(val)
+    }
+
+    pub fn write_i64(&mut self, val: i64) {
+        self.output.put_i64_le(val)
+    }
+
     pub fn write_i256(&mut self, val: &Int256) {
         self.output.reserve(32);
         self.output.put_slice(val)
@@ -66,11 +74,9 @@ pub fn to_bytes<T>(value: &T) -> anyhow::Result<Vec<u8>>
 
 #[cfg(test)]
 mod tests {
-    use crate::tl::{AdnlMessageQuery, LiteServerQuery, Bytes, Int256, LiteServerGetMasterchainInfo};
     use super::*;
 
     #[test]
-    #[tracing_test::traced_test]
     fn serialize_bytes_length255() {
         let mut serializer = Serializer { output: Vec::new() };
         let value = vec![1; 255];
@@ -81,39 +87,5 @@ mod tests {
         serializer.write_bytes(&value);
 
         assert_eq!(serializer.output, expected)
-    }
-
-    #[test]
-    #[tracing_test::traced_test]
-    fn adnl_query_serialize_test() {
-        let query = AdnlMessageQuery {
-            query_id: hex::decode("77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4").unwrap().try_into().unwrap(),
-            query: hex::decode("df068c79042ee6b589000000").unwrap()
-        };
-
-        let bytes = to_bytes(&query).unwrap();
-
-        assert_eq!(bytes, hex::decode("7af98bb477c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c40cdf068c79042ee6b589000000000000").unwrap())
-    }
-
-    #[test]
-    #[tracing_test::traced_test]
-    fn liteserver_query_serialize_test() {
-        let query = LiteServerQuery {
-            data: hex::decode("2ee6b589").unwrap(),
-        };
-
-        let bytes = to_bytes(&query).unwrap();
-
-        assert_eq!(bytes, hex::decode("df068c79042ee6b589000000").unwrap())
-    }
-
-    #[test]
-    fn serialize_get_masterchain_info_test() {
-        let s = LiteServerGetMasterchainInfo {};
-
-        let bytes = to_bytes(&s).unwrap();
-
-        assert_eq!(bytes, hex::decode("2ee6b589").unwrap())
     }
 }

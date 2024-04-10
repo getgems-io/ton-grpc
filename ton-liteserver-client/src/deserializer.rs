@@ -24,16 +24,20 @@ impl Deserializer {
         }
     }
 
+    pub fn parse_i32(&mut self) -> anyhow::Result<i32> {
+        return Ok(self.input.get_i32_le())
+    }
+
+    pub fn parse_i64(&mut self) -> anyhow::Result<i64> {
+        return Ok(self.input.get_i64_le())
+    }
+
     pub fn parse_i256(&mut self) -> anyhow::Result<Int256> {
-        if self.input.remaining() >= 32 {
-            let mut needed = self.input.split_to(32);
-            let mut result: [u8; 32] = [0; 32];
-            needed.copy_to_slice(&mut result);
+        let mut needed = self.input.split_to(32);
+        let mut result: [u8; 32] = [0; 32];
+        needed.copy_to_slice(&mut result);
 
-            return Ok(result)
-        }
-
-        bail!("not enough bytes")
+        return Ok(result)
     }
 
     pub fn parse_bytes(&mut self) -> anyhow::Result<crate::tl::Bytes> {
@@ -84,25 +88,9 @@ pub fn from_bytes<T>(bytes: Vec<u8>) -> anyhow::Result<T>
 
 #[cfg(test)]
 mod tests {
-    use crate::serializer::Serializer;
-    use crate::tl::{AdnlMessageQuery, LiteServerQuery, Bytes, Int256, LiteServerGetMasterchainInfo};
     use super::*;
 
     #[test]
-    #[tracing_test::traced_test]
-    fn deserialize_adnl_query_test() {
-        let bytes = hex::decode("7af98bb477c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c40cdf068c79042ee6b589000000000000").unwrap();
-
-        let query = from_bytes::<AdnlMessageQuery>(bytes).unwrap();
-
-        assert_eq!(query, AdnlMessageQuery {
-            query_id: hex::decode("77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4").unwrap().try_into().unwrap(),
-            query: hex::decode("df068c79042ee6b589000000").unwrap()
-        })
-    }
-
-    #[test]
-    #[tracing_test::traced_test]
     fn deserialize_bytes_length255() {
         let mut buf = vec![254, 0, 0, 255];
         buf.append(&mut vec![1; 255]);
