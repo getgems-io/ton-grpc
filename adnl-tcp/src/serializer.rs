@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::fmt::{Debug, Display};
 use bytes::BufMut;
-use crate::tl::{Bytes, Int256};
+use crate::types::{Bytes, Int256};
 
 pub trait Serialize {
     fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()>;

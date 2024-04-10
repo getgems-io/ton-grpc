@@ -1,6 +1,6 @@
 use anyhow::bail;
 use bytes::{Buf, Bytes};
-use crate::tl::Int256;
+use crate::types::Int256;
 
 pub trait Deserialize where Self: Sized {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self>;
@@ -40,7 +40,7 @@ impl Deserializer {
         return Ok(result)
     }
 
-    pub fn parse_bytes(&mut self) -> anyhow::Result<crate::tl::Bytes> {
+    pub fn parse_bytes(&mut self) -> anyhow::Result<crate::types::Bytes> {
         let len = self.input.get_u8();
         if len <= 253 {
             let mut needed = self.input.split_to(len as usize);

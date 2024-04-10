@@ -16,17 +16,17 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::MissedTickBehavior;
 use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
-use crate::deserializer::from_bytes;
+use adnl_tcp::deserializer::from_bytes;
+use adnl_tcp::serializer::to_bytes;
 use crate::request::Requestable;
-use crate::serializer::to_bytes;
 use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerQuery};
 
-pub struct LiteServerClient {
+pub struct LiteserverClient {
     responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>,
     tx: UnboundedSender<AdnlMessageQuery>
 }
 
-impl LiteServerClient {
+impl LiteserverClient {
     pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
         let inner = AdnlTcpClient::connect(addr, server_key).await?;
         let (mut write_half, mut read_half) = inner.split();
@@ -84,7 +84,7 @@ impl LiteServerClient {
     }
 }
 
-impl<R : Requestable> Service<R> for LiteServerClient {
+impl<R : Requestable> Service<R> for LiteserverClient {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -147,7 +147,7 @@ mod tests {
         Ok(())
     }
 
-    async fn provided_client() -> anyhow::Result<LiteServerClient> {
+    async fn provided_client() -> anyhow::Result<LiteserverClient> {
         let ip: i32 = -2018147075;
         let ip = Ipv4Addr::from(ip as u32);
         let port = 46529;
@@ -155,7 +155,7 @@ mod tests {
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-        let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), &key).await?;
+        let client = LiteserverClient::connect(SocketAddrV4::new(ip, port), &key).await?;
 
         Ok(client)
     }

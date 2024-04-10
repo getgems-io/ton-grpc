@@ -24,6 +24,7 @@ dependencies = [
  "aes",
  "anyhow",
  "base64 0.22.0",
+ "bytes",
  "ctr",
  "ed25519-dalek",
  "futures",

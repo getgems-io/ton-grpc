@@ -1,25 +1,11 @@
-use crate::deserializer::{Deserialize, Deserializer};
-use crate::serializer::{Serialize, Serializer};
+use adnl_tcp::deserializer::{Deserialize, Deserializer};
+use adnl_tcp::serializer::{Serialize, Serializer};
+pub use adnl_tcp::types::*;
 
 pub trait Functional {
     type Result;
 }
 
-type Double = f64;
-type Int31 = i32; // "#" / nat type
-type Int32 = i32;
-type Int = i32;
-type Int53 = i64;
-type Int64 = i64;
-type Long = i64;
-type Int128 = i128;
-pub type Int256 = [u8; 32];
-type BoxedBool = bool;
-pub type Bytes = Vec<u8>;
-type Object = Bytes;
-type SecureString = String;
-type SecureBytes = Vec<u8>;
-type Vector<T> = Vec<T>;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
