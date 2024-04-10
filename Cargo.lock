@@ -2474,13 +2474,17 @@ version = "0.1.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
+ "bytes",
  "convert_case",
+ "hex",
  "prettyplease 0.2.17",
  "quote",
  "syn 2.0.58",
  "tl_parser",
  "tokio",
  "tower",
+ "tracing",
+ "tracing-test",
 ]
 
 [[package]]

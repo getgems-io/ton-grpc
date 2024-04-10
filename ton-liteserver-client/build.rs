@@ -148,7 +148,7 @@ impl Generator {
 
         let mut formatted = String::new();
 
-        let skip_list: Vec<String> = vec!["Vector t", "Bool", "Int32", "Int53", "Int64", "Int128", "Int256", "Bytes", "SecureString", "SecureBytes", "Object", "Function"]
+        let skip_list: Vec<String> = vec!["Vector t", "Bool", "Int32", "Int53", "Int64", "Int128", "Int256", "Bytes", "SecureString", "SecureBytes", "Function"]
             .into_iter().map(|s| s.to_owned()).collect();
 
         for (type_ident, types) in map {

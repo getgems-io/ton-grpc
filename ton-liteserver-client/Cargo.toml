@@ -16,6 +16,12 @@ adnl-tcp = { path = "../adnl-tcp" }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 tower = { workspace = true }
+tracing = { workspace = true }
+bytes = "1.6.0"
+
+[dev-dependencies]
+hex = "0.4.3"
+tracing-test = "0.2.4"
 
 [features]
 testnet = []
