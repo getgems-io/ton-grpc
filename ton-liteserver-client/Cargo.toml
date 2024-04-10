@@ -21,6 +21,7 @@ bytes = "1.6.0"
 
 [dev-dependencies]
 hex = "0.4.3"
+base64 = "0.22.0"
 tracing-test = "0.2.4"
 
 [features]

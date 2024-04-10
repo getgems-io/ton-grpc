@@ -2474,6 +2474,7 @@ version = "0.1.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
+ "base64 0.22.0",
  "bytes",
  "convert_case",
  "hex",
