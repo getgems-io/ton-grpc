@@ -45,6 +45,7 @@ impl Serializer {
     }
 
     pub fn write_i256(&mut self, val: &Int256) {
+        self.output.reserve(32);
         self.output.put_slice(val)
     }
 }
