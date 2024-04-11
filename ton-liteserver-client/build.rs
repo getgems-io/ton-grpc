@@ -215,6 +215,19 @@ impl Generator {
                     })
                     .collect();
 
+                let deserialize_match: Vec<_> = types
+                    .iter()
+                    .filter(|combinator| !combinator.is_functional())
+                    .map(|combinator| {
+                        let rename = combinator.id();
+                        let field_name = format_ident!("{}", generate_type_name(rename));
+
+                        quote! {
+                             #field_name::CONSTRUCTOR_NUMBER_BE => { Ok(Self::#field_name(#field_name::deserialize(de)?)) }
+                        }
+                    })
+                    .collect();
+
                 quote! {
                     #[derive(Clone, Debug, PartialEq, Eq)]
                     pub enum #struct_name {
@@ -237,6 +250,16 @@ impl Generator {
                             }
 
                             Ok(())
+                        }
+                    }
+
+                    impl Deserialize for #struct_name {
+                        fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+                            let constructor_number = de.parse_constructor_numer()?;
+                            match constructor_number {
+                                #(#deserialize_match),*
+                                _ => Err(anyhow!("Unexpected constructor number"))
+                            }
                         }
                     }
                 }
@@ -382,6 +405,73 @@ impl Generator {
                         }
                     }).collect();
 
+                let deserialize_fields: Vec<_> = definition.fields()
+                    .iter()
+                    .filter(|field| {
+                        let default_configuration = FieldConfiguration::default();
+                        let field_name = field.id().clone().unwrap();
+                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+
+                        !field_configuration.skip
+                    })
+                    .map(|field| {
+                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+
+                        eprintln!("field = {:?}", field);
+                        let field_name_ident = format_ident!("{}", &field_name);
+
+                        if field.type_is_polymorphic() {
+                            quote! {
+                                #field_name_ident: unimplemented!(),
+                            }
+                        } else {
+                            match field.field_type() {
+                                Some("#") => {
+                                    quote! {
+                                        #field_name_ident: de.parse_i31()?,
+                                    }
+                                },
+                                // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
+                                Some("Bool") => {
+                                    quote! {
+                                        #field_name_ident: de.parse_bool()?,
+                                    }
+                                }
+                                Some("int") => {
+                                    quote! {
+                                        #field_name_ident: de.parse_i32()?,
+                                    }
+                                },
+                                Some("long") => {
+                                    quote! {
+                                        #field_name_ident: de.parse_i64()?,
+                                    }
+                                },
+                                Some("int256") => {
+                                    quote! {
+                                        #field_name_ident: de.parse_i256()?,
+                                    }
+                                },
+                                Some("bytes") => {
+                                    quote! {
+                                        #field_name_ident: de.parse_bytes()?,
+                                    }
+                                },
+                                Some("string") => {
+                                    quote! {
+                                        #field_name_ident: de.parse_string()?,
+                                    }
+                                }
+                                _ => {
+                                    let field_type = format_ident!("{}", structure_ident(field.field_type().unwrap()));
+                                    quote! {
+                                        #field_name_ident: #field_type::deserialize(de)?,
+                                    }
+                                }
+                            }
+                        }
+                    }).collect();
+
                 let traits = if definition.is_functional() {
                     let result_name = format_ident!("{}", generate_type_name(definition.result_type()));
                     quote! {
@@ -417,6 +507,15 @@ impl Generator {
                             #(#serialize_fields)*
 
                             Ok(())
+                        }
+                    }
+
+                    impl Deserialize for #struct_name {
+                        #[allow(unused_variables)]
+                        fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+                            Ok(Self {
+                                #(#deserialize_fields)*
+                            })
                         }
                     }
                 };

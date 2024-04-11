@@ -1,98 +1,12 @@
 #![allow(dead_code)]
 
+use anyhow::anyhow;
 use adnl_tcp::deserializer::{Deserialize, Deserializer};
 use adnl_tcp::serializer::{Serialize, Serializer};
 use adnl_tcp::boxed::Boxed;
 pub use adnl_tcp::types::*;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
-
-impl Deserialize for AdnlMessageQuery {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        let query_id = de.parse_i256()?;
-        let query = de.parse_bytes()?;
-
-        Ok(Self {
-            query_id,
-            query
-        })
-    }
-}
-
-impl Deserialize for AdnlMessageAnswer {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        let query_id = de.parse_i256()?;
-        let answer = de.parse_bytes()?;
-
-        Ok(Self {
-            query_id,
-            answer
-        })
-    }
-}
-
-impl Deserialize for TonNodeBlockIdExt {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        let workchain = de.parse_i32()?;
-        let shard = de.parse_i64()?;
-        let seqno = de.parse_i32()?;
-        let root_hash = de.parse_i256()?;
-        let file_hash = de.parse_i256()?;
-
-        Ok(Self {
-            workchain,
-            shard,
-            seqno,
-            root_hash,
-            file_hash
-        })
-    }
-}
-
-impl Deserialize for TonNodeZeroStateIdExt {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        let workchain = de.parse_i32()?;
-        let root_hash = de.parse_i256()?;
-        let file_hash = de.parse_i256()?;
-
-        Ok(Self {
-            workchain,
-            root_hash,
-            file_hash
-        })
-    }
-}
-
-impl Deserialize for LiteServerMasterchainInfo {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        let last = TonNodeBlockIdExt::deserialize(de)?;
-        let state_root_hash = de.parse_i256()?;
-        let init = TonNodeZeroStateIdExt::deserialize(de)?;
-
-        Ok(Self {
-            last,
-            state_root_hash,
-            init
-        })
-    }
-}
-
-impl Deserialize for LiteServerQuery {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        let data = de.parse_bytes()?;
-
-        Ok(Self {
-            data
-        })
-    }
-}
-
-impl Deserialize for LiteServerGetMasterchainInfo {
-    fn deserialize(_: &mut Deserializer) -> anyhow::Result<Self> {
-        Ok(Self {})
-    }
-}
-
 
 #[cfg(test)]
 mod tests {
@@ -134,7 +48,6 @@ mod tests {
     }
 
     #[test]
-    #[tracing_test::traced_test]
     fn deserialize_adnl_query_test() {
         let bytes = hex::decode("7af98bb477c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c40cdf068c79042ee6b589000000000000").unwrap();
 

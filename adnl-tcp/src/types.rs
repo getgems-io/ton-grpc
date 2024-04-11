@@ -28,6 +28,7 @@ pub type Int128 = i128;
 pub type Int256 = [u8; 32];
 pub type BoxedBool = bool;
 pub type Bytes = Vec<u8>;
+pub type String = Vec<u8>;
 pub type Object = Bytes;
 pub type SecureString = String;
 pub type SecureBytes = Vec<u8>;

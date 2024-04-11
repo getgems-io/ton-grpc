@@ -24,6 +24,18 @@ impl Deserializer {
         }
     }
 
+    pub fn parse_constructor_numer(&mut self) -> anyhow::Result<u32> {
+        Ok(self.input.get_u32())
+    }
+
+    pub fn parse_bool(&mut self) -> anyhow::Result<bool> {
+        unimplemented!()
+    }
+
+    pub fn parse_i31(&mut self) -> anyhow::Result<i32> {
+        unimplemented!()
+    }
+
     pub fn parse_i32(&mut self) -> anyhow::Result<i32> {
         Ok(self.input.get_i32_le())
     }
@@ -69,6 +81,10 @@ impl Deserializer {
 
             Ok(result)
         }
+    }
+
+    pub fn parse_string(&mut self) -> anyhow::Result<crate::types::String> {
+        unimplemented!()
     }
 }
 

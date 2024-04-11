@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use bytes::BufMut;
-use crate::types::{Bytes, Int256};
+use crate::types::{Bytes, Int256, String};
 
 pub trait Serialize {
     fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()>;
