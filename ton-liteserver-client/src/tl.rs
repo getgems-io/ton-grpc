@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use std::fmt::{Debug, Formatter};
 use anyhow::anyhow;
 use adnl_tcp::deserializer::{Deserialize, Deserializer};
 use adnl_tcp::serializer::{Serialize, Serializer};

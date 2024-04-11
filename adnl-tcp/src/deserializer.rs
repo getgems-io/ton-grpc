@@ -67,14 +67,14 @@ impl Deserializer {
         } else {
             let mut len: [u8; 4] = [0; 4];
             let mut needed = self.input.split_to(3);
-            needed.copy_to_slice(&mut (len[1..]));
-            let len = u32::from_be_bytes(len);
+            needed.copy_to_slice(&mut (len[..3]));
+            let len = u32::from_le_bytes(len);
 
             let mut needed = self.input.split_to(len as usize);
             let mut result = vec![0; len as usize];
 
             needed.copy_to_slice(&mut result);
-            let padding = (len + 1) % 4;
+            let padding = len % 4;
             if padding > 0 {
                 self.input.advance(4 - padding as usize)
             }

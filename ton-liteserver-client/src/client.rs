@@ -133,7 +133,7 @@ mod tests {
     use base64::Engine;
     use tower::ServiceExt;
     use tracing_test::traced_test;
-    use crate::tl::LiteServerGetMasterchainInfo;
+    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo, LiteServerMasterchainInfo};
     use super::*;
 
     #[tokio::test]
@@ -145,6 +145,22 @@ mod tests {
 
         assert_eq!(response.last.workchain, -1);
         assert_eq!(response.last.shard, -9223372036854775808);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn client_get_all_shards_info() -> anyhow::Result<()> {
+        let mut client = provided_client().await?;
+        let response = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox();
+
+        let response = (&mut client).oneshot((LiteServerGetAllShardsInfo {
+            id: response.last
+        }).into_boxed()).await?.unbox();
+
+        assert_eq!(response.id.workchain, -1);
+        assert_eq!(response.id.shard, -9223372036854775808);
 
         Ok(())
     }
