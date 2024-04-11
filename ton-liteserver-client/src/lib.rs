@@ -1,3 +1,3 @@
 pub mod client;
-mod tl;
-mod request;
+pub mod tl;
+pub mod request;

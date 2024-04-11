@@ -59,13 +59,13 @@ impl Serializer {
             if padding > 0 {
                 self.output.reserve(val.len() + 4 + 4 - padding);
                 self.output.put_u8(254);
-                self.output.put_slice(&(val.len() as u32).to_be_bytes()[1..]);
+                self.output.put_slice(&(val.len() as u32).to_le_bytes()[..3]);
                 self.output.put_slice(val);
                 self.output.put_bytes(0, 4 - padding);
             } else {
                 self.output.reserve(val.len() + 4);
                 self.output.put_u8(254);
-                self.output.put_slice(&(val.len() as u32).to_be_bytes()[1..]);
+                self.output.put_slice(&(val.len() as u32).to_le_bytes()[..3]);
                 self.output.put_u8(val.len() as u8);
                 self.output.put_slice(val);
             }
@@ -91,7 +91,7 @@ mod tests {
     fn serialize_bytes_length255() {
         let mut serializer = Serializer { output: Vec::new() };
         let value = vec![1; 255];
-        let mut expected = vec![254, 0, 0, 255];
+        let mut expected = vec![254, 255, 0, 0];
         expected.append(&mut vec![1; 255]);
         expected.append(&mut vec![0; 1]);
 
