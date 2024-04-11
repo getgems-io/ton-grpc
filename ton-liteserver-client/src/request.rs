@@ -1,6 +1,6 @@
 use adnl_tcp::deserializer::Deserialize;
 use adnl_tcp::serializer::Serialize;
-use crate::tl::Functional;
+use adnl_tcp::types::Functional;
 
 pub trait Requestable: Serialize + Send {
     type Response: Deserialize + Send + 'static;

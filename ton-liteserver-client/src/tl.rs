@@ -2,11 +2,8 @@
 
 use adnl_tcp::deserializer::{Deserialize, Deserializer};
 use adnl_tcp::serializer::{Serialize, Serializer};
+use adnl_tcp::boxed::Boxed;
 pub use adnl_tcp::types::*;
-
-pub trait Functional {
-    type Result;
-}
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
@@ -14,7 +11,6 @@ include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
 impl Serialize for AdnlMessageQuery {
     fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
         se.write_i256(&self.query_id);
         se.write_bytes(&self.query);
 
@@ -24,8 +20,6 @@ impl Serialize for AdnlMessageQuery {
 
 impl Deserialize for AdnlMessageQuery {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        de.verify_constructor_number(Self::CONSTRUCTOR_NUMBER_BE)?;
-
         let query_id = de.parse_i256()?;
         let query = de.parse_bytes()?;
 
@@ -38,7 +32,6 @@ impl Deserialize for AdnlMessageQuery {
 
 impl Serialize for AdnlMessageAnswer {
     fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
         se.write_bytes(&self.answer);
 
         Ok(())
@@ -47,7 +40,6 @@ impl Serialize for AdnlMessageAnswer {
 
 impl Deserialize for AdnlMessageAnswer {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        de.verify_constructor_number(Self::CONSTRUCTOR_NUMBER_BE)?;
         let query_id = de.parse_i256()?;
         let answer = de.parse_bytes()?;
 
@@ -114,7 +106,6 @@ impl Deserialize for TonNodeZeroStateIdExt {
 
 impl Serialize for LiteServerMasterchainInfo {
     fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
         self.last.serialize(se)?;
         se.write_i256(&self.state_root_hash);
         self.init.serialize(se)?;
@@ -125,7 +116,6 @@ impl Serialize for LiteServerMasterchainInfo {
 
 impl Deserialize for LiteServerMasterchainInfo {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        de.verify_constructor_number(Self::CONSTRUCTOR_NUMBER_BE)?;
         let last = TonNodeBlockIdExt::deserialize(de)?;
         let state_root_hash = de.parse_i256()?;
         let init = TonNodeZeroStateIdExt::deserialize(de)?;
@@ -140,7 +130,6 @@ impl Deserialize for LiteServerMasterchainInfo {
 
 impl Serialize for LiteServerQuery {
     fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
         se.write_bytes(&self.data);
 
         Ok(())
@@ -149,7 +138,6 @@ impl Serialize for LiteServerQuery {
 
 impl Deserialize for LiteServerQuery {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        de.verify_constructor_number(Self::CONSTRUCTOR_NUMBER_BE)?;
         let data = de.parse_bytes()?;
 
         Ok(Self {
@@ -159,17 +147,13 @@ impl Deserialize for LiteServerQuery {
 }
 
 impl Serialize for LiteServerGetMasterchainInfo {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_constructor_number(Self::CONSTRUCTOR_NUMBER_BE);
-
+    fn serialize(&self, _: &mut Serializer) -> anyhow::Result<()> {
         Ok(())
     }
 }
 
 impl Deserialize for LiteServerGetMasterchainInfo {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        de.verify_constructor_number(Self::CONSTRUCTOR_NUMBER_BE)?;
-
+    fn deserialize(_: &mut Deserializer) -> anyhow::Result<Self> {
         Ok(Self {})
     }
 }
@@ -177,6 +161,7 @@ impl Deserialize for LiteServerGetMasterchainInfo {
 
 #[cfg(test)]
 mod tests {
+    use adnl_tcp::boxed::Boxed;
     use adnl_tcp::deserializer::from_bytes;
     use adnl_tcp::serializer::to_bytes;
     use super::*;
@@ -188,7 +173,7 @@ mod tests {
             query: hex::decode("df068c79042ee6b589000000").unwrap()
         };
 
-        let bytes = to_bytes(&query).unwrap();
+        let bytes = to_bytes(&query.into_boxed()).unwrap();
 
         assert_eq!(bytes, hex::decode("7af98bb477c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c40cdf068c79042ee6b589000000000000").unwrap())
     }
@@ -199,7 +184,7 @@ mod tests {
             data: hex::decode("2ee6b589").unwrap(),
         };
 
-        let bytes = to_bytes(&query).unwrap();
+        let bytes = to_bytes(&query.into_boxed()).unwrap();
 
         assert_eq!(bytes, hex::decode("df068c79042ee6b589000000").unwrap())
     }
@@ -208,7 +193,7 @@ mod tests {
     fn serialize_get_masterchain_info_test() {
         let s = LiteServerGetMasterchainInfo {};
 
-        let bytes = to_bytes(&s).unwrap();
+        let bytes = to_bytes(&s.into_boxed()).unwrap();
 
         assert_eq!(bytes, hex::decode("2ee6b589").unwrap())
     }
@@ -218,19 +203,19 @@ mod tests {
     fn deserialize_adnl_query_test() {
         let bytes = hex::decode("7af98bb477c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c40cdf068c79042ee6b589000000000000").unwrap();
 
-        let query = from_bytes::<AdnlMessageQuery>(bytes).unwrap();
+        let query = from_bytes::<Boxed<AdnlMessageQuery>>(bytes).unwrap();
 
         assert_eq!(query, AdnlMessageQuery {
             query_id: hex::decode("77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4").unwrap().try_into().unwrap(),
             query: hex::decode("df068c79042ee6b589000000").unwrap()
-        })
+        }.into_boxed())
     }
 
     #[test]
     fn deserialize_masterchain_info_test() {
         let bytes = hex::decode("81288385ffffffff000000000000008027405801e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e01235178b4d3b38b06bb484015faf9821c3ba1c609a25b74f30e1e585b8c8e820ef0976ffffffff17a3a92992aabea785a7a090985a265cd31f323d849da51239737e321fb055695e994fcf4d425c0a6ce6a792594b7173205f740a39cd56f537defd28b48a0f6e").unwrap();
 
-        let masterchain_info = from_bytes::<LiteServerMasterchainInfo>(bytes).unwrap();
+        let masterchain_info = from_bytes::<Boxed<LiteServerMasterchainInfo>>(bytes).unwrap();
 
         eprintln!("{}", base64::encode(hex::decode("e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4").unwrap()));
         eprintln!("{}", base64::encode(hex::decode("876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e0123517").unwrap()));
@@ -249,6 +234,6 @@ mod tests {
                 root_hash: hex::decode("17a3a92992aabea785a7a090985a265cd31f323d849da51239737e321fb05569").unwrap().try_into().unwrap(),
                 file_hash: hex::decode("5e994fcf4d425c0a6ce6a792594b7173205f740a39cd56f537defd28b48a0f6e").unwrap().try_into().unwrap(),
             },
-        })
+        }.into_boxed())
     }
 }

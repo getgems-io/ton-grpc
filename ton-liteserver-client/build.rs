@@ -151,6 +151,7 @@ impl Generator {
         let skip_list: Vec<String> = vec!["Vector t", "Bool", "Int32", "Int53", "Int64", "Int128", "Int256", "Bytes", "SecureString", "SecureBytes", "Function"]
             .into_iter().map(|s| s.to_owned()).collect();
 
+        // Boxed Types
         for (type_ident, types) in map {
             eprintln!("type_ident = {:}", type_ident);
             if skip_list.contains(&&type_ident) {
@@ -164,8 +165,15 @@ impl Generator {
                 let bare_type = types.first().unwrap().id();
                 let name = format_ident!("{}", generate_type_name(bare_type));
 
-                quote! {
-                    pub type #struct_name = #name;
+                // TODO[akostylev0]
+                if struct_name == "BoxedObject" {
+                    quote! {
+                        pub type #struct_name = #name;
+                    }
+                } else {
+                    quote! {
+                    pub type #struct_name = Boxed<#name>;
+                }
                 }
             } else {
                 let fields: Vec<_> = types
@@ -196,6 +204,7 @@ impl Generator {
 
             eprintln!("tokens = {}", output);
 
+            // Bare Types
             for definition in types.into_iter() {
                 if definition.is_builtin() || definition.id() == "vector" || definition.id() == "int256" {
                     continue;
@@ -291,6 +300,9 @@ impl Generator {
 
                 impl #struct_name {
                     const CONSTRUCTOR_NUMBER_LE: u32 = #constructor_number_le;
+                }
+
+                impl BareType for #struct_name {
                     const CONSTRUCTOR_NUMBER_BE: u32 = #constructor_number_be;
                 }
             };

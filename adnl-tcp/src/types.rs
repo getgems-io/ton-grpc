@@ -1,3 +1,21 @@
+use crate::boxed::Boxed;
+
+pub trait Functional {
+    type Result;
+}
+
+pub trait BareType where Self: Sized {
+    const CONSTRUCTOR_NUMBER_BE: u32;
+
+    fn into_boxed(self) -> Boxed<Self> {
+        Boxed::new(self)
+    }
+}
+
+pub trait BoxedType where Self: Sized {
+    fn constructor_number(&self) -> u32;
+}
+
 // TODO[akostylev0] review
 pub type Double = f64;
 pub type Int31 = i32; // "#" / nat type

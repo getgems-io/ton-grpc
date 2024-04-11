@@ -12,6 +12,8 @@ use futures::{FutureExt, SinkExt, StreamExt};
 use rand::random;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::time::MissedTickBehavior;
+use adnl_tcp::boxed::Boxed;
+use adnl_tcp::types::{BareType, BoxedType};
 use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
 use adnl_tcp::deserializer::from_bytes;
@@ -38,8 +40,9 @@ impl LiteserverClient {
                         tracing::trace!("pong packet received");
                     },
                     Ok(packet) => {
-                        let adnl_answer = from_bytes::<AdnlMessageAnswer>(packet.data)
-                            .expect("expect adnl answer packet");
+                        let adnl_answer = from_bytes::<Boxed<AdnlMessageAnswer>>(packet.data)
+                            .expect("expect adnl answer packet")
+                            .unbox();
 
                         if let Some((_, oneshot)) = responses_read_half.remove(&adnl_answer.query_id) {
                             oneshot
@@ -67,7 +70,7 @@ impl LiteserverClient {
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(adnl_query) => {
-                        let data = to_bytes(&adnl_query).expect("expect to serialize adnl query");
+                        let data = to_bytes(&adnl_query.into_boxed()).expect("expect to serialize adnl query");
                         write_half.send(Packet::new(&data)).await.expect("expect to send adnl query packet")
                     }
                     Err(_) => {
@@ -82,7 +85,7 @@ impl LiteserverClient {
     }
 }
 
-impl<R : Requestable> Service<R> for LiteserverClient {
+impl<R : Requestable + BoxedType> Service<R> for LiteserverClient {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -101,7 +104,7 @@ impl<R : Requestable> Service<R> for LiteserverClient {
         };
 
         let query = LiteServerQuery { data };
-        let Ok(query) = to_bytes(&query) else {
+        let Ok(query) = to_bytes(&query.into_boxed()) else {
             return std::future::ready(Err(anyhow!("cannot serialize liteserver query"))).boxed()
         };
 
@@ -123,6 +126,7 @@ impl<R : Requestable> Service<R> for LiteserverClient {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use std::net::Ipv4Addr;
@@ -137,7 +141,7 @@ mod tests {
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot(LiteServerGetMasterchainInfo {}).await?;
+        let response = client.oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox();
 
         assert_eq!(response.last.workchain, -1);
         assert_eq!(response.last.shard, -9223372036854775808);
