@@ -16,8 +16,16 @@ impl Serializer {
         self.output.put_u32(crc32)
     }
 
+    pub fn write_bool(&mut self, val: bool) {
+        unimplemented!()
+    }
+
     pub fn write_i32(&mut self, val: i32) {
         self.output.put_i32_le(val)
+    }
+
+    pub fn write_i31(&mut self, val: i32) {
+        unimplemented!()
     }
 
     pub fn write_i64(&mut self, val: i64) {
@@ -27,6 +35,10 @@ impl Serializer {
     pub fn write_i256(&mut self, val: &Int256) {
         self.output.reserve(32);
         self.output.put_slice(val)
+    }
+
+    pub fn write_string(&mut self, val: &String) {
+        unimplemented!()
     }
 
     pub fn write_bytes(&mut self, val: &Bytes) {

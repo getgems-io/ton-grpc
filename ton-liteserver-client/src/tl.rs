@@ -7,17 +7,6 @@ pub use adnl_tcp::types::*;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-// TODO[akostylev0] move writing/reading constructor number to boxed types
-
-impl Serialize for AdnlMessageQuery {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_i256(&self.query_id);
-        se.write_bytes(&self.query);
-
-        Ok(())
-    }
-}
-
 impl Deserialize for AdnlMessageQuery {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
         let query_id = de.parse_i256()?;
@@ -30,14 +19,6 @@ impl Deserialize for AdnlMessageQuery {
     }
 }
 
-impl Serialize for AdnlMessageAnswer {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_bytes(&self.answer);
-
-        Ok(())
-    }
-}
-
 impl Deserialize for AdnlMessageAnswer {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
         let query_id = de.parse_i256()?;
@@ -47,18 +28,6 @@ impl Deserialize for AdnlMessageAnswer {
             query_id,
             answer
         })
-    }
-}
-
-impl Serialize for TonNodeBlockIdExt {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_i32(self.workchain);
-        se.write_i64(self.shard);
-        se.write_i32(self.seqno);
-        se.write_i256(&self.root_hash);
-        se.write_i256(&self.file_hash);
-
-        Ok(())
     }
 }
 
@@ -80,16 +49,6 @@ impl Deserialize for TonNodeBlockIdExt {
     }
 }
 
-impl Serialize for TonNodeZeroStateIdExt {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_i32(self.workchain);
-        se.write_i256(&self.root_hash);
-        se.write_i256(&self.file_hash);
-
-        Ok(())
-    }
-}
-
 impl Deserialize for TonNodeZeroStateIdExt {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
         let workchain = de.parse_i32()?;
@@ -101,16 +60,6 @@ impl Deserialize for TonNodeZeroStateIdExt {
             root_hash,
             file_hash
         })
-    }
-}
-
-impl Serialize for LiteServerMasterchainInfo {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        self.last.serialize(se)?;
-        se.write_i256(&self.state_root_hash);
-        self.init.serialize(se)?;
-
-        Ok(())
     }
 }
 
@@ -128,14 +77,6 @@ impl Deserialize for LiteServerMasterchainInfo {
     }
 }
 
-impl Serialize for LiteServerQuery {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
-        se.write_bytes(&self.data);
-
-        Ok(())
-    }
-}
-
 impl Deserialize for LiteServerQuery {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
         let data = de.parse_bytes()?;
@@ -143,12 +84,6 @@ impl Deserialize for LiteServerQuery {
         Ok(Self {
             data
         })
-    }
-}
-
-impl Serialize for LiteServerGetMasterchainInfo {
-    fn serialize(&self, _: &mut Serializer) -> anyhow::Result<()> {
-        Ok(())
     }
 }
 

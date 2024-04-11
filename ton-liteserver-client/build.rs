@@ -202,6 +202,19 @@ impl Generator {
                     })
                     .collect();
 
+                let serialize_match: Vec<_> = types
+                    .iter()
+                    .filter(|combinator| !combinator.is_functional())
+                    .map(|combinator| {
+                        let rename = combinator.id();
+                        let field_name = format_ident!("{}", generate_type_name(rename));
+
+                        quote! {
+                            Self::#field_name(inner) => inner.serialize(se)?
+                        }
+                    })
+                    .collect();
+
                 quote! {
                     #[derive(Clone, Debug, PartialEq, Eq)]
                     pub enum #struct_name {
@@ -213,6 +226,17 @@ impl Generator {
                             match self {
                                 #(#constructor_number_fields),*
                             }
+                        }
+                    }
+
+                    impl Serialize for #struct_name {
+                        fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+                            se.write_constructor_number(self.constructor_number());
+                            match self {
+                                #(#serialize_match),*
+                            }
+
+                            Ok(())
                         }
                     }
                 }
@@ -258,9 +282,7 @@ impl Generator {
 
                         eprintln!("field = {:?}", field);
                         let field_name = format_ident!("{}", &field_name);
-                        let mut deserialize_number_from_string = false; // TODO[akostylev0]
                         let field_type: Box<dyn ToTokens> = if field.field_type().is_some_and(|typ| typ == "#") {
-                            deserialize_number_from_string = true;
                             if field_configuration.optional {
                                 Box::new(syn::parse_str::<GenericArgument>("Option<Int31>").unwrap())
                             } else {
@@ -281,10 +303,6 @@ impl Generator {
                             Box::new(syn::parse_str::<GenericArgument>(&gen).unwrap())
                         } else {
                             let field_type = field.field_type();
-                            if field_type.is_some_and(|s| s == "int32" || s == "int64" || s == "int53" || s == "int256")  {
-                                deserialize_number_from_string = true;
-                            }
-
                             if field_configuration.optional {
                                 let id = format!("Option<{}>", structure_ident(field_type.unwrap()));
                                 Box::new(syn::parse_str::<GenericArgument>(&id).unwrap())
@@ -298,13 +316,79 @@ impl Generator {
                         }
                     }).collect();
 
+                let serialize_fields: Vec<_> = definition.fields()
+                    .iter()
+                    .filter(|field| {
+                        let default_configuration = FieldConfiguration::default();
+                        let field_name = field.id().clone().unwrap();
+                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+
+                        !field_configuration.skip
+                    })
+                    .map(|field| {
+                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+
+                        eprintln!("field = {:?}", field);
+                        let field_name_ident = format_ident!("{}", &field_name);
+
+                        if field.type_is_polymorphic() {
+                            quote! {
+                                unimplemented!();
+                            }
+                        } else {
+                            match field.field_type() {
+                                Some("#") => {
+                                    quote! {
+                                        se.write_i31(self.#field_name_ident);
+                                    }
+                                },
+                                // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
+                                Some("Bool") => {
+                                    quote! {
+                                        se.write_bool(self.#field_name_ident);
+                                    }
+                                }
+                                Some("int") => {
+                                    quote! {
+                                        se.write_i32(self.#field_name_ident);
+                                    }
+                                },
+                                Some("long") => {
+                                    quote! {
+                                        se.write_i64(self.#field_name_ident);
+                                    }
+                                },
+                                Some("int256") => {
+                                    quote! {
+                                        se.write_i256(&self.#field_name_ident);
+                                    }
+                                },
+                                Some("bytes") => {
+                                    quote! {
+                                        se.write_bytes(&self.#field_name_ident);
+                                    }
+                                },
+                                Some("string") => {
+                                    quote! {
+                                        se.write_string(&self.#field_name_ident);
+                                    }
+                                }
+                                _ => {
+                                    quote! {
+                                        self.#field_name_ident.serialize(se)?;
+                                    }
+                                }
+                            }
+                        }
+                    }).collect();
+
                 let traits = if definition.is_functional() {
                     let result_name = format_ident!("{}", generate_type_name(definition.result_type()));
                     quote! {
-                    impl Functional for #struct_name {
-                        type Result = #result_name;
+                        impl Functional for #struct_name {
+                            type Result = #result_name;
+                        }
                     }
-                }
                 } else {
                     quote! {}
                 };
@@ -312,21 +396,32 @@ impl Generator {
                 let constructor_number_le = definition.constructor_number_le();
                 let constructor_number_be = definition.constructor_number_be();
                 let output = quote! {
-                #[#t]
-                pub struct #struct_name {
-                    #(#fields),*
-                }
+                    #[#t]
+                    pub struct #struct_name {
+                        #(#fields),*
+                    }
 
-                #traits
+                    #traits
 
-                impl #struct_name {
-                    const CONSTRUCTOR_NUMBER_LE: u32 = #constructor_number_le;
-                }
+                    impl #struct_name {
+                        const CONSTRUCTOR_NUMBER_LE: u32 = #constructor_number_le;
+                    }
 
-                impl BareType for #struct_name {
-                    const CONSTRUCTOR_NUMBER_BE: u32 = #constructor_number_be;
-                }
-            };
+                    impl BareType for #struct_name {
+                        const CONSTRUCTOR_NUMBER_BE: u32 = #constructor_number_be;
+                    }
+
+                    impl Serialize for #struct_name {
+                        #[allow(unused_variables)]
+                        fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+                            #(#serialize_fields)*
+
+                            Ok(())
+                        }
+                    }
+                };
+
+                eprintln!("{}", output);
 
                 let syntax_tree = syn::parse2(output.clone()).unwrap();
                 formatted += &prettyplease::unparse(&syntax_tree);
