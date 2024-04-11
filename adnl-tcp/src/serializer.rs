@@ -25,7 +25,7 @@ impl Serializer {
     }
 
     pub fn write_i31(&mut self, val: i32) {
-        unimplemented!()
+        self.output.put_i32_le(val & 0x7fffffff)
     }
 
     pub fn write_i64(&mut self, val: i64) {

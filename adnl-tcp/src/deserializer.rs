@@ -32,9 +32,8 @@ impl Deserializer {
         unimplemented!()
     }
 
-    // TODO[akostylev0]
     pub fn parse_i31(&mut self) -> anyhow::Result<i32> {
-        Ok(self.input.get_i32_le())
+        Ok(self.input.get_i32_le() & 0x7fffffff)
     }
 
     pub fn parse_i32(&mut self) -> anyhow::Result<i32> {
