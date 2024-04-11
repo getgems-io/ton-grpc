@@ -133,7 +133,9 @@ mod tests {
     use base64::Engine;
     use tower::ServiceExt;
     use tracing_test::traced_test;
-    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo, LiteServerMasterchainInfo};
+    use std::time::SystemTime;
+    use std::time::UNIX_EPOCH;
+    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo, LiteServerGetVersion, LiteServerMasterchainInfo};
     use super::*;
 
     #[tokio::test]
@@ -161,6 +163,18 @@ mod tests {
 
         assert_eq!(response.id.workchain, -1);
         assert_eq!(response.id.shard, -9223372036854775808);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn client_get_version() -> anyhow::Result<()> {
+        let client = provided_client().await?;
+
+        let response = client.oneshot((LiteServerGetVersion {}).into_boxed()).await?.unbox();
+
+        assert!(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().abs_diff(response.now as u64) <= 10);
 
         Ok(())
     }
