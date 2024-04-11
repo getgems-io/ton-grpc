@@ -19,7 +19,7 @@ use adnl_tcp::ping::{is_pong_packet, ping_packet};
 use adnl_tcp::deserializer::from_bytes;
 use adnl_tcp::serializer::to_bytes;
 use crate::request::Requestable;
-use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerQuery};
+use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery};
 
 pub struct LiteserverClient {
     responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>,
@@ -40,6 +40,7 @@ impl LiteserverClient {
                         tracing::trace!("pong packet received");
                     },
                     Ok(packet) => {
+                        tracing::error!(?packet);
                         let adnl_answer = from_bytes::<Boxed<AdnlMessageAnswer>>(packet.data)
                             .expect("expect adnl answer packet")
                             .unbox();
@@ -85,7 +86,7 @@ impl LiteserverClient {
     }
 }
 
-impl<R : Requestable + BoxedType> Service<R> for LiteserverClient {
+impl<R> Service<R> for LiteserverClient where R: Requestable + BoxedType, R::Response : BoxedType {
     type Response = R::Response;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -119,7 +120,7 @@ impl<R : Requestable + BoxedType> Service<R> for LiteserverClient {
         return async {
             let response = rx.await?;
 
-            let response = from_bytes::<R::Response>(response)?;
+            let response = from_bytes::<Result<R::Response, LiteServerError>>(response)??;
 
             Ok(response)
         }.boxed()
@@ -135,7 +136,7 @@ mod tests {
     use tracing_test::traced_test;
     use std::time::SystemTime;
     use std::time::UNIX_EPOCH;
-    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo, LiteServerGetVersion, LiteServerMasterchainInfo};
+    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetVersion, LiteServerMasterchainInfo};
     use super::*;
 
     #[tokio::test]
@@ -175,6 +176,19 @@ mod tests {
         let response = client.oneshot((LiteServerGetVersion {}).into_boxed()).await?.unbox();
 
         assert!(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().abs_diff(response.now as u64) <= 10);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn client_error_test() -> anyhow::Result<()> {
+        let client = provided_client().await?;
+
+        let response = client.oneshot((LiteServerGetMasterchainInfoExt { mode: 1 }).into_boxed()).await;
+
+        assert!(response.is_err());
+        assert_eq!(response.unwrap_err().to_string(), "Error code: -400, message: \"unsupported getMasterchainInfo mode\"".to_owned());
 
         Ok(())
     }

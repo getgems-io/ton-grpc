@@ -1,4 +1,7 @@
+use anyhow::bail;
 use crate::boxed::Boxed;
+use crate::deserializer::{Deserialize, Deserializer};
+use crate::serializer::{Serialize, Serializer};
 
 pub trait Functional {
     type Result;
@@ -28,8 +31,38 @@ pub type Int128 = i128;
 pub type Int256 = [u8; 32];
 pub type BoxedBool = bool;
 pub type Bytes = Vec<u8>;
-pub type String = Vec<u8>;
 pub type Object = Bytes;
 pub type SecureString = String;
 pub type SecureBytes = Vec<u8>;
 pub type Vector<T> = Vec<T>;
+
+impl<T, E> Deserialize for Result<T, E> where T:BoxedType + Deserialize, E: BareType + Deserialize {
+    fn deserialize(de: &mut Deserializer, constructor_number: Option<u32>) -> anyhow::Result<Self> {
+        let constructor_number = match constructor_number {
+            Some(c) => c,
+            None => de.parse_constructor_numer()?,
+        };
+
+        if constructor_number == E::CONSTRUCTOR_NUMBER_BE {
+            return Ok(Err(E::deserialize(de, None)?))
+        }
+
+        Ok(Ok(T::deserialize(de, Some(constructor_number))?))
+    }
+}
+
+impl<T, E> Serialize for Result<T, E> where T: BoxedType + Serialize, E: BareType + Serialize {
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+        match self {
+            Ok(val) => {
+                val.serialize(se)?;
+                Ok(())
+            }
+            Err(val) => {
+                se.write_constructor_number(E::CONSTRUCTOR_NUMBER_BE);
+                val.serialize(se)?;
+                Ok(())
+            }
+        }
+    }
+}

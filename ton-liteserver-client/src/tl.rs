@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use std::fmt::{Debug, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use anyhow::anyhow;
 use adnl_tcp::deserializer::{Deserialize, Deserializer};
 use adnl_tcp::serializer::{Serialize, Serializer};
@@ -8,6 +8,16 @@ use adnl_tcp::boxed::Boxed;
 pub use adnl_tcp::types::*;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
+impl Display for LiteServerError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Error code: {}, message: {:?}", self.code, self.message)
+    }
+}
+
+impl std::error::Error for LiteServerError {
+
+}
 
 #[cfg(test)]
 mod tests {

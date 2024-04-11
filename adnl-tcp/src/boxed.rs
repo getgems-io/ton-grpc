@@ -36,9 +36,9 @@ impl<T> Serialize for Boxed<T> where T : BareType + Serialize {
 }
 
 impl<T> Deserialize for Boxed<T> where T : BareType + Deserialize {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
-        de.verify_constructor_number(T::CONSTRUCTOR_NUMBER_BE)?;
+    fn deserialize(de: &mut Deserializer, constructor_number: Option<u32>) -> anyhow::Result<Self> {
+        de.verify_constructor_number(T::CONSTRUCTOR_NUMBER_BE, constructor_number)?;
 
-        Ok(Boxed { inner: T::deserialize(de)? })
+        Ok(Boxed { inner: T::deserialize(de, None)? })
     }
 }

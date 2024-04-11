@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use bytes::BufMut;
-use crate::types::{Bytes, Int256, String};
+use crate::types::{Bytes, Int256};
 
 pub trait Serialize {
     fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()>;
@@ -37,11 +37,11 @@ impl Serializer {
         self.output.put_slice(val)
     }
 
-    pub fn write_string(&mut self, val: &String) {
-        unimplemented!()
+    pub fn write_string(&mut self, val: &str) {
+        self.write_bytes(val.as_bytes())
     }
 
-    pub fn write_bytes(&mut self, val: &Bytes) {
+    pub fn write_bytes(&mut self, val: &[u8]) {
         if val.len() <= 253 {
             let padding = (val.len() + 1) % 4;
             if padding > 0 {

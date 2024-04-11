@@ -3,7 +3,7 @@ use bytes::{Buf, Bytes};
 use crate::types::Int256;
 
 pub trait Deserialize where Self: Sized {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self>;
+    fn deserialize(de: &mut Deserializer, constructor_number_peek: Option<u32>) -> anyhow::Result<Self>;
 }
 
 pub struct Deserializer {
@@ -16,11 +16,16 @@ impl Deserializer {
         Deserializer { input: bytes.into() }
     }
 
-    pub fn verify_constructor_number(&mut self, crc32: u32) -> anyhow::Result<()> {
-        if self.input.get_u32() == crc32 {
+    pub fn verify_constructor_number(&mut self, crc32: u32, peek: Option<u32>) -> anyhow::Result<()> {
+        let constructor_number = match peek {
+            Some(c) => c,
+            None => self.input.get_u32(),
+        };
+
+        if constructor_number == crc32 {
             Ok(())
         } else {
-            bail!("Unexpected constructor number")
+            bail!("Unexpected constructor number, expected: {}, actual: {}", crc32, constructor_number)
         }
     }
 
@@ -83,8 +88,10 @@ impl Deserializer {
         }
     }
 
-    pub fn parse_string(&mut self) -> anyhow::Result<crate::types::String> {
-        unimplemented!()
+    pub fn parse_string(&mut self) -> anyhow::Result<String> {
+        let bytes = self.parse_bytes()?;
+
+        Ok(String::from_utf8(bytes)?)
     }
 }
 
@@ -93,7 +100,7 @@ pub fn from_bytes<T>(bytes: Vec<u8>) -> anyhow::Result<T>
         T: Deserialize,
 {
     let mut deserializer = Deserializer::from_bytes(bytes);
-    let t = T::deserialize(&mut deserializer)?;
+    let t = T::deserialize(&mut deserializer, None)?;
     if deserializer.input.is_empty() {
         Ok(t)
     } else {
@@ -108,7 +115,7 @@ mod tests {
 
     #[test]
     fn deserialize_bytes_length255() {
-        let mut buf = vec![254, 0, 0, 255];
+        let mut buf = vec![254, 255, 0, 0];
         buf.append(&mut vec![1; 255]);
         buf.append(&mut vec![0; 1]);
         let mut deserializer = Deserializer { input: buf.into() };
