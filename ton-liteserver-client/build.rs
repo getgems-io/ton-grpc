@@ -189,10 +189,31 @@ impl Generator {
                     })
                     .collect();
 
+                let constructor_number_fields: Vec<_> = types
+                    .iter()
+                    .filter(|combinator| !combinator.is_functional())
+                    .map(|combinator| {
+                        let rename = combinator.id();
+                        let field_name = format_ident!("{}", generate_type_name(rename));
+
+                        quote! {
+                            Self::#field_name { .. } => #field_name::CONSTRUCTOR_NUMBER_BE
+                        }
+                    })
+                    .collect();
+
                 quote! {
                     #[derive(Clone, Debug, PartialEq, Eq)]
                     pub enum #struct_name {
                         #(#fields),*
+                    }
+
+                    impl BoxedType for #struct_name {
+                        fn constructor_number(&self) -> u32 {
+                            match self {
+                                #(#constructor_number_fields),*
+                            }
+                        }
                     }
                 }
             };
