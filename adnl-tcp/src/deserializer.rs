@@ -21,24 +21,20 @@ impl Deserializer {
         self.peek_constructor_number.replace(constructor_number);
     }
 
-    pub fn parse_constructor_numer(&mut self) -> anyhow::Result<u32> {
-        Ok(match self.peek_constructor_number.take() {
-            Some(c) => c,
-            None => self.input.get_u32()
-        })
-    }
-
     pub fn verify_constructor_number(&mut self, crc32: u32) -> anyhow::Result<()> {
-        let constructor_number = match self.peek_constructor_number {
-            Some(c) => { c }
-            None => { self.input.get_u32() }
-        };
-
+        let constructor_number = self.parse_constructor_numer()?;
         if constructor_number == crc32 {
             Ok(())
         } else {
             bail!("Unexpected constructor number, expected: {}, actual: {}", crc32, constructor_number)
         }
+    }
+
+    pub fn parse_constructor_numer(&mut self) -> anyhow::Result<u32> {
+        Ok(match self.peek_constructor_number.take() {
+            Some(c) => c,
+            None => self.input.get_u32()
+        })
     }
 
     pub fn parse_bool(&mut self) -> anyhow::Result<bool> {
