@@ -1,4 +1,3 @@
-use anyhow::bail;
 use crate::boxed::Boxed;
 use crate::deserializer::{Deserialize, Deserializer};
 use crate::serializer::{Serialize, Serializer};
@@ -37,17 +36,17 @@ pub type SecureBytes = Vec<u8>;
 pub type Vector<T> = Vec<T>;
 
 impl<T, E> Deserialize for Result<T, E> where T:BoxedType + Deserialize, E: BareType + Deserialize {
-    fn deserialize(de: &mut Deserializer, constructor_number: Option<u32>) -> anyhow::Result<Self> {
-        let constructor_number = match constructor_number {
-            Some(c) => c,
-            None => de.parse_constructor_numer()?,
-        };
+    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+        let constructor_number = de.parse_constructor_numer()?;
 
         if constructor_number == E::CONSTRUCTOR_NUMBER_BE {
-            return Ok(Err(E::deserialize(de, None)?))
+            return Ok(Err(E::deserialize(de)?))
         }
 
-        Ok(Ok(T::deserialize(de, Some(constructor_number))?))
+        // Put back constructor number for T::deserialize
+        de.unpeek_constructor_number(constructor_number);
+
+        Ok(Ok(T::deserialize(de)?))
     }
 }
 

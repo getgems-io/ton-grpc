@@ -3,23 +3,35 @@ use bytes::{Buf, Bytes};
 use crate::types::Int256;
 
 pub trait Deserialize where Self: Sized {
-    fn deserialize(de: &mut Deserializer, constructor_number_peek: Option<u32>) -> anyhow::Result<Self>;
+    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self>;
 }
 
 pub struct Deserializer {
-    input: Bytes
+    input: Bytes,
+    peek_constructor_number: Option<u32>
 }
 
 impl Deserializer {
     // TODO[akostylev0]
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Deserializer { input: bytes.into() }
+        Deserializer { input: bytes.into(), peek_constructor_number: None }
     }
 
-    pub fn verify_constructor_number(&mut self, crc32: u32, peek: Option<u32>) -> anyhow::Result<()> {
-        let constructor_number = match peek {
+    pub fn unpeek_constructor_number(&mut self, constructor_number: u32) {
+        self.peek_constructor_number.replace(constructor_number);
+    }
+
+    pub fn parse_constructor_numer(&mut self) -> anyhow::Result<u32> {
+        Ok(match self.peek_constructor_number.take() {
             Some(c) => c,
-            None => self.input.get_u32(),
+            None => self.input.get_u32()
+        })
+    }
+
+    pub fn verify_constructor_number(&mut self, crc32: u32) -> anyhow::Result<()> {
+        let constructor_number = match self.peek_constructor_number {
+            Some(c) => { c }
+            None => { self.input.get_u32() }
         };
 
         if constructor_number == crc32 {
@@ -27,10 +39,6 @@ impl Deserializer {
         } else {
             bail!("Unexpected constructor number, expected: {}, actual: {}", crc32, constructor_number)
         }
-    }
-
-    pub fn parse_constructor_numer(&mut self) -> anyhow::Result<u32> {
-        Ok(self.input.get_u32())
     }
 
     pub fn parse_bool(&mut self) -> anyhow::Result<bool> {
@@ -100,7 +108,7 @@ pub fn from_bytes<T>(bytes: Vec<u8>) -> anyhow::Result<T>
         T: Deserialize,
 {
     let mut deserializer = Deserializer::from_bytes(bytes);
-    let t = T::deserialize(&mut deserializer, None)?;
+    let t = T::deserialize(&mut deserializer)?;
     if deserializer.input.is_empty() {
         Ok(t)
     } else {
@@ -118,7 +126,7 @@ mod tests {
         let mut buf = vec![254, 255, 0, 0];
         buf.append(&mut vec![1; 255]);
         buf.append(&mut vec![0; 1]);
-        let mut deserializer = Deserializer { input: buf.into() };
+        let mut deserializer = Deserializer::from_bytes(buf);
 
         let value = deserializer.parse_bytes().unwrap();
 

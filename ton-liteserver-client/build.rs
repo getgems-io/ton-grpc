@@ -223,7 +223,7 @@ impl Generator {
                         let field_name = format_ident!("{}", generate_type_name(rename));
 
                         quote! {
-                             #field_name::CONSTRUCTOR_NUMBER_BE => { Ok(Self::#field_name(#field_name::deserialize(de, None)?)) }
+                             #field_name::CONSTRUCTOR_NUMBER_BE => { Ok(Self::#field_name(#field_name::deserialize(de)?)) }
                         }
                     })
                     .collect();
@@ -254,11 +254,8 @@ impl Generator {
                     }
 
                     impl Deserialize for #struct_name {
-                        fn deserialize(de: &mut Deserializer, constructor_number_peek: Option<u32>) -> anyhow::Result<Self> {
-                            let constructor_number = match constructor_number_peek {
-                                Some(c) => c,
-                                None => de.parse_constructor_numer()?,
-                            };
+                        fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+                            let constructor_number = de.parse_constructor_numer()?;
 
                             match constructor_number {
                                 #(#deserialize_match),*
@@ -469,7 +466,7 @@ impl Generator {
                                 _ => {
                                     let field_type = format_ident!("{}", structure_ident(field.field_type().unwrap()));
                                     quote! {
-                                        #field_name_ident: #field_type::deserialize(de, None)?,
+                                        #field_name_ident: #field_type::deserialize(de)?,
                                     }
                                 }
                             }
@@ -516,7 +513,7 @@ impl Generator {
 
                     impl Deserialize for #struct_name {
                         #[allow(unused_variables)]
-                        fn deserialize(de: &mut Deserializer, constructor_number: Option<u32>) -> anyhow::Result<Self> {
+                        fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
                             Ok(Self {
                                 #(#deserialize_fields)*
                             })

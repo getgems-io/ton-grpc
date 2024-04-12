@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use bytes::BufMut;
-use crate::types::{Bytes, Int256};
+use crate::types::{Int256};
 
 pub trait Serialize {
     fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()>;
@@ -16,7 +16,7 @@ impl Serializer {
         self.output.put_u32(crc32)
     }
 
-    pub fn write_bool(&mut self, val: bool) {
+    pub fn write_bool(&mut self, _: bool) {
         unimplemented!()
     }
 
