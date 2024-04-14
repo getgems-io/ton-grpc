@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.2](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.17.1...tonlibjson-client-v0.17.2) (2024-04-14)
+
+
+### Bug Fixes
+
+* **deps:** bump crc from 3.0.1 to 3.2.0 ([1999024](https://github.com/getgems-io/ton-grpc/commit/199902400b8a6d83eb6ca6095c8e8ee0465f877c))
+* **deps:** bump crc from 3.2.0 to 3.2.1 ([f47f4c4](https://github.com/getgems-io/ton-grpc/commit/f47f4c4330f6cb0e138633ebd67f577a064caf26))
+
 ## [0.17.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.17.0...tonlibjson-client-v0.17.1) (2024-04-05)
 
 

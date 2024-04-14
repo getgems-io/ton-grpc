@@ -28,6 +28,13 @@
 
 
 
+## [0.7.1](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.7.0...tvm-grpc-v0.7.1) (2024-04-14)
+
+
+### Bug Fixes
+
+* **deps:** bump quick_cache from 0.4.2 to 0.5.1 ([4b6bd7a](https://github.com/getgems-io/ton-grpc/commit/4b6bd7ab68ec8bc4032224cc1c5fa4bcf3c5e2e6))
+
 ## [0.7.0](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.6.0...tvm-grpc-v0.7.0) (2024-04-05)
 
 
