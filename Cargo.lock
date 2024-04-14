@@ -111,9 +111,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.82"
+version = "1.0.81"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f538837af36e6f6a9be0faa67f9a314f8119e4e4b5867c6ab40ed60360142519"
+checksum = "0952808a6c2afd1aa8947271f3a60f1a6763c7b912d210184c5149b5cf147247"
 dependencies = [
  "backtrace",
 ]
@@ -493,7 +493,7 @@ checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.58",
+ "syn 2.0.53",
 ]
 
 [[package]]
@@ -1774,9 +1774,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.36"
+version = "1.0.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa76aaf39101c457836aec0ce2316dbdc3ab723cdda1c6bd4e6ad4208acaca7"
+checksum = "291ec9ab5efd934aaf503a6466c5d5251535d108ee747472c3977cc5acc868ef"
 dependencies = [
  "proc-macro2",
 ]
@@ -2442,7 +2442,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.10.2"
+version = "0.10.3"
 dependencies = [
  "anyhow",
  "clap",
@@ -2537,7 +2537,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.17.1"
+version = "0.17.2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2579,7 +2579,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-sys"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "cmake",
@@ -2772,7 +2772,7 @@ checksum = "59547bce71d9c38b83d9c0e92b6066c4253371f15005def0c30d9657f50c7642"
 
 [[package]]
 name = "tvm-grpc"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "anyhow",
  "async-stream",
