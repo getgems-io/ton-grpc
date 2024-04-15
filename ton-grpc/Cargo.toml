@@ -27,7 +27,7 @@ prost = { workspace = true }
 url = { workspace = true }
 clap = { workspace = true }
 humantime = { workspace = true }
-either = "1.10"
+either = "1.11"
 derive-new = "0.6.0"
 metrics-exporter-prometheus = "0.14.0"
 
