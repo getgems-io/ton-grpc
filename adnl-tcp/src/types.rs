@@ -34,6 +34,105 @@ pub type SecureString = String;
 pub type SecureBytes = Vec<u8>;
 pub type Vector<T> = Vec<T>;
 
+impl Serialize for Vector<Int256> {
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+        se.reserve(4 + 32 * self.len());
+        se.write_i31(self.len() as i32);
+        for val in self {
+            se.write_i256(val)
+        }
+
+        Ok(())
+    }
+}
+
+impl Deserialize for Vector<Int256> {
+    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+        let len = de.parse_i31()?;
+        let mut buf = Vec::with_capacity(len as usize);
+        for _ in 0 .. len {
+            let val = de.parse_i256()?;
+            buf.push(val)
+        }
+
+        Ok(buf)
+    }
+}
+
+impl Serialize for Vector<Int32> {
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+        se.reserve(4 + 4 * self.len());
+        se.write_i31(self.len() as i32);
+        for val in self {
+            se.write_i32(*val)
+        }
+
+        Ok(())
+    }
+}
+
+impl Deserialize for Vector<Int32> {
+    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+        let len = de.parse_i31()?;
+        let mut buf = Vec::with_capacity(len as usize);
+        for _ in 0 .. len {
+            let val = de.parse_i32()?;
+            buf.push(val)
+        }
+
+        Ok(buf)
+    }
+}
+
+impl Serialize for Vector<Int64> {
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+        se.reserve(4 + 8 * self.len());
+        se.write_i31(self.len() as i32);
+        for val in self {
+            se.write_i64(*val)
+        }
+
+        Ok(())
+    }
+}
+
+impl Deserialize for Vector<Int64> {
+    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+        let len = de.parse_i31()?;
+        let mut buf = Vec::with_capacity(len as usize);
+        for _ in 0 .. len {
+            let val = de.parse_i64()?;
+            buf.push(val)
+        }
+
+        Ok(buf)
+    }
+}
+
+impl<T> Serialize for Vector<T> where T : Serialize {
+    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+        se.write_i31(self.len() as i32);
+        for val in self {
+            val.serialize(se)?
+        }
+
+        Ok(())
+    }
+}
+
+impl<T> Deserialize for Vector<T> where T : Deserialize {
+    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+        let len = de.parse_i31()?;
+        let mut buf = Vec::with_capacity(len as usize);
+        for _ in 0 .. len {
+            let val = T::deserialize(de)?;
+            buf.push(val)
+        }
+
+        Ok(buf)
+    }
+}
+
 impl<T, E> Deserialize for Result<T, E> where T:BoxedType + Deserialize, E: BareType + Deserialize {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
         let constructor_number = de.parse_constructor_numer()?;

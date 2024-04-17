@@ -199,17 +199,19 @@ mod tests {
         let mut client = provided_client().await?;
         let known_block = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox().last;
 
-        let request = LiteServerGetBlockProof { mode: 0, known_block, target_block: None };
-        let response = client.oneshot(request.into_boxed()).await?;
+        let request = LiteServerGetBlockProof { mode: 0, known_block: known_block.clone(), target_block: None };
+        let response = client.oneshot(request.into_boxed()).await?.unbox();
+
+        assert_eq!(&response.from.seqno, &known_block.seqno);
 
         Ok(())
     }
 
     async fn provided_client() -> anyhow::Result<LiteserverClient> {
-        let ip: i32 = -2018147075;
+        let ip: i32 = -2018135749;
         let ip = Ipv4Addr::from(ip as u32);
-        let port = 46529;
-        let key: ServerKey = base64::engine::general_purpose::STANDARD.decode("jLO6yoooqUQqg4/1QXflpv2qGCoXmzZCR+bOsYJ2hxw=")?.as_slice().try_into()?;
+        let port = 53312;
+        let key: ServerKey = base64::engine::general_purpose::STANDARD.decode("aF91CuUHuuOv9rm2W5+O/4h38M3sRm40DtSdRxQhmtQ=")?.as_slice().try_into()?;
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 

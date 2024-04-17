@@ -355,35 +355,29 @@ impl Generator {
                         eprintln!("field = {:?}", field);
                         let field_name_ident = format_ident!("{}", &field_name);
 
-                        if field.type_is_polymorphic() {
-                            quote! {
-                                unimplemented!();
-                            }
-                        } else {
-                            match field.type_condition() {
-                                None => match field.field_type() {
-                                    Some("#") => quote! { let mut #field_name_ident = self.#field_name_ident; },
-                                    // TODO[akostylev0] bool optimization
-                                    // Some("Bool") => quote! { let #field_name_ident = self.#field_name_ident; },
-                                    Some("int") => quote! { let #field_name_ident = self.#field_name_ident; },
-                                    Some("long") => quote! { let #field_name_ident = self.#field_name_ident; },
-                                    Some("int256") => quote! { let #field_name_ident = &self.#field_name_ident; },
-                                    Some("bytes") => quote! { let #field_name_ident = &self.#field_name_ident; },
-                                    Some("string") => quote! { let #field_name_ident = &self.#field_name_ident; },
-                                    _ => quote! { let #field_name_ident = &self.#field_name_ident; }
-                                },
-                                Some(Condition { field_ref, bit_selector: Some(bit_selector) }) =>  {
-                                    let field_ref = format_ident!("{}", &field_ref);
-                                    quote! {
-                                        let #field_name_ident = self.#field_name_ident.as_ref();
-                                        if #field_name_ident.is_some() {
-                                            #field_ref |= 1 << #bit_selector;
-                                        }
+                        match field.type_condition() {
+                            None => match field.field_type() {
+                                Some("#") => quote! { let mut #field_name_ident = self.#field_name_ident; },
+                                // TODO[akostylev0] bool optimization
+                                // Some("Bool") => quote! { let #field_name_ident = self.#field_name_ident; },
+                                Some("int") => quote! { let #field_name_ident = self.#field_name_ident; },
+                                Some("long") => quote! { let #field_name_ident = self.#field_name_ident; },
+                                Some("int256") => quote! { let #field_name_ident = &self.#field_name_ident; },
+                                Some("bytes") => quote! { let #field_name_ident = &self.#field_name_ident; },
+                                Some("string") => quote! { let #field_name_ident = &self.#field_name_ident; },
+                                _ => quote! { let #field_name_ident = &self.#field_name_ident; }
+                            },
+                            Some(Condition { field_ref, bit_selector: Some(bit_selector) }) =>  {
+                                let field_ref = format_ident!("{}", &field_ref);
+                                quote! {
+                                    let #field_name_ident = self.#field_name_ident.as_ref();
+                                    if #field_name_ident.is_some() {
+                                        #field_ref |= 1 << #bit_selector;
                                     }
-                                },
-                                Some(Condition { field_ref, bit_selector: None }) => {
-                                    unimplemented!()
                                 }
+                            },
+                            Some(Condition { field_ref, bit_selector: None }) => {
+                                unimplemented!()
                             }
                         }
                     }).collect();
@@ -403,45 +397,39 @@ impl Generator {
                         eprintln!("field = {:?}", field);
                         let field_name_ident = format_ident!("{}", &field_name);
 
-                        if field.type_is_polymorphic() {
-                            quote! {
-                                unimplemented!();
-                            }
-                        } else {
-                            match field.type_condition() {
-                                None => match field.field_type() {
-                                    Some("#") => quote! { se.write_i31(#field_name_ident); },
+                        match field.type_condition() {
+                            None => match field.field_type() {
+                                Some("#") => quote! { se.write_i31(#field_name_ident); },
+                                // TODO[akostylev0] bool optimization
+                                // Some("Bool") => quote! { se.write_bool(#field_name_ident.into()); },
+                                Some("int") => quote! { se.write_i32(#field_name_ident); },
+                                Some("long") => quote! { se.write_i64(#field_name_ident); },
+                                Some("int256") => quote! { se.write_i256(#field_name_ident); },
+                                Some("bytes") => quote! { se.write_bytes(#field_name_ident); },
+                                Some("string") => quote! { se.write_string(#field_name_ident); },
+                                _ => quote! { #field_name_ident.serialize(se)?; }
+                            },
+                            Some(Condition { field_ref, bit_selector: Some(_) }) =>  {
+                                let inner = match field.field_type() {
+                                    Some("#") => quote! { se.write_i31(*value) },
                                     // TODO[akostylev0] bool optimization
-                                    // Some("Bool") => quote! { se.write_bool(#field_name_ident.into()); },
-                                    Some("int") => quote! { se.write_i32(#field_name_ident); },
-                                    Some("long") => quote! { se.write_i64(#field_name_ident); },
-                                    Some("int256") => quote! { se.write_i256(#field_name_ident); },
-                                    Some("bytes") => quote! { se.write_bytes(#field_name_ident); },
-                                    Some("string") => quote! { se.write_string(#field_name_ident); },
-                                    _ => quote! { #field_name_ident.serialize(se)?; }
-                                },
-                                Some(Condition { field_ref, bit_selector: Some(_) }) =>  {
-                                    let inner = match field.field_type() {
-                                        Some("#") => quote! { se.write_i31(*value) },
-                                        // TODO[akostylev0] bool optimization
-                                        // Some("Bool") => quote! { se.write_bool(value.into()) },
-                                        Some("int") => quote! { se.write_i32(*value) },
-                                        Some("long") => quote! { se.write_i64(*value) },
-                                        Some("int256") => quote! { se.write_i256(value) },
-                                        Some("bytes") => quote! { se.write_bytes(value) },
-                                        Some("string") => quote! { se.write_string(value) },
-                                        _ => quote! { value.serialize(se)? }
+                                    // Some("Bool") => quote! { se.write_bool(value.into()) },
+                                    Some("int") => quote! { se.write_i32(*value) },
+                                    Some("long") => quote! { se.write_i64(*value) },
+                                    Some("int256") => quote! { se.write_i256(value) },
+                                    Some("bytes") => quote! { se.write_bytes(value) },
+                                    Some("string") => quote! { se.write_string(value) },
+                                    _ => quote! { value.serialize(se)? }
+                                };
+                                quote! {
+                                    match #field_name_ident {
+                                        None => {},
+                                        Some(value) => #inner,
                                     };
-                                    quote! {
-                                        match #field_name_ident {
-                                            None => {},
-                                            Some(value) => #inner,
-                                        };
-                                    }
-                                },
-                                Some(Condition { field_ref, bit_selector: None }) => {
-                                    unimplemented!()
                                 }
+                            },
+                            Some(Condition { field_ref, bit_selector: None }) => {
+                                unimplemented!()
                             }
                         }
                     }).collect();
@@ -461,41 +449,35 @@ impl Generator {
                         eprintln!("field = {:?}", field);
                         let field_name_ident = format_ident!("{}", &field_name);
 
-                        if field.type_is_polymorphic() {
-                            quote! {
-                                let #field_name_ident = unimplemented!();
+                        let parse_fn = match field.field_type() {
+                            Some("#") => quote! { de.parse_i31()? },
+                            // TODO[akostylev0] bool optimization
+                            // Some("Bool") => quote! { de.parse_bool()?.into() },
+                            Some("int") => quote! { de.parse_i32()? },
+                            Some("long") => quote! { de.parse_i64()? },
+                            Some("int256") => quote! { de.parse_i256()? },
+                            Some("bytes") => quote! { de.parse_bytes()? },
+                            Some("string") => quote! { de.parse_string()? },
+                            _ => {
+                                let field_type = format_ident!("{}", structure_ident(field.field_type().unwrap()));
+                                quote! { #field_type::deserialize(de)? }
                             }
-                        } else {
-                            let parse_fn = match field.field_type() {
-                                Some("#") => quote! { de.parse_i31()? },
-                                // TODO[akostylev0] bool optimization
-                                // Some("Bool") => quote! { de.parse_bool()?.into() },
-                                Some("int") => quote! { de.parse_i32()? },
-                                Some("long") => quote! { de.parse_i64()? },
-                                Some("int256") => quote! { de.parse_i256()? },
-                                Some("bytes") => quote! { de.parse_bytes()? },
-                                Some("string") => quote! { de.parse_string()? },
-                                _ => {
-                                    let field_type = format_ident!("{}", structure_ident(field.field_type().unwrap()));
-                                    quote! { #field_type::deserialize(de)? }
-                                }
-                            };
+                        };
 
-                            match field.type_condition() {
-                                None => quote! {
-                                    let #field_name_ident = #parse_fn;
-                                },
-                                Some(Condition { field_ref, bit_selector: Some(bit_selector) }) =>  {
-                                    let field_ref = format_ident!("{}", &field_ref);
-                                    quote! {
-                                        let #field_name_ident = if #field_ref & (1 << #bit_selector) > 0 { Some(#parse_fn) } else { None };
-                                    }
-                                },
-                                Some(Condition { field_ref, bit_selector: None }) => {
-                                    let field_ref = format_ident!("{}", &field_ref);
-                                    quote! {
-                                        let #field_name_ident = if #field_ref { Some(#parse_fn) } else { None };
-                                    }
+                        match field.type_condition() {
+                            None => quote! {
+                                let #field_name_ident = #parse_fn;
+                            },
+                            Some(Condition { field_ref, bit_selector: Some(bit_selector) }) =>  {
+                                let field_ref = format_ident!("{}", &field_ref);
+                                quote! {
+                                    let #field_name_ident = if #field_ref & (1 << #bit_selector) > 0 { Some(#parse_fn) } else { None };
+                                }
+                            },
+                            Some(Condition { field_ref, bit_selector: None }) => {
+                                let field_ref = format_ident!("{}", &field_ref);
+                                quote! {
+                                    let #field_name_ident = if #field_ref { Some(#parse_fn) } else { None };
                                 }
                             }
                         }

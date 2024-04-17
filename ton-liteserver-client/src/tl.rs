@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![allow(unused_mut)]
 
 use std::fmt::{Debug, Display, Formatter};
 use anyhow::anyhow;

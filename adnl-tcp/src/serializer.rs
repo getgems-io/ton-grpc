@@ -12,12 +12,12 @@ pub struct Serializer {
 }
 
 impl Serializer {
-    pub fn write_constructor_number(&mut self, crc32: u32) {
-        self.output.put_u32(crc32)
+    pub fn reserve(&mut self, n: usize) {
+        self.output.reserve(n);
     }
 
-    pub fn write_bool(&mut self, _: bool) {
-        unimplemented!()
+    pub fn write_constructor_number(&mut self, crc32: u32) {
+        self.output.put_u32(crc32)
     }
 
     pub fn write_i32(&mut self, val: i32) {
@@ -33,7 +33,6 @@ impl Serializer {
     }
 
     pub fn write_i256(&mut self, val: &Int256) {
-        self.output.reserve(32);
         self.output.put_slice(val)
     }
 
