@@ -40,7 +40,7 @@ impl LiteserverClient {
                         tracing::trace!("pong packet received");
                     },
                     Ok(packet) => {
-                        tracing::error!(?packet);
+                        tracing::trace!(?packet);
                         let adnl_answer = from_bytes::<Boxed<AdnlMessageAnswer>>(packet.data)
                             .expect("expect adnl answer packet")
                             .unbox();
