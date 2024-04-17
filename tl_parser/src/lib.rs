@@ -4,7 +4,7 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till, take_until, take_while, take_while1, take_while_m_n};
 use nom::character::complete::{line_ending, multispace0, multispace1, satisfy, space0};
 use nom::combinator::{map, opt, recognize};
-use nom::error::Error;
+use nom::error::{Error, ErrorKind};
 use nom::multi::{many0, many1, separated_list1};
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated};
 use crate::FieldType::{Plain, Repetition};
@@ -75,8 +75,23 @@ impl Combinator {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Condition {
+    pub field_ref: String,
+    pub bit_selector: Option<u32>
+}
+
+impl Condition {
+    pub fn constructor_number_form(&self) -> String {
+        match self.bit_selector {
+            None => { self.field_ref.clone() }
+            Some(bit_selector) => { format!("{}.{}", self.field_ref, bit_selector) }
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
 enum FieldType {
-    Plain { name: String, condition: Option<String> },
+    Plain { name: String, condition: Option<Condition> },
     Repetition { multiplicity: Option<String>, fields: Vec<Field>, },
 }
 
@@ -84,7 +99,7 @@ impl FieldType {
     pub fn constructor_number_form(&self) -> String {
         match self {
             Plain { name, condition: None } => { format!("{}", name) }
-            Plain { name, condition: Some(condition) } => { format!("{}?{}", name, condition) }
+            Plain { name, condition: Some(condition) } => { format!("{}?{}", condition.constructor_number_form(), name) }
             Repetition { multiplicity: None, fields } => {
                 let fields = fields
                     .iter()
@@ -144,6 +159,14 @@ impl Field {
         };
 
         condition.is_some()
+    }
+
+    pub fn type_condition(&self) -> Option<&Condition> {
+        let Plain { ref condition, .. } = self.r#type else {
+            return None
+        };
+
+        condition.as_ref()
     }
 
     pub fn type_is_polymorphic(&self) -> bool {
@@ -419,15 +442,13 @@ fn nat_const(input: &str) -> nom::IResult<&str, &str> {
     take_while1(is_digit)(input)
 }
 
-fn conditional_def(input: &str) -> nom::IResult<&str, String> {
-    let (input, var) = var_ident(input)?;
-    let (input, opt) = opt(preceded(tag("."), nat_const))(input)?;
+fn conditional_def(input: &str) -> nom::IResult<&str, Condition> {
+    let (input, field_ref) = var_ident(input)?;
+    let (input, bit_selector) = opt(preceded(tag("."), nat_const))(input)?;
+    let bit_selector = bit_selector.map(|n| n.parse::<u32>()).transpose().map_err(|e| nom::Err::Failure(Error::new(input, ErrorKind::Fail)))?;
     let (input, _) = tag("?")(input)?;
 
-    match opt {
-        None => Ok((input, var)),
-        Some(opt) => Ok((input, format!("{}.{}", var, opt)))
-    }
+    Ok((input, Condition { field_ref, bit_selector }))
 }
 
 fn subexpr(input: &str) -> nom::IResult<&str, String> {

@@ -136,7 +136,7 @@ mod tests {
     use tracing_test::traced_test;
     use std::time::SystemTime;
     use std::time::UNIX_EPOCH;
-    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetVersion, LiteServerMasterchainInfo};
+    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetShardBlockProof, LiteServerGetVersion, LiteServerMasterchainInfo};
     use super::*;
 
     #[tokio::test]
@@ -189,6 +189,18 @@ mod tests {
 
         assert!(response.is_err());
         assert_eq!(response.unwrap_err().to_string(), "Error code: -400, message: \"unsupported getMasterchainInfo mode\"".to_owned());
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn client_get_block_proof_test() -> anyhow::Result<()> {
+        let mut client = provided_client().await?;
+        let known_block = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox().last;
+
+        let request = LiteServerGetBlockProof { mode: 0, known_block, target_block: None };
+        let response = client.oneshot(request.into_boxed()).await?;
 
         Ok(())
     }

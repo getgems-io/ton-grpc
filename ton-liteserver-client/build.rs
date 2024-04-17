@@ -5,7 +5,7 @@ use syn::{GenericArgument, Ident, MetaList};
 use quote::{format_ident, quote, ToTokens};
 use convert_case::{Case, Casing};
 use convert_case::Case::UpperCamel;
-use tl_parser::Combinator;
+use tl_parser::{Combinator, Condition};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scheme_path = if cfg!(testnet) {
@@ -327,7 +327,7 @@ impl Generator {
                             Box::new(syn::parse_str::<GenericArgument>(&gen).unwrap())
                         } else {
                             let field_type = field.field_type();
-                            if field_configuration.optional {
+                            if field.type_is_optional() {
                                 let id = format!("Option<{}>", structure_ident(field_type.unwrap()));
                                 Box::new(syn::parse_str::<GenericArgument>(&id).unwrap())
                             } else {
@@ -337,6 +337,53 @@ impl Generator {
 
                         quote! {
                             pub #field_name: #field_type
+                        }
+                    }).collect();
+
+                let serialize_defs: Vec<_> = definition.fields()
+                    .iter()
+                    .filter(|field| {
+                        let default_configuration = FieldConfiguration::default();
+                        let field_name = field.id().clone().unwrap();
+                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+
+                        !field_configuration.skip
+                    })
+                    .map(|field| {
+                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+
+                        eprintln!("field = {:?}", field);
+                        let field_name_ident = format_ident!("{}", &field_name);
+
+                        if field.type_is_polymorphic() {
+                            quote! {
+                                unimplemented!();
+                            }
+                        } else {
+                            match field.type_condition() {
+                                None => match field.field_type() {
+                                    Some("#") => quote! { let mut #field_name_ident = self.#field_name_ident; },
+                                    Some("Bool") => quote! { let #field_name_ident = self.#field_name_ident; },
+                                    Some("int") => quote! { let #field_name_ident = self.#field_name_ident; },
+                                    Some("long") => quote! { let #field_name_ident = self.#field_name_ident; },
+                                    Some("int256") => quote! { let #field_name_ident = &self.#field_name_ident; },
+                                    Some("bytes") => quote! { let #field_name_ident = &self.#field_name_ident; },
+                                    Some("string") => quote! { let #field_name_ident = &self.#field_name_ident; },
+                                    _ => quote! { let #field_name_ident = &self.#field_name_ident; }
+                                },
+                                Some(Condition { field_ref, bit_selector: Some(bit_selector) }) =>  {
+                                    let field_ref = format_ident!("{}", &field_ref);
+                                    quote! {
+                                        let #field_name_ident = self.#field_name_ident.as_ref();
+                                        if #field_name_ident.is_some() {
+                                            #field_ref |= 1 << #bit_selector;
+                                        }
+                                    }
+                                },
+                                Some(Condition { field_ref, bit_selector: None }) => {
+                                    unimplemented!()
+                                }
+                            }
                         }
                     }).collect();
 
@@ -360,47 +407,39 @@ impl Generator {
                                 unimplemented!();
                             }
                         } else {
-                            match field.field_type() {
-                                Some("#") => {
+                            match field.type_condition() {
+                                None => match field.field_type() {
+                                    Some("#") => quote! { se.write_i31(#field_name_ident); },
+                                    // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
+                                    Some("Bool") => quote! { se.write_bool(#field_name_ident); },
+                                    Some("int") => quote! { se.write_i32(#field_name_ident); },
+                                    Some("long") => quote! { se.write_i64(#field_name_ident); },
+                                    Some("int256") => quote! { se.write_i256(#field_name_ident); },
+                                    Some("bytes") => quote! { se.write_bytes(#field_name_ident); },
+                                    Some("string") => quote! { se.write_string(#field_name_ident); },
+                                    _ => quote! { #field_name_ident.serialize(se)?; }
+                                },
+                                Some(Condition { field_ref, bit_selector: Some(_) }) =>  {
+                                    let inner = match field.field_type() {
+                                        Some("#") => quote! { se.write_i31(*value) },
+                                        // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
+                                        Some("Bool") => quote! { se.write_bool(*value) },
+                                        Some("int") => quote! { se.write_i32(*value) },
+                                        Some("long") => quote! { se.write_i64(*value) },
+                                        Some("int256") => quote! { se.write_i256(value) },
+                                        Some("bytes") => quote! { se.write_bytes(value) },
+                                        Some("string") => quote! { se.write_string(value) },
+                                        _ => quote! { value.serialize(se)? }
+                                    };
                                     quote! {
-                                        se.write_i31(self.#field_name_ident);
+                                        match #field_name_ident {
+                                            None => {},
+                                            Some(value) => #inner,
+                                        };
                                     }
                                 },
-                                // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
-                                Some("Bool") => {
-                                    quote! {
-                                        se.write_bool(self.#field_name_ident);
-                                    }
-                                }
-                                Some("int") => {
-                                    quote! {
-                                        se.write_i32(self.#field_name_ident);
-                                    }
-                                },
-                                Some("long") => {
-                                    quote! {
-                                        se.write_i64(self.#field_name_ident);
-                                    }
-                                },
-                                Some("int256") => {
-                                    quote! {
-                                        se.write_i256(&self.#field_name_ident);
-                                    }
-                                },
-                                Some("bytes") => {
-                                    quote! {
-                                        se.write_bytes(&self.#field_name_ident);
-                                    }
-                                },
-                                Some("string") => {
-                                    quote! {
-                                        se.write_string(&self.#field_name_ident);
-                                    }
-                                }
-                                _ => {
-                                    quote! {
-                                        self.#field_name_ident.serialize(se)?;
-                                    }
+                                Some(Condition { field_ref, bit_selector: None }) => {
+                                    unimplemented!()
                                 }
                             }
                         }
@@ -423,53 +462,61 @@ impl Generator {
 
                         if field.type_is_polymorphic() {
                             quote! {
-                                #field_name_ident: unimplemented!(),
+                                let #field_name_ident = unimplemented!();
                             }
                         } else {
-                            match field.field_type() {
-                                Some("#") => {
-                                    quote! {
-                                        #field_name_ident: de.parse_i31()?,
-                                    }
-                                },
+                            let parse_fn = match field.field_type() {
+                                Some("#") => quote! { de.parse_i31()? },
                                 // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
-                                Some("Bool") => {
-                                    quote! {
-                                        #field_name_ident: de.parse_bool()?,
-                                    }
-                                }
-                                Some("int") => {
-                                    quote! {
-                                        #field_name_ident: de.parse_i32()?,
-                                    }
-                                },
-                                Some("long") => {
-                                    quote! {
-                                        #field_name_ident: de.parse_i64()?,
-                                    }
-                                },
-                                Some("int256") => {
-                                    quote! {
-                                        #field_name_ident: de.parse_i256()?,
-                                    }
-                                },
-                                Some("bytes") => {
-                                    quote! {
-                                        #field_name_ident: de.parse_bytes()?,
-                                    }
-                                },
-                                Some("string") => {
-                                    quote! {
-                                        #field_name_ident: de.parse_string()?,
-                                    }
-                                }
+                                Some("Bool") => quote! { de.parse_bool()? },
+                                Some("int") => quote! { de.parse_i32()? },
+                                Some("long") => quote! { de.parse_i64()? },
+                                Some("int256") => quote! { de.parse_i256()? },
+                                Some("bytes") => quote! { de.parse_bytes()? },
+                                Some("string") => quote! { de.parse_string()? },
                                 _ => {
                                     let field_type = format_ident!("{}", structure_ident(field.field_type().unwrap()));
+                                    quote! { #field_type::deserialize(de)? }
+                                }
+                            };
+
+                            match field.type_condition() {
+                                None => quote! {
+                                    let #field_name_ident = #parse_fn;
+                                },
+                                Some(Condition { field_ref, bit_selector: Some(bit_selector) }) =>  {
+                                    let field_ref = format_ident!("{}", &field_ref);
                                     quote! {
-                                        #field_name_ident: #field_type::deserialize(de)?,
+                                        let #field_name_ident = if #field_ref & (1 << #bit_selector) > 0 { Some(#parse_fn) } else { None };
+                                    }
+                                },
+                                Some(Condition { field_ref, bit_selector: None }) => {
+                                    let field_ref = format_ident!("{}", &field_ref);
+                                    quote! {
+                                        let #field_name_ident = if #field_ref { Some(#parse_fn) } else { None };
                                     }
                                 }
                             }
+                        }
+                    }).collect();
+
+                let deserialize_pass: Vec<_> = definition.fields()
+                    .iter()
+                    .filter(|field| {
+                        let default_configuration = FieldConfiguration::default();
+                        let field_name = field.id().clone().unwrap();
+                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+
+                        !field_configuration.skip
+                    })
+                    .map(|field| {
+                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+
+                        eprintln!("field = {:?}", field);
+                        let field_name_ident = format_ident!("{}", &field_name);
+
+                        quote! {
+                            #field_name_ident,
                         }
                     }).collect();
 
@@ -505,6 +552,8 @@ impl Generator {
                     impl Serialize for #struct_name {
                         #[allow(unused_variables)]
                         fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+                            #(#serialize_defs)*
+
                             #(#serialize_fields)*
 
                             Ok(())
@@ -514,8 +563,10 @@ impl Generator {
                     impl Deserialize for #struct_name {
                         #[allow(unused_variables)]
                         fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+                            #(#deserialize_fields)*
+
                             Ok(Self {
-                                #(#deserialize_fields)*
+                                #(#deserialize_pass)*
                             })
                         }
                     }
