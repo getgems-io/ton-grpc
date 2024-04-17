@@ -28,6 +28,7 @@ tokio-stream = "0.1.15"
 hex = "0.4.3"
 base64 = "0.22.0"
 tracing-test = "0.2.4"
+tracing-subscriber = "0.3.18"
 
 [features]
 testnet = []
