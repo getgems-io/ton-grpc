@@ -148,7 +148,7 @@ impl Generator {
 
         let mut formatted = String::new();
 
-        let skip_list: Vec<String> = vec!["Vector t", "Bool", "Int32", "Int53", "Int64", "Int128", "Int256", "Bytes", "SecureString", "SecureBytes", "Function"]
+        let skip_list: Vec<String> = vec!["Vector t", "Int32", "Int53", "Int64", "Int128", "Int256", "Bytes", "SecureString", "SecureBytes", "Function"]
             .into_iter().map(|s| s.to_owned()).collect();
 
         // Boxed Types
@@ -363,7 +363,8 @@ impl Generator {
                             match field.type_condition() {
                                 None => match field.field_type() {
                                     Some("#") => quote! { let mut #field_name_ident = self.#field_name_ident; },
-                                    Some("Bool") => quote! { let #field_name_ident = self.#field_name_ident; },
+                                    // TODO[akostylev0] bool optimization
+                                    // Some("Bool") => quote! { let #field_name_ident = self.#field_name_ident; },
                                     Some("int") => quote! { let #field_name_ident = self.#field_name_ident; },
                                     Some("long") => quote! { let #field_name_ident = self.#field_name_ident; },
                                     Some("int256") => quote! { let #field_name_ident = &self.#field_name_ident; },
@@ -410,8 +411,8 @@ impl Generator {
                             match field.type_condition() {
                                 None => match field.field_type() {
                                     Some("#") => quote! { se.write_i31(#field_name_ident); },
-                                    // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
-                                    Some("Bool") => quote! { se.write_bool(#field_name_ident); },
+                                    // TODO[akostylev0] bool optimization
+                                    // Some("Bool") => quote! { se.write_bool(#field_name_ident.into()); },
                                     Some("int") => quote! { se.write_i32(#field_name_ident); },
                                     Some("long") => quote! { se.write_i64(#field_name_ident); },
                                     Some("int256") => quote! { se.write_i256(#field_name_ident); },
@@ -422,8 +423,8 @@ impl Generator {
                                 Some(Condition { field_ref, bit_selector: Some(_) }) =>  {
                                     let inner = match field.field_type() {
                                         Some("#") => quote! { se.write_i31(*value) },
-                                        // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
-                                        Some("Bool") => quote! { se.write_bool(*value) },
+                                        // TODO[akostylev0] bool optimization
+                                        // Some("Bool") => quote! { se.write_bool(value.into()) },
                                         Some("int") => quote! { se.write_i32(*value) },
                                         Some("long") => quote! { se.write_i64(*value) },
                                         Some("int256") => quote! { se.write_i256(value) },
@@ -467,8 +468,8 @@ impl Generator {
                         } else {
                             let parse_fn = match field.field_type() {
                                 Some("#") => quote! { de.parse_i31()? },
-                                // TODO[akostylev0] I'm not sure that bool encoded as bare primitive
-                                Some("Bool") => quote! { de.parse_bool()? },
+                                // TODO[akostylev0] bool optimization
+                                // Some("Bool") => quote! { de.parse_bool()?.into() },
                                 Some("int") => quote! { de.parse_i32()? },
                                 Some("long") => quote! { de.parse_i64()? },
                                 Some("int256") => quote! { de.parse_i256()? },

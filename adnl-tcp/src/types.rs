@@ -28,7 +28,6 @@ pub type Int64 = i64;
 pub type Long = i64;
 pub type Int128 = i128;
 pub type Int256 = [u8; 32];
-pub type BoxedBool = bool;
 pub type Bytes = Vec<u8>;
 pub type Object = Bytes;
 pub type SecureString = String;
