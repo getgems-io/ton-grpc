@@ -43,7 +43,7 @@ serial_test = "3.0.0"
 tl_parser = { path = "../tl_parser" }
 anyhow = { workspace = true }
 quote = "1.0"
-syn = "2.0.58"
+syn = "2.0.59"
 prettyplease = "0.2.17"
 convert_case = "0.6.0"
 
