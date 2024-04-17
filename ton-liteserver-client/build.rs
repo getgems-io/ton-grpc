@@ -29,90 +29,15 @@ struct Generator {
     types: HashMap<String, TypeConfiguration>,
 }
 
-fn configure_type() -> TypeConfigurationBuilder { Default::default() }
-fn configure_field() -> FieldConfigurationBuilder { Default::default() }
-
-#[derive(Default)]
-struct TypeConfigurationBuilder {
-    derives: Vec<String>,
-    fields: HashMap<String, FieldConfiguration>
-}
-
 struct TypeConfiguration {
-    pub derives: Vec<String>,
-    pub fields: HashMap<String, FieldConfiguration>
+    pub derives: Vec<String>
 }
 
 impl Default for TypeConfiguration {
     fn default() -> Self {
-        Self { derives: vec!["Debug".to_owned(), "Clone".to_owned(), "PartialEq".to_owned(), "Eq".to_owned()], fields: HashMap::new() }
+        Self { derives: vec!["Debug".to_owned(), "Clone".to_owned(), "PartialEq".to_owned(), "Eq".to_owned()] }
     }
 }
-
-#[derive(Default)]
-struct FieldConfigurationBuilder {
-    skip: bool,
-    optional: bool,
-    deserialize_with: Option<String>,
-    serialize_with: Option<String>
-}
-
-#[derive(Default)]
-struct FieldConfiguration {
-    pub skip: bool,
-    pub optional: bool,
-    pub deserialize_with: Option<String>,
-    pub serialize_with: Option<String>
-}
-
-impl FieldConfigurationBuilder {
-    fn skip(mut self) -> Self {
-        self.skip = true;
-
-        self
-    }
-    fn optional(mut self) -> Self {
-        self.optional = true;
-
-        self
-    }
-
-    fn deserialize_with(mut self, deserialize_with: &str) -> Self {
-        self.deserialize_with = Some(deserialize_with.to_owned());
-
-        self
-    }
-
-    fn serialize_with(mut self, serialize_with: &str) -> Self {
-        self.serialize_with = Some(serialize_with.to_owned());
-
-        self
-    }
-
-    fn build(self) -> FieldConfiguration {
-        FieldConfiguration { skip: self.skip, optional: self.optional, deserialize_with: self.deserialize_with, serialize_with: self.serialize_with }
-    }
-}
-
-impl TypeConfigurationBuilder {
-    fn derives(mut self, derives: Vec<&str>) -> Self {
-        self.derives = derives.into_iter().map(|s| s.to_owned()).collect();
-        self.derives.push("Debug".to_owned());
-
-        self
-    }
-
-    fn field(mut self, field: &str, configuration: FieldConfiguration) -> Self {
-        self.fields.insert(field.to_owned(), configuration);
-
-        self
-    }
-
-    fn build(self) -> TypeConfiguration {
-        TypeConfiguration { derives: self.derives, fields: self.fields }
-    }
-}
-
 
 impl Generator {
     fn from<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O) -> Self {
@@ -120,18 +45,6 @@ impl Generator {
         let output: PathBuf = output.as_ref().to_path_buf();
 
         Self { input, output, types: Default::default() }
-    }
-
-    fn configure(mut self, name: &str, derives: Vec<&str>) -> Self {
-        self.types.insert(name.to_owned(), configure_type().derives(derives).build());
-
-        self
-    }
-
-    fn configure_full(mut self, name: &str, configuration: TypeConfiguration) -> Self {
-        self.types.insert(name.to_owned(), configuration);
-
-        self
     }
 
     fn generate(self) -> anyhow::Result<()> {
@@ -154,7 +67,7 @@ impl Generator {
         // Boxed Types
         for (type_ident, types) in map {
             eprintln!("type_ident = {:}", type_ident);
-            if skip_list.contains(&&type_ident) {
+            if skip_list.contains(&type_ident) {
                 continue;
             }
 
@@ -284,7 +197,6 @@ impl Generator {
 
                 eprintln!("definition = {:?}", definition);
 
-                let id = definition.id();
                 let struct_name = structure_ident(definition.id());
 
                 let derives = format!("derive({})", configuration.derives.join(","));
@@ -292,26 +204,13 @@ impl Generator {
 
                 let fields: Vec<_> = definition.fields()
                     .iter()
-                    .filter(|field| {
-                        let default_configuration = FieldConfiguration::default();
-                        let field_name = field.id().clone().unwrap();
-                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
-
-                        !field_configuration.skip
-                    })
                     .map(|field| {
-                        let default_configuration = FieldConfiguration::default();
                         let field_name = field.id().clone().unwrap().to_case(Case::Snake);
-                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
 
                         eprintln!("field = {:?}", field);
                         let field_name = format_ident!("{}", &field_name);
                         let field_type: Box<dyn ToTokens> = if field.field_type().is_some_and(|typ| typ == "#") {
-                            if field_configuration.optional {
-                                Box::new(syn::parse_str::<GenericArgument>("Option<Int31>").unwrap())
-                            } else {
-                                Box::new(format_ident!("{}", "Int31"))
-                            }
+                            Box::new(format_ident!("{}", "Int31"))
                         } else if field.type_is_polymorphic() {
                             let type_name = generate_type_name(field.field_type().unwrap());
                             let type_variables = field.type_variables().unwrap();
@@ -321,7 +220,7 @@ impl Generator {
                                 .collect();
 
                             let mut gen = format!("{}<{}>", type_name, args.join(","));
-                            if field.type_is_optional() || field_configuration.optional {
+                            if field.type_is_optional() {
                                 gen = format!("Option<{}>", gen);
                             }
                             Box::new(syn::parse_str::<GenericArgument>(&gen).unwrap())
@@ -342,13 +241,6 @@ impl Generator {
 
                 let serialize_defs: Vec<_> = definition.fields()
                     .iter()
-                    .filter(|field| {
-                        let default_configuration = FieldConfiguration::default();
-                        let field_name = field.id().clone().unwrap();
-                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
-
-                        !field_configuration.skip
-                    })
                     .map(|field| {
                         let field_name = field.id().clone().unwrap().to_case(Case::Snake);
 
@@ -376,7 +268,7 @@ impl Generator {
                                     }
                                 }
                             },
-                            Some(Condition { field_ref, bit_selector: None }) => {
+                            Some(Condition { field_ref: _, bit_selector: None }) => {
                                 unimplemented!()
                             }
                         }
@@ -384,13 +276,6 @@ impl Generator {
 
                 let serialize_fields: Vec<_> = definition.fields()
                     .iter()
-                    .filter(|field| {
-                        let default_configuration = FieldConfiguration::default();
-                        let field_name = field.id().clone().unwrap();
-                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
-
-                        !field_configuration.skip
-                    })
                     .map(|field| {
                         let field_name = field.id().clone().unwrap().to_case(Case::Snake);
 
@@ -409,7 +294,7 @@ impl Generator {
                                 Some("string") => quote! { se.write_string(#field_name_ident); },
                                 _ => quote! { #field_name_ident.serialize(se)?; }
                             },
-                            Some(Condition { field_ref, bit_selector: Some(_) }) =>  {
+                            Some(Condition { field_ref: _, bit_selector: Some(_) }) =>  {
                                 let inner = match field.field_type() {
                                     Some("#") => quote! { se.write_i31(*value) },
                                     // TODO[akostylev0] bool optimization
@@ -428,7 +313,7 @@ impl Generator {
                                     };
                                 }
                             },
-                            Some(Condition { field_ref, bit_selector: None }) => {
+                            Some(Condition { field_ref: _, bit_selector: None }) => {
                                 unimplemented!()
                             }
                         }
@@ -436,13 +321,6 @@ impl Generator {
 
                 let deserialize_fields: Vec<_> = definition.fields()
                     .iter()
-                    .filter(|field| {
-                        let default_configuration = FieldConfiguration::default();
-                        let field_name = field.id().clone().unwrap();
-                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
-
-                        !field_configuration.skip
-                    })
                     .map(|field| {
                         let field_name = field.id().clone().unwrap().to_case(Case::Snake);
 
@@ -485,13 +363,6 @@ impl Generator {
 
                 let deserialize_pass: Vec<_> = definition.fields()
                     .iter()
-                    .filter(|field| {
-                        let default_configuration = FieldConfiguration::default();
-                        let field_name = field.id().clone().unwrap();
-                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
-
-                        !field_configuration.skip
-                    })
                     .map(|field| {
                         let field_name = field.id().clone().unwrap().to_case(Case::Snake);
 

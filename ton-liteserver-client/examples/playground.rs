@@ -4,7 +4,7 @@ use tower::ServiceExt;
 use adnl_tcp::client::ServerKey;
 use adnl_tcp::types::BareType;
 use ton_liteserver_client::client::LiteserverClient;
-use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo, LiteServerListBlockTransactions, LiteServerLookupBlock, TonNodeBlockId, True};
+use ton_liteserver_client::tl::{LiteServerGetMasterchainInfo, LiteServerListBlockTransactions, LiteServerLookupBlock, TonNodeBlockId, True};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

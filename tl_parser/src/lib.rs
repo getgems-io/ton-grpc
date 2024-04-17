@@ -445,7 +445,7 @@ fn nat_const(input: &str) -> nom::IResult<&str, &str> {
 fn conditional_def(input: &str) -> nom::IResult<&str, Condition> {
     let (input, field_ref) = var_ident(input)?;
     let (input, bit_selector) = opt(preceded(tag("."), nat_const))(input)?;
-    let bit_selector = bit_selector.map(|n| n.parse::<u32>()).transpose().map_err(|e| nom::Err::Failure(Error::new(input, ErrorKind::Fail)))?;
+    let bit_selector = bit_selector.map(|n| n.parse::<u32>()).transpose().map_err(|_| nom::Err::Failure(Error::new(input, ErrorKind::Fail)))?;
     let (input, _) = tag("?")(input)?;
 
     Ok((input, Condition { field_ref, bit_selector }))
@@ -709,7 +709,7 @@ comment ")));
 
         assert_eq!(output, Ok(("", vec![Field {
             name: Some("first_name".to_owned()),
-            r#type: Plain { name: "string".to_owned(), condition: Some("fields.0".to_owned()) },
+            r#type: Plain { name: "string".to_owned(), condition: Some(Condition { field_ref: "fields".to_string(), bit_selector: Some(0) }) },
             exclamation_point_modifier: false
         }])));
     }

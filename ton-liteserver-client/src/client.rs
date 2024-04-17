@@ -136,7 +136,7 @@ mod tests {
     use tracing_test::traced_test;
     use std::time::SystemTime;
     use std::time::UNIX_EPOCH;
-    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetShardBlockProof, LiteServerGetVersion, LiteServerMasterchainInfo};
+    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetVersion};
     use super::*;
 
     #[tokio::test]

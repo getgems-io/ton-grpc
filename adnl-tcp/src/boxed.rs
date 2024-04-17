@@ -13,7 +13,7 @@ impl<T> Boxed<T> where T: BareType {
     }
 
     pub fn unbox(self) -> T {
-        return self.inner
+        self.inner
     }
 }
 

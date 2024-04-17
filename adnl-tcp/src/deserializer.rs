@@ -37,10 +37,6 @@ impl Deserializer {
         })
     }
 
-    pub fn parse_bool(&mut self) -> anyhow::Result<bool> {
-        unimplemented!()
-    }
-
     pub fn parse_i31(&mut self) -> anyhow::Result<i32> {
         Ok(self.input.get_i32_le() & 0x7fffffff)
     }
@@ -129,4 +125,3 @@ mod tests {
         assert_eq!(value, vec![1; 255])
     }
 }
-
