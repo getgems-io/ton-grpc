@@ -2485,7 +2485,7 @@ dependencies = [
  "prettyplease 0.2.17",
  "quote",
  "rand",
- "syn 2.0.58",
+ "syn 2.0.59",
  "tl_parser",
  "tokio",
  "tokio-stream",
