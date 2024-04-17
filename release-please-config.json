@@ -25,6 +25,9 @@
     },
     "adnl-tcp": {
       "release-type": "rust"
+    },
+    "ton-liteserver-client": {
+      "release-type": "rust"
     }
   }
 }
