@@ -117,8 +117,10 @@ impl<R> Service<R> for LiteserverClient where R: Requestable + BoxedType, R::Res
         self.responses.insert(query_id, tx);
         self.tx.send(request).expect("inner channel is closed");
 
-        return async {
-            let response = rx.await?;
+        let responses = self.responses.clone();
+        return async move {
+            let response = tokio::time::timeout(Duration::from_secs(3), rx).await
+                .inspect_err(|_| { responses.remove(&query_id); })??;
 
             let response = from_bytes::<Result<R::Response, LiteServerError>>(response)??;
 
