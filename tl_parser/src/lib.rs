@@ -222,7 +222,7 @@ pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
     let mut collect = Vec::new();
 
     loop {
-        let prev = input.clone();
+        let prev = input;
         let types;
         let funcs;
         (input, types) = opt(preceded(
@@ -1062,7 +1062,6 @@ d = !D;
     }
 
     #[test]
-    // TODO[akostylev0] check that it is in use and correct
     fn vector_constructor_number_form() {
         let input = "vector {t:Type} # [ t ] = Vector t;";
 

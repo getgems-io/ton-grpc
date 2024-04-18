@@ -22,6 +22,7 @@ impl std::error::Error for LiteServerError {
 
 #[cfg(test)]
 mod tests {
+    use base64::Engine;
     use adnl_tcp::boxed::Boxed;
     use adnl_tcp::deserializer::from_bytes;
     use adnl_tcp::serializer::to_bytes;
@@ -77,8 +78,8 @@ mod tests {
 
         let masterchain_info = from_bytes::<Boxed<LiteServerMasterchainInfo>>(bytes).unwrap();
 
-        eprintln!("{}", base64::encode(hex::decode("e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4").unwrap()));
-        eprintln!("{}", base64::encode(hex::decode("876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e0123517").unwrap()));
+        eprintln!("{}", base64::engine::general_purpose::STANDARD.encode(hex::decode("e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4").unwrap()));
+        eprintln!("{}", base64::engine::general_purpose::STANDARD.encode(hex::decode("876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e0123517").unwrap()));
 
         assert_eq!(masterchain_info, LiteServerMasterchainInfo {
             last: TonNodeBlockIdExt {
