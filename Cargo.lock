@@ -2486,6 +2486,7 @@ dependencies = [
  "quote",
  "rand",
  "syn 2.0.59",
+ "thiserror",
  "tl_parser",
  "tokio",
  "tokio-stream",

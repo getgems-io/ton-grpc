@@ -1,25 +1,40 @@
 use std::future::Future;
+use std::marker::PhantomData;
 use std::net::SocketAddrV4;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use anyhow::anyhow;
 use dashmap::DashMap;
 use tower::Service;
 use adnl_tcp::client::{AdnlTcpClient, ServerKey};
-use futures::{FutureExt, SinkExt, StreamExt};
+use futures::{ready, SinkExt, StreamExt};
+use pin_project::pin_project;
 use rand::random;
+use thiserror::Error;
 use tokio::sync::mpsc::UnboundedSender;
+use tokio::sync::oneshot::Receiver;
 use tokio::time::MissedTickBehavior;
 use adnl_tcp::boxed::Boxed;
 use adnl_tcp::types::{BareType, BoxedType};
 use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
-use adnl_tcp::deserializer::from_bytes;
+use adnl_tcp::deserializer::{Deserialize, from_bytes};
 use adnl_tcp::serializer::to_bytes;
 use crate::request::Requestable;
 use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery};
+
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("LiteServer error")]
+    LiteServerError(#[from] LiteServerError),
+    #[error("Deserialize error")]
+    Deserialize,
+    #[error("Inner channel is closed")]
+    ChannelClosed,
+    #[error("Response oneshot channel is closed")]
+    OneshotClosed,
+}
 
 pub struct LiteserverClient {
     responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>,
@@ -71,7 +86,7 @@ impl LiteserverClient {
             while let Some(request) = stream.next().await {
                 match request {
                     Ok(adnl_query) => {
-                        let data = to_bytes(&adnl_query.into_boxed()).expect("expect to serialize adnl query");
+                        let data = to_bytes(&adnl_query.into_boxed());
                         write_half.send(Packet::new(data)).await.expect("expect to send adnl query packet")
                     }
                     Err(_) => {
@@ -88,26 +103,22 @@ impl LiteserverClient {
 
 impl<R> Service<R> for LiteserverClient where R: Requestable + BoxedType, R::Response : BoxedType {
     type Response = R::Response;
-    type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Error = Error;
+    type Future = ResponseFuture<R::Response>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.tx.is_closed() {
-            return Poll::Ready(Err(anyhow!("inner channel is closed")))
+            return Poll::Ready(Err(Error::ChannelClosed))
         }
 
         Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        let Ok(data) = to_bytes(&req) else {
-            return std::future::ready(Err(anyhow!("cannot serialize request"))).boxed()
-        };
+        let data = to_bytes(&req);
 
         let query = LiteServerQuery { data };
-        let Ok(query) = to_bytes(&query.into_boxed()) else {
-            return std::future::ready(Err(anyhow!("cannot serialize liteserver query"))).boxed()
-        };
+        let query = to_bytes(&query.into_boxed());
 
         let query_id: Int256 = random();
         let request = AdnlMessageQuery { query_id, query };
@@ -115,17 +126,72 @@ impl<R> Service<R> for LiteserverClient where R: Requestable + BoxedType, R::Res
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.responses.insert(query_id, tx);
-        self.tx.send(request).expect("inner channel is closed");
+        if let Err(_) = self.tx.send(request) {
+            return ResponseFuture::failed(Error::ChannelClosed);
+        }
 
-        let responses = self.responses.clone();
-        return async move {
-            let response = tokio::time::timeout(Duration::from_secs(3), rx).await
-                .inspect_err(|_| { responses.remove(&query_id); })??;
+        ResponseFuture::new(query_id, rx, self.responses.clone())
+    }
+}
 
-            let response = from_bytes::<Result<R::Response, LiteServerError>>(response)??;
 
-            Ok(response)
-        }.boxed()
+#[pin_project(project = ResponseStateProj)]
+pub enum ResponseState {
+    Failed { error: Option<Error> },
+    Rx { #[pin] rx: Receiver<Bytes>, query_id: Int256, responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>> }
+}
+
+#[pin_project(PinnedDrop)]
+pub struct ResponseFuture<Response> {
+    #[pin]
+    state: ResponseState,
+
+    _phantom: PhantomData<Response>,
+}
+
+impl<Response> ResponseFuture<Response> {
+    fn new(query_id: Int256, rx: Receiver<Bytes>, responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>) -> Self {
+        Self { state: ResponseState::Rx { query_id, responses, rx }, _phantom: PhantomData::default() }
+    }
+
+    fn failed(error: Error) -> Self {
+        Self { state: ResponseState::Failed { error: Some(error) }, _phantom: PhantomData::default() }
+    }
+}
+
+#[pin_project::pinned_drop]
+impl<Response> PinnedDrop for ResponseFuture<Response> {
+    fn drop(self: Pin<&mut Self>) {
+        match self.state {
+            ResponseState::Failed { .. } => {},
+            ResponseState::Rx { ref responses, ref query_id, .. } => { responses.remove(query_id); }
+        }
+    }
+}
+
+impl<Response> Future for ResponseFuture<Response> where Response : BoxedType + Deserialize {
+    type Output = Result<Response, Error>;
+
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let mut this = self.project();
+
+        return match this.state.as_mut().project() {
+            ResponseStateProj::Failed { error } => {
+                Poll::Ready(Err(error.take().expect("polled after error")))
+            },
+            ResponseStateProj::Rx { rx, .. } => return match ready!(rx.poll(cx)) {
+                Ok(response) => {
+                    let response = from_bytes::<Result<Response, LiteServerError>>(response)
+                        .map_err(|_| Error::Deserialize)?
+                        .map_err(|e| Error::LiteServerError(e))?;
+
+                    Poll::Ready(Ok(response))
+                }
+                Err(_) => {
+                    Poll::Ready(Err(Error::OneshotClosed))
+                }
+            }
+        }
     }
 }
 

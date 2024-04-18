@@ -123,7 +123,7 @@ impl Generator {
                         let field_name = format_ident!("{}", generate_type_name(rename));
 
                         quote! {
-                            Self::#field_name(inner) => inner.serialize(se)?
+                            Self::#field_name(inner) => inner.serialize(se)
                         }
                     })
                     .collect();
@@ -156,13 +156,11 @@ impl Generator {
                     }
 
                     impl Serialize for #struct_name {
-                        fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+                        fn serialize(&self, se: &mut Serializer) {
                             se.write_constructor_number(self.constructor_number());
                             match self {
                                 #(#serialize_match),*
                             }
-
-                            Ok(())
                         }
                     }
 
@@ -292,7 +290,7 @@ impl Generator {
                                 Some("int256") => quote! { se.write_i256(#field_name_ident); },
                                 Some("bytes") => quote! { se.write_bytes(#field_name_ident); },
                                 Some("string") => quote! { se.write_string(#field_name_ident); },
-                                _ => quote! { #field_name_ident.serialize(se)?; }
+                                _ => quote! { #field_name_ident.serialize(se); }
                             },
                             Some(Condition { field_ref: _, bit_selector: Some(_) }) =>  {
                                 let inner = match field.field_type() {
@@ -304,7 +302,7 @@ impl Generator {
                                     Some("int256") => quote! { se.write_i256(value) },
                                     Some("bytes") => quote! { se.write_bytes(value) },
                                     Some("string") => quote! { se.write_string(value) },
-                                    _ => quote! { value.serialize(se)? }
+                                    _ => quote! { value.serialize(se) }
                                 };
                                 quote! {
                                     match #field_name_ident {
@@ -405,12 +403,10 @@ impl Generator {
 
                     impl Serialize for #struct_name {
                         #[allow(unused_variables)]
-                        fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+                        fn serialize(&self, se: &mut Serializer) {
                             #(#serialize_defs)*
 
                             #(#serialize_fields)*
-
-                            Ok(())
                         }
                     }
 

@@ -35,14 +35,12 @@ pub type SecureBytes = Vec<u8>;
 pub type Vector<T> = Vec<T>;
 
 impl Serialize for Vector<Int256> {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+    fn serialize(&self, se: &mut Serializer) {
         se.reserve(4 + 32 * self.len());
         se.write_i31(self.len() as i32);
         for val in self {
             se.write_i256(val)
         }
-
-        Ok(())
     }
 }
 
@@ -60,14 +58,12 @@ impl Deserialize for Vector<Int256> {
 }
 
 impl Serialize for Vector<Int32> {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+    fn serialize(&self, se: &mut Serializer) {
         se.reserve(4 + 4 * self.len());
         se.write_i31(self.len() as i32);
         for val in self {
             se.write_i32(*val)
         }
-
-        Ok(())
     }
 }
 
@@ -85,14 +81,12 @@ impl Deserialize for Vector<Int32> {
 }
 
 impl Serialize for Vector<Int64> {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+    fn serialize(&self, se: &mut Serializer) {
         se.reserve(4 + 8 * self.len());
         se.write_i31(self.len() as i32);
         for val in self {
             se.write_i64(*val)
         }
-
-        Ok(())
     }
 }
 
@@ -110,13 +104,11 @@ impl Deserialize for Vector<Int64> {
 }
 
 impl<T> Serialize for Vector<T> where T : Serialize {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+    fn serialize(&self, se: &mut Serializer) {
         se.write_i31(self.len() as i32);
         for val in self {
-            val.serialize(se)?
+            val.serialize(se)
         }
-
-        Ok(())
     }
 }
 
@@ -149,16 +141,14 @@ impl<T, E> Deserialize for Result<T, E> where T:BoxedType + Deserialize, E: Bare
 }
 
 impl<T, E> Serialize for Result<T, E> where T: BoxedType + Serialize, E: BareType + Serialize {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+    fn serialize(&self, se: &mut Serializer) {
         match self {
             Ok(val) => {
-                val.serialize(se)?;
-                Ok(())
+                val.serialize(se);
             }
             Err(val) => {
                 se.write_constructor_number(E::CONSTRUCTOR_NUMBER_BE);
-                val.serialize(se)?;
-                Ok(())
+                val.serialize(se);
             }
         }
     }

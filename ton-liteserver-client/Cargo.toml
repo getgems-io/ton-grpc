@@ -23,6 +23,7 @@ pin-project = "1.1.5"
 futures = "0.3.30"
 rand = "0.8.5"
 tokio-stream = "0.1.15"
+thiserror = "1.0.58"
 
 [dev-dependencies]
 hex = "0.4.3"

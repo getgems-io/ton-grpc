@@ -3,7 +3,7 @@ use bytes::BufMut;
 use crate::types::{Int256};
 
 pub trait Serialize {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()>;
+    fn serialize(&self, se: &mut Serializer);
 }
 
 #[derive(Debug)]
@@ -72,14 +72,14 @@ impl Serializer {
     }
 }
 
-pub fn to_bytes<T>(value: &T) -> anyhow::Result<Vec<u8>>
+pub fn to_bytes<T>(value: &T) -> Vec<u8>
     where
         T: Serialize,
 {
     let mut serializer = Serializer { output: Vec::new() };
-    value.serialize(&mut serializer)?;
+    value.serialize(&mut serializer);
 
-    Ok(serializer.output)
+    serializer.output
 }
 
 #[cfg(test)]

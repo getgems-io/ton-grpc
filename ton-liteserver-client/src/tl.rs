@@ -35,7 +35,7 @@ mod tests {
             query: hex::decode("df068c79042ee6b589000000").unwrap()
         };
 
-        let bytes = to_bytes(&query.into_boxed()).unwrap();
+        let bytes = to_bytes(&query.into_boxed());
 
         assert_eq!(bytes, hex::decode("7af98bb477c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c40cdf068c79042ee6b589000000000000").unwrap())
     }
@@ -46,7 +46,7 @@ mod tests {
             data: hex::decode("2ee6b589").unwrap(),
         };
 
-        let bytes = to_bytes(&query.into_boxed()).unwrap();
+        let bytes = to_bytes(&query.into_boxed());
 
         assert_eq!(bytes, hex::decode("df068c79042ee6b589000000").unwrap())
     }
@@ -55,7 +55,7 @@ mod tests {
     fn serialize_get_masterchain_info_test() {
         let s = LiteServerGetMasterchainInfo {};
 
-        let bytes = to_bytes(&s.into_boxed()).unwrap();
+        let bytes = to_bytes(&s.into_boxed());
 
         assert_eq!(bytes, hex::decode("2ee6b589").unwrap())
     }

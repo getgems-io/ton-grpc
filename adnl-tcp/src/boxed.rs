@@ -28,10 +28,10 @@ impl<T> BoxedType for Boxed<T> where T : BareType {
 }
 
 impl<T> Serialize for Boxed<T> where T : BareType + Serialize {
-    fn serialize(&self, se: &mut Serializer) -> anyhow::Result<()> {
+    fn serialize(&self, se: &mut Serializer) {
         se.write_constructor_number(self.constructor_number());
 
-        self.inner.serialize(se)
+        self.inner.serialize(se);
     }
 }
 
