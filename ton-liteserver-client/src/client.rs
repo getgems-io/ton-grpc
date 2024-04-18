@@ -36,6 +36,7 @@ pub enum Error {
     OneshotClosed,
 }
 
+#[derive(Debug, Clone)]
 pub struct LiteserverClient {
     responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>,
     tx: UnboundedSender<AdnlMessageQuery>
