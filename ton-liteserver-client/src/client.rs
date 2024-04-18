@@ -72,7 +72,7 @@ impl LiteserverClient {
                 match request {
                     Ok(adnl_query) => {
                         let data = to_bytes(&adnl_query.into_boxed()).expect("expect to serialize adnl query");
-                        write_half.send(Packet::new(&data)).await.expect("expect to send adnl query packet")
+                        write_half.send(Packet::new(data)).await.expect("expect to send adnl query packet")
                     }
                     Err(_) => {
                         write_half.send(ping_packet()).await.expect("expect to send ping packet")
