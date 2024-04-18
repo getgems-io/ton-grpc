@@ -98,7 +98,7 @@ enum FieldType {
 impl FieldType {
     pub fn constructor_number_form(&self) -> String {
         match self {
-            Plain { name, condition: None } => { format!("{}", name) }
+            Plain { name, condition: None } => { name.to_string() }
             Plain { name, condition: Some(condition) } => { format!("{}?{}", condition.constructor_number_form(), name) }
             Repetition { multiplicity: None, fields } => {
                 let fields = fields
@@ -199,7 +199,7 @@ impl Field {
 
     pub fn constructor_number_form(&self) -> String {
         match &self.name {
-            None => { format!("{}", self.r#type.constructor_number_form() )}
+            None => { self.r#type.constructor_number_form().to_string() }
             Some(name) => { format!("{}:{}", name, self.r#type.constructor_number_form() )}
         }
     }
