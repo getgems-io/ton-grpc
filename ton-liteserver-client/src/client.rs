@@ -127,7 +127,7 @@ impl<R> Service<R> for LiteServerClient where R: Requestable + BoxedType, R::Res
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         self.responses.insert(query_id, tx);
-        if let Err(_) = self.tx.send(request) {
+        if self.tx.send(request).is_err() {
             return ResponseFuture::failed(Error::ChannelClosed);
         }
 
