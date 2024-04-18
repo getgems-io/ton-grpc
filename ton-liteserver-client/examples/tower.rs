@@ -5,7 +5,7 @@ use futures::{stream, StreamExt};
 use tower::{ServiceBuilder, ServiceExt};
 use adnl_tcp::client::ServerKey;
 use adnl_tcp::types::BareType;
-use ton_liteserver_client::client::LiteserverClient;
+use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId};
 
 #[tokio::main]
@@ -32,7 +32,7 @@ async fn main() -> Result<(), tower::BoxError> {
     Ok(())
 }
 
-async fn provided_client() -> anyhow::Result<LiteserverClient> {
+async fn provided_client() -> anyhow::Result<LiteServerClient> {
     let ip: i32 = -2018135749;
     let ip = Ipv4Addr::from(ip as u32);
     let port = 53312;
@@ -40,7 +40,7 @@ async fn provided_client() -> anyhow::Result<LiteserverClient> {
 
     tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-    let client = LiteserverClient::connect(SocketAddrV4::new(ip, port), &key).await?;
+    let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), &key).await?;
 
     Ok(client)
 }

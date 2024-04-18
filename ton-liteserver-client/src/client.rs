@@ -26,7 +26,7 @@ use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerEr
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("LiteServer error")]
+    #[error("LiteServer error: {0}")]
     LiteServerError(#[from] LiteServerError),
     #[error("Deserialize error")]
     Deserialize,
@@ -37,12 +37,12 @@ pub enum Error {
 }
 
 #[derive(Debug, Clone)]
-pub struct LiteserverClient {
+pub struct LiteServerClient {
     responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>,
     tx: UnboundedSender<AdnlMessageQuery>
 }
 
-impl LiteserverClient {
+impl LiteServerClient {
     pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
         let inner = AdnlTcpClient::connect(addr, server_key).await?;
         let (mut write_half, mut read_half) = inner.split();
@@ -102,7 +102,7 @@ impl LiteserverClient {
     }
 }
 
-impl<R> Service<R> for LiteserverClient where R: Requestable + BoxedType, R::Response : BoxedType {
+impl<R> Service<R> for LiteServerClient where R: Requestable + BoxedType, R::Response : BoxedType {
     type Response = R::Response;
     type Error = Error;
     type Future = ResponseFuture<R::Response>;
@@ -257,7 +257,7 @@ mod tests {
         let response = client.oneshot((LiteServerGetMasterchainInfoExt { mode: 1 }).into_boxed()).await;
 
         assert!(response.is_err());
-        assert_eq!(response.unwrap_err().to_string(), "Error code: -400, message: \"unsupported getMasterchainInfo mode\"".to_owned());
+        assert_eq!(response.unwrap_err().to_string(), "LiteServer error: Error code: -400, message: \"unsupported getMasterchainInfo mode\"".to_owned());
 
         Ok(())
     }
@@ -276,7 +276,7 @@ mod tests {
         Ok(())
     }
 
-    async fn provided_client() -> anyhow::Result<LiteserverClient> {
+    async fn provided_client() -> anyhow::Result<LiteServerClient> {
         let ip: i32 = -2018135749;
         let ip = Ipv4Addr::from(ip as u32);
         let port = 53312;
@@ -284,7 +284,7 @@ mod tests {
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-        let client = LiteserverClient::connect(SocketAddrV4::new(ip, port), &key).await?;
+        let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), &key).await?;
 
         Ok(client)
     }
