@@ -4,7 +4,7 @@ use nom::branch::alt;
 use nom::bytes::complete::{tag, take_till, take_until, take_while, take_while1, take_while_m_n};
 use nom::character::complete::{line_ending, multispace0, multispace1, satisfy, space0};
 use nom::combinator::{map, opt, recognize};
-use nom::error::Error;
+use nom::error::{Error, ErrorKind};
 use nom::multi::{many0, many1, separated_list1};
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated};
 use crate::FieldType::{Plain, Repetition};
@@ -19,7 +19,7 @@ pub struct Combinator {
     r#type: String,
     constructor_number: Option<ConstructorNumber>,
     optional_fields: Vec<OptionalField>,
-    fields: Vec<Field>,
+    fields: Vec<Field>
 }
 
 impl Combinator {
@@ -42,12 +42,84 @@ impl Combinator {
     pub fn is_builtin(&self) -> bool {
         self.builtin
     }
+
+    pub fn constructor_number_form(&self) -> String {
+        let optional = self.optional_fields
+            .iter()
+            .map(OptionalField::constructor_number_form)
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let fields = self.fields
+            .iter()
+            .map(Field::constructor_number_form)
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        let lhs = vec![self.id.as_str(), optional.as_str(), fields.as_str()]
+            .into_iter()
+            .filter(|l| !l.is_empty())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        format!("{} = {}", lhs, self.result_type())
+    }
+
+    pub fn constructor_number_be(&self) -> u32 {
+        return self.constructor_number.unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes())).to_be()
+    }
+
+    pub fn constructor_number_le(&self) -> u32 {
+        return self.constructor_number.unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes()))
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct Condition {
+    pub field_ref: String,
+    pub bit_selector: Option<u32>
+}
+
+impl Condition {
+    pub fn constructor_number_form(&self) -> String {
+        match self.bit_selector {
+            None => { self.field_ref.clone() }
+            Some(bit_selector) => { format!("{}.{}", self.field_ref, bit_selector) }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 enum FieldType {
-    Plain { name: String, condition: Option<String> },
+    Plain { name: String, condition: Option<Condition> },
     Repetition { multiplicity: Option<String>, fields: Vec<Field>, },
+}
+
+impl FieldType {
+    pub fn constructor_number_form(&self) -> String {
+        match self {
+            Plain { name, condition: None } => { name.to_string() }
+            Plain { name, condition: Some(condition) } => { format!("{}?{}", condition.constructor_number_form(), name) }
+            Repetition { multiplicity: None, fields } => {
+                let fields = fields
+                    .iter()
+                    .map(Field::constructor_number_form)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                format!("[ {} ]", fields)
+            }
+            Repetition { multiplicity: Some(multiplicity), fields } => {
+                let fields = fields
+                    .iter()
+                    .map(Field::constructor_number_form)
+                    .collect::<Vec<_>>()
+                    .join(" ");
+
+                format!("{}*[ {} ]", multiplicity, fields)
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -89,6 +161,14 @@ impl Field {
         condition.is_some()
     }
 
+    pub fn type_condition(&self) -> Option<&Condition> {
+        let Plain { ref condition, .. } = self.r#type else {
+            return None
+        };
+
+        condition.as_ref()
+    }
+
     pub fn type_is_polymorphic(&self) -> bool {
         let Plain { name , ..} = &self.r#type else {
             return false
@@ -116,6 +196,13 @@ impl Field {
             Some(tail.replace('>', "").split(',').map(|s| s.trim().to_owned()).collect())
         }
     }
+
+    pub fn constructor_number_form(&self) -> String {
+        match &self.name {
+            None => { self.r#type.constructor_number_form().to_string() }
+            Some(name) => { format!("{}:{}", name, self.r#type.constructor_number_form() )}
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -124,12 +211,18 @@ pub struct OptionalField {
     r#type: String,
 }
 
+impl OptionalField {
+    pub fn constructor_number_form(&self) -> String {
+        format!("{}:{}", self.name, self.r#type)
+    }
+}
+
 pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
     let mut input = input;
     let mut collect = Vec::new();
 
     loop {
-        let prev = input.clone();
+        let prev = input;
         let types;
         let funcs;
         (input, types) = opt(preceded(
@@ -286,8 +379,15 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (functional, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number,
-        fields: fields.into_iter().flatten().collect(), optional_fields: opts.unwrap_or_default(), functional }))
+    Ok((input, Combinator {
+        id: combinator_id,
+        r#type: combinator_type,
+        builtin: false,
+        constructor_number,
+        fields: fields.into_iter().flatten().collect(),
+        optional_fields: opts.unwrap_or_default(),
+        functional
+    }))
 }
 
 fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -298,8 +398,15 @@ fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (_, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: false, constructor_number,
-        fields: fields.into_iter().flatten().collect(), optional_fields: opts.unwrap_or_default(), functional: true }))
+    Ok((input, Combinator {
+        id: combinator_id,
+        r#type: combinator_type,
+        builtin: false,
+        constructor_number,
+        fields: fields.into_iter().flatten().collect(),
+        optional_fields: opts.unwrap_or_default(),
+        functional: true,
+    }))
 }
 
 fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
@@ -309,7 +416,15 @@ fn builtin_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, combinator_type) = boxed_type_ident(input)?;
     let (input, _) = preceded(multispace0, tag(";"))(input)?;
 
-    Ok((input, Combinator { id: combinator_id, r#type: combinator_type, builtin: true, constructor_number, fields: vec![], optional_fields: vec![], functional: false }))
+    Ok((input, Combinator {
+        id: combinator_id,
+        r#type: combinator_type,
+        builtin: true,
+        constructor_number,
+        fields: vec![],
+        optional_fields: vec![],
+        functional: false,
+    }))
 }
 
 fn var_ident(input: &str) -> nom::IResult<&str, String> {
@@ -327,15 +442,13 @@ fn nat_const(input: &str) -> nom::IResult<&str, &str> {
     take_while1(is_digit)(input)
 }
 
-fn conditional_def(input: &str) -> nom::IResult<&str, String> {
-    let (input, var) = var_ident(input)?;
-    let (input, opt) = opt(preceded(tag("."), nat_const))(input)?;
+fn conditional_def(input: &str) -> nom::IResult<&str, Condition> {
+    let (input, field_ref) = var_ident(input)?;
+    let (input, bit_selector) = opt(preceded(tag("."), nat_const))(input)?;
+    let bit_selector = bit_selector.map(|n| n.parse::<u32>()).transpose().map_err(|_| nom::Err::Failure(Error::new(input, ErrorKind::Fail)))?;
     let (input, _) = tag("?")(input)?;
 
-    match opt {
-        None => Ok((input, var)),
-        Some(opt) => Ok((input, format!("{}.{}", var, opt)))
-    }
+    Ok((input, Condition { field_ref, bit_selector }))
 }
 
 fn subexpr(input: &str) -> nom::IResult<&str, String> {
@@ -596,7 +709,7 @@ comment ")));
 
         assert_eq!(output, Ok(("", vec![Field {
             name: Some("first_name".to_owned()),
-            r#type: Plain { name: "string".to_owned(), condition: Some("fields.0".to_owned()) },
+            r#type: Plain { name: "string".to_owned(), condition: Some(Condition { field_ref: "fields".to_string(), bit_selector: Some(0) }) },
             exclamation_point_modifier: false
         }])));
     }
@@ -930,5 +1043,51 @@ d = !D;
                 ]
             ),
         ]);
+    }
+
+    #[test]
+    fn parse_ping_crc32() {
+        let input = "tcp.ping random_id:long = tcp.Pong;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output[0].constructor_number_form(), "tcp.ping random_id:long = tcp.Pong");
+        assert_eq!(output[0].constructor_number_be(), 0x9a2b084d);
+        assert_eq!(output, vec![
+            Combinator::new("tcp.ping", "tcp.Pong")
+                .with_fields(vec![
+                    Field::plain("random_id", "long")
+                ])
+        ]);
+    }
+
+    #[test]
+    fn vector_constructor_number_form() {
+        let input = "vector {t:Type} # [ t ] = Vector t;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output[0].constructor_number_form(), "vector t:Type # [ t ] = Vector t");
+        assert_eq!(output[0].constructor_number_le(), 0x1cb5c415);
+    }
+
+    #[test]
+    fn liteserver_query_constructor_number_form() {
+        let input = "liteServer.query data:bytes = Object;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output[0].constructor_number_form(), "liteServer.query data:bytes = Object");
+        assert_eq!(output[0].constructor_number_be(), 0xdf068c79);
+    }
+
+    #[test]
+    fn adnl_query_constructor_number_form() {
+        let input = "adnl.message.query query_id:int256 query:bytes = adnl.Message;";
+
+        let output = parse(input).unwrap();
+
+        assert_eq!(output[0].constructor_number_form(), "adnl.message.query query_id:int256 query:bytes = adnl.Message");
+        assert_eq!(output[0].constructor_number_be(), 0x7af98bb4);
     }
 }

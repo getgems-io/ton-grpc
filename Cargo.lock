@@ -24,6 +24,7 @@ dependencies = [
  "aes",
  "anyhow",
  "base64 0.22.0",
+ "bytes",
  "ctr",
  "ed25519-dalek",
  "futures",
@@ -420,9 +421,9 @@ checksum = "19d374276b40fb8bbdee95aef7c7fa6b5316ec764510eb64b8dd0e2ed0d7e7f5"
 
 [[package]]
 name = "crc32fast"
-version = "1.3.2"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b540bd8bc810d3885c6ea91e2018302f68baba2129ab3e88f32389ee9370880d"
+checksum = "b3855a8a784b474f333699ef2bbca9db2c4a1f6d9088a90a2d25b1eb53111eaa"
 dependencies = [
  "cfg-if",
 ]
@@ -2340,6 +2341,7 @@ name = "tl_parser"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "crc32fast",
  "nom",
 ]
 
@@ -2465,6 +2467,33 @@ dependencies = [
  "tracing-subscriber",
  "tracing-test",
  "url",
+]
+
+[[package]]
+name = "ton-liteserver-client"
+version = "0.1.0"
+dependencies = [
+ "adnl-tcp",
+ "anyhow",
+ "base64 0.22.0",
+ "bytes",
+ "convert_case",
+ "dashmap",
+ "futures",
+ "hex",
+ "pin-project",
+ "prettyplease 0.2.17",
+ "quote",
+ "rand",
+ "syn 2.0.59",
+ "thiserror",
+ "tl_parser",
+ "tokio",
+ "tokio-stream",
+ "tower",
+ "tracing",
+ "tracing-subscriber",
+ "tracing-test",
 ]
 
 [[package]]
