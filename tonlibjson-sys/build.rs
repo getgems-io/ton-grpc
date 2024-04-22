@@ -179,25 +179,7 @@ fn main() {
     }
 
     if cfg!(feature = "tonemulator") {
-        let mut cfg = Config::new(ton_dir);
-        cfg.uses_cxx11()
-            .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", "clang")
-            .define("CMAKE_CXX_COMPILER", "clang++")
-            .define("CMAKE_CXX_STANDARD", "14")
-            .define("BUILD_SHARED_LIBS", "OFF")
-            .define("PORTABLE", "ON")
-            .define("TON_ARCH", target_arch)
-            .cxxflag("-std=c++14")
-            .cxxflag("-stdlib=libc++")
-            .build_target("emulator");
-        if !is_macos && is_release {
-            cfg.cxxflag("-flto")
-                .define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
-                .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
-                .define("CMAKE_SHARED_LINKER_FLAGS_INIT", "-fuse-ld=lld");
-        }
-        let dst = cfg.build();
+        let dst = cfg.build_target("emulator").build();
 
         println!(
             "cargo:rustc-link-search=native={}/build/third-party/blst",
