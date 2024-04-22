@@ -1,10 +1,10 @@
-use cmake::Config;
 use std::env;
+
+use cmake::Config;
 
 fn main() {
     let is_release = env::var("PROFILE").unwrap() == "release";
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-    let is_macos = target_os == "macos";
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
 
     let ton_dir = if cfg!(feature = "testnet") {
@@ -14,7 +14,7 @@ fn main() {
     };
     eprintln!("ton dir is {}", ton_dir);
     println!("cargo:rerun-if-changed={ton_dir}/CMakeLists.txt");
-    println!("cargo::rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=build.rs");
 
     if target_os == "macos" {
         println!("cargo:rustc-link-lib=dylib=c++");
@@ -87,7 +87,7 @@ fn main() {
             );
     }
 
-    if is_macos {
+    if target_os == "macos" {
         cfg.cxxflag("-stdlib=libc++");
     } else if is_release {
         cfg.cxxflag("-flto")
