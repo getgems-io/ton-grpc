@@ -40,7 +40,7 @@ fn main() {
         .link_paths
         .first()
         .unwrap()
-        .to_owned();
+        .to_path_buf();
     println!("cargo:rustc-link-search=native={}", sodium_dir.display());
     println!("cargo:rustc-link-lib=static=sodium");
 
@@ -49,37 +49,55 @@ fn main() {
         .link_paths
         .first()
         .unwrap()
-        .to_owned();
+        .to_path_buf();
     println!("cargo:rustc-link-search=native={}", secp256k1_dir.display());
     println!("cargo:rustc-link-lib=static=secp256k1");
 
+    let mut cfg = Config::new(ton_dir);
+    cfg.define("TON_ONLY_TONLIB", "ON")
+        .define("CMAKE_C_COMPILER", "clang")
+        .define("CMAKE_CXX_COMPILER", "clang++")
+        .define("PORTABLE", "ON")
+        .define("BUILD_SHARED_LIBS", "OFF")
+        .define("TON_ARCH", &target_arch)
+        .always_configure(true)
+        .very_verbose(false);
+
+    // lz4
+    {
+        let liblz4 = pkg_config::probe_library("liblz4").unwrap();
+        println!(
+            "cargo:rustc-link-search=native={}",
+            liblz4.link_paths.first().unwrap().display()
+        );
+        println!("cargo:rustc-link-lib=static=lz4");
+
+        cfg.define("LZ4_FOUND", "1")
+            .define(
+                "LZ4_LIBRARIES",
+                liblz4
+                    .link_paths
+                    .first()
+                    .unwrap()
+                    .join(format!("lib{}.a", liblz4.libs.first().unwrap())),
+            )
+            .define(
+                "LZ4_INCLUDE_DIRS",
+                liblz4.include_paths.first().unwrap().to_str().unwrap(),
+            );
+    }
+
+    if is_macos {
+        cfg.cxxflag("-stdlib=libc++");
+    } else if is_release {
+        cfg.cxxflag("-flto")
+            .define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
+            .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
+            .define("CMAKE_SHARED_LINKER_FLAGS_INIT", "-fuse-ld=lld");
+    }
+
     if cfg!(feature = "tonlibjson") {
-        let mut cfg = Config::new(ton_dir);
-        cfg.uses_cxx11()
-            .configure_arg("-DTON_ONLY_TONLIB=ON")
-            .configure_arg("-DBUILD_SHARED_LIBS=FALSE")
-            .configure_arg("-DCMAKE_EXE_LINKER_FLAGS=-L/opt/homebrew/lib")
-            .define("TON_ONLY_TONLIB", "ON")
-            .define("CMAKE_C_COMPILER", "clang")
-            .define("CMAKE_CXX_COMPILER", "clang++")
-            .define("CMAKE_CXX_STANDARD", "14")
-            .define("BUILD_SHARED_LIBS", "OFF")
-            .define("PORTABLE", "ON")
-            .define("TON_ARCH", &target_arch)
-            .cxxflag("-std=c++14")
-            .cxxflag("-stdlib=libc++")
-            .build_target("tonlibjson")
-            .always_configure(true);
-        if is_release {
-            cfg.define("CMAKE_BUILD_TYPE", "Release");
-            if !is_macos {
-                cfg.cxxflag("-flto")
-                    .define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
-                    .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
-                    .define("CMAKE_SHARED_LINKER_FLAGS_INIT", "-fuse-ld=lld");
-            }
-        }
-        let dst = cfg.build();
+        let dst = cfg.build_target("tonlibjson").build();
 
         println!(
             "cargo:rustc-link-search=native={}/build/third-party/blst",
