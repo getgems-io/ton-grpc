@@ -1,10 +1,15 @@
-use std::env;
+use std::{env, fs};
+use std::path::Path;
+use std::process::Command;
 use cmake::Config;
 
 fn main() {
     let is_release = env::var("PROFILE").unwrap() == "release";
     let target = env::var("TARGET").unwrap();
     let is_darwin = target == "x86_64-apple-darwin";
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let target_dir = out_dir.clone();
+    fs::create_dir_all(&target_dir).unwrap();
 
     let openssl_dir = env::var("OPENSSL_ROOT_DIR")
         .ok()
@@ -15,11 +20,19 @@ fn main() {
                 .map(|lib| lib.link_paths.first().unwrap().display().to_string())
         ).unwrap();
 
-    let ton_dir = if cfg!(feature = "testnet") { "ton-testnet" } else { "ton" };
+    let ton_dir = env::current_dir().unwrap().join(if cfg!(feature = "testnet") { "ton-testnet" } else { "ton" }).display().to_string();
     let build_tonlibjson = cfg!(feature = "tonlibjson");
     let build_emulator = cfg!(feature = "tonemulator");
 
-    eprintln!("ton dir is {}", ton_dir);
+    Command::new("cp")
+        .args(["-r", &ton_dir, &target_dir])
+        .status()
+        .expect("Failed to execute copy command");
+
+    let target_dir = Path::new(&target_dir).join(if cfg!(feature = "testnet") { "ton-testnet" } else { "ton" }).display().to_string();
+
+    eprintln!("ton dir is {}", target_dir);
+    eprintln!("source ton dir is {}", ton_dir);
 
     if is_darwin {
         println!("cargo:rustc-link-lib=dylib=c++");
@@ -38,7 +51,7 @@ fn main() {
 
     if build_tonlibjson {
         let dst= if !is_darwin && is_release {
-            Config::new(ton_dir)
+            Config::new(&target_dir)
                 .define("TON_ONLY_TONLIB", "ON")
                 .define("CMAKE_C_COMPILER", "clang")
                 .define("CMAKE_CXX_COMPILER", "clang++")
@@ -57,7 +70,7 @@ fn main() {
                 .build_target("tonlibjson")
                 .build()
         } else {
-            Config::new(ton_dir)
+            Config::new(&target_dir)
                 .uses_cxx11()
                 .define("TON_ONLY_TONLIB", "ON")
                 .define("CMAKE_C_COMPILER", "clang")
@@ -123,7 +136,7 @@ fn main() {
 
     if build_emulator {
         let dst = if !is_darwin && is_release {
-            Config::new(ton_dir)
+            Config::new(&target_dir)
                 .define("TON_ONLY_TONLIB", "ON")
                 .define("CMAKE_C_COMPILER", "clang")
                 .define("CMAKE_CXX_COMPILER", "clang++")
@@ -142,7 +155,7 @@ fn main() {
                 .build_target("emulator")
                 .build()
         } else {
-            Config::new(ton_dir)
+            Config::new(&target_dir)
                 .uses_cxx11()
                 .define("TON_ONLY_TONLIB", "ON")
                 .define("CMAKE_C_COMPILER", "clang")
