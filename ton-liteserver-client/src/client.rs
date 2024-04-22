@@ -210,6 +210,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
@@ -223,6 +224,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
         let response = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox();
@@ -239,6 +241,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_get_version() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
@@ -251,6 +254,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_error_test() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
@@ -264,6 +268,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
         let known_block = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox().last;

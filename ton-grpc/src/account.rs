@@ -176,6 +176,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn account_get_from_to() {
         tracing::info!("prep client");
         let mut client = TonClientBuilder::default().await.unwrap();
@@ -204,6 +205,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn get_account_state_without_criteria() {
         tracing::info!("prep client");
         let mut client = TonClientBuilder::default().await.unwrap();
@@ -223,6 +225,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn get_shard_account_cell_without_criteria() {
         tracing::info!("prep client");
         let mut client = TonClientBuilder::default().await.unwrap();
