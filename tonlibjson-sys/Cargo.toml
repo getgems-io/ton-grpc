@@ -1,8 +1,12 @@
 [package]
 name = "tonlibjson-sys"
 version = "0.3.1"
-edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+license = "MIT"
+links = "tonlibjson"
+description = "Rust binding for tonlibjson from https://github.com/ton-blockchain/ton"
+repository = "https://github.com/getgems-io/ton-grpc"
+edition = "2021"
 
 [dependencies]
 libc = "0.2"
