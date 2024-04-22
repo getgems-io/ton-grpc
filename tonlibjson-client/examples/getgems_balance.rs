@@ -20,8 +20,10 @@ async fn main() -> anyhow::Result<()> {
             let tx: RawTransaction = tx.unwrap();
             if let Some(msg) = tx.out_msgs.first() {
                 Some(-msg.value - tx.fee)
+            } else if let Some(msg) = tx.in_msg {
+                Some(msg.value - tx.fee)
             } else {
-                Some(tx.in_msg.value - tx.fee)
+                Some(0)
             }
         })
         .collect::<Vec<i64>>()

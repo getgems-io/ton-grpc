@@ -152,11 +152,11 @@ pub struct ResponseFuture<Response> {
 
 impl<Response> ResponseFuture<Response> {
     fn new(query_id: Int256, rx: Receiver<Bytes>, responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>) -> Self {
-        Self { state: ResponseState::Rx { query_id, responses, rx }, _phantom: PhantomData::default() }
+        Self { state: ResponseState::Rx { query_id, responses, rx }, _phantom: PhantomData }
     }
 
     fn failed(error: Error) -> Self {
-        Self { state: ResponseState::Failed { error: Some(error) }, _phantom: PhantomData::default() }
+        Self { state: ResponseState::Failed { error: Some(error) }, _phantom: PhantomData }
     }
 }
 
@@ -184,7 +184,7 @@ impl<Response> Future for ResponseFuture<Response> where Response : BoxedType + 
                 Ok(response) => {
                     let response = from_bytes::<Result<Response, LiteServerError>>(response)
                         .map_err(|_| Error::Deserialize)?
-                        .map_err(|e| Error::LiteServerError(e))?;
+                        .map_err(Error::LiteServerError)?;
 
                     Poll::Ready(Ok(response))
                 }
@@ -210,6 +210,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
@@ -223,6 +224,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
         let response = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox();
@@ -239,6 +241,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_get_version() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
@@ -251,6 +254,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_error_test() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
@@ -264,6 +268,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
         let known_block = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox().last;

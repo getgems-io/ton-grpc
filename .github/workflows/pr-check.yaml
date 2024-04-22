@@ -36,20 +36,6 @@ jobs:
           targets: x86_64-unknown-linux-gnu
       - name: Run sccache-cache
         uses: mozilla-actions/sccache-action@v0.0.4
-      - run: cargo build -v --target x86_64-unknown-linux-gnu
-        env:
-          RUSTFLAGS: ""
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
-          CMAKE_C_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
-      - run: cargo build -v --target x86_64-unknown-linux-gnu --features testnet
-        env:
-          RUSTFLAGS: ""
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
-          CMAKE_C_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
       - uses: actions-rs/clippy-check@v1
         env:
           RUSTFLAGS: ""

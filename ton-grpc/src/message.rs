@@ -1,3 +1,5 @@
+#![allow(clippy::blocks_in_conditions)]
+
 use tonic::{async_trait, Request, Response, Status};
 use tonlibjson_client::ton::TonClient;
 use derive_new::new;

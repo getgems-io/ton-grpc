@@ -1,9 +1,7 @@
 use std::time::Duration;
 use url::Url;
-use tonlibjson_client::address::AccountAddressData;
-use tonlibjson_client::block::{BlocksAccountTransactionId, RawTransaction};
+use tonlibjson_client::block::{RawTransaction};
 use tonlibjson_client::ton::{TonClient, TonClientBuilder};
-use std::str::FromStr;
 use futures::stream::StreamExt;
 
 async fn client() -> TonClient {

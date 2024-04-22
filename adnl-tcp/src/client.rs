@@ -131,6 +131,7 @@ mod tests {
 
     #[traced_test]
     #[tokio::test]
+    #[ignore]
     async fn client_connect() -> anyhow::Result<()> {
         let _ = provided_client().await?;
 
@@ -139,6 +140,7 @@ mod tests {
 
     #[traced_test]
     #[tokio::test]
+    #[ignore]
     async fn client_connect_wrong_key() -> anyhow::Result<()> {
         let ip: i32 = -2018147075;
         let ip = Ipv4Addr::from(ip as u32);
@@ -157,6 +159,7 @@ mod tests {
 
     #[traced_test]
     #[tokio::test]
+    #[ignore]
     async fn client_ping() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
 

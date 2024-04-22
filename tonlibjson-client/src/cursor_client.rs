@@ -75,9 +75,7 @@ impl ShardBounds {
     }
 
     fn right_next(&self) -> Option<Seqno> {
-        let Some(seqno) = self.right_end else {
-            return None;
-        };
+        let seqno = self.right_end?;
 
         match self.right {
             None => Some(seqno),
