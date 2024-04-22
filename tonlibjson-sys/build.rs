@@ -163,14 +163,12 @@ fn main() {
             "cargo:rustc-link-search=native={}/build/emulator",
             dst.display()
         );
-        println!("cargo:rerun-if-changed={}/build/emulator", dst.display());
         println!("cargo:rustc-link-lib=static=emulator_static");
 
         println!(
             "cargo:rustc-link-search=native={}/build/tonlib",
             dst.display()
         );
-        println!("cargo:rerun-if-changed={}/build/tonlib", dst.display());
         println!("cargo:rustc-link-lib=static=tonlib");
         println!("cargo:rustc-link-lib=static=tonlibjson_private");
         println!("cargo:rustc-link-lib=static=tonlibjson");
