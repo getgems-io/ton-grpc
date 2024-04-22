@@ -94,7 +94,6 @@ impl Service<&Route> for Router {
                 let req = *req;
                 let svcs = self.services.clone();
                 Retry::spawn(FibonacciBackoff::from_millis(32).map(jitter).take(10), move || {
-                    let req = req.clone();
                     let svcs = svcs.clone();
 
                     async move { req.choose(&svcs) }
@@ -149,7 +148,7 @@ impl Route {
                         .collect());
                 }
 
-                return Err(RouterError::RouteUnknown);
+                Err(RouterError::RouteUnknown)
             }
         }
     }

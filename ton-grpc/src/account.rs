@@ -1,3 +1,5 @@
+#![allow(clippy::blocks_in_conditions)]
+
 use std::pin::Pin;
 use std::str::FromStr;
 use tonic::{async_trait, Request, Response, Status};

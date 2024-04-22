@@ -1,3 +1,5 @@
+#![allow(clippy::blocks_in_conditions)]
+
 use anyhow::Context;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};

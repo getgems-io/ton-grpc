@@ -131,7 +131,7 @@ impl Routable for BlocksLookupBlock {
     fn route(&self) -> Route {
         let criteria = match self.mode {
             2 => BlockCriteria::LogicalTime(self.lt),
-            1 | _ => BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno }
+            _ => BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno }
         };
 
         Route::Block { chain: self.id.workchain, criteria }

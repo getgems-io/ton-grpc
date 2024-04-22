@@ -152,11 +152,11 @@ pub struct ResponseFuture<Response> {
 
 impl<Response> ResponseFuture<Response> {
     fn new(query_id: Int256, rx: Receiver<Bytes>, responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>) -> Self {
-        Self { state: ResponseState::Rx { query_id, responses, rx }, _phantom: PhantomData::default() }
+        Self { state: ResponseState::Rx { query_id, responses, rx }, _phantom: PhantomData }
     }
 
     fn failed(error: Error) -> Self {
-        Self { state: ResponseState::Failed { error: Some(error) }, _phantom: PhantomData::default() }
+        Self { state: ResponseState::Failed { error: Some(error) }, _phantom: PhantomData }
     }
 }
 
@@ -184,7 +184,7 @@ impl<Response> Future for ResponseFuture<Response> where Response : BoxedType + 
                 Ok(response) => {
                     let response = from_bytes::<Result<Response, LiteServerError>>(response)
                         .map_err(|_| Error::Deserialize)?
-                        .map_err(|e| Error::LiteServerError(e))?;
+                        .map_err(Error::LiteServerError)?;
 
                     Poll::Ready(Ok(response))
                 }
