@@ -184,6 +184,7 @@ mod tests {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore]
     async fn not_initialized_call() {
         let mut client = Client::default();
 

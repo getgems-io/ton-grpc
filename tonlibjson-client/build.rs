@@ -217,7 +217,7 @@ impl Generator {
 
         for (type_ident, types) in map {
             eprintln!("type_ident = {:}", type_ident);
-            if skip_list.contains(&&type_ident) {
+            if skip_list.contains(&type_ident) {
                 continue;
             }
 
