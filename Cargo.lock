@@ -2357,7 +2357,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
 
 [[package]]
-name = "tl_parser"
+name = "tl-parser"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -2507,7 +2507,7 @@ dependencies = [
  "rand",
  "syn 2.0.60",
  "thiserror",
- "tl_parser",
+ "tl-parser",
  "tokio",
  "tokio-stream",
  "tower",
@@ -2613,7 +2613,7 @@ dependencies = [
  "serial_test",
  "syn 2.0.60",
  "thiserror",
- "tl_parser",
+ "tl-parser",
  "tokio",
  "tokio-retry",
  "tokio-stream",

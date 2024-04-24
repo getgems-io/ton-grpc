@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "tl_parser",
+    "tl-parser",
     "tonlibjson-sys",
     "tonlibjson-client",
     "ton-grpc",
