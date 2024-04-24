@@ -15,12 +15,12 @@ use thiserror::Error;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot::Receiver;
 use tokio::time::MissedTickBehavior;
-use adnl_tcp::boxed::Boxed;
-use adnl_tcp::types::{BareType, BoxedType};
 use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
-use adnl_tcp::deserializer::{Deserialize, from_bytes};
-use adnl_tcp::serializer::to_bytes;
+use tl_core::boxed::Boxed;
+use tl_core::types::{BareType, BoxedType};
+use tl_core::deserializer::{Deserialize, from_bytes};
+use tl_core::serializer::to_bytes;
 use crate::request::Requestable;
 use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery};
 

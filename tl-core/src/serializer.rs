@@ -1,6 +1,5 @@
 use std::fmt::Debug;
 use bytes::BufMut;
-use crate::types::{Int256};
 
 pub trait Serialize {
     fn serialize(&self, se: &mut Serializer);
@@ -32,7 +31,7 @@ impl Serializer {
         self.output.put_i64_le(val)
     }
 
-    pub fn write_i256(&mut self, val: &Int256) {
+    pub fn write_i256(&mut self, val: &[u8; 32]) {
         self.output.put_slice(val)
     }
 

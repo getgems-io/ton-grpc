@@ -3,10 +3,10 @@
 
 use std::fmt::{Debug, Display, Formatter};
 use anyhow::anyhow;
-use adnl_tcp::deserializer::{Deserialize, Deserializer};
-use adnl_tcp::serializer::{Serialize, Serializer};
-use adnl_tcp::boxed::Boxed;
-pub use adnl_tcp::types::*;
+use tl_core::deserializer::{Deserialize, Deserializer};
+use tl_core::serializer::{Serialize, Serializer};
+use tl_core::boxed::Boxed;
+pub use tl_core::types::*;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
@@ -23,9 +23,9 @@ impl std::error::Error for LiteServerError {
 #[cfg(test)]
 mod tests {
     use base64::Engine;
-    use adnl_tcp::boxed::Boxed;
-    use adnl_tcp::deserializer::from_bytes;
-    use adnl_tcp::serializer::to_bytes;
+    use tl_core::boxed::Boxed;
+    use tl_core::deserializer::from_bytes;
+    use tl_core::serializer::to_bytes;
     use super::*;
 
     #[test]

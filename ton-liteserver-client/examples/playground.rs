@@ -2,7 +2,7 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use base64::Engine;
 use tower::ServiceExt;
 use adnl_tcp::client::ServerKey;
-use adnl_tcp::types::BareType;
+use tl_core::types::BareType;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetMasterchainInfo, LiteServerListBlockTransactions, LiteServerLookupBlock, TonNodeBlockId, True};
 

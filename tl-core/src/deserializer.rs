@@ -1,6 +1,5 @@
 use anyhow::bail;
 use bytes::{Buf, Bytes};
-use crate::types::Int256;
 
 pub trait Deserialize where Self: Sized {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self>;
@@ -49,7 +48,7 @@ impl Deserializer {
         Ok(self.input.get_i64_le())
     }
 
-    pub fn parse_i256(&mut self) -> anyhow::Result<Int256> {
+    pub fn parse_i256(&mut self) -> anyhow::Result<[u8; 32]> {
         let mut needed = self.input.split_to(32);
         let mut result: [u8; 32] = [0; 32];
         needed.copy_to_slice(&mut result);
@@ -57,7 +56,7 @@ impl Deserializer {
         Ok(result)
     }
 
-    pub fn parse_bytes(&mut self) -> anyhow::Result<crate::types::Bytes> {
+    pub fn parse_bytes(&mut self) -> anyhow::Result<Vec<u8>> {
         let len = self.input.get_u8();
         if len <= 253 {
             let mut needed = self.input.split_to(len as usize);

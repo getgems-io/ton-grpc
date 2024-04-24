@@ -1,0 +1,12 @@
+[package]
+name = "tl-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+license = "MIT"
+repository = "https://github.com/getgems-io/ton-grpc"
+description = "A toolset for Telegram Type Language"
+
+[dependencies]
+anyhow = { workspace = true }
+bytes = "1.6.0"

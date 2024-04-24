@@ -1,6 +1,6 @@
-use crate::boxed::Boxed;
 use crate::deserializer::{Deserialize, Deserializer};
 use crate::serializer::{Serialize, Serializer};
+use crate::boxed::Boxed;
 
 pub trait Functional {
     type Result;
