@@ -3,6 +3,9 @@ name = "tl-parser"
 version = "0.1.0"
 edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+license = "MIT"
+repository = "https://github.com/getgems-io/ton-grpc"
+description = "A parser for Telegram Type Language"
 
 [dependencies]
 anyhow = { workspace = true }
