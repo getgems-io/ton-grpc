@@ -33,7 +33,7 @@ tokio-retry = "0.3"
 bytes = "1.6"
 crc = "3.2.1"
 metrics = "0.22.3"
-thiserror = "1.0.58"
+thiserror = "1.0.59"
 
 [dev-dependencies]
 tracing-test = { workspace = true }
