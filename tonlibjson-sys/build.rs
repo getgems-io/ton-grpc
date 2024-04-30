@@ -5,6 +5,8 @@ use cmake::Config;
 fn main() {
     let is_release = env::var("PROFILE").unwrap() == "release";
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap()
+        .replace("_", "-");
 
     let ton_dir = if cfg!(feature = "testnet") {
         "ton-testnet"
@@ -58,6 +60,7 @@ fn main() {
         .define("CMAKE_CXX_COMPILER", "clang++")
         .define("PORTABLE", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
+        .define("TON_ARCH", target_arch)
         .cxxflag("-std=c++14")
         .cxxflag("-stdlib=libc++")
         .always_configure(true)
