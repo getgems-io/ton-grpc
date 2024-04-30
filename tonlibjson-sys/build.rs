@@ -56,6 +56,7 @@ fn main() {
     cfg.define("TON_ONLY_TONLIB", "ON")
         .define("CMAKE_C_COMPILER", "clang")
         .define("CMAKE_CXX_COMPILER", "clang++")
+        .define("CMAKE_CXX_STANDARD", "14")
         .define("PORTABLE", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
         .always_configure(true)
