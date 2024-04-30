@@ -5,6 +5,8 @@ use cmake::Config;
 fn main() {
     let is_release = env::var("PROFILE").unwrap() == "release";
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap()
+        .replace('_', "-");
 
     let ton_dir = if cfg!(feature = "testnet") {
         "ton-testnet"
@@ -18,7 +20,7 @@ fn main() {
     if target_os == "macos" {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target_os == "linux" {
-        println!("cargo:rustc-link-lib=dylib=stdc++");
+        println!("cargo:rustc-link-lib=static=c++");
     }
 
     let openssl_dir = env::var("OPENSSL_ROOT_DIR").unwrap_or_else(|_| {
@@ -58,6 +60,9 @@ fn main() {
         .define("CMAKE_CXX_COMPILER", "clang++")
         .define("PORTABLE", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
+        .define("TON_ARCH", target_arch)
+        .cxxflag("-std=c++14")
+        .cxxflag("-stdlib=libc++")
         .always_configure(true)
         .very_verbose(false);
 
@@ -70,24 +75,28 @@ fn main() {
         );
         println!("cargo:rustc-link-lib=static=lz4");
 
+        let lz4libs = if target_os == "macos" {
+            liblz4
+                .link_paths
+                .first()
+                .unwrap()
+                .join(format!("lib{}.a", liblz4.libs.first().unwrap()))
+                .to_str()
+                .unwrap()
+                .to_owned()
+        } else {
+            liblz4.libs.first().unwrap().to_owned()
+        };
+
         cfg.define("LZ4_FOUND", "1")
-            .define(
-                "LZ4_LIBRARIES",
-                liblz4
-                    .link_paths
-                    .first()
-                    .unwrap()
-                    .join(format!("lib{}.a", liblz4.libs.first().unwrap())),
-            )
+            .define("LZ4_LIBRARIES", lz4libs)
             .define(
                 "LZ4_INCLUDE_DIRS",
                 liblz4.include_paths.first().unwrap().to_str().unwrap(),
             );
     }
 
-    if target_os == "macos" {
-        cfg.cxxflag("-stdlib=libc++");
-    } else if is_release {
+    if is_release {
         cfg.cxxflag("-flto")
             .define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
             .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
