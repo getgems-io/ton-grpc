@@ -70,8 +70,21 @@ fn main() {
         );
         println!("cargo:rustc-link-lib=static=lz4");
 
+        let lz4libs = if target_os == "macos" {
+            liblz4
+                .link_paths
+                .first()
+                .unwrap()
+                .join(format!("lib{}.a", liblz4.libs.first().unwrap()))
+                .to_str()
+                .unwrap()
+                .to_owned()
+        } else {
+            liblz4.libs.first().unwrap().to_owned()
+        };
+
         cfg.define("LZ4_FOUND", "1")
-            .define("LZ4_LIBRARIES", liblz4.libs.first().unwrap())
+            .define("LZ4_LIBRARIES", lz4libs)
             .define(
                 "LZ4_INCLUDE_DIRS",
                 liblz4.include_paths.first().unwrap().to_str().unwrap(),
