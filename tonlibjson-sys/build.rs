@@ -18,7 +18,7 @@ fn main() {
     if target_os == "macos" {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target_os == "linux" {
-        println!("cargo:rustc-link-lib=dylib=stdc++");
+        println!("cargo:rustc-link-lib=static=c++");
     }
 
     let openssl_dir = env::var("OPENSSL_ROOT_DIR").unwrap_or_else(|_| {
@@ -56,9 +56,10 @@ fn main() {
     cfg.define("TON_ONLY_TONLIB", "ON")
         .define("CMAKE_C_COMPILER", "clang")
         .define("CMAKE_CXX_COMPILER", "clang++")
-        .define("CMAKE_CXX_STANDARD", "14")
         .define("PORTABLE", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
+        .cxxflag("-std=c++14")
+        .cxxflag("-stdlib=libc++")
         .always_configure(true)
         .very_verbose(false);
 
@@ -92,9 +93,7 @@ fn main() {
             );
     }
 
-    if target_os == "macos" {
-        cfg.cxxflag("-stdlib=libc++");
-    } else if is_release {
+    if is_release {
         cfg.cxxflag("-flto")
             .define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
             .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
