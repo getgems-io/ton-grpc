@@ -1,0 +1,34 @@
+name: Test PR Mac
+on:
+  pull_request:
+    branches:
+      - "master"
+    paths-ignore:
+      - .github/workflows/charts-*
+      - charts/**
+      - .release-please-manifest.json
+      - release-please-config.json
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  pr-tests:
+    strategy:
+      matrix:
+        os: ['macos-14', 'macos-13']
+        features: ['', 'testnet']
+    name: Run cargo tests
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      checks: write
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: brew install secp256k1 libsodium liblz4 protobuf
+      - run: cargo test --no-fail-fast --features "${{ matrix.features }}"
