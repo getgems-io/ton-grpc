@@ -18,7 +18,7 @@ fn main() {
     if target_os == "macos" {
         println!("cargo:rustc-link-lib=dylib=c++");
     } else if target_os == "linux" {
-        println!("cargo:rustc-link-lib=dylib=stdc++");
+        println!("cargo:rustc-link-lib=static=c++");
     }
 
     let openssl_dir = env::var("OPENSSL_ROOT_DIR").unwrap_or_else(|_| {
