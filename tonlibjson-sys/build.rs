@@ -96,7 +96,7 @@ fn main() {
             );
     }
 
-    if is_release {
+    if target_os == "linux" && is_release {
         cfg.cxxflag("-flto")
             .define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
             .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
