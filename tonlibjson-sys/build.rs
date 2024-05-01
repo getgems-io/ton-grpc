@@ -5,8 +5,13 @@ use cmake::Config;
 fn main() {
     let is_release = env::var("PROFILE").unwrap() == "release";
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap()
-        .replace('_', "-");
+    let target_arch = if cfg!(feature = "target-cpu-native") {
+         "native".to_owned()
+    } else {
+        env::var("CARGO_CFG_TARGET_ARCH")
+            .unwrap()
+            .replace('_', "-")
+    };
 
     let ton_dir = if cfg!(feature = "testnet") {
         "ton-testnet"
