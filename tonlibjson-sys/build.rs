@@ -3,7 +3,6 @@ use std::env;
 use cmake::Config;
 
 fn main() {
-    let is_release = env::var("PROFILE").unwrap() == "release";
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let target_arch = if cfg!(feature = "target-cpu-native") {
          "native".to_owned()
@@ -101,9 +100,12 @@ fn main() {
             );
     }
 
-    if target_os == "linux" && is_release {
-        cfg.cxxflag("-flto")
-            .define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
+    if cfg!(feature = "lto") {
+        cfg.cxxflag("-flto");
+    }
+
+    if cfg!(feature = "lld") {
+        cfg.define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
             .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
             .define("CMAKE_SHARED_LINKER_FLAGS_INIT", "-fuse-ld=lld");
     }
