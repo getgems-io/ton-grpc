@@ -31,4 +31,4 @@ jobs:
         with:
           submodules: recursive
       - run: brew install secp256k1 libsodium lz4 protobuf
-      - run: cargo test --no-fail-fast --features "${{ matrix.features }}" --release
+      - run: cargo test --no-fail-fast --features "${{ matrix.features }}"
