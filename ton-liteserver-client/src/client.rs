@@ -12,9 +12,11 @@ use futures::{ready, SinkExt, StreamExt};
 use pin_project::pin_project;
 use rand::random;
 use thiserror::Error;
+use tokio::select;
 use tokio::sync::mpsc::UnboundedSender;
-use tokio::sync::oneshot::Receiver;
+use tokio::sync::oneshot::{Receiver, Sender};
 use tokio::time::MissedTickBehavior;
+use tokio_util::sync::{CancellationToken, DropGuard};
 use adnl_tcp::boxed::Boxed;
 use adnl_tcp::types::{BareType, BoxedType};
 use adnl_tcp::packet::Packet;
@@ -38,44 +40,57 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub struct LiteServerClient {
-    responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>,
-    tx: UnboundedSender<AdnlMessageQuery>
+    responses: Arc<DashMap<Int256, Sender<Bytes>>>,
+    tx: UnboundedSender<AdnlMessageQuery>,
+    drop_guard: Arc<DropGuard>,
 }
 
 impl LiteServerClient {
     pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
         let inner = AdnlTcpClient::connect(addr, server_key).await?;
         let (mut write_half, mut read_half) = inner.split();
-        let responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>> = Arc::new(DashMap::new());
+        let responses: Arc<DashMap<Int256, Sender<Bytes>>> = Arc::new(DashMap::new());
+        let cancel_token = CancellationToken::new();
 
+        let read_token = cancel_token.clone();
         let responses_read_half = responses.clone();
         tokio::spawn(async move {
-            while let Some(response) = read_half.next().await {
-                match response {
-                    Ok(packet) if is_pong_packet(&packet) => {
-                        tracing::trace!("pong packet received");
+            loop {
+                select! {
+                    _ = read_token.cancelled() => {
+                        tracing::error!("LiteServerClient cancelled");
+                        break;
                     },
-                    Ok(packet) => {
-                        tracing::trace!(?packet);
-                        let adnl_answer = from_bytes::<Boxed<AdnlMessageAnswer>>(packet.data)
-                            .expect("expect adnl answer packet")
-                            .unbox();
+                    Some(response) = read_half.next() => {
+                        match response {
+                            Ok(packet) if is_pong_packet(&packet) => {
+                                tracing::trace!("pong packet received");
+                            },
+                            Ok(packet) => {
+                                tracing::trace!(?packet);
+                                let adnl_answer = from_bytes::<Boxed<AdnlMessageAnswer>>(packet.data)
+                                    .expect("expect adnl answer packet")
+                                    .unbox();
 
-                        if let Some((_, oneshot)) = responses_read_half.remove(&adnl_answer.query_id) {
-                            oneshot
-                                .send(adnl_answer.answer)
-                                .expect("expect oneshot alive");
+                                if let Some((_, oneshot)) = responses_read_half.remove(&adnl_answer.query_id) {
+                                    oneshot
+                                        .send(adnl_answer.answer)
+                                        .expect("expect oneshot alive");
+                                }
+                            }
+                            Err(error) => {
+                                tracing::error!(error = ?error, "reading error");
+
+                                return
+                            }
                         }
-                    }
-                    Err(error) => {
-                        tracing::error!(error = ?error, "reading error");
-
-                        return
                     }
                 }
             }
+            tracing::trace!("read thread closed");
         });
 
+        let write_token = cancel_token.clone();
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<AdnlMessageQuery>();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(5));
@@ -84,21 +99,31 @@ impl LiteServerClient {
             let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx);
             let mut stream = tokio_stream::StreamExt::timeout_repeating(stream, interval);
 
-            while let Some(request) = stream.next().await {
-                match request {
-                    Ok(adnl_query) => {
-                        let data = to_bytes(&adnl_query.into_boxed());
-                        write_half.send(Packet::new(data)).await.expect("expect to send adnl query packet")
-                    }
-                    Err(_) => {
-                        write_half.send(ping_packet()).await.expect("expect to send ping packet")
+            loop {
+                select! {
+                    _ = write_token.cancelled() => {
+                        tracing::error!("LiteServerClient cancelled");
+                        break;
+                    },
+                    Some(request) = stream.next() => {
+                        match request {
+                            Ok(adnl_query) => {
+                                let data = to_bytes(&adnl_query.into_boxed());
+                                write_half.send(Packet::new(data)).await.expect("expect to send adnl query packet")
+                            }
+                            Err(_) => {
+                                write_half.send(ping_packet()).await.expect("expect to send ping packet")
+                            }
+                        }
                     }
                 }
             }
+
+            tracing::trace!("write thread closed");
         });
 
 
-        Ok(Self { responses, tx })
+        Ok(Self { responses, tx, drop_guard: Arc::new(cancel_token.drop_guard()) })
     }
 }
 
@@ -131,7 +156,7 @@ impl<R> Service<R> for LiteServerClient where R: Requestable + BoxedType, R::Res
             return ResponseFuture::failed(Error::ChannelClosed);
         }
 
-        ResponseFuture::new(query_id, rx, self.responses.clone())
+        ResponseFuture::new(query_id, rx, self.responses.clone(), self.drop_guard.clone())
     }
 }
 
@@ -139,7 +164,7 @@ impl<R> Service<R> for LiteServerClient where R: Requestable + BoxedType, R::Res
 #[pin_project(project = ResponseStateProj)]
 pub enum ResponseState {
     Failed { error: Option<Error> },
-    Rx { #[pin] rx: Receiver<Bytes>, query_id: Int256, responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>> }
+    Rx { #[pin] rx: Receiver<Bytes>, query_id: Int256, responses: Arc<DashMap<Int256, Sender<Bytes>>>, drop_guard: Arc<DropGuard> }
 }
 
 #[pin_project(PinnedDrop)]
@@ -151,8 +176,8 @@ pub struct ResponseFuture<Response> {
 }
 
 impl<Response> ResponseFuture<Response> {
-    fn new(query_id: Int256, rx: Receiver<Bytes>, responses: Arc<DashMap<Int256, tokio::sync::oneshot::Sender<Bytes>>>) -> Self {
-        Self { state: ResponseState::Rx { query_id, responses, rx }, _phantom: PhantomData }
+    fn new(query_id: Int256, rx: Receiver<Bytes>, responses: Arc<DashMap<Int256, Sender<Bytes>>>, drop_guard: Arc<DropGuard>) -> Self {
+        Self { state: ResponseState::Rx { query_id, responses, rx, drop_guard }, _phantom: PhantomData }
     }
 
     fn failed(error: Error) -> Self {
@@ -277,6 +302,23 @@ mod tests {
         let response = client.oneshot(request.into_boxed()).await?.unbox();
 
         assert_eq!(&response.from.seqno, &known_block.seqno);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    #[ignore]
+    async fn client_drop_test() -> anyhow::Result<()> {
+        let future = {
+            let client = provided_client().await?;
+
+            client.oneshot((LiteServerGetMasterchainInfo {}).into_boxed())
+        };
+
+        let response = future.await;
+
+        assert!(response.is_ok());
 
         Ok(())
     }
