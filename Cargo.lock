@@ -2485,6 +2485,7 @@ dependencies = [
  "tl_parser",
  "tokio",
  "tokio-stream",
+ "tokio-util",
  "tower",
  "tracing",
  "tracing-subscriber",
