@@ -17,7 +17,7 @@ use crate::request::Requestable;
 pub(crate) struct Client {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
-    _drop_guard: DropGuard
+    drop_guard: Arc<DropGuard>
 }
 
 impl Client {
@@ -61,7 +61,7 @@ impl Client {
         Client {
             client,
             responses,
-            _drop_guard: cancel_token.drop_guard()
+            drop_guard: Arc::new(cancel_token.drop_guard())
         }
     }
 }
@@ -102,9 +102,11 @@ impl<R : Requestable> Service<R> for Client {
             return Box::pin(futures::future::ready(Err(e)));
         }
 
+        let drop_guard = self.drop_guard.clone();
         Box::pin(async move {
             let result = tokio::time::timeout(req.timeout, rx).await;
             requests.remove(&req.id);
+            drop(drop_guard);
 
             let response = result??;
 
