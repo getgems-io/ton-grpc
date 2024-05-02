@@ -37,7 +37,6 @@ thiserror = "1.0.59"
 
 [dev-dependencies]
 tracing-test = { workspace = true }
-serial_test = "3.0.0"
 
 [build-dependencies]
 tl_parser = { path = "../tl_parser" }
