@@ -2591,6 +2591,7 @@ dependencies = [
  "tokio",
  "tokio-retry",
  "tokio-stream",
+ "tokio-util",
  "tonlibjson-sys",
  "tower",
  "tracing",

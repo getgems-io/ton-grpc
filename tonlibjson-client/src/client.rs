@@ -1,7 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
-use std::sync::{Arc, mpsc, Mutex};
-use std::sync::mpsc::TryRecvError;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tower::{Service};
@@ -9,6 +8,7 @@ use anyhow::{anyhow, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use dashmap::DashMap;
+use tokio_util::sync::{CancellationToken, DropGuard};
 use uuid::Uuid;
 use crate::block::TonError;
 use crate::request::Requestable;
@@ -17,7 +17,7 @@ use crate::request::Requestable;
 pub(crate) struct Client {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,
-    _stop_signal: Arc<Mutex<Stop>>
+    _drop_guard: DropGuard
 }
 
 impl Client {
@@ -32,40 +32,36 @@ impl Client {
         let responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>> =
             Arc::new(DashMap::new());
         let responses_rcv = Arc::clone(&responses);
-        let (stop_signal, stop_receiver) = mpsc::channel();
+
+        let cancel_token = CancellationToken::new();
+        let child_token = cancel_token.child_token();
 
         tokio::task::spawn_blocking(move || {
-            let timeout = Duration::from_secs(20);
-
-            loop {
-                match stop_receiver.try_recv() {
-                    Ok(_) | Err(TryRecvError::Disconnected) => {
-                        return
-                    },
-                    Err(TryRecvError::Empty) => {
-                        if let Ok(packet) = client_recv.receive(timeout) {
-                            if let Ok(response) = serde_json::from_str::<Response>(packet) {
-                                if let Some((_, sender)) = responses_rcv.remove(&response.id) {
-                                    let _ = sender.send(response);
-                                }
-                            } else if packet.contains("syncState") {
-                                tracing::trace!("Sync state: {}", packet.to_string());
-                                if packet.contains("syncStateDone") {
-                                    tracing::trace!("syncState: {:#?}", packet);
-                                }
-                            } else {
-                                tracing::warn!("Unexpected response {:?}", packet.to_string())
-                            }
+            let timeout = Duration::from_secs(1);
+            while !child_token.is_cancelled() {
+                if let Ok(packet) = client_recv.receive(timeout) {
+                    if let Ok(response) = serde_json::from_str::<Response>(packet) {
+                        if let Some((_, sender)) = responses_rcv.remove(&response.id) {
+                            let _ = sender.send(response);
                         }
+                    } else if packet.contains("syncState") {
+                        tracing::trace!("Sync state: {}", packet.to_string());
+                        if packet.contains("syncStateDone") {
+                            tracing::trace!("syncState: {:#?}", packet);
+                        }
+                    } else {
+                        tracing::warn!("Unexpected response {:?}", packet.to_string())
                     }
                 }
             }
+
+            tracing::trace!("Client dropped");
         });
 
         Client {
             client,
             responses,
-            _stop_signal: Arc::new(Mutex::new(Stop::new(stop_signal)))
+            _drop_guard: cancel_token.drop_guard()
         }
     }
 }
@@ -126,25 +122,6 @@ impl<R : Requestable> Service<R> for Client {
                 Ok(response)
             }
         })
-    }
-}
-
-#[derive(Debug)]
-struct Stop {
-    sender: mpsc::Sender<()>
-}
-
-impl Stop {
-    fn new(sender: mpsc::Sender<()>) -> Self {
-        Self {
-            sender
-        }
-    }
-}
-
-impl Drop for Stop {
-    fn drop(&mut self) {
-        let _ = self.sender.send(());
     }
 }
 
