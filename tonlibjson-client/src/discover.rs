@@ -102,7 +102,7 @@ impl ClientDiscover {
                 }
             }
 
-            liteservers = liteserver_new.clone();
+            liteservers.clone_from(&liteserver_new);
         }
     }
 
