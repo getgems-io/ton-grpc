@@ -2,6 +2,7 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;
 use anyhow::{anyhow, Context};
+use base64::display::Base64Display;
 use base64::Engine;
 use bytes::BufMut;
 use crc::Crc;
@@ -165,9 +166,9 @@ impl FromStr for ShardContextAccountAddress {
     }
 }
 
-impl ToString for ShardContextAccountAddress {
-    fn to_string(&self) -> String {
-        base64::engine::general_purpose::STANDARD.encode(self.bytes)
+impl Display for ShardContextAccountAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        Base64Display::new(&self.bytes, &base64::engine::general_purpose::STANDARD).fmt(f)
     }
 }
 
@@ -225,7 +226,16 @@ impl ToString for InternalAccountAddress {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use crate::address::AccountAddressData;
+    use crate::address::{AccountAddressData, ShardContextAccountAddress};
+
+    #[test]
+    fn shard_context_account_data_to_string() {
+        let input = ShardContextAccountAddress { bytes: [0; 32] };
+
+        let actual = input.to_string();
+
+        assert_eq!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", actual)
+    }
 
     #[test]
     fn account_address_correct() {
