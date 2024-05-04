@@ -217,16 +217,17 @@ impl Debug for InternalAccountAddress {
     }
 }
 
-impl ToString for InternalAccountAddress {
-    fn to_string(&self) -> String {
-        format!("{}:{}", self.chain_id, hex::encode(self.bytes))
+impl Display for InternalAccountAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.chain_id, hex::encode(self.bytes))
     }
 }
+
 
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use crate::address::{AccountAddressData, ShardContextAccountAddress};
+    use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
 
     #[test]
     fn shard_context_account_data_to_string() {
@@ -235,6 +236,15 @@ mod tests {
         let actual = input.to_string();
 
         assert_eq!("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", actual)
+    }
+
+    #[test]
+    fn internal_account_address_to_string() {
+        let input = InternalAccountAddress { chain_id: -1, bytes: [11; 32] };
+
+        let actual = input.to_string();
+
+        assert_eq!("-1:0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b", actual)
     }
 
     #[test]
