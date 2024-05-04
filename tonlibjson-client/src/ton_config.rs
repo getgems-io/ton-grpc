@@ -1,3 +1,4 @@
+use std::fmt::{Display, Formatter};
 use std::path::{Path};
 use reqwest::IntoUrl;
 use serde::{Serialize, Deserialize};
@@ -10,9 +11,9 @@ pub struct TonConfig {
     pub data: Value
 }
 
-impl ToString for TonConfig {
-    fn to_string(&self) -> String {
-        serde_json::to_string(self).unwrap()
+impl Display for TonConfig {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", serde_json::to_string(self).map_err(|_| std::fmt::Error)?)
     }
 }
 
@@ -69,8 +70,17 @@ pub async fn read_ton_config(path: impl AsRef<Path>) -> anyhow::Result<TonConfig
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{json, Value};
     use crate::ton_config::{load_ton_config, TonConfig};
+
+    #[test]
+    fn ton_config_to_string() {
+        let input = TonConfig { liteservers: vec![], data: Value::Null };
+
+        let actual = input.to_string();
+
+        assert_eq!("{\"liteservers\":[]}", actual)
+    }
 
     #[tokio::test]
     async fn load_config_mainnet() {

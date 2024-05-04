@@ -49,8 +49,8 @@ impl AdnlTcpClient {
         let handshake_packet = [
             server_key.id().as_slice(),
             client_key.public_key().as_bytes(),
-            &aes_bases_checksum.as_slice(),
-            &aes_basis_encrypted.as_slice()
+            aes_bases_checksum.as_slice(),
+            aes_basis_encrypted.as_slice()
         ].concat();
 
         tracing::debug!(handshake_packet = ?handshake_packet);
