@@ -8,7 +8,7 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 use aes::cipher::StreamCipher;
 use pin_project::pin_project;
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::Framed;
 use tokio::io::AsyncWriteExt;
 use crate::codec::PacketCodec;
@@ -24,7 +24,7 @@ pub struct AdnlTcpClient {
 }
 
 impl AdnlTcpClient {
-    pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
+    pub async fn connect<A: ToSocketAddrs>(addr: A, server_key: &ServerKey) -> anyhow::Result<Self> {
         let mut stream = tokio::time::timeout(Duration::from_secs(10), TcpStream::connect(addr)).await??;
         stream.set_linger(Some(Duration::from_secs(0)))?;
         stream.set_nodelay(true)?;

@@ -5,5 +5,6 @@ pub mod types;
 pub mod serializer;
 pub mod deserializer;
 pub mod boxed;
+pub mod server;
 mod codec;
 mod key;
