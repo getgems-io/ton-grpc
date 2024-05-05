@@ -1,8 +1,12 @@
 use std::env;
+use std::fs::{create_dir_all, copy};
+use std::path::{Path, PathBuf};
 
 use cmake::Config;
+use walkdir::WalkDir;
 
 fn main() {
+    let out_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let target_arch = if cfg!(feature = "target-cpu-native") {
          "native".to_owned()
@@ -58,7 +62,7 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", secp256k1_dir.display());
     println!("cargo:rustc-link-lib=static=secp256k1");
 
-    let mut cfg = Config::new(ton_dir);
+    let mut cfg = Config::new(out_dir.join(ton_dir));
     cfg.define("TON_ONLY_TONLIB", "ON")
         .define("CMAKE_C_COMPILER", "clang")
         .define("CMAKE_CXX_COMPILER", "clang++")
@@ -109,6 +113,8 @@ fn main() {
             .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
             .define("CMAKE_SHARED_LINKER_FLAGS_INIT", "-fuse-ld=lld");
     }
+
+    copy_dir_recursively(env::current_dir().unwrap().join(ton_dir), out_dir.join(ton_dir)).unwrap();
 
     if cfg!(feature = "tonlibjson") {
         let dst = cfg.build_target("tonlibjson").build();
@@ -214,4 +220,32 @@ fn main() {
         println!("cargo:rustc-link-lib=static=emulator_static");
         println!("cargo:rustc-link-lib=static=emulator");
     }
+}
+
+
+fn copy_dir_recursively(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
+    let src = src.as_ref();
+    let dst = dst.as_ref();
+
+    if !dst.exists() {
+        create_dir_all(dst)?;
+    }
+
+    for entry in WalkDir::new(src) {
+        let entry = entry.unwrap();
+
+        let target_path = dst.join(entry.path().strip_prefix(src).unwrap());
+        if entry.path().is_dir() {
+            create_dir_all(&target_path)?;
+        } else {
+            if let Some(parent) = target_path.parent() {
+                if !parent.exists() {
+                    create_dir_all(parent)?;
+                }
+            }
+            copy(entry.path(), &target_path)?;
+        }
+    }
+
+    Ok(())
 }
