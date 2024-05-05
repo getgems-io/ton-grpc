@@ -12,6 +12,7 @@ tracing = { workspace = true }
 [build-dependencies]
 cmake = "0.1"
 pkg-config = "0.3"
+walkdir = "2.5"
 
 [features]
 default = ["tonlibjson", "tonemulator"]
