@@ -1,21 +1,20 @@
 use aes::cipher::StreamCipher;
 use anyhow::{anyhow, bail};
+use ed25519_dalek::VerifyingKey;
 use futures::SinkExt;
 use sha2::{Digest, Sha256};
-use tokio::io::{AsyncWrite, AsyncRead, AsyncReadExt};
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
 use crate::codec::PacketCodec;
+use crate::connection::Connection;
 use crate::key::{Ed25519Key, Ed25519KeyId};
 use crate::packet::Packet;
 
-pub struct Connection {
-    inner: Framed<TcpStream, PacketCodec>,
-    client_key: Ed25519Key
-}
+pub struct AdnlTcpServer {}
 
-impl Connection {
-    pub async fn handshake(mut stream: TcpStream, server_key: &Ed25519Key) -> anyhow::Result<Self> {
+impl AdnlTcpServer {
+    pub async fn handshake(mut stream: TcpStream, server_key: &Ed25519Key) -> anyhow::Result<(VerifyingKey, Connection)> {
         let mut handshake_packet= [0u8; 32 + 32 + 32 + 160];
         let len = stream.read_exact(&mut handshake_packet).await?;
         tracing::info!(len = len, handshake_packet = ?handshake_packet);
@@ -26,7 +25,7 @@ impl Connection {
         }
 
         let client_key = Ed25519Key::from_public_key_bytes(handshake_packet[32 .. 64].try_into()?)?;
-        let shared_key = server_key.shared_key(&client_key)?;
+        let shared_key = server_key.shared_key(client_key.public_key())?;
 
         tracing::info!(shared_key = ?shared_key);
 
@@ -43,7 +42,7 @@ impl Connection {
 
         inner.send(Packet::empty()).await?;
 
-        Ok(Self { inner, client_key })
+        Ok((client_key.public_key().to_owned(), Connection::new(inner)))
     }
 }
 
@@ -64,7 +63,7 @@ mod tests {
 
         tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            let connection = Connection::handshake(stream, key).await.unwrap();
+            let (_client_public_key, _connection) = AdnlTcpServer::handshake(stream, key).await.unwrap();
         });
         let connected = AdnlTcpClient::connect(format!("127.0.0.1:{}", port), server_public_key).await;
 

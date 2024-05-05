@@ -1,4 +1,3 @@
-use std::net::SocketAddrV4;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
@@ -14,13 +13,14 @@ use tokio::io::AsyncWriteExt;
 use crate::codec::PacketCodec;
 use crate::key::Ed25519Key;
 use crate::packet::Packet;
+use crate::connection::Connection;
 
 pub type ServerKey = [u8; 32];
 
 #[pin_project]
 pub struct AdnlTcpClient {
     #[pin]
-    inner: Framed<TcpStream, PacketCodec>
+    inner: Connection
 }
 
 impl AdnlTcpClient {
@@ -33,7 +33,7 @@ impl AdnlTcpClient {
 
         let server_key = Ed25519Key::from_public_key_bytes(server_key)?;
         let client_key = Ed25519Key::generate();
-        let shared_key = client_key.shared_key(&server_key)?;
+        let shared_key = client_key.shared_key(server_key.public_key())?;
 
         tracing::debug!(server_key_id = ?server_key.id());
         tracing::debug!(shared_key = ?shared_key);
@@ -73,7 +73,7 @@ impl AdnlTcpClient {
             bail!("empty packet expected")
         }
 
-        Ok(Self { inner: framed })
+        Ok(Self { inner: Connection::new(framed) })
     }
 
     fn generate_aes_basis() -> ([u8; 160], [u8; 32]) {
@@ -118,11 +118,9 @@ impl Stream for AdnlTcpClient {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
-    use std::net::Ipv4Addr;
+    use std::net::{Ipv4Addr, SocketAddrV4};
     use base64::Engine;
     use futures::SinkExt;
     use tracing_test::traced_test;

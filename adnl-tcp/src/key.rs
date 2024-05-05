@@ -65,11 +65,11 @@ impl Ed25519Key {
         &self.pub_key
     }
 
-    pub fn shared_key(&self, other: &Ed25519Key) -> anyhow::Result<[u8; 32]> {
+    pub fn shared_key(&self, other: &VerifyingKey) -> anyhow::Result<[u8; 32]> {
         let Some(exp_key) = self.exp_key.as_ref() else {
             bail!("No expanded secret key");
         };
 
-        Ok(other.pub_key.to_montgomery().mul(exp_key.scalar).to_bytes())
+        Ok(other.to_montgomery().mul(exp_key.scalar).to_bytes())
     }
 }
