@@ -11,9 +11,9 @@ use crate::connection::Connection;
 use crate::key::{Ed25519Key, Ed25519KeyId};
 use crate::packet::Packet;
 
-pub struct AdnlTcpServer {}
+pub struct Server;
 
-impl AdnlTcpServer {
+impl Server {
     pub async fn handshake(mut stream: TcpStream, server_key: &Ed25519Key) -> anyhow::Result<(VerifyingKey, Connection)> {
         let mut handshake_packet= [0u8; 32 + 32 + 32 + 160];
         let len = stream.read_exact(&mut handshake_packet).await?;
@@ -50,7 +50,7 @@ impl AdnlTcpServer {
 mod tests {
     use std::sync::OnceLock;
     use tokio::net::TcpListener;
-    use crate::client::AdnlTcpClient;
+    use crate::client::Client;
     use super::*;
 
     #[tokio::test]
@@ -63,9 +63,9 @@ mod tests {
 
         tokio::spawn(async move {
             let (stream, _) = listener.accept().await.unwrap();
-            let (_client_public_key, _connection) = AdnlTcpServer::handshake(stream, key).await.unwrap();
+            let (_client_public_key, _connection) = Server::handshake(stream, key).await.unwrap();
         });
-        let connected = AdnlTcpClient::connect(format!("127.0.0.1:{}", port), server_public_key).await;
+        let connected = Client::connect(format!("127.0.0.1:{}", port), server_public_key).await;
 
         assert!(connected.is_ok());
     }
