@@ -26,16 +26,18 @@ base64 = "0.22"
 hex = "0.4"
 tracing-test = "0.2.4"
 async-stream = "0.3.5"
-tonic = { version = "0.9", features = ["gzip"] }
-tonic-reflection = "0.9"
-tonic-health = "0.9"
-tonic-build = "0.9"
-prost = "0.11"
-opentelemetry = { version = "0.19.0", features = ["rt-tokio", "metrics"] }
-opentelemetry-otlp = { version = "0.12.0", features = ["metrics"] }
-tracing-opentelemetry = "0.19.0"
+tonic = { version = "0.11", features = ["gzip"] }
+tonic-reflection = "0.11"
+tonic-health = "0.11"
+tonic-build = "0.11"
+prost = "0.12"
 quick_cache = "0.5"
 url = { version = "2.5.0", features = ["serde"] }
 clap = { version = "4.5.4", features = ["derive"] }
 humantime = "2.1.0"
 uuid = { version = "1.8", features = ["v4", "fast-rng", "serde"] }
+dashmap = "5.5"
+pin-project = "1.1"
+rand = "0.8"
+bytes = "1.6"
+thiserror = "1.0.59"
