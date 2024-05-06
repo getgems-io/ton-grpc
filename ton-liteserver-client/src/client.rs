@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use dashmap::DashMap;
 use tower::Service;
-use adnl_tcp::client::{AdnlTcpClient, ServerKey};
+use adnl_tcp::client::{Client, ServerKey};
 use futures::{ready, SinkExt, StreamExt};
 use pin_project::pin_project;
 use rand::random;
@@ -47,7 +47,7 @@ pub struct LiteServerClient {
 
 impl LiteServerClient {
     pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
-        let inner = AdnlTcpClient::connect(addr, server_key).await?;
+        let inner = Client::connect(addr, server_key).await?;
         let (mut write_half, mut read_half) = inner.split();
         let responses: Arc<DashMap<Int256, Sender<Bytes>>> = Arc::new(DashMap::new());
         let cancel_token = CancellationToken::new();
