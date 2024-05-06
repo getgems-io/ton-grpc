@@ -1,11 +1,10 @@
-use aes::cipher::StreamCipher;
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use ed25519_dalek::VerifyingKey;
 use futures::SinkExt;
-use sha2::{Digest, Sha256};
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 use tokio_util::codec::Framed;
+use crate::aes_ctr::AesCtr;
 use crate::codec::PacketCodec;
 use crate::connection::Connection;
 use crate::key::{Ed25519Key, Ed25519KeyId};
@@ -25,19 +24,11 @@ impl Server {
         }
 
         let client_key = Ed25519Key::from_public_key_bytes(handshake_packet[32 .. 64].try_into()?)?;
-        let shared_key = server_key.shared_key(client_key.public_key())?;
+        let checksum: &[u8; 32] = &handshake_packet[64 .. 96].try_into()?;
+        let aes_basis_encrypted: &[u8; 160] = &handshake_packet[96 .. 256].try_into()?;
 
-        tracing::info!(shared_key = ?shared_key);
-
-        crate::codec::build_cipher(&shared_key, &handshake_packet[64 .. 96].try_into()?)
-            .try_apply_keystream(&mut handshake_packet[96 .. 256])
-            .map_err(|e| anyhow!(e))?;
-
-        if Sha256::digest(&handshake_packet[96 .. 256]).as_slice() != &handshake_packet[64 .. 96] {
-            bail!("wrong handshake checksum");
-        }
-
-        let codec = PacketCodec::from_bytes_as_server(handshake_packet[96 .. 256].try_into()?);
+        let aes_ctr = AesCtr::from_encrypted(aes_basis_encrypted, checksum, server_key.expanded_secret_key().unwrap(), client_key.public_key())?;
+        let codec = PacketCodec::from_aes_ctr_as_server(aes_ctr);
         let mut inner = Framed::new(stream, codec);
 
         inner.send(Packet::empty()).await?;

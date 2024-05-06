@@ -1,5 +1,3 @@
-use std::ops::Mul;
-use anyhow::bail;
 use ed25519_dalek::hazmat::ExpandedSecretKey;
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use sha2::{Digest, Sha256};
@@ -16,6 +14,13 @@ impl Ed25519KeyId {
             .chain_update(public_key.as_slice())
             .finalize()
             .into())
+    }
+
+    pub fn from_slice(slice: &[u8]) -> Self {
+        let mut id = [0u8; 32];
+        id.copy_from_slice(slice);
+
+        Self(id)
     }
 
     pub fn as_slice(&self) -> &[u8] {
@@ -61,11 +66,7 @@ impl Ed25519Key {
         &self.pub_key
     }
 
-    pub fn shared_key(&self, other: &VerifyingKey) -> anyhow::Result<[u8; 32]> {
-        let Some(exp_key) = self.exp_key.as_ref() else {
-            bail!("No expanded secret key");
-        };
-
-        Ok(other.to_montgomery().mul(exp_key.scalar).to_bytes())
+    pub fn expanded_secret_key(&self) -> Option<&ExpandedSecretKey> {
+        self.exp_key.as_ref()
     }
 }

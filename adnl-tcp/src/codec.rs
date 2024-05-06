@@ -5,11 +5,12 @@ use ctr::cipher::KeyIvInit;
 use sha2::{Digest, Sha256};
 use tokio_util::bytes::{BufMut, BytesMut};
 use tokio_util::codec::{Decoder, Encoder};
+use crate::aes_ctr::{Aes256Ctr128, AesCtr};
 use crate::packet::Packet;
 
 pub struct PacketCodec {
-    cipher_recv: Aes256Ctr,
-    cipher_send: Aes256Ctr,
+    cipher_recv: Aes256Ctr128,
+    cipher_send: Aes256Ctr128,
     next_len: Option<usize>
 }
 
@@ -83,40 +84,31 @@ impl Decoder for PacketCodec {
 }
 
 impl PacketCodec {
-    pub fn from_bytes_as_client(bytes: &[u8; 160]) -> Self {
-        let cipher_recv = Aes256Ctr::new(GenericArray::from_slice(&bytes[0..32]), GenericArray::from_slice(&bytes[64 .. 80]));
-        let cipher_send = Aes256Ctr::new(GenericArray::from_slice(&bytes[32..64]), GenericArray::from_slice(&bytes[80 .. 96]));
+    pub fn from_aes_ctr_as_client(aes_ctr: AesCtr) -> Self {
+        let bytes = aes_ctr.into_bytes();
+
+        Self::from_bytes_as_client(&bytes)
+    }
+
+    pub fn from_aes_ctr_as_server(aes_ctr: AesCtr) -> Self {
+        let bytes = aes_ctr.into_bytes();
+
+        Self::from_bytes_as_server(&bytes)
+    }
+
+    fn from_bytes_as_client(bytes: &[u8; 160]) -> Self {
+        let cipher_recv = Aes256Ctr128::new(GenericArray::from_slice(&bytes[0..32]), GenericArray::from_slice(&bytes[64 .. 80]));
+        let cipher_send = Aes256Ctr128::new(GenericArray::from_slice(&bytes[32..64]), GenericArray::from_slice(&bytes[80 .. 96]));
 
         Self { cipher_recv, cipher_send, next_len: None }
     }
 
-    #[allow(dead_code)]
-    pub fn from_bytes_as_server(bytes: &[u8; 160]) -> Self {
-        let cipher_recv = Aes256Ctr::new(GenericArray::from_slice(&bytes[32..64]), GenericArray::from_slice(&bytes[80 .. 96]));
-        let cipher_send = Aes256Ctr::new(GenericArray::from_slice(&bytes[0..32]), GenericArray::from_slice(&bytes[64 .. 80]));
+    fn from_bytes_as_server(bytes: &[u8; 160]) -> Self {
+        let cipher_recv = Aes256Ctr128::new(GenericArray::from_slice(&bytes[32..64]), GenericArray::from_slice(&bytes[80 .. 96]));
+        let cipher_send = Aes256Ctr128::new(GenericArray::from_slice(&bytes[0..32]), GenericArray::from_slice(&bytes[64 .. 80]));
 
         Self { cipher_recv, cipher_send, next_len: None }
     }
-}
-
-pub type Aes256Ctr = ctr::Ctr128BE<aes::Aes256>;
-
-pub fn build_cipher(shared_key: &[u8; 32], checksum: &[u8; 32]) -> Aes256Ctr {
-    let x = shared_key;
-    let y = checksum;
-
-    let key = [
-        x[ 0], x[ 1], x[ 2], x[ 3], x[ 4], x[ 5], x[ 6], x[ 7],
-        x[ 8], x[ 9], x[10], x[11], x[12], x[13], x[14], x[15],
-        y[16], y[17], y[18], y[19], y[20], y[21], y[22], y[23],
-        y[24], y[25], y[26], y[27], y[28], y[29], y[30], y[31]
-    ];
-    let ctr = [
-        y[ 0], y[ 1], y[ 2], y[ 3], x[20], x[21], x[22], x[23],
-        x[24], x[25], x[26], x[27], x[28], x[29], x[30], x[31]
-    ];
-
-    Aes256Ctr::new(GenericArray::from_slice(&key), GenericArray::from_slice(&ctr))
 }
 
 #[cfg(test)]
