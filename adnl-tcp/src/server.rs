@@ -23,17 +23,17 @@ impl Server {
             bail!("wrong server key id");
         }
 
-        let client_key = Ed25519Key::from_public_key_bytes(handshake_packet[32 .. 64].try_into()?)?;
+        let client_public_key = VerifyingKey::from_bytes(handshake_packet[32 .. 64].try_into()?)?;
         let checksum: &[u8; 32] = &handshake_packet[64 .. 96].try_into()?;
         let aes_basis_encrypted: &[u8; 160] = &handshake_packet[96 .. 256].try_into()?;
 
-        let aes_ctr = AesCtr::from_encrypted(aes_basis_encrypted, checksum, server_key.expanded_secret_key().unwrap(), client_key.public_key())?;
+        let aes_ctr = AesCtr::from_encrypted(aes_basis_encrypted, checksum, server_key.expanded_secret_key(), &client_public_key)?;
         let codec = PacketCodec::from_aes_ctr_as_server(aes_ctr);
         let mut inner = Framed::new(stream, codec);
 
         inner.send(Packet::empty()).await?;
 
-        Ok((client_key.public_key().to_owned(), Connection::new(inner)))
+        Ok((client_public_key, Connection::new(inner)))
     }
 }
 

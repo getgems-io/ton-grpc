@@ -1,12 +1,13 @@
 use std::time::Duration;
 use anyhow::{anyhow, bail};
+use ed25519_dalek::VerifyingKey;
 use futures::StreamExt;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::Framed;
 use tokio::io::AsyncWriteExt;
 use crate::aes_ctr::AesCtr;
 use crate::codec::PacketCodec;
-use crate::key::Ed25519Key;
+use crate::key::{Ed25519Key, Ed25519KeyId};
 use crate::connection::Connection;
 
 pub type ServerKey = [u8; 32];
@@ -18,12 +19,13 @@ impl Client {
         let mut stream = TcpStream::connect(addr).await?;
 
         let aes_ctr = AesCtr::generate();
-        let server_key = Ed25519Key::from_public_key_bytes(server_key)?;
+        let server_public_key = VerifyingKey::from_bytes(&server_key)?;
+        let server_key_id = Ed25519KeyId::from_public_key_bytes(&server_key);
         let client_key = Ed25519Key::generate();
 
-        let (basis, checksum) = aes_ctr.encrypt(client_key.expanded_secret_key().unwrap(), server_key.public_key());
+        let (basis, checksum) = aes_ctr.encrypt(client_key.expanded_secret_key(), &server_public_key);
         let handshake_packet = [
-            server_key.id().as_slice(),
+            server_key_id.as_slice(),
             client_key.public_key().as_bytes(),
             checksum.as_slice(),
             basis.as_slice()
