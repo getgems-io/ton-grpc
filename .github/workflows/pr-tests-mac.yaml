@@ -31,4 +31,10 @@ jobs:
         with:
           submodules: recursive
       - run: brew install secp256k1 libsodium lz4 protobuf
+      - uses: mozilla-actions/sccache-action@v0.0.4
       - run: cargo test --no-fail-fast --features "${{ matrix.features }}"
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          RUSTC_WRAPPER: "sccache"
+          CMAKE_C_COMPILER_LAUNCHER: "sccache"
+          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
