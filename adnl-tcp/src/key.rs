@@ -18,10 +18,6 @@ impl Ed25519KeyId {
             .into())
     }
 
-    pub fn from_slice(slice: &[u8]) -> Self {
-        Self(slice.try_into().unwrap())
-    }
-
     pub fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
     }
