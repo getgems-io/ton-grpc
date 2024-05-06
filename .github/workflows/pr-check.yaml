@@ -23,25 +23,79 @@ jobs:
       contents: read
       checks: write
       security-events: write
+    env:
+      SCCACHE_GHA_ENABLED: "true"
+      RUSTC_WRAPPER: "sccache"
+      CMAKE_C_COMPILER_LAUNCHER: "sccache"
+      CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            adnl_tcp:
+              - 'adnl-tcp/**'
+            tl_parser:
+              - 'tl_parser/**'
+            ton_grpc:
+              - 'ton-grpc/**'
+            ton_liteserver_client:
+              - 'ton-liteserver-client/**'
+            tonlibjson_client:
+              - 'tonlibjson-client/**'
+            tonlibjson_sys:
+              - 'tonlibjson-sys/**'
+            tvm_grpc:
+              - 'tvm-grpc/**'
       - uses: awalsh128/cache-apt-pkgs-action@latest
+        if: steps.changes.outputs.src == 'tonlibjson_sys' || steps.changes.outputs.src == 'ton_liteserver_client' || steps.changes.outputs.src == 'ton_grpc' || steps.changes.outputs.src == 'tvm_grpc'
         with:
           packages: libsecp256k1-dev libsodium-dev liblz4-dev
       - uses: arduino/setup-protoc@v3
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
-      - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.4
+        if: steps.changes.outputs.src == 'tonlibjson_sys' || steps.changes.outputs.src == 'ton_liteserver_client' || steps.changes.outputs.src == 'ton_grpc' || steps.changes.outputs.src == 'tvm_grpc'
+      - uses: mozilla-actions/sccache-action@v0.0.4
       - uses: actions-rs/clippy-check@v1
-        env:
-          RUSTFLAGS: ""
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
-          CMAKE_C_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
+        if: steps.changes.outputs.src == 'tonlibjson_sys'
         with:
+          name: 'tonlibjson-sys'
           token: ${{ secrets.GITHUB_TOKEN }}
+          args: cargo clippy --package tonlibjson-sys --no-deps
+      - uses: actions-rs/clippy-check@v1
+        if: steps.changes.outputs.src == 'tonlibjson_client'
+        with:
+          name: 'tonlibjson-client'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: cargo clippy --package tonlibjson-client --no-deps --all-features
+      - uses: actions-rs/clippy-check@v1
+        if: steps.changes.outputs.src == 'tvm_grpc'
+        with:
+          name: 'tvm-grpc'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: cargo clippy --package tvm-grpc --no-deps --all-features
+      - uses: actions-rs/clippy-check@v1
+        if: steps.changes.outputs.src == 'ton_grpc'
+        with:
+          name: 'ton-grpc'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: cargo clippy --package ton-grpc --no-deps --all-features
+      - uses: actions-rs/clippy-check@v1
+        if: steps.changes.outputs.src == 'tl_parser'
+        with:
+          name: 'tl_parser'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: cargo clippy --package tl_parser --no-deps --all-features
+      - uses: actions-rs/clippy-check@v1
+        if: steps.changes.outputs.src == 'adnl_tcp'
+        with:
+          name: 'adnl-tcp'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: cargo clippy --package adnl-tcp --no-deps --all-features
+      - uses: actions-rs/clippy-check@v1
+        if: steps.changes.outputs.src == 'ton_liteserver_client'
+        with:
+          name: 'ton-liteserver-client'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: cargo clippy --package ton-liteserver-client --no-deps --all-features
