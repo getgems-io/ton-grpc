@@ -27,7 +27,7 @@ pin-project = { workspace = true }
 rand = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
-reqwest = { version = "0.12.4", features = ["rustls-tls", "trust-dns"], default-features = false }
+reqwest = { version = "0.12.4", features = ["rustls-tls", "hickory-dns"], default-features = false }
 hickory-resolver = { version = "0.24.1", features = ["tokio-runtime"] }
 itertools = "0.12"
 derive-new = "0.6.0"
