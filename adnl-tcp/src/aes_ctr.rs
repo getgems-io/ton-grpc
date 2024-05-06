@@ -24,15 +24,14 @@ impl AesCtr {
 
     pub fn from_encrypted(basis: &[u8; 160], checksum: &[u8; 32], expanded_secret_key: &ExpandedSecretKey, verifying_key: &VerifyingKey) -> anyhow::Result<Self> {
         let x = verifying_key.to_montgomery().mul(expanded_secret_key.scalar).to_bytes();
-        let y = checksum;
 
-        let mut cipher = Self::cipher(&x, &y);
+        let mut cipher = Self::cipher(&x, checksum);
         let mut basis_decrypted = [0u8; 160];
         cipher
             .apply_keystream_b2b(basis, &mut basis_decrypted)
             .map_err(|e| anyhow!(e))?;
 
-        if Sha256::digest(&basis_decrypted).as_slice() != checksum {
+        if Sha256::digest(basis_decrypted).as_slice() != checksum {
             bail!("wrong handshake checksum");
         }
 
@@ -44,12 +43,10 @@ impl AesCtr {
     }
 
     pub fn encrypt(&self, expanded_secret_key: &ExpandedSecretKey, verifying_key: &VerifyingKey) -> ([u8; 160], [u8; 32]) {
-        let checksum: [u8; 32] = Sha256::digest(&self.basis).into();
-
+        let checksum: [u8; 32] = Sha256::digest(self.basis).into();
         let x = verifying_key.to_montgomery().mul(expanded_secret_key.scalar).to_bytes();
-        let y = &checksum;
 
-        let mut cipher = Self::cipher(&x, &y);
+        let mut cipher = Self::cipher(&x, &checksum);
         let mut basis_encrypted = [0u8; 160];
         cipher
             .apply_keystream_b2b(&self.basis, &mut basis_encrypted)
