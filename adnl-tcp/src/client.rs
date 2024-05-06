@@ -5,6 +5,7 @@ use futures::StreamExt;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::Framed;
 use tokio::io::AsyncWriteExt;
+use tokio::time::timeout;
 use crate::aes_ctr::AesCtr;
 use crate::codec::PacketCodec;
 use crate::key::{Ed25519Key, Ed25519KeyId};
@@ -24,23 +25,19 @@ impl Client {
         let client_key = Ed25519Key::generate();
 
         let (basis, checksum) = aes_ctr.encrypt(client_key.expanded_secret_key(), &server_public_key);
-        let handshake_packet = [
-            server_key_id.as_slice(),
-            client_key.public_key().as_bytes(),
-            checksum.as_slice(),
-            basis.as_slice()
-        ].concat();
 
-        stream.write_all(handshake_packet.as_slice()).await?;
+        stream.write_all(server_key_id.as_slice()).await?;
+        stream.write_all(client_key.public_key().as_bytes()).await?;
+        stream.write_all(checksum.as_slice()).await?;
+        stream.write_all(basis.as_slice()).await?;
         stream.flush().await?;
 
         let codec = PacketCodec::from_aes_ctr_as_client(aes_ctr);
         let mut framed = Framed::new(stream, codec);
 
-        let packet = tokio::time::timeout(
-            Duration::from_secs(5),
-            framed.next()
-        ).await?.ok_or(anyhow!("missed empty packet"))??;
+        let packet = timeout(Duration::from_secs(5), framed.next())
+            .await?
+            .ok_or(anyhow!("missed empty packet"))??;
 
         tracing::info!(packet = ?packet, "received packet");
         if packet.is_empty() {
