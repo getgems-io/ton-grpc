@@ -1,5 +1,3 @@
-use std::ops::Mul;
-use anyhow::bail;
 use ed25519_dalek::hazmat::ExpandedSecretKey;
 use ed25519_dalek::{SigningKey, VerifyingKey};
 use sha2::{Digest, Sha256};
@@ -18,6 +16,13 @@ impl Ed25519KeyId {
             .into())
     }
 
+    pub fn from_slice(slice: &[u8]) -> Self {
+        let mut id = [0u8; 32];
+        id.copy_from_slice(slice);
+
+        Self(id)
+    }
+
     pub fn as_slice(&self) -> &[u8] {
         self.0.as_slice()
     }
@@ -26,31 +31,17 @@ impl Ed25519KeyId {
 pub struct Ed25519Key {
     id: Ed25519KeyId,
     pub_key: VerifyingKey,
-    exp_key: Option<ExpandedSecretKey>
+    exp_key: ExpandedSecretKey
 }
 
 impl Ed25519Key {
-    pub fn from_public_key_bytes(public_key: &[u8; 32]) -> anyhow::Result<Self> {
-        let key_id = Ed25519KeyId::from_public_key_bytes(public_key);
-
-        Ok(Self {
-            id: key_id,
-            pub_key: VerifyingKey::from_bytes(public_key)?,
-            exp_key: None
-        })
-    }
-
     pub fn generate() -> Self {
         let private_key = SigningKey::generate(&mut rand::thread_rng());
-        let public_key = private_key.verifying_key();
-        let key_id = Ed25519KeyId::from_public_key_bytes(public_key.as_bytes());
+        let pub_key = private_key.verifying_key();
+        let id = Ed25519KeyId::from_public_key_bytes(pub_key.as_bytes());
         let exp_key: ExpandedSecretKey = private_key.as_bytes().into();
 
-        Self {
-            id: key_id,
-            pub_key: public_key,
-            exp_key: Some(exp_key)
-        }
+        Self { id, pub_key, exp_key }
     }
 
     pub fn id(&self) -> &Ed25519KeyId {
@@ -61,11 +52,7 @@ impl Ed25519Key {
         &self.pub_key
     }
 
-    pub fn shared_key(&self, other: &VerifyingKey) -> anyhow::Result<[u8; 32]> {
-        let Some(exp_key) = self.exp_key.as_ref() else {
-            bail!("No expanded secret key");
-        };
-
-        Ok(other.to_montgomery().mul(exp_key.scalar).to_bytes())
+    pub fn expanded_secret_key(&self) -> &ExpandedSecretKey {
+        &self.exp_key
     }
 }

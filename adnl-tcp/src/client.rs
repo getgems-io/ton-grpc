@@ -1,14 +1,14 @@
 use std::time::Duration;
 use anyhow::{anyhow, bail};
+use ed25519_dalek::VerifyingKey;
 use futures::StreamExt;
-use rand::Rng;
-use sha2::{Digest, Sha256};
-use aes::cipher::StreamCipher;
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::Framed;
 use tokio::io::AsyncWriteExt;
+use tokio::time::timeout;
+use crate::aes_ctr::AesCtr;
 use crate::codec::PacketCodec;
-use crate::key::Ed25519Key;
+use crate::key::{Ed25519Key, Ed25519KeyId};
 use crate::connection::Connection;
 
 pub type ServerKey = [u8; 32];
@@ -19,42 +19,25 @@ impl Client {
     pub async fn connect<A: ToSocketAddrs>(addr: A, server_key: &ServerKey) -> anyhow::Result<Connection> {
         let mut stream = TcpStream::connect(addr).await?;
 
-        let (aes_basis, aes_bases_checksum) = Self::generate_aes_basis();
-
-        let server_key = Ed25519Key::from_public_key_bytes(server_key)?;
+        let aes_ctr = AesCtr::generate();
+        let server_public_key = VerifyingKey::from_bytes(server_key)?;
+        let server_key_id = Ed25519KeyId::from_public_key_bytes(server_key);
         let client_key = Ed25519Key::generate();
-        let shared_key = client_key.shared_key(server_key.public_key())?;
 
-        tracing::debug!(server_key_id = ?server_key.id());
-        tracing::debug!(shared_key = ?shared_key);
-        tracing::debug!(aes_basis = ?aes_basis);
+        let (basis, checksum) = aes_ctr.encrypt(client_key.expanded_secret_key(), &server_public_key);
 
-        let mut aes_basis_encrypted = [0u8; 160];
-        crate::codec::build_cipher(&shared_key, &aes_bases_checksum)
-            .apply_keystream_b2b(&aes_basis, &mut aes_basis_encrypted)
-            .map_err(|e| anyhow!(e))?;
-
-        tracing::debug!(aes_basis = ?aes_basis);
-
-        let handshake_packet = [
-            server_key.id().as_slice(),
-            client_key.public_key().as_bytes(),
-            aes_bases_checksum.as_slice(),
-            aes_basis_encrypted.as_slice()
-        ].concat();
-
-        tracing::debug!(handshake_packet = ?handshake_packet);
-
-        stream.write_all(handshake_packet.as_slice()).await?;
+        stream.write_all(server_key_id.as_slice()).await?;
+        stream.write_all(client_key.public_key().as_bytes()).await?;
+        stream.write_all(checksum.as_slice()).await?;
+        stream.write_all(basis.as_slice()).await?;
         stream.flush().await?;
 
-        let codec = PacketCodec::from_bytes_as_client(&aes_basis);
+        let codec = PacketCodec::from_aes_ctr_as_client(aes_ctr);
         let mut framed = Framed::new(stream, codec);
 
-        let packet = tokio::time::timeout(
-            Duration::from_secs(5),
-            framed.next()
-        ).await?.ok_or(anyhow!("missed empty packet"))??;
+        let packet = timeout(Duration::from_secs(5), framed.next())
+            .await?
+            .ok_or(anyhow!("missed empty packet"))??;
 
         tracing::info!(packet = ?packet, "received packet");
         if packet.is_empty() {
@@ -64,15 +47,6 @@ impl Client {
         }
 
         Ok(Connection::new(framed))
-    }
-
-    fn generate_aes_basis() -> ([u8; 160], [u8; 32]) {
-        let mut aes_basis = [0u8; 160];
-        rand::thread_rng().fill(aes_basis.as_mut_slice());
-
-        let checksum = Sha256::digest(aes_basis).into();
-
-        (aes_basis, checksum)
     }
 }
 
