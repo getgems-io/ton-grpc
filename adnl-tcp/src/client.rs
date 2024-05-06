@@ -1,39 +1,29 @@
-use std::net::SocketAddrV4;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use std::time::Duration;
 use anyhow::{anyhow, bail};
-use futures::{Sink, Stream, StreamExt};
+use futures::StreamExt;
 use rand::Rng;
 use sha2::{Digest, Sha256};
 use aes::cipher::StreamCipher;
-use pin_project::pin_project;
-use tokio::net::TcpStream;
+use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::codec::Framed;
 use tokio::io::AsyncWriteExt;
 use crate::codec::PacketCodec;
 use crate::key::Ed25519Key;
-use crate::packet::Packet;
+use crate::connection::Connection;
 
 pub type ServerKey = [u8; 32];
 
-#[pin_project]
-pub struct AdnlTcpClient {
-    #[pin]
-    inner: Framed<TcpStream, PacketCodec>
-}
+pub struct Client;
 
-impl AdnlTcpClient {
-    pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
-        let mut stream = tokio::time::timeout(Duration::from_secs(10), TcpStream::connect(addr)).await??;
-        stream.set_linger(Some(Duration::from_secs(0)))?;
-        stream.set_nodelay(true)?;
+impl Client {
+    pub async fn connect<A: ToSocketAddrs>(addr: A, server_key: &ServerKey) -> anyhow::Result<Connection> {
+        let mut stream = TcpStream::connect(addr).await?;
 
         let (aes_basis, aes_bases_checksum) = Self::generate_aes_basis();
 
         let server_key = Ed25519Key::from_public_key_bytes(server_key)?;
         let client_key = Ed25519Key::generate();
-        let shared_key = client_key.shared_key(&server_key)?;
+        let shared_key = client_key.shared_key(server_key.public_key())?;
 
         tracing::debug!(server_key_id = ?server_key.id());
         tracing::debug!(shared_key = ?shared_key);
@@ -73,7 +63,7 @@ impl AdnlTcpClient {
             bail!("empty packet expected")
         }
 
-        Ok(Self { inner: framed })
+        Ok(Connection::new(framed))
     }
 
     fn generate_aes_basis() -> ([u8; 160], [u8; 32]) {
@@ -86,43 +76,9 @@ impl AdnlTcpClient {
     }
 }
 
-impl Sink<Packet> for AdnlTcpClient {
-    type Error = anyhow::Error;
-
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_ready(cx)
-    }
-
-    fn start_send(self: Pin<&mut Self>, item: Packet) -> Result<(), Self::Error> {
-        self.project().inner.start_send(item)
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_flush(cx)
-    }
-
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.project().inner.poll_close(cx)
-    }
-}
-
-impl Stream for AdnlTcpClient {
-    type Item = Result<Packet, anyhow::Error>;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        self.project().inner.poll_next(cx)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
-}
-
-
-
 #[cfg(test)]
 mod tests {
-    use std::net::Ipv4Addr;
+    use std::net::{Ipv4Addr, SocketAddrV4};
     use base64::Engine;
     use futures::SinkExt;
     use tracing_test::traced_test;
@@ -149,7 +105,7 @@ mod tests {
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-        let client = AdnlTcpClient::connect(SocketAddrV4::new(ip, port), &key).await;
+        let client = Client::connect(SocketAddrV4::new(ip, port), &key).await;
 
         assert!(client.is_err());
         assert_eq!(client.err().unwrap().to_string(), "missed empty packet".to_string());
@@ -172,7 +128,7 @@ mod tests {
         Ok(())
     }
 
-    async fn provided_client() -> anyhow::Result<AdnlTcpClient> {
+    async fn provided_client() -> anyhow::Result<Connection> {
         let ip: i32 = -2018147075;
         let ip = Ipv4Addr::from(ip as u32);
         let port = 46529;
@@ -180,8 +136,8 @@ mod tests {
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-        let client = AdnlTcpClient::connect(SocketAddrV4::new(ip, port), &key).await?;
+        let connection = Client::connect(SocketAddrV4::new(ip, port), &key).await?;
 
-        Ok(client)
+        Ok(connection)
     }
 }
