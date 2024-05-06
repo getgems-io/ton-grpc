@@ -36,3 +36,8 @@ url = { version = "2.5.0", features = ["serde"] }
 clap = { version = "4.5.4", features = ["derive"] }
 humantime = "2.1.0"
 uuid = { version = "1.8", features = ["v4", "fast-rng", "serde"] }
+dashmap = "5.5"
+pin-project = "1.1"
+rand = "0.8"
+bytes = "1.6"
+thiserror = "1.0.59"
