@@ -28,7 +28,7 @@ jobs:
       - uses: ./.github/actions/prepare
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - run: cargo build -v --bin ton-grpc --config .cargo/docker.toml --target x86_64-unknown-linux-gnu --release --features "${{ matrix.features }}" --features "tonlibjson-sys/lto,tonlibjson-sys/lld"
+      - run: TONLIBJSON_SYS_LLD=1 TONLIBJSON_SYS_LTO=1 cargo build -v --bin ton-grpc --config .cargo/docker.toml --target x86_64-unknown-linux-gnu --release --features "${{ matrix.features }}"
         env:
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"

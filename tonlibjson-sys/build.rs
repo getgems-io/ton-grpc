@@ -6,9 +6,17 @@ use cmake::Config;
 use walkdir::WalkDir;
 
 fn main() {
+    let use_native_arch = env::var("TONLIBJSON_SYS_TARGET_CPU_NATIVE").is_ok_and(|v| v == "1" || v == "true");
+    let use_lld = env::var("TONLIBJSON_SYS_LLD").is_ok_and(|v| v == "1" || v == "true");
+    let use_lto = env::var("TONLIBJSON_SYS_LTO").is_ok_and(|v| v == "1" || v == "true");
+
+    println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_TARGET_CPU_NATIVE");
+    println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_LLD");
+    println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_LTO");
+
     let out_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
-    let target_arch = if cfg!(feature = "target-cpu-native") {
+    let target_arch = if use_native_arch {
          "native".to_owned()
     } else {
         env::var("CARGO_CFG_TARGET_ARCH")
@@ -104,11 +112,11 @@ fn main() {
             );
     }
 
-    if cfg!(feature = "lto") {
+    if use_lto {
         cfg.cxxflag("-flto");
     }
 
-    if cfg!(feature = "lld") {
+    if use_lld {
         cfg.define("CMAKE_EXE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
             .define("CMAKE_MODULE_LINKER_FLAGS_INIT", "-fuse-ld=lld")
             .define("CMAKE_SHARED_LINKER_FLAGS_INIT", "-fuse-ld=lld");

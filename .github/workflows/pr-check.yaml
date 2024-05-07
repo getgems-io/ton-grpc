@@ -45,3 +45,4 @@ jobs:
           CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-features
