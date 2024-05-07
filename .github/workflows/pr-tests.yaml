@@ -18,12 +18,10 @@ jobs:
   pr-tests:
     strategy:
       matrix:
-        include:
-          - features: ''
-          - features: 'testnet'
+        os: ['ubuntu-22.04', 'macos-14', 'macos-13']
+        features: ['', 'testnet']
     name: Run cargo tests
-    runs-on:
-      group: "CPUBound"
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       checks: write
@@ -33,16 +31,16 @@ jobs:
         with:
           submodules: recursive
       - uses: awalsh128/cache-apt-pkgs-action@latest
+        if: runner.os == 'Linux'
         with:
           packages: libsecp256k1-dev libsodium-dev liblz4-dev
       - uses: arduino/setup-protoc@v3
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-unknown-linux-gnu
+        if: runner.os == 'Linux'
+      - run: brew install secp256k1 libsodium lz4 protobuf
+        if: runner.os == 'macOS'
       - uses: mozilla-actions/sccache-action@v0.0.4
-      - run: cargo test --target x86_64-unknown-linux-gnu --no-fail-fast --features "${{ matrix.features }}"
+      - run: cargo test --no-fail-fast --features "${{ matrix.features }}"
         env:
-          RUSTFLAGS: ""
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
           CMAKE_C_COMPILER_LAUNCHER: "sccache"
