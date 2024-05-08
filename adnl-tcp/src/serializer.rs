@@ -6,6 +6,10 @@ pub trait Serialize {
     fn serialize(&self, se: &mut Serializer);
 }
 
+pub trait SerializeBoxed {
+    fn serialize_boxed(&self, se: &mut Serializer);
+}
+
 #[derive(Debug)]
 pub struct Serializer {
     output: Vec<u8>,
