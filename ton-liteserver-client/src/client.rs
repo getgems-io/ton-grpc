@@ -127,7 +127,7 @@ impl LiteServerClient {
     }
 }
 
-impl<R> Service<R> for LiteServerClient where R: Requestable + BoxedType, R::Response : BoxedType {
+impl<R> Service<R> for LiteServerClient where R: Requestable + BareType, R::Response : BoxedType {
     type Response = R::Response;
     type Error = Error;
     type Future = ResponseFuture<R::Response>;
@@ -141,7 +141,7 @@ impl<R> Service<R> for LiteServerClient where R: Requestable + BoxedType, R::Res
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        let data = to_bytes(&req);
+        let data = to_bytes(&req.into_boxed());
 
         let query = LiteServerQuery { data };
         let query = to_bytes(&query.into_boxed());
@@ -239,7 +239,7 @@ mod tests {
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox();
+        let response = client.oneshot(LiteServerGetMasterchainInfo {}).await?.unbox();
 
         assert_eq!(response.last.workchain, -1);
         assert_eq!(response.last.shard, -9223372036854775808);
@@ -252,11 +252,11 @@ mod tests {
     #[ignore]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let response = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox();
+        let response = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.unbox();
 
-        let response = (&mut client).oneshot((LiteServerGetAllShardsInfo {
+        let response = (&mut client).oneshot(LiteServerGetAllShardsInfo {
             id: response.last
-        }).into_boxed()).await?.unbox();
+        }).await?.unbox();
 
         assert_eq!(response.id.workchain, -1);
         assert_eq!(response.id.shard, -9223372036854775808);
@@ -270,7 +270,7 @@ mod tests {
     async fn client_get_version() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot((LiteServerGetVersion {}).into_boxed()).await?.unbox();
+        let response = client.oneshot(LiteServerGetVersion {}).await?.unbox();
 
         assert!(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().abs_diff(response.now as u64) <= 10);
 
@@ -283,7 +283,7 @@ mod tests {
     async fn client_error_test() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot((LiteServerGetMasterchainInfoExt { mode: 1 }).into_boxed()).await;
+        let response = client.oneshot(LiteServerGetMasterchainInfoExt { mode: 1 }).await;
 
         assert!(response.is_err());
         assert_eq!(response.unwrap_err().to_string(), "LiteServer error: Error code: -400, message: \"unsupported getMasterchainInfo mode\"".to_owned());
@@ -296,10 +296,10 @@ mod tests {
     #[ignore]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let known_block = (&mut client).oneshot((LiteServerGetMasterchainInfo {}).into_boxed()).await?.unbox().last;
+        let known_block = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.unbox().last;
 
         let request = LiteServerGetBlockProof { mode: 0, known_block: known_block.clone(), target_block: None };
-        let response = client.oneshot(request.into_boxed()).await?.unbox();
+        let response = client.oneshot(request).await?.unbox();
 
         assert_eq!(&response.from.seqno, &known_block.seqno);
 
@@ -313,7 +313,7 @@ mod tests {
         let future = {
             let client = provided_client().await?;
 
-            client.oneshot((LiteServerGetMasterchainInfo {}).into_boxed())
+            client.oneshot(LiteServerGetMasterchainInfo {})
         };
 
         let response = future.await;
