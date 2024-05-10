@@ -78,15 +78,8 @@ impl Generator {
                 let bare_type = types.first().unwrap().id();
                 let name = format_ident!("{}", generate_type_name(bare_type));
 
-                // TODO[akostylev0]
-                if struct_name == "BoxedObject" {
-                    quote! {
-                        pub type #struct_name = #name;
-                    }
-                } else {
-                    quote! {
+                quote! {
                     pub type #struct_name = #name;
-                }
                 }
             } else {
                 let fields: Vec<_> = types
