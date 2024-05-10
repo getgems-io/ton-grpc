@@ -78,15 +78,8 @@ impl Generator {
                 let bare_type = types.first().unwrap().id();
                 let name = format_ident!("{}", generate_type_name(bare_type));
 
-                // TODO[akostylev0]
-                if struct_name == "BoxedObject" {
-                    quote! {
-                        pub type #struct_name = #name;
-                    }
-                } else {
-                    quote! {
-                    pub type #struct_name = Boxed<#name>;
-                }
+                quote! {
+                    pub type #struct_name = #name;
                 }
             } else {
                 let fields: Vec<_> = types
@@ -147,30 +140,36 @@ impl Generator {
                         #(#fields),*
                     }
 
-                    impl BoxedType for #struct_name {
-                        fn constructor_number(&self) -> u32 {
-                            match self {
-                                #(#constructor_number_fields),*
-                            }
-                        }
-                    }
-
                     impl Serialize for #struct_name {
                         fn serialize(&self, se: &mut Serializer) {
-                            se.write_constructor_number(self.constructor_number());
+                            se.write_constructor_number(match self {
+                                #(#constructor_number_fields),*
+                            });
                             match self {
                                 #(#serialize_match),*
                             }
                         }
                     }
 
+                    impl SerializeBoxed for #struct_name {
+                        fn serialize_boxed(&self, se: &mut Serializer) {
+                            self.serialize(se);
+                        }
+                    }
+
                     impl Deserialize for #struct_name {
-                        fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+                        fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
                             let constructor_number = de.parse_constructor_numer()?;
 
+                            Self::deserialize_boxed(constructor_number, de)
+                        }
+                    }
+
+                    impl DeserializeBoxed for #struct_name {
+                        fn deserialize_boxed(constructor_number: u32, de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
                             match constructor_number {
                                 #(#deserialize_match),*
-                                _ => Err(anyhow!("Unexpected constructor number"))
+                                _ => Err(DeserializerBoxedError::UnexpectedConstructorNumber(constructor_number))
                             }
                         }
                     }
@@ -383,7 +382,6 @@ impl Generator {
                     quote! {}
                 };
 
-                let constructor_number_le = definition.constructor_number_le();
                 let constructor_number_be = definition.constructor_number_be();
                 let output = quote! {
                     #[#t]
@@ -394,10 +392,6 @@ impl Generator {
                     #traits
 
                     impl #struct_name {
-                        const CONSTRUCTOR_NUMBER_LE: u32 = #constructor_number_le;
-                    }
-
-                    impl BareType for #struct_name {
                         const CONSTRUCTOR_NUMBER_BE: u32 = #constructor_number_be;
                     }
 
@@ -410,14 +404,33 @@ impl Generator {
                         }
                     }
 
+                    impl SerializeBoxed for #struct_name {
+                        #[allow(unused_variables)]
+                        fn serialize_boxed(&self, se: &mut Serializer) {
+                            se.write_constructor_number(#constructor_number_be);
+                            self.serialize(se)
+                        }
+                    }
+
                     impl Deserialize for #struct_name {
                         #[allow(unused_variables)]
-                        fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+                        fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
                             #(#deserialize_fields)*
 
                             Ok(Self {
                                 #(#deserialize_pass)*
                             })
+                        }
+                    }
+
+                    impl DeserializeBoxed for #struct_name {
+                        #[allow(unused_variables)]
+                        fn deserialize_boxed(constructor_number: u32, de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
+                            if constructor_number != #constructor_number_be {
+                                Err(DeserializerBoxedError::UnexpectedConstructorNumber(constructor_number))
+                            } else {
+                                Self::deserialize(de)
+                            }
                         }
                     }
                 };

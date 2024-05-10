@@ -1,40 +1,36 @@
 use anyhow::bail;
 use bytes::{Buf, Bytes};
+use thiserror::Error;
 use crate::types::Int256;
 
+#[derive(Error, Debug)]
+pub enum DeserializerBoxedError {
+    #[error("Unexpected constructor number: {0}")]
+    UnexpectedConstructorNumber(u32),
+    #[error(transparent)]
+    DeserializeError(#[from] anyhow::Error)
+}
+
 pub trait Deserialize where Self: Sized {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self>;
+    fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError>;
+}
+
+pub trait DeserializeBoxed: Deserialize {
+    fn deserialize_boxed(constructor_number: u32, de: &mut Deserializer) -> Result<Self, DeserializerBoxedError>;
 }
 
 pub struct Deserializer {
-    input: Bytes,
-    peek_constructor_number: Option<u32>
+    input: Bytes
 }
 
 impl Deserializer {
     // TODO[akostylev0]
     pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Deserializer { input: bytes.into(), peek_constructor_number: None }
-    }
-
-    pub fn unpeek_constructor_number(&mut self, constructor_number: u32) {
-        self.peek_constructor_number.replace(constructor_number);
-    }
-
-    pub fn verify_constructor_number(&mut self, crc32: u32) -> anyhow::Result<()> {
-        let constructor_number = self.parse_constructor_numer()?;
-        if constructor_number == crc32 {
-            Ok(())
-        } else {
-            bail!("Unexpected constructor number, expected: {}, actual: {}", crc32, constructor_number)
-        }
+        Deserializer { input: bytes.into() }
     }
 
     pub fn parse_constructor_numer(&mut self) -> anyhow::Result<u32> {
-        Ok(match self.peek_constructor_number.take() {
-            Some(c) => c,
-            None => self.input.get_u32()
-        })
+        Ok(self.input.get_u32())
     }
 
     pub fn parse_i31(&mut self) -> anyhow::Result<i32> {
@@ -95,12 +91,13 @@ impl Deserializer {
     }
 }
 
-pub fn from_bytes<T>(bytes: Vec<u8>) -> anyhow::Result<T>
+pub fn from_bytes_boxed<T>(bytes: Vec<u8>) -> anyhow::Result<T>
     where
-        T: Deserialize,
+        T: DeserializeBoxed,
 {
     let mut deserializer = Deserializer::from_bytes(bytes);
-    let t = T::deserialize(&mut deserializer)?;
+    let constructor_number = deserializer.parse_constructor_numer()?;
+    let t = T::deserialize_boxed(constructor_number, &mut deserializer)?;
     if deserializer.input.is_empty() {
         Ok(t)
     } else {

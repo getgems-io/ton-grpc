@@ -1,21 +1,8 @@
-use crate::boxed::Boxed;
-use crate::deserializer::{Deserialize, Deserializer};
+use crate::deserializer::{Deserialize, DeserializeBoxed, Deserializer, DeserializerBoxedError};
 use crate::serializer::{Serialize, Serializer};
 
 pub trait Functional {
     type Result;
-}
-
-pub trait BareType where Self: Sized {
-    const CONSTRUCTOR_NUMBER_BE: u32;
-
-    fn into_boxed(self) -> Boxed<Self> {
-        Boxed::new(self)
-    }
-}
-
-pub trait BoxedType where Self: Sized {
-    fn constructor_number(&self) -> u32;
 }
 
 // TODO[akostylev0] review
@@ -45,7 +32,7 @@ impl Serialize for Vector<Int256> {
 }
 
 impl Deserialize for Vector<Int256> {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+    fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
         let len = de.parse_i31()?;
         let mut buf = Vec::with_capacity(len as usize);
         for _ in 0 .. len {
@@ -68,7 +55,7 @@ impl Serialize for Vector<Int32> {
 }
 
 impl Deserialize for Vector<Int32> {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+    fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
         let len = de.parse_i31()?;
         let mut buf = Vec::with_capacity(len as usize);
         for _ in 0 .. len {
@@ -91,7 +78,7 @@ impl Serialize for Vector<Int64> {
 }
 
 impl Deserialize for Vector<Int64> {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+    fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
         let len = de.parse_i31()?;
         let mut buf = Vec::with_capacity(len as usize);
         for _ in 0 .. len {
@@ -113,7 +100,7 @@ impl<T> Serialize for Vector<T> where T : Serialize {
 }
 
 impl<T> Deserialize for Vector<T> where T : Deserialize {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+    fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
         let len = de.parse_i31()?;
         let mut buf = Vec::with_capacity(len as usize);
         for _ in 0 .. len {
@@ -125,31 +112,20 @@ impl<T> Deserialize for Vector<T> where T : Deserialize {
     }
 }
 
-impl<T, E> Deserialize for Result<T, E> where T:BoxedType + Deserialize, E: BareType + Deserialize {
-    fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+impl<T, E> Deserialize for Result<T, E> where T: DeserializeBoxed, E: DeserializeBoxed {
+    fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
         let constructor_number = de.parse_constructor_numer()?;
 
-        if constructor_number == E::CONSTRUCTOR_NUMBER_BE {
-            return Ok(Err(E::deserialize(de)?))
-        }
-
-        // Put back constructor number for T::deserialize
-        de.unpeek_constructor_number(constructor_number);
-
-        Ok(Ok(T::deserialize(de)?))
+        Self::deserialize_boxed(constructor_number, de)
     }
 }
 
-impl<T, E> Serialize for Result<T, E> where T: BoxedType + Serialize, E: BareType + Serialize {
-    fn serialize(&self, se: &mut Serializer) {
-        match self {
-            Ok(val) => {
-                val.serialize(se);
-            }
-            Err(val) => {
-                se.write_constructor_number(E::CONSTRUCTOR_NUMBER_BE);
-                val.serialize(se);
-            }
+impl<T, E> DeserializeBoxed for Result<T, E> where T: DeserializeBoxed, E: DeserializeBoxed {
+    fn deserialize_boxed(constructor_number: u32, de: &mut Deserializer) -> Result<Self, DeserializerBoxedError> {
+        match T::deserialize_boxed(constructor_number, de) {
+            Ok(val) => Ok(Ok(val)),
+            Err(DeserializerBoxedError::UnexpectedConstructorNumber { .. }) => Ok(Err(E::deserialize_boxed(constructor_number, de)?)),
+            Err(DeserializerBoxedError::DeserializeError(e)) => Err(DeserializerBoxedError::DeserializeError(e)),
         }
     }
 }
