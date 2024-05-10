@@ -122,7 +122,6 @@ impl<T, E> Deserialize for Result<T, E> where T: DeserializeBoxed, E: Deserializ
     }
 }
 
-
 // TODO[akostylev0] reinvent
 impl<T, E> DeserializeBoxed for Result<T, E> where T: DeserializeBoxed, E: DeserializeBoxed {
     fn deserialize_boxed(de: &mut Deserializer) -> anyhow::Result<Self> {
@@ -141,20 +140,6 @@ impl<T, E> DeserializeBoxed for Result<T, E> where T: DeserializeBoxed, E: Deser
                 }
 
                 Err(e)
-            }
-        }
-    }
-}
-
-impl<T, E> Serialize for Result<T, E> where T: Serialize, E: BareType + Serialize {
-    fn serialize(&self, se: &mut Serializer) {
-        match self {
-            Ok(val) => {
-                val.serialize(se);
-            }
-            Err(val) => {
-                se.write_constructor_number(E::CONSTRUCTOR_NUMBER_BE);
-                val.serialize(se);
             }
         }
     }
