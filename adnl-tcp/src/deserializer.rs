@@ -6,10 +6,6 @@ pub trait Deserialize where Self: Sized {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self>;
 }
 
-pub trait DeserializeBoxed where Self: Sized {
-    fn deserialize_boxed(de: &mut Deserializer) -> anyhow::Result<Self>;
-}
-
 pub struct Deserializer {
     input: Bytes,
     peek_constructor_number: Option<u32>
