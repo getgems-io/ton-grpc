@@ -2,8 +2,7 @@
 #![allow(unused_mut)]
 
 use std::fmt::{Debug, Display, Formatter};
-use anyhow::anyhow;
-use adnl_tcp::deserializer::{Deserialize, DeserializeBoxed, Deserializer};
+use adnl_tcp::deserializer::{Deserialize, DeserializeBoxed, Deserializer, DeserializerBoxedError};
 use adnl_tcp::serializer::{Serialize, SerializeBoxed, Serializer};
 pub use adnl_tcp::types::*;
 
