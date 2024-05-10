@@ -1,6 +1,6 @@
 use crate::deserializer::{Deserialize, Deserializer};
 use crate::serializer::{Serialize, Serializer};
-use crate::types::{BareType, BoxedType, Functional};
+use crate::types::BareType;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub struct Boxed<T> where T: BareType {
@@ -17,19 +17,9 @@ impl<T> Boxed<T> where T: BareType {
     }
 }
 
-impl<T> Functional for Boxed<T> where T: Functional + BareType, T::Result : BoxedType {
-    type Result = T::Result;
-}
-
-impl<T> BoxedType for Boxed<T> where T : BareType {
-    fn constructor_number(&self) -> u32 {
-        T::CONSTRUCTOR_NUMBER_BE
-    }
-}
-
 impl<T> Serialize for Boxed<T> where T : BareType + Serialize {
     fn serialize(&self, se: &mut Serializer) {
-        se.write_constructor_number(self.constructor_number());
+        se.write_constructor_number(T::CONSTRUCTOR_NUMBER_BE);
 
         self.inner.serialize(se);
     }

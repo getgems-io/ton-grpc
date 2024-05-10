@@ -11,24 +11,24 @@ async fn main() -> anyhow::Result<()> {
 
     let mut client = provided_client().await?;
 
-    let last = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.unbox().last;
+    let last = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.last;
     tracing::info!(?last);
 
     let partial_block_id = TonNodeBlockId { workchain: last.workchain, shard: last.shard, seqno: last.seqno - 200000 };
-    let block_id = (&mut client).oneshot(LiteServerLookupBlock { mode: 1, id: partial_block_id, lt: None, utime: None }).await?.unbox();
+    let block_id = (&mut client).oneshot(LiteServerLookupBlock { mode: 1, id: partial_block_id, lt: None, utime: None }).await?;
     tracing::info!(?block_id);
 
-    let txs = (&mut client).oneshot(LiteServerListBlockTransactions { id: last, mode: 15, count: 4, after: None, reverse_order: None, want_proof: Some(True {}) }).await?.unbox();
+    let txs = (&mut client).oneshot(LiteServerListBlockTransactions { id: last, mode: 15, count: 4, after: None, reverse_order: None, want_proof: Some(True {}) }).await?;
     for tx in txs.ids {
         tracing::info!(?tx)
     }
 
-    let txs = (&mut client).oneshot(LiteServerListBlockTransactions { id: block_id.id.clone(), mode: 1, count: 4, after: None, reverse_order: None, want_proof: None }).await?.unbox();
+    let txs = (&mut client).oneshot(LiteServerListBlockTransactions { id: block_id.id.clone(), mode: 1, count: 4, after: None, reverse_order: None, want_proof: None }).await?;
     for tx in txs.ids {
         tracing::info!(?tx)
     }
 
-    let txs = (&mut client).oneshot(LiteServerListBlockTransactions { id: block_id.id, mode: 1, count: 4, after: None, reverse_order: Some(True {}), want_proof: None }).await?.unbox();
+    let txs = (&mut client).oneshot(LiteServerListBlockTransactions { id: block_id.id, mode: 1, count: 4, after: None, reverse_order: Some(True {}), want_proof: None }).await?;
     for tx in txs.ids {
         tracing::info!(?tx)
     }

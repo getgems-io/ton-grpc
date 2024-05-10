@@ -18,7 +18,7 @@ use tokio::sync::oneshot::{Receiver, Sender};
 use tokio::time::MissedTickBehavior;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use adnl_tcp::boxed::Boxed;
-use adnl_tcp::types::{BareType, BoxedType};
+use adnl_tcp::types::BareType;
 use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
 use adnl_tcp::deserializer::{Deserialize, from_bytes};
@@ -127,8 +127,8 @@ impl LiteServerClient {
     }
 }
 
-impl<R> Service<R> for LiteServerClient where R: Requestable + BareType, R::Response : BoxedType {
-    type Response = R::Response;
+impl<R, I> Service<R> for LiteServerClient where I: BareType + Deserialize, R: Requestable<Response = Boxed<I>> + BareType {
+    type Response = I;
     type Error = Error;
     type Future = ResponseFuture<R::Response>;
 
@@ -195,8 +195,8 @@ impl<Response> PinnedDrop for ResponseFuture<Response> {
     }
 }
 
-impl<Response> Future for ResponseFuture<Response> where Response : BoxedType + Deserialize {
-    type Output = Result<Response, Error>;
+impl<Inner> Future for ResponseFuture<Boxed<Inner>> where Inner : BareType + Deserialize {
+    type Output = Result<Inner, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
@@ -207,11 +207,11 @@ impl<Response> Future for ResponseFuture<Response> where Response : BoxedType + 
             },
             ResponseStateProj::Rx { rx, .. } => return match ready!(rx.poll(cx)) {
                 Ok(response) => {
-                    let response = from_bytes::<Result<Response, LiteServerError>>(response)
+                    let response = from_bytes::<Result<Boxed<Inner>, LiteServerError>>(response)
                         .map_err(|_| Error::Deserialize)?
                         .map_err(Error::LiteServerError)?;
 
-                    Poll::Ready(Ok(response))
+                    Poll::Ready(Ok(response.unbox()))
                 }
                 Err(_) => {
                     Poll::Ready(Err(Error::OneshotClosed))
@@ -239,7 +239,7 @@ mod tests {
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot(LiteServerGetMasterchainInfo {}).await?.unbox();
+        let response = client.oneshot(LiteServerGetMasterchainInfo {}).await?;
 
         assert_eq!(response.last.workchain, -1);
         assert_eq!(response.last.shard, -9223372036854775808);
@@ -252,11 +252,11 @@ mod tests {
     #[ignore]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let response = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.unbox();
+        let response = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?;
 
         let response = (&mut client).oneshot(LiteServerGetAllShardsInfo {
             id: response.last
-        }).await?.unbox();
+        }).await?;
 
         assert_eq!(response.id.workchain, -1);
         assert_eq!(response.id.shard, -9223372036854775808);
@@ -270,7 +270,7 @@ mod tests {
     async fn client_get_version() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot(LiteServerGetVersion {}).await?.unbox();
+        let response = client.oneshot(LiteServerGetVersion {}).await?;
 
         assert!(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().abs_diff(response.now as u64) <= 10);
 
@@ -296,10 +296,10 @@ mod tests {
     #[ignore]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let known_block = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.unbox().last;
+        let known_block = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.last;
 
         let request = LiteServerGetBlockProof { mode: 0, known_block: known_block.clone(), target_block: None };
-        let response = client.oneshot(request).await?.unbox();
+        let response = client.oneshot(request).await?;
 
         assert_eq!(&response.from.seqno, &known_block.seqno);
 

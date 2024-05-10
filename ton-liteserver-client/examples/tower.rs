@@ -17,7 +17,7 @@ async fn main() -> Result<(), tower::BoxError> {
         .timeout(Duration::from_secs(3))
         .service(client);
 
-    let last = (&mut svc).oneshot(LiteServerGetMasterchainInfo {}).await?.unbox().last;
+    let last = (&mut svc).oneshot(LiteServerGetMasterchainInfo {}).await?.last;
 
     let requests = stream::iter((1 .. last.seqno).rev())
         .map(|seqno| LiteServerLookupBlock { mode: 1, id: TonNodeBlockId { workchain: last.workchain, shard: last.shard, seqno }, lt: None, utime: None });
@@ -25,7 +25,6 @@ async fn main() -> Result<(), tower::BoxError> {
     let mut responses = svc.call_all(requests).unordered();
 
     while let Some(item) = responses.next().await.transpose().inspect_err(|e| tracing::error!(e))? {
-        let item = item.unbox();
         tracing::info!(?item.id.seqno);
     }
     Ok(())

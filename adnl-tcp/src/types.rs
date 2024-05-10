@@ -125,7 +125,7 @@ impl<T> Deserialize for Vector<T> where T : Deserialize {
     }
 }
 
-impl<T, E> Deserialize for Result<T, E> where T:BoxedType + Deserialize, E: BareType + Deserialize {
+impl<T, E> Deserialize for Result<T, E> where T: Deserialize, E: BareType + Deserialize {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
         let constructor_number = de.parse_constructor_numer()?;
 
@@ -140,7 +140,7 @@ impl<T, E> Deserialize for Result<T, E> where T:BoxedType + Deserialize, E: Bare
     }
 }
 
-impl<T, E> Serialize for Result<T, E> where T: BoxedType + Serialize, E: BareType + Serialize {
+impl<T, E> Serialize for Result<T, E> where T: Serialize, E: BareType + Serialize {
     fn serialize(&self, se: &mut Serializer) {
         match self {
             Ok(val) => {
