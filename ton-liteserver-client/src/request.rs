@@ -12,3 +12,9 @@ impl<T> Requestable for T
 {
     type Response = T::Result;
 }
+
+
+pub struct WithMasterChainSeqno<R> {
+    pub inner: R,
+    pub seqno: i32,
+}

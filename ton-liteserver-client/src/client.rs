@@ -21,8 +21,8 @@ use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
 use adnl_tcp::deserializer::{DeserializeBoxed, from_bytes_boxed};
 use adnl_tcp::serializer::to_bytes_boxed;
-use crate::request::Requestable;
-use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery};
+use crate::request::{Requestable, WithMasterChainSeqno};
+use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery, LiteServerWaitMasterchainSeqno};
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -157,6 +157,39 @@ impl<R> Service<R> for LiteServerClient where R: Requestable {
     }
 }
 
+impl<R> Service<WithMasterChainSeqno<R>> for LiteServerClient where R: Requestable {
+    type Response = R::Response;
+    type Error = Error;
+    type Future = ResponseFuture<R::Response>;
+
+    fn poll_ready(&mut self, ctx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        <Self as Service<R>>::poll_ready(self, ctx)
+    }
+
+    fn call(&mut self, req: WithMasterChainSeqno<R>) -> Self::Future {
+        let prefix = LiteServerWaitMasterchainSeqno { seqno: req.seqno, timeout_ms: 5000 };
+
+        // TODO[akostylev0] optimize concat
+        let prefix_data = to_bytes_boxed(&prefix);
+        let query_data = to_bytes_boxed(&req.inner);
+
+        let query = LiteServerQuery { data: [prefix_data, query_data].concat() };
+        let query = to_bytes_boxed(&query);
+
+        let query_id: Int256 = random();
+        let request = AdnlMessageQuery { query_id, query };
+
+        let (tx, rx) = tokio::sync::oneshot::channel();
+
+        self.responses.insert(query_id, tx);
+        if self.tx.send(request).is_err() {
+            return ResponseFuture::failed(Error::ChannelClosed);
+        }
+
+        ResponseFuture::new(query_id, rx, self.responses.clone(), self.drop_guard.clone())
+    }
+}
+
 
 #[pin_project(project = ResponseStateProj)]
 pub enum ResponseState {
@@ -227,7 +260,7 @@ mod tests {
     use tracing_test::traced_test;
     use std::time::SystemTime;
     use std::time::UNIX_EPOCH;
-    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetVersion};
+    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetVersion, LiteServerLookupBlock, TonNodeBlockId};
     use super::*;
 
     #[tokio::test]
@@ -240,6 +273,29 @@ mod tests {
 
         assert_eq!(response.last.workchain, -1);
         assert_eq!(response.last.shard, -9223372036854775808);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    #[ignore]
+    async fn client_get_next_block_header() -> anyhow::Result<()> {
+        let mut client = provided_client().await?;
+        let last = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.last;
+        let next_block_id = TonNodeBlockId { workchain: last.workchain, shard: last.shard, seqno: last.seqno + 10 };
+
+        let response = client.oneshot(LiteServerLookupBlock {
+            mode: 1,
+            id: next_block_id,
+            lt: None,
+            utime: None
+        }).await;
+
+        tracing::info!(?response);
+        assert!(response.is_err());
+        let Error::LiteServerError(LiteServerError { code,.. }) = response.unwrap_err() else { unreachable!() };
+        assert_eq!(code, 651);
 
         Ok(())
     }
