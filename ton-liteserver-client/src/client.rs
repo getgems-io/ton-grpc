@@ -17,12 +17,10 @@ use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::oneshot::{Receiver, Sender};
 use tokio::time::MissedTickBehavior;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use adnl_tcp::boxed::Boxed;
-use adnl_tcp::types::BareType;
 use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
-use adnl_tcp::deserializer::{Deserialize, from_bytes};
-use adnl_tcp::serializer::to_bytes;
+use adnl_tcp::deserializer::{DeserializeBoxed, from_bytes_boxed};
+use adnl_tcp::serializer::to_bytes_boxed;
 use crate::request::Requestable;
 use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery};
 
@@ -68,9 +66,8 @@ impl LiteServerClient {
                             },
                             Ok(packet) => {
                                 tracing::trace!(?packet);
-                                let adnl_answer = from_bytes::<Boxed<AdnlMessageAnswer>>(packet.data)
-                                    .expect("expect adnl answer packet")
-                                    .unbox();
+                                let adnl_answer = from_bytes_boxed::<AdnlMessageAnswer>(packet.data)
+                                    .expect("expect adnl answer packet");
 
                                 if let Some((_, oneshot)) = responses_read_half.remove(&adnl_answer.query_id) {
                                     oneshot
@@ -108,7 +105,7 @@ impl LiteServerClient {
                     Some(request) = stream.next() => {
                         match request {
                             Ok(adnl_query) => {
-                                let data = to_bytes(&adnl_query.into_boxed());
+                                let data = to_bytes_boxed(&adnl_query);
                                 write_half.send(Packet::new(data)).await.expect("expect to send adnl query packet")
                             }
                             Err(_) => {
@@ -127,8 +124,8 @@ impl LiteServerClient {
     }
 }
 
-impl<R, I> Service<R> for LiteServerClient where I: BareType + Deserialize, R: Requestable<Response = Boxed<I>> + BareType {
-    type Response = I;
+impl<R> Service<R> for LiteServerClient where R: Requestable {
+    type Response = R::Response;
     type Error = Error;
     type Future = ResponseFuture<R::Response>;
 
@@ -141,10 +138,10 @@ impl<R, I> Service<R> for LiteServerClient where I: BareType + Deserialize, R: R
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        let data = to_bytes(&req.into_boxed());
+        let data = to_bytes_boxed(&req);
 
         let query = LiteServerQuery { data };
-        let query = to_bytes(&query.into_boxed());
+        let query = to_bytes_boxed(&query);
 
         let query_id: Int256 = random();
         let request = AdnlMessageQuery { query_id, query };
@@ -195,8 +192,8 @@ impl<Response> PinnedDrop for ResponseFuture<Response> {
     }
 }
 
-impl<Inner> Future for ResponseFuture<Boxed<Inner>> where Inner : BareType + Deserialize {
-    type Output = Result<Inner, Error>;
+impl<Response> Future for ResponseFuture<Response> where Response: DeserializeBoxed {
+    type Output = Result<Response, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
@@ -207,11 +204,11 @@ impl<Inner> Future for ResponseFuture<Boxed<Inner>> where Inner : BareType + Des
             },
             ResponseStateProj::Rx { rx, .. } => return match ready!(rx.poll(cx)) {
                 Ok(response) => {
-                    let response = from_bytes::<Result<Boxed<Inner>, LiteServerError>>(response)
+                    let response = from_bytes_boxed::<Result<Response, LiteServerError>>(response)
                         .map_err(|_| Error::Deserialize)?
                         .map_err(Error::LiteServerError)?;
 
-                    Poll::Ready(Ok(response.unbox()))
+                    Poll::Ready(Ok(response))
                 }
                 Err(_) => {
                     Poll::Ready(Err(Error::OneshotClosed))

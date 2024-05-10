@@ -6,6 +6,10 @@ pub trait Deserialize where Self: Sized {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self>;
 }
 
+pub trait DeserializeBoxed: Deserialize {
+    fn deserialize_boxed(de: &mut Deserializer) -> anyhow::Result<Self>;
+}
+
 pub struct Deserializer {
     input: Bytes,
     peek_constructor_number: Option<u32>
@@ -95,12 +99,12 @@ impl Deserializer {
     }
 }
 
-pub fn from_bytes<T>(bytes: Vec<u8>) -> anyhow::Result<T>
+pub fn from_bytes_boxed<T>(bytes: Vec<u8>) -> anyhow::Result<T>
     where
-        T: Deserialize,
+        T: DeserializeBoxed,
 {
     let mut deserializer = Deserializer::from_bytes(bytes);
-    let t = T::deserialize(&mut deserializer)?;
+    let t = T::deserialize_boxed(&mut deserializer)?;
     if deserializer.input.is_empty() {
         Ok(t)
     } else {

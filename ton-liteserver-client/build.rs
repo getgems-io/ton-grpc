@@ -85,7 +85,7 @@ impl Generator {
                     }
                 } else {
                     quote! {
-                    pub type #struct_name = Boxed<#name>;
+                    pub type #struct_name = #name;
                 }
                 }
             } else {
@@ -147,20 +147,20 @@ impl Generator {
                         #(#fields),*
                     }
 
-                    impl BoxedType for #struct_name {
-                        fn constructor_number(&self) -> u32 {
-                            match self {
+                    impl Serialize for #struct_name {
+                        fn serialize(&self, se: &mut Serializer) {
+                            se.write_constructor_number(match self {
                                 #(#constructor_number_fields),*
+                            });
+                            match self {
+                                #(#serialize_match),*
                             }
                         }
                     }
 
-                    impl Serialize for #struct_name {
-                        fn serialize(&self, se: &mut Serializer) {
-                            se.write_constructor_number(self.constructor_number());
-                            match self {
-                                #(#serialize_match),*
-                            }
+                    impl SerializeBoxed for #struct_name {
+                        fn serialize_boxed(&self, se: &mut Serializer) {
+                            self.serialize(se);
                         }
                     }
 
@@ -172,6 +172,12 @@ impl Generator {
                                 #(#deserialize_match),*
                                 _ => Err(anyhow!("Unexpected constructor number"))
                             }
+                        }
+                    }
+
+                    impl DeserializeBoxed for #struct_name {
+                        fn deserialize_boxed(de: &mut Deserializer) -> anyhow::Result<Self> {
+                            Self::deserialize(de)
                         }
                     }
                 }
@@ -383,7 +389,6 @@ impl Generator {
                     quote! {}
                 };
 
-                let constructor_number_le = definition.constructor_number_le();
                 let constructor_number_be = definition.constructor_number_be();
                 let output = quote! {
                     #[#t]
@@ -392,10 +397,6 @@ impl Generator {
                     }
 
                     #traits
-
-                    impl #struct_name {
-                        const CONSTRUCTOR_NUMBER_LE: u32 = #constructor_number_le;
-                    }
 
                     impl BareType for #struct_name {
                         const CONSTRUCTOR_NUMBER_BE: u32 = #constructor_number_be;
@@ -410,6 +411,14 @@ impl Generator {
                         }
                     }
 
+                    impl SerializeBoxed for #struct_name {
+                        #[allow(unused_variables)]
+                        fn serialize_boxed(&self, se: &mut Serializer) {
+                            se.write_constructor_number(#constructor_number_be);
+                            self.serialize(se)
+                        }
+                    }
+
                     impl Deserialize for #struct_name {
                         #[allow(unused_variables)]
                         fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
@@ -418,6 +427,15 @@ impl Generator {
                             Ok(Self {
                                 #(#deserialize_pass)*
                             })
+                        }
+                    }
+
+                    impl DeserializeBoxed for #struct_name {
+                        #[allow(unused_variables)]
+                        fn deserialize_boxed(de: &mut Deserializer) -> anyhow::Result<Self> {
+                            de.verify_constructor_number(#constructor_number_be)?;
+
+                            Self::deserialize(de)
                         }
                     }
                 };

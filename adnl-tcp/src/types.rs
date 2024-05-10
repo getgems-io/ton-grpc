@@ -1,5 +1,4 @@
-use crate::boxed::Boxed;
-use crate::deserializer::{Deserialize, Deserializer};
+use crate::deserializer::{Deserialize, DeserializeBoxed, Deserializer};
 use crate::serializer::{Serialize, Serializer};
 
 pub trait Functional {
@@ -8,14 +7,6 @@ pub trait Functional {
 
 pub trait BareType where Self: Sized {
     const CONSTRUCTOR_NUMBER_BE: u32;
-
-    fn into_boxed(self) -> Boxed<Self> {
-        Boxed::new(self)
-    }
-}
-
-pub trait BoxedType where Self: Sized {
-    fn constructor_number(&self) -> u32;
 }
 
 // TODO[akostylev0] review
@@ -125,18 +116,33 @@ impl<T> Deserialize for Vector<T> where T : Deserialize {
     }
 }
 
-impl<T, E> Deserialize for Result<T, E> where T: Deserialize, E: BareType + Deserialize {
+impl<T, E> Deserialize for Result<T, E> where T: DeserializeBoxed, E: DeserializeBoxed {
     fn deserialize(de: &mut Deserializer) -> anyhow::Result<Self> {
+        Self::deserialize_boxed(de)
+    }
+}
+
+
+// TODO[akostylev0] reinvent
+impl<T, E> DeserializeBoxed for Result<T, E> where T: DeserializeBoxed, E: DeserializeBoxed {
+    fn deserialize_boxed(de: &mut Deserializer) -> anyhow::Result<Self> {
         let constructor_number = de.parse_constructor_numer()?;
-
-        if constructor_number == E::CONSTRUCTOR_NUMBER_BE {
-            return Ok(Err(E::deserialize(de)?))
-        }
-
         // Put back constructor number for T::deserialize
         de.unpeek_constructor_number(constructor_number);
 
-        Ok(Ok(T::deserialize(de)?))
+        match T::deserialize_boxed(de) {
+            Ok(val) => { Ok(Ok(val))  }
+            Err(e) => {
+                // TODO[akostylev0] error type
+                if e.to_string().starts_with("Unexpected constructor number") {
+                    // Put back constructor number for T::deserialize
+                    de.unpeek_constructor_number(constructor_number);
+                    return Ok(Err(E::deserialize_boxed(de)?))
+                }
+
+                Err(e)
+            }
+        }
     }
 }
 
