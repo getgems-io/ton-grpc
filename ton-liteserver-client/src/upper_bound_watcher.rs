@@ -4,38 +4,46 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use tower::ServiceExt;
 use crate::client::{Error, LiteServerClient};
 use crate::request::WaitSeqno;
-use crate::tl::{LiteServerBoxedMasterchainInfo, LiteServerGetMasterchainInfo, LiteServerLookupBlock, LiteServerMasterchainInfo, TonNodeBlockId, TonNodeBlockIdExt};
+use crate::tl::{LiteServerGetMasterchainInfo, LiteServerLookupBlock, LiteServerMasterchainInfo, TonNodeBlockId};
 
 pub struct UpperBoundWatcher {
     current: Receiver<Option<LiteServerMasterchainInfo>>,
-    join_handle: tokio::task::JoinHandle<()>,
     _drop_guard: DropGuard,
 }
 
 impl UpperBoundWatcher {
-    pub fn new(inner: LiteServerClient) -> Self {
+    pub fn new(mut inner: LiteServerClient) -> Self {
         let (tx, current) = tokio::sync::watch::channel(None);
         let token = CancellationToken::new();
-        let join_handle = tokio::spawn({
+        tokio::spawn({
             let token = token.child_token();
-            let mut stream = upper_bound_stream(inner);
 
             async move {
                 loop {
-                    tokio::select! {
-                        _ = token.cancelled() => {
-                            tracing::error!("UpperBoundWatcher cancelled");
-                            break;
-                        },
-                        Ok(Some(block_id)) = stream.try_next() => {
-                            let _ = tx.send(Some(block_id)).inspect_err(|e| tracing::error!(error = ?e));
+                    let mut stream = upper_bound_stream(&mut inner);
+                    'inner: loop {
+                        tokio::select! {
+                            _ = token.cancelled() => {
+                                tracing::error!("UpperBoundWatcher cancelled");
+                                break;
+                            },
+                            result = stream.try_next() => {
+                                match result {
+                                    Ok(Some(block_id)) => {
+                                        let _ = tx.send(Some(block_id))
+                                        .inspect_err(|error| tracing::error!(?error));
+                                    },
+                                    Ok(None) => { unreachable!(); }
+                                    Err(error) => { tracing::error!(?error); break 'inner; },
+                                }
+                            }
                         }
                     }
                 }
             }
         });
 
-        Self { current, join_handle, _drop_guard: token.drop_guard() }
+        Self { current, _drop_guard: token.drop_guard() }
     }
 
     pub fn current_upper_bound(&self) -> Ref<'_, Option<LiteServerMasterchainInfo>> {
@@ -43,16 +51,16 @@ impl UpperBoundWatcher {
     }
 }
 
-fn upper_bound_stream(client: LiteServerClient) -> impl TryStream<Ok=LiteServerMasterchainInfo, Error=crate::client::Error> + Unpin {
-    struct State {
-        client: LiteServerClient,
+fn upper_bound_stream<'a>(client: &'a mut LiteServerClient) -> impl TryStream<Ok=LiteServerMasterchainInfo, Error=crate::client::Error> + Unpin + 'a {
+    struct State<'a> {
+        client: &'a mut LiteServerClient,
         current: Option<LiteServerMasterchainInfo>
     }
 
-    futures::stream::try_unfold(State { client, current: None }, |State { mut client, current }| async move {
+    futures::stream::try_unfold(State { client, current: None }, |State { client, current }| async move {
         match current {
             None => {
-                let info = (&mut client).oneshot(LiteServerGetMasterchainInfo::default()).await?;
+                let info = client.oneshot(LiteServerGetMasterchainInfo::default()).await?;
 
                 Ok(Some((info.clone(), State { client, current: Some(info) })))
             },
@@ -64,7 +72,7 @@ fn upper_bound_stream(client: LiteServerClient) -> impl TryStream<Ok=LiteServerM
                 let request = WaitSeqno::new(LiteServerLookupBlock { mode: 1, id: next_block_id, lt: None, utime: None  }, next_seqno);
 
                 loop {
-                    let block_id = (&mut client).oneshot(request.clone()).await;
+                    let block_id = client.oneshot(request.clone()).await;
 
                     match block_id {
                         Ok(block_id) => {
@@ -94,8 +102,8 @@ mod tests {
     #[traced_test]
     #[ignore]
     async fn upper_bound_stream_test() -> anyhow::Result<()> {
-        let client = crate::client::tests::provided_client().await?;
-        let mut stream = upper_bound_stream(client);
+        let mut client = crate::client::tests::provided_client().await?;
+        let mut stream = upper_bound_stream(&mut client);
 
         let block_id1 = stream.try_next().await.unwrap().unwrap();
         tracing::info!("{:?}", block_id1);

@@ -1,12 +1,11 @@
 use std::future::{ready, Ready};
 use std::task::{Context, Poll};
-use futures::FutureExt;
 use tower::Service;
 use crate::client::LiteServerClient;
 use crate::tl::{LiteServerBoxedMasterchainInfo, LiteServerGetMasterchainInfo};
 use crate::upper_bound_watcher::UpperBoundWatcher;
 
-struct BoundedClient {
+pub struct BoundedClient {
     inner: LiteServerClient,
     upper_bound_watcher: UpperBoundWatcher,
 }
@@ -57,7 +56,7 @@ mod tests {
     #[tokio::test]
     #[traced_test]
     #[ignore]
-    async fn bounded_client__masterchain_info_test() -> anyhow::Result<()> {
+    async fn bounded_client_masterchain_info_test() -> anyhow::Result<()> {
         let client = crate::client::tests::provided_client().await?;
         let mut client = BoundedClient::new(client);
 
