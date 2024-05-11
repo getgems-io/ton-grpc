@@ -16,6 +16,12 @@ impl Display for LiteServerError {
 
 impl std::error::Error for LiteServerError {}
 
+impl From<TonNodeBlockIdExt> for TonNodeBlockId {
+    fn from(value: TonNodeBlockIdExt) -> Self {
+        TonNodeBlockId { workchain: value.workchain, shard: value.shard, seqno: value.seqno }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use base64::Engine;

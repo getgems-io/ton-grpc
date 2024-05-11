@@ -13,6 +13,7 @@ impl<T> Requestable for T
     type Response = T::Result;
 }
 
+#[derive(Debug, Clone)]
 pub struct WaitSeqno<R> {
     prefix: LiteServerWaitMasterchainSeqno,
     request: R,
