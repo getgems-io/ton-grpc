@@ -227,6 +227,7 @@ mod tests {
     use tracing_test::traced_test;
     use std::time::SystemTime;
     use std::time::UNIX_EPOCH;
+    use crate::request::WaitSeqno;
     use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetVersion};
     use super::*;
 
@@ -241,6 +242,21 @@ mod tests {
         assert_eq!(response.last.workchain, -1);
         assert_eq!(response.last.shard, -9223372036854775808);
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    #[ignore]
+    async fn client_wait_seqno_info() -> anyhow::Result<()> {
+        let mut client = provided_client().await?;
+        let current = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?;
+
+        let actual = (&mut client).oneshot(WaitSeqno::new(LiteServerGetMasterchainInfo {}, current.last.seqno + 1)).await?;
+
+        assert_eq!(actual.last.workchain, -1);
+        assert_eq!(actual.last.shard, -9223372036854775808);
+        assert!(current.last.seqno < actual.last.seqno);
         Ok(())
     }
 
