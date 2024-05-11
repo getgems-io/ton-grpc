@@ -197,7 +197,7 @@ impl Generator {
                 let struct_name = structure_ident(definition.id());
 
                 let mut to_derive = configuration.derives.clone();
-                if definition.fields().len() == 0 {
+                if definition.fields().is_empty() {
                     to_derive.push("Default".to_owned());
                 }
 
