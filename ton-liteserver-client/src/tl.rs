@@ -14,9 +14,7 @@ impl Display for LiteServerError {
     }
 }
 
-impl std::error::Error for LiteServerError {
-
-}
+impl std::error::Error for LiteServerError {}
 
 #[cfg(test)]
 mod tests {
@@ -50,7 +48,7 @@ mod tests {
 
     #[test]
     fn serialize_get_masterchain_info_test() {
-        let s = LiteServerGetMasterchainInfo {};
+        let s = LiteServerGetMasterchainInfo::default();
 
         let bytes = to_bytes_boxed(&s);
 

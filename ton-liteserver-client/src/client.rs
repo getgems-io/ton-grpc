@@ -237,7 +237,7 @@ mod tests {
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot(LiteServerGetMasterchainInfo {}).await?;
+        let response = client.oneshot(LiteServerGetMasterchainInfo::default()).await?;
 
         assert_eq!(response.last.workchain, -1);
         assert_eq!(response.last.shard, -9223372036854775808);
@@ -250,9 +250,9 @@ mod tests {
     #[ignore]
     async fn client_wait_seqno_info() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let current = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?;
+        let current = (&mut client).oneshot(LiteServerGetMasterchainInfo::default()).await?;
 
-        let actual = (&mut client).oneshot(WaitSeqno::new(LiteServerGetMasterchainInfo {}, current.last.seqno + 1)).await?;
+        let actual = (&mut client).oneshot(WaitSeqno::new(LiteServerGetMasterchainInfo::default(), current.last.seqno + 1)).await?;
 
         assert_eq!(actual.last.workchain, -1);
         assert_eq!(actual.last.shard, -9223372036854775808);
@@ -265,7 +265,7 @@ mod tests {
     #[ignore]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let response = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?;
+        let response = (&mut client).oneshot(LiteServerGetMasterchainInfo::default()).await?;
 
         let response = (&mut client).oneshot(LiteServerGetAllShardsInfo {
             id: response.last
@@ -283,7 +283,7 @@ mod tests {
     async fn client_get_version() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot(LiteServerGetVersion {}).await?;
+        let response = client.oneshot(LiteServerGetVersion::default()).await?;
 
         assert!(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().abs_diff(response.now as u64) <= 10);
 
@@ -309,7 +309,7 @@ mod tests {
     #[ignore]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let known_block = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.last;
+        let known_block = (&mut client).oneshot(LiteServerGetMasterchainInfo::default()).await?.last;
 
         let request = LiteServerGetBlockProof { mode: 0, known_block: known_block.clone(), target_block: None };
         let response = client.oneshot(request).await?;
@@ -326,7 +326,7 @@ mod tests {
         let future = {
             let client = provided_client().await?;
 
-            client.oneshot(LiteServerGetMasterchainInfo {})
+            client.oneshot(LiteServerGetMasterchainInfo::default())
         };
 
         let response = future.await;
