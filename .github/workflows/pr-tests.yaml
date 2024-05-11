@@ -41,6 +41,7 @@ jobs:
       - uses: mozilla-actions/sccache-action@v0.0.4
       - run: cargo test --no-fail-fast --features "${{ matrix.features }}"
         env:
+          CARGO_INCREMENTAL: "0"
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
           CMAKE_C_COMPILER_LAUNCHER: "sccache"
