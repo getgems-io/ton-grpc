@@ -17,7 +17,7 @@ async fn main() -> Result<(), tower::BoxError> {
         .timeout(Duration::from_secs(3))
         .service(client);
 
-    let last = (&mut svc).oneshot(LiteServerGetMasterchainInfo {}).await?.last;
+    let last = (&mut svc).oneshot(LiteServerGetMasterchainInfo::default()).await?.last;
 
     let requests = stream::iter((1 .. last.seqno).rev())
         .map(|seqno| LiteServerLookupBlock { mode: 1, id: TonNodeBlockId { workchain: last.workchain, shard: last.shard, seqno }, lt: None, utime: None });

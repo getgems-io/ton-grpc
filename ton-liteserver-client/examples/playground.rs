@@ -11,7 +11,7 @@ async fn main() -> anyhow::Result<()> {
 
     let mut client = provided_client().await?;
 
-    let last = (&mut client).oneshot(LiteServerGetMasterchainInfo {}).await?.last;
+    let last = (&mut client).oneshot(LiteServerGetMasterchainInfo::default()).await?.last;
     tracing::info!(?last);
 
     let partial_block_id = TonNodeBlockId { workchain: last.workchain, shard: last.shard, seqno: last.seqno - 200000 };

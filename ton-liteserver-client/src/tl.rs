@@ -14,8 +14,24 @@ impl Display for LiteServerError {
     }
 }
 
-impl std::error::Error for LiteServerError {
+impl std::error::Error for LiteServerError {}
 
+impl Default for LiteServerGetMasterchainInfo {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
+impl Default for LiteServerGetTime {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
+impl Default for LiteServerGetVersion {
+    fn default() -> Self {
+        Self {}
+    }
 }
 
 #[cfg(test)]
@@ -50,7 +66,7 @@ mod tests {
 
     #[test]
     fn serialize_get_masterchain_info_test() {
-        let s = LiteServerGetMasterchainInfo {};
+        let s = LiteServerGetMasterchainInfo::default();
 
         let bytes = to_bytes_boxed(&s);
 
