@@ -8,7 +8,17 @@ pub trait Requestable: SerializeBoxed + Send {
 
 impl<T> Requestable for T
     where T : Functional + SerializeBoxed + Send,
-        T::Result: DeserializeBoxed + Send + 'static
-{
+        T::Result: DeserializeBoxed + Send + 'static {
     type Response = T::Result;
+}
+
+pub struct WithSeqno<R> {
+    request: R,
+    seqno: i32
+}
+
+impl<R> WithSeqno<R> where R: Requestable + Sized {
+    pub fn new(request: R, seqno: i32) -> Self {
+        Self { request, seqno }
+    }
 }
