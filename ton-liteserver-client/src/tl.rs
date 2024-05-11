@@ -16,24 +16,6 @@ impl Display for LiteServerError {
 
 impl std::error::Error for LiteServerError {}
 
-impl Default for LiteServerGetMasterchainInfo {
-    fn default() -> Self {
-        Self {}
-    }
-}
-
-impl Default for LiteServerGetTime {
-    fn default() -> Self {
-        Self {}
-    }
-}
-
-impl Default for LiteServerGetVersion {
-    fn default() -> Self {
-        Self {}
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use base64::Engine;

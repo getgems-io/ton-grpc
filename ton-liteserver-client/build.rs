@@ -196,7 +196,12 @@ impl Generator {
 
                 let struct_name = structure_ident(definition.id());
 
-                let derives = format!("derive({})", configuration.derives.join(","));
+                let mut to_derive = configuration.derives.clone();
+                if definition.fields().len() == 0 {
+                    to_derive.push("Default".to_owned());
+                }
+
+                let derives = format!("derive({})", to_derive.join(","));
                 let t = syn::parse_str::<MetaList>(&derives)?;
 
                 let fields: Vec<_> = definition.fields()
