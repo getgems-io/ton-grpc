@@ -204,6 +204,14 @@ impl Generator {
                 let derives = format!("derive({})", to_derive.join(","));
                 let t = syn::parse_str::<MetaList>(&derives)?;
 
+                let target_block_id = definition.is_functional() && definition
+                    .fields()
+                    .iter()
+                    .any(|field|
+                        field.id().is_some_and(|s| s == "id") &&
+                        field.field_type().is_some_and(|typ| typ == "tonNode.blockIdExt")
+                    );
+
                 let fields: Vec<_> = definition.fields()
                     .iter()
                     .map(|field| {
@@ -387,6 +395,18 @@ impl Generator {
                     quote! {}
                 };
 
+                let target_block_impl = if target_block_id {
+                    quote! {
+                        impl TargetBlockId for #struct_name {
+                            fn target_block_id(&self) -> &TonNodeBlockIdExt {
+                                &self.id
+                            }
+                        }
+                    }
+                } else {
+                    quote! {}
+                };
+
                 let constructor_number_be = definition.constructor_number_be();
                 let output = quote! {
                     #[#t]
@@ -395,6 +415,8 @@ impl Generator {
                     }
 
                     #traits
+
+                    #target_block_impl
 
                     impl #struct_name {
                         const CONSTRUCTOR_NUMBER_BE: u32 = #constructor_number_be;

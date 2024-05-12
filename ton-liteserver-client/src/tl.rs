@@ -1,10 +1,12 @@
 #![allow(dead_code)]
 #![allow(unused_mut)]
 
+use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
 use adnl_tcp::deserializer::{Deserialize, DeserializeBoxed, Deserializer, DeserializerBoxedError};
 use adnl_tcp::serializer::{Serialize, SerializeBoxed, Serializer};
 pub use adnl_tcp::types::*;
+use crate::request::TargetBlockId;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
@@ -19,6 +21,16 @@ impl std::error::Error for LiteServerError {}
 impl From<TonNodeBlockIdExt> for TonNodeBlockId {
     fn from(value: TonNodeBlockIdExt) -> Self {
         TonNodeBlockId { workchain: value.workchain, shard: value.shard, seqno: value.seqno }
+    }
+}
+
+impl PartialOrd for TonNodeBlockIdExt {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.workchain != other.workchain || self.shard != other.shard {
+            return None;
+        }
+
+        Some(self.seqno.cmp(&other.seqno))
     }
 }
 

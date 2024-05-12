@@ -1,10 +1,14 @@
 use adnl_tcp::deserializer::DeserializeBoxed;
 use adnl_tcp::serializer::{SerializeBoxed, Serializer};
 use adnl_tcp::types::Functional;
-use crate::tl::LiteServerWaitMasterchainSeqno;
+use crate::tl::{LiteServerWaitMasterchainSeqno, TonNodeBlockIdExt};
 
 pub trait Requestable: SerializeBoxed + Send {
     type Response: DeserializeBoxed + Send + 'static;
+}
+
+pub trait TargetBlockId: Requestable {
+    fn target_block_id(&self) -> &TonNodeBlockIdExt;
 }
 
 impl<T> Requestable for T
