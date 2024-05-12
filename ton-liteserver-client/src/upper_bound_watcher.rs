@@ -51,7 +51,7 @@ impl UpperBoundWatcher {
     }
 }
 
-fn upper_bound_stream<'a>(client: &'a mut LiteServerClient) -> impl TryStream<Ok=LiteServerMasterchainInfo, Error=crate::client::Error> + Unpin + 'a {
+fn upper_bound_stream(client: &mut LiteServerClient) -> impl TryStream<Ok=LiteServerMasterchainInfo, Error=crate::client::Error> + Unpin + '_ {
     struct State<'a> {
         client: &'a mut LiteServerClient,
         current: Option<LiteServerMasterchainInfo>
