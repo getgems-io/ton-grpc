@@ -132,8 +132,8 @@ pub struct Field {
 
 // TODO[akostylev0] TypeDefinition
 impl Field {
-    pub fn id(&self) -> &Option<String> {
-        &self.name
+    pub fn id(&self) -> Option<&str> {
+        self.name.as_deref()
     }
 
     pub fn field_type(&self) -> Option<&str> {
