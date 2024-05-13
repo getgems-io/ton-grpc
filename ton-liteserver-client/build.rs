@@ -207,7 +207,7 @@ impl Generator {
                 let fields: Vec<_> = definition.fields()
                     .iter()
                     .map(|field| {
-                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+                        let field_name = field.id().unwrap().to_case(Case::Snake);
 
                         eprintln!("field = {:?}", field);
                         let field_name = format_ident!("{}", &field_name);
@@ -244,7 +244,7 @@ impl Generator {
                 let serialize_defs: Vec<_> = definition.fields()
                     .iter()
                     .map(|field| {
-                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+                        let field_name = field.id().unwrap().to_case(Case::Snake);
 
                         eprintln!("field = {:?}", field);
                         let field_name_ident = format_ident!("{}", &field_name);
@@ -279,7 +279,7 @@ impl Generator {
                 let serialize_fields: Vec<_> = definition.fields()
                     .iter()
                     .map(|field| {
-                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+                        let field_name = field.id().unwrap().to_case(Case::Snake);
 
                         eprintln!("field = {:?}", field);
                         let field_name_ident = format_ident!("{}", &field_name);
@@ -324,7 +324,7 @@ impl Generator {
                 let deserialize_fields: Vec<_> = definition.fields()
                     .iter()
                     .map(|field| {
-                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+                        let field_name = field.id().unwrap().to_case(Case::Snake);
 
                         eprintln!("field = {:?}", field);
                         let field_name_ident = format_ident!("{}", &field_name);
@@ -366,7 +366,7 @@ impl Generator {
                 let deserialize_pass: Vec<_> = definition.fields()
                     .iter()
                     .map(|field| {
-                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+                        let field_name = field.id().unwrap().to_case(Case::Snake);
 
                         eprintln!("field = {:?}", field);
                         let field_name_ident = format_ident!("{}", &field_name);

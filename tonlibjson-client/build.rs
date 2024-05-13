@@ -281,14 +281,14 @@ impl Generator {
                     .iter()
                     .filter(|field| {
                         let default_configuration = FieldConfiguration::default();
-                        let field_name = field.id().clone().unwrap();
-                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+                        let field_name = field.id().unwrap();
+                        let field_configuration = configuration.fields.get(field_name).unwrap_or(&default_configuration);
 
                         !field_configuration.skip
                     })
                     .map(|field| {
                         let default_configuration = FieldConfiguration::default();
-                        let field_name = field.id().clone().unwrap().to_case(Case::Snake);
+                        let field_name = field.id().unwrap().to_case(Case::Snake);
                         let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
 
                         eprintln!("field = {:?}", field);
