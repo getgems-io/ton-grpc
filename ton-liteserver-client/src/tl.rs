@@ -59,7 +59,7 @@ mod tests {
     fn deserialize_adnl_query_test() {
         let bytes = hex::decode("7af98bb477c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c40cdf068c79042ee6b589000000000000").unwrap();
 
-        let query = from_bytes_boxed::<AdnlMessageQuery>(bytes).unwrap();
+        let query = from_bytes_boxed::<AdnlMessageQuery>(&bytes).unwrap();
 
         assert_eq!(query, AdnlMessageQuery {
             query_id: hex::decode("77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4").unwrap().try_into().unwrap(),
@@ -71,7 +71,7 @@ mod tests {
     fn deserialize_masterchain_info_test() {
         let bytes = hex::decode("81288385ffffffff000000000000008027405801e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e01235178b4d3b38b06bb484015faf9821c3ba1c609a25b74f30e1e585b8c8e820ef0976ffffffff17a3a92992aabea785a7a090985a265cd31f323d849da51239737e321fb055695e994fcf4d425c0a6ce6a792594b7173205f740a39cd56f537defd28b48a0f6e").unwrap();
 
-        let masterchain_info = from_bytes_boxed::<LiteServerMasterchainInfo>(bytes).unwrap();
+        let masterchain_info = from_bytes_boxed::<LiteServerMasterchainInfo>(&bytes).unwrap();
 
         eprintln!("{}", base64::engine::general_purpose::STANDARD.encode(hex::decode("e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4").unwrap()));
         eprintln!("{}", base64::engine::general_purpose::STANDARD.encode(hex::decode("876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e0123517").unwrap()));

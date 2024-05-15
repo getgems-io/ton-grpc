@@ -1,5 +1,5 @@
 use anyhow::bail;
-use bytes::{Buf, Bytes};
+use bytes::Buf;
 use thiserror::Error;
 use crate::types::Int256;
 
@@ -19,14 +19,13 @@ pub trait DeserializeBoxed: Deserialize {
     fn deserialize_boxed(constructor_number: u32, de: &mut Deserializer) -> Result<Self, DeserializerBoxedError>;
 }
 
-pub struct Deserializer {
-    input: Bytes
+pub struct Deserializer<'de> {
+    input: &'de [u8]
 }
 
-impl Deserializer {
-    // TODO[akostylev0]
-    pub fn from_bytes(bytes: Vec<u8>) -> Self {
-        Deserializer { input: bytes.into() }
+impl<'de> Deserializer<'de> {
+    pub fn from_bytes(input: &'de [u8]) -> Self {
+        Deserializer { input }
     }
 
     pub fn parse_constructor_numer(&mut self) -> anyhow::Result<u32> {
@@ -46,9 +45,8 @@ impl Deserializer {
     }
 
     pub fn parse_i256(&mut self) -> anyhow::Result<Int256> {
-        let mut needed = self.input.split_to(32);
         let mut result: [u8; 32] = [0; 32];
-        needed.copy_to_slice(&mut result);
+        self.input.copy_to_slice(&mut result);
 
         Ok(result)
     }
@@ -56,9 +54,9 @@ impl Deserializer {
     pub fn parse_bytes(&mut self) -> anyhow::Result<crate::types::Bytes> {
         let len = self.input.get_u8();
         if len <= 253 {
-            let mut needed = self.input.split_to(len as usize);
             let mut result = vec![0; len as usize];
-            needed.copy_to_slice(&mut result);
+            self.input.copy_to_slice(&mut result);
+
             let padding = (len + 1) % 4;
             if padding > 0 {
                 self.input.advance(4 - padding as usize)
@@ -67,14 +65,12 @@ impl Deserializer {
             Ok(result)
         } else {
             let mut len: [u8; 4] = [0; 4];
-            let mut needed = self.input.split_to(3);
-            needed.copy_to_slice(&mut (len[..3]));
+            self.input.copy_to_slice(&mut (len[..3]));
             let len = u32::from_le_bytes(len);
 
-            let mut needed = self.input.split_to(len as usize);
             let mut result = vec![0; len as usize];
+            self.input.copy_to_slice(&mut result);
 
-            needed.copy_to_slice(&mut result);
             let padding = len % 4;
             if padding > 0 {
                 self.input.advance(4 - padding as usize)
@@ -91,9 +87,8 @@ impl Deserializer {
     }
 }
 
-pub fn from_bytes_boxed<T>(bytes: Vec<u8>) -> anyhow::Result<T>
-    where
-        T: DeserializeBoxed,
+pub fn from_bytes_boxed<T>(bytes: &[u8]) -> anyhow::Result<T>
+    where T: DeserializeBoxed,
 {
     let mut deserializer = Deserializer::from_bytes(bytes);
     let constructor_number = deserializer.parse_constructor_numer()?;
@@ -115,7 +110,7 @@ mod tests {
         let mut buf = vec![254, 255, 0, 0];
         buf.append(&mut vec![1; 255]);
         buf.append(&mut vec![0; 1]);
-        let mut deserializer = Deserializer::from_bytes(buf);
+        let mut deserializer = Deserializer::from_bytes(&buf);
 
         let value = deserializer.parse_bytes().unwrap();
 
