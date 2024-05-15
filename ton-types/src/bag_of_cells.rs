@@ -112,15 +112,9 @@ impl Deserialize for BagOfCells {
         let constructor_number = de.parse_constructor_numer()?;
 
         match constructor_number {
-            0x68ff65f3 => {
-                Ok(<BagOfCells as DeserializeBare<0x68ff65f3>>::deserialize_bare(de)?)
-            },
-            0xacc3a728 => {
-                Ok(<BagOfCells as DeserializeBare<0xacc3a728>>::deserialize_bare(de)?)
-            },
-            0xb5ee9c72 => {
-                Ok(<BagOfCells as DeserializeBare<0xb5ee9c72>>::deserialize_bare(de)?)
-            },
+            0x68ff65f3 => Ok(<BagOfCells as DeserializeBare<0x68ff65f3>>::deserialize_bare(de)?),
+            0xacc3a728 => Ok(<BagOfCells as DeserializeBare<0xacc3a728>>::deserialize_bare(de)?),
+            0xb5ee9c72 => Ok(<BagOfCells as DeserializeBare<0xb5ee9c72>>::deserialize_bare(de)?),
             _ => Err(DeserializerError::UnexpectedConstructorNumber(constructor_number))
         }
     }
@@ -128,15 +122,14 @@ impl Deserialize for BagOfCells {
 
 #[cfg(test)]
 mod tests {
-    use crate::deserializer::Deserialize;
+    use crate::deserializer::from_bytes;
     use super::*;
 
     #[test]
     fn boc_deserialize_example_test() {
         let bytes = hex::decode("b5ee9c7201010301000e000201c002010101ff0200060aaaaa").unwrap();
-        let mut de = Deserializer::new(&bytes);
 
-        let boc = BagOfCells::deserialize(&mut de).unwrap();
+        let boc = from_bytes::<BagOfCells>(&bytes).unwrap();
 
         assert_eq!(boc, BagOfCells::SerializedBoc {
             flags_and_size: 1,
@@ -154,9 +147,8 @@ mod tests {
     #[test]
     fn boc_shards_info_deserialize_test() {
         let bytes = hex::decode("b5ee9c7201020701000110000101c0010103d040020201c0030401eb5014c376901214cdb0000152890a35b600000152890a35b85e31d8be7f5f1b44600e445b3cf778b40eaad885db5153838bea3e8f0f4a9b25e36422b74bfadf372f7d3e16b48c05f4866b05d2c7e5787bd954a5d79ad9fdb6990000450f5a00000000000000001214cd933228b81ccc8a2e52000000c90501db5014c367381214cda8000152890aafc800000152890aafcefff0db0738592205986066e14fa1221d28f0156604fd4346cea0b705712ddd2872d9dc6b6fd4eb6624bf6cb9b77d673d2df07a993f5ed281b375f3c659c25e4df80000450f5e00000000000000001214cd933228b8020600134591048ab20ee6b28020001343332bfa820ee6b28020").unwrap();
-        let mut de = Deserializer::new(&bytes);
 
-        let boc = BagOfCells::deserialize(&mut de).unwrap();
+        let boc = from_bytes::<BagOfCells>(&bytes).unwrap();
 
         assert_eq!(boc.total_cells_size(), 272)
     }

@@ -6,7 +6,7 @@ use adnl_tcp::client::ServerKey;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo};
 use ton_types::bag_of_cells::BagOfCells;
-use ton_types::deserializer::{Deserialize, Deserializer};
+use ton_types::deserializer::from_bytes;
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
@@ -21,10 +21,7 @@ async fn main() -> Result<(), tower::BoxError> {
     let id = (&mut svc).oneshot(LiteServerGetMasterchainInfo::default()).await?.last;
     let shards = (&mut svc).oneshot(LiteServerGetAllShardsInfo { id }).await.unwrap();
 
-    tracing::info!(bytes = hex::encode(&shards.data));
-
-    let mut de = Deserializer::new(&shards.data);
-    let boc = BagOfCells::deserialize(&mut de).unwrap();
+    let boc = from_bytes::<BagOfCells>(&shards.data)?;
 
     tracing::info!("Got BOC: {:?}", boc);
 
