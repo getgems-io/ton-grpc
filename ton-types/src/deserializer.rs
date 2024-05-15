@@ -5,8 +5,8 @@ use thiserror::Error;
 pub enum DeserializerError {
     #[error("Unexpected constructor number: {0}")]
     UnexpectedConstructorNumber(u32),
-    #[error(transparent)]
-    DeserializeError(#[from] anyhow::Error)
+    #[error("Input not empty after deserialization")]
+    InputNotEmpty
 }
 
 pub trait Deserialize where Self: Sized {
@@ -57,5 +57,15 @@ impl<'de> Deserializer<'de> {
         self.input.copy_to_slice(&mut result);
 
         Ok(result)
+    }
+}
+
+pub fn from_bytes<T>(bytes: &[u8]) -> Result<T, DeserializerError> where T: Deserialize {
+    let mut deserializer = Deserializer::new(bytes);
+    let t = T::deserialize(&mut deserializer)?;
+    if deserializer.input.is_empty() {
+        Ok(t)
+    } else {
+        Err(DeserializerError::InputNotEmpty)
     }
 }
