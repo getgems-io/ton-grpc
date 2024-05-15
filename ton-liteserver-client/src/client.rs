@@ -66,7 +66,7 @@ impl LiteServerClient {
                             },
                             Ok(packet) => {
                                 tracing::trace!(?packet);
-                                let adnl_answer = from_bytes_boxed::<AdnlMessageAnswer>(packet.data)
+                                let adnl_answer = from_bytes_boxed::<AdnlMessageAnswer>(&packet.data)
                                     .expect("expect adnl answer packet");
 
                                 if let Some((_, oneshot)) = responses_read_half.remove(&adnl_answer.query_id) {
@@ -204,7 +204,7 @@ impl<Response> Future for ResponseFuture<Response> where Response: DeserializeBo
             },
             ResponseStateProj::Rx { rx, .. } => return match ready!(rx.poll(cx)) {
                 Ok(response) => {
-                    let response = from_bytes_boxed::<Result<Response, LiteServerError>>(response)
+                    let response = from_bytes_boxed::<Result<Response, LiteServerError>>(&response)
                         .map_err(|_| Error::Deserialize)?
                         .map_err(Error::LiteServerError)?;
 
