@@ -2227,6 +2227,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
+ "ton-types",
  "tower",
  "tracing",
  "tracing-subscriber",

@@ -8,7 +8,6 @@ pub enum BagOfCells {
         cells: u32,
         roots: u32,
         absent: u32,
-        tot_cells_size: u64,
         index: Vec<u8>,
         cell_data: Vec<u8>,
     },
@@ -18,7 +17,6 @@ pub enum BagOfCells {
         cells: u32,
         roots: u32,
         absent: u32,
-        tot_cells_size: u64,
         index: Vec<u8>,
         cell_data: Vec<u8>,
         crc32c: u32
@@ -29,11 +27,20 @@ pub enum BagOfCells {
         cells: u32,
         roots: u32,
         absent: u32,
-        tot_cells_size: u64,
         root_list: Vec<u8>,
         index: Option<Vec<u8>>,
         cell_data: Vec<u8>,
         crc32c: Option<u32>
+    }
+}
+
+impl BagOfCells {
+    pub fn total_cells_size(&self) -> usize {
+        match self {
+            BagOfCells::SerializedBocIdx { cell_data, .. } => cell_data.len(),
+            BagOfCells::SerializedBocIdxCrc32 { cell_data, .. } => cell_data.len(),
+            BagOfCells::SerializedBoc { cell_data, .. } => cell_data.len(),
+        }
     }
 }
 
@@ -50,7 +57,7 @@ impl DeserializeBare<0x68ff65f3> for BagOfCells {
         let index = de.parse_u8_vec((off_bytes as u32 * cells) as usize)?;
         let cell_data = de.parse_u8_vec(tot_cells_size as usize)?;
 
-        Ok(Self::SerializedBocIdx { size, off_bytes, cells, roots, absent, tot_cells_size, index, cell_data })
+        Ok(Self::SerializedBocIdx { size, off_bytes, cells, roots, absent, index, cell_data })
     }
 }
 
@@ -69,7 +76,7 @@ impl DeserializeBare<0xacc3a728> for BagOfCells {
 
         let crc32c = de.parse_u32()?;
 
-        Ok(Self::SerializedBocIdxCrc32 { size, off_bytes, cells, roots, absent, tot_cells_size, index, cell_data, crc32c })
+        Ok(Self::SerializedBocIdxCrc32 { size, off_bytes, cells, roots, absent, index, cell_data, crc32c })
     }
 }
 
@@ -96,7 +103,7 @@ impl DeserializeBare<0xb5ee9c72> for BagOfCells {
             false => None
         };
 
-        Ok(Self::SerializedBoc { flags_and_size: size_and_flags, off_bytes, cells, roots, absent, tot_cells_size, root_list, index, cell_data, crc32c })
+        Ok(Self::SerializedBoc { flags_and_size: size_and_flags, off_bytes, cells, roots, absent, root_list, index, cell_data, crc32c })
     }
 }
 
@@ -125,7 +132,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn boc_deserialize() {
+    fn boc_deserialize_example_test() {
         let bytes = hex::decode("b5ee9c7201010301000e000201c002010101ff0200060aaaaa").unwrap();
         let mut de = Deserializer::new(&bytes);
 
@@ -137,11 +144,20 @@ mod tests {
             cells: 3,
             roots: 1,
             absent: 0,
-            tot_cells_size: 14,
             root_list: vec![0],
             index: None,
             cell_data: hex::decode("0201c002010101ff0200060aaaaa").unwrap(),
             crc32c: None,
         });
+    }
+
+    #[test]
+    fn boc_shards_info_deserialize_test() {
+        let bytes = hex::decode("b5ee9c7201020701000110000101c0010103d040020201c0030401eb5014c376901214cdb0000152890a35b600000152890a35b85e31d8be7f5f1b44600e445b3cf778b40eaad885db5153838bea3e8f0f4a9b25e36422b74bfadf372f7d3e16b48c05f4866b05d2c7e5787bd954a5d79ad9fdb6990000450f5a00000000000000001214cd933228b81ccc8a2e52000000c90501db5014c367381214cda8000152890aafc800000152890aafcefff0db0738592205986066e14fa1221d28f0156604fd4346cea0b705712ddd2872d9dc6b6fd4eb6624bf6cb9b77d673d2df07a993f5ed281b375f3c659c25e4df80000450f5e00000000000000001214cd933228b8020600134591048ab20ee6b28020001343332bfa820ee6b28020").unwrap();
+        let mut de = Deserializer::new(&bytes);
+
+        let boc = BagOfCells::deserialize(&mut de).unwrap();
+
+        assert_eq!(boc.total_cells_size(), 272)
     }
 }
