@@ -40,16 +40,16 @@ impl<'de> Deserializer<'de> {
 
     pub fn parse_sized_u32(&mut self, size: usize) -> Result<u32, DeserializerError> {
         let mut buffer = [0u8; 4];
-        self.input.copy_to_slice(&mut buffer[0..size]);
+        self.input.copy_to_slice(&mut buffer[4 - size .. ]);
 
-        Ok(u32::from_le_bytes(buffer))
+        Ok(u32::from_be_bytes(buffer))
     }
 
     pub fn parse_sized_u64(&mut self, size: usize) -> Result<u64, DeserializerError> {
         let mut buffer = [0u8; 8];
-        self.input.copy_to_slice(&mut buffer[0..size]);
+        self.input.copy_to_slice(&mut buffer[8 - size ..]);
 
-        Ok(u64::from_le_bytes(buffer))
+        Ok(u64::from_be_bytes(buffer))
     }
 
     pub fn parse_u8_vec(&mut self, size: usize) -> Result<Vec<u8>, DeserializerError> {
