@@ -139,7 +139,7 @@ impl Route {
                     .iter()
                     .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
                     .sorted_unstable_by_key(|(_, seqno)| -seqno)
-                    .group_by(|(_, seqno)| *seqno);
+                    .chunk_by(|(_, seqno)| *seqno);
 
                 if let Some((_, group)) = (&groups).into_iter().next() {
                     return Ok(group
