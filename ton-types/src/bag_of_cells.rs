@@ -82,8 +82,8 @@ impl DeserializeBare<0xacc3a728> for BagOfCells {
 
 impl DeserializeBare<0xb5ee9c72> for BagOfCells {
     fn deserialize_bare(de: &mut Deserializer) -> Result<Self, DeserializerError> {
-        let size_and_flags = de.parse_u8()?; // has_idx:(## 1) has_crc32c:(## 1) has_cache_bits:(## 1) flags:(## 2) { flags = 0 } size:(## 3) { size <= 4 }
-        let size = size_and_flags & 0b00000111;
+        let flags_and_size = de.parse_u8()?; // has_idx:(## 1) has_crc32c:(## 1) has_cache_bits:(## 1) flags:(## 2) { flags = 0 } size:(## 3) { size <= 4 }
+        let size = flags_and_size & 0b00000111;
         let off_bytes = de.parse_u8()?; // { off_bytes <= 8 }
 
         let cells = de.parse_sized_u32(size as usize)?;
@@ -92,18 +92,18 @@ impl DeserializeBare<0xb5ee9c72> for BagOfCells {
         let tot_cells_size = de.parse_sized_u64(off_bytes as usize)?;
 
         let root_list = de.parse_u8_vec(roots as usize * size as usize)?;
-        let index = match size_and_flags & 0b10000000 > 0 {
+        let index = match flags_and_size & 0b10000000 > 0 {
             true => Some(de.parse_u8_vec(cells as usize * off_bytes as usize)?),
             false => None
         };
 
         let cell_data = de.parse_u8_vec(tot_cells_size as usize)?;
-        let crc32c = match size_and_flags & 0b01000000 > 0 {
+        let crc32c = match flags_and_size & 0b01000000 > 0 {
             true => Some(de.parse_u32()?),
             false => None
         };
 
-        Ok(Self::SerializedBoc { flags_and_size: size_and_flags, off_bytes, cells, roots, absent, root_list, index, cell_data, crc32c })
+        Ok(Self::SerializedBoc { flags_and_size, off_bytes, cells, roots, absent, root_list, index, cell_data, crc32c })
     }
 }
 
