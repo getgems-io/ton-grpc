@@ -7,6 +7,8 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 [dependencies]
 bytes = { workspace = true }
 thiserror = { workspace = true }
+hex = { workspace = true }
+
 
 [dev-dependencies]
 hex = { workspace = true }

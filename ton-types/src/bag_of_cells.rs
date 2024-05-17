@@ -1,3 +1,4 @@
+use crate::cell::Cell;
 use crate::deserializer::{Deserialize, DeserializeBare, Deserializer, DeserializerError};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -24,12 +25,12 @@ pub enum BagOfCells {
     SerializedBoc {
         flags_and_size: u8,
         off_bytes: u8,
-        cells: u32,
+        cells: usize,
         roots: u32,
         absent: u32,
         root_list: Vec<u8>,
         index: Option<Vec<u8>>,
-        cell_data: Vec<u8>,
+        cell_data: Vec<Cell>,
         crc32c: Option<u32>
     }
 }
@@ -40,6 +41,14 @@ impl BagOfCells {
             BagOfCells::SerializedBocIdx { cell_data, .. } => cell_data.len(),
             BagOfCells::SerializedBocIdxCrc32 { cell_data, .. } => cell_data.len(),
             BagOfCells::SerializedBoc { cell_data, .. } => cell_data.len(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            BagOfCells::SerializedBocIdx { cells, .. } => { *cells as usize }
+            BagOfCells::SerializedBocIdxCrc32 { cells, .. } => { *cells as usize }
+            BagOfCells::SerializedBoc { cell_data, .. } => { cell_data.len() }
         }
     }
 }
@@ -86,24 +95,29 @@ impl DeserializeBare<0xb5ee9c72> for BagOfCells {
         let size = flags_and_size & 0b00000111;
         let off_bytes = de.parse_u8()?; // { off_bytes <= 8 }
 
-        let cells = de.parse_sized_u32(size as usize)?;
+        let cells_count = de.parse_sized_u32(size as usize)? as usize;
         let roots = de.parse_sized_u32(size as usize)?;
         let absent = de.parse_sized_u32(size as usize)?;
-        let tot_cells_size = de.parse_sized_u64(off_bytes as usize)?;
+        let _ = de.parse_sized_u64(off_bytes as usize)?;
 
         let root_list = de.parse_u8_vec(roots as usize * size as usize)?;
         let index = match flags_and_size & 0b10000000 > 0 {
-            true => Some(de.parse_u8_vec(cells as usize * off_bytes as usize)?),
+            true => Some(de.parse_u8_vec(cells_count * off_bytes as usize)?),
             false => None
         };
 
-        let cell_data = de.parse_u8_vec(tot_cells_size as usize)?;
+        let mut cells = Vec::with_capacity(cells_count);
+        for _ in 0..cells_count {
+            let cell = de.parse_cell()?;
+
+            cells.push(cell)
+        }
         let crc32c = match flags_and_size & 0b01000000 > 0 {
             true => Some(de.parse_u32()?),
             false => None
         };
 
-        Ok(Self::SerializedBoc { flags_and_size, off_bytes, cells, roots, absent, root_list, index, cell_data, crc32c })
+        Ok(Self::SerializedBoc { flags_and_size, off_bytes, cells: cells_count, roots, absent, root_list, index, cell_data: cells, crc32c })
     }
 }
 
@@ -139,7 +153,11 @@ mod tests {
             absent: 0,
             root_list: vec![0],
             index: None,
-            cell_data: hex::decode("0201c002010101ff0200060aaaaa").unwrap(),
+            cell_data: vec![
+                Cell::new(vec![128], vec![2, 1]),
+                Cell::new(vec![254], vec![2]),
+                Cell::new(vec![10, 170, 170], vec![]),
+            ],
             crc32c: None,
         });
     }
@@ -150,6 +168,8 @@ mod tests {
 
         let boc = from_bytes::<BagOfCells>(&bytes).unwrap();
 
-        assert_eq!(boc.total_cells_size(), 272)
+        println!("{:?}", boc);
+
+        assert_eq!(boc.len(), 7)
     }
 }
