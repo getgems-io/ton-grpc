@@ -29,7 +29,7 @@ bytes = { workspace = true }
 thiserror = { workspace = true }
 reqwest = { version = "0.12.4", features = ["rustls-tls", "hickory-dns"], default-features = false }
 hickory-resolver = { version = "0.24.1", features = ["tokio-runtime"] }
-itertools = "0.12"
+itertools = "0.13"
 derive-new = "0.6.0"
 tokio-retry = "0.3"
 crc = "3.2.1"
