@@ -1,5 +1,6 @@
 use bytes::Buf;
 use thiserror::Error;
+use crate::cell::Cell;
 
 #[derive(Debug, Error)]
 pub enum DeserializerError {
@@ -57,6 +58,31 @@ impl<'de> Deserializer<'de> {
         self.input.copy_to_slice(&mut result);
 
         Ok(result)
+    }
+
+    pub fn parse_cell(&mut self) -> Result<Cell, DeserializerError> {
+        let refs_descriptor = self.input.get_u8();
+        let bits_descriptor = self.input.get_u8();
+
+        let refs_count = refs_descriptor & 0b00000111;
+
+        // bits_descriptor is the number of 4-bit groups in content,
+        // so we need to divide it by 2 to get the number of bytes in content,
+        // but we also need to add 1 if bits_descriptor is odd
+        let len = ((bits_descriptor / 2) + (bits_descriptor % 2)) as usize;
+
+        let mut content = vec![0; len];
+        self.input.copy_to_slice(&mut content);
+
+        // if bits_descriptor is odd, we need to clear the least significant bit of the last byte in content
+        if bits_descriptor % 2 > 0 {
+            content[len - 1] = content[len - 1] & (content[len - 1] - 1);
+        }
+
+        let mut refs = vec![0; refs_count as usize];
+        self.input.copy_to_slice(&mut refs);
+
+        Ok(Cell::new(content, refs))
     }
 }
 
