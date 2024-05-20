@@ -1,5 +1,7 @@
+use bitter::LittleEndianReader;
 use bytes::Buf;
 use thiserror::Error;
+use bitter::BitReader;
 use crate::cell::Cell;
 
 #[derive(Debug, Error)]
@@ -25,6 +27,10 @@ pub struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     pub fn new(input: &'de [u8]) -> Self {
         Self { input }
+    }
+
+    pub fn bit_reader(&mut self) -> LittleEndianReader {
+        LittleEndianReader::new(self.input)
     }
 
     pub fn parse_constructor_numer(&mut self) -> Result<u32, DeserializerError> {
