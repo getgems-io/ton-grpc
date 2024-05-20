@@ -17,6 +17,6 @@ impl Debug for Cell {
         f.debug_struct("Cell")
             .field("content", &hex::encode(&self.content))
             .field("refs", &self.refs)
-            .finish()
+        .finish()
     }
 }
