@@ -7,4 +7,4 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 [dependencies]
 anyhow = { workspace = true }
 nom = "7.1.3"
-crc32fast = "1.4.0"
+crc32fast = "1.4.2"
