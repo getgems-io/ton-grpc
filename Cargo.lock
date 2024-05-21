@@ -260,12 +260,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf4b9d6a944f767f8e5e0db018570623c85f3d925ac718db4e06d0187adb21c1"
 
 [[package]]
-name = "bitter"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ef3a13b71496a92e8c00ebe576b260655b56935cd5118d5a8949788b651b5e07"
-
-[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2235,7 +2229,6 @@ dependencies = [
 name = "ton-types"
 version = "0.1.0"
 dependencies = [
- "bitter",
  "bytes",
  "hex",
  "thiserror",
