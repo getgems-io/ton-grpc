@@ -10,6 +10,10 @@ impl Cell {
     pub fn new(content: Vec<u8>, refs: Vec<u8>) -> Self {
         Self { content, refs }
     }
+
+    pub fn refs(&self) -> &[u8] {
+        &self.refs
+    }
 }
 
 impl Debug for Cell {
