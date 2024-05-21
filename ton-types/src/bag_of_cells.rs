@@ -1,3 +1,4 @@
+use std::fmt::{Debug, Formatter};
 use crate::cell::Cell;
 use crate::deserializer::{Deserialize, DeserializeBare, Deserializer, DeserializerError};
 
@@ -25,10 +26,17 @@ impl BagOfCells {
     }
 }
 
-#[derive(Debug)]
 pub struct CellInBag<'a> {
     cell: &'a Cell,
     bag: &'a BagOfCells,
+}
+
+impl Debug for CellInBag<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CellInBag")
+            .field("cell", &self.cell)
+        .finish()
+    }
 }
 
 impl<'a> CellInBag<'a> {
