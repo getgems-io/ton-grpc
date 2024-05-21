@@ -29,30 +29,32 @@ pub struct HmLabel {
     label: u32
 }
 
-fn read_hm_label(m: u32, reader: &mut LittleEndianReader) -> HmLabel {
-    let bit = reader.read_bit().unwrap();
-    if bit {
+impl HmLabel {
+    pub fn read(m: u32, reader: &mut LittleEndianReader) -> Self {
         let bit = reader.read_bit().unwrap();
         if bit {
             let bit = reader.read_bit().unwrap();
-            let len = reader.read_bits(len_bits(m)).unwrap() as u32;
-
             if bit {
-                HmLabel { label: (1u32 << len) - 1, m, n: len }
+                let bit = reader.read_bit().unwrap();
+                let len = reader.read_bits(len_bits(m)).unwrap() as u32;
+
+                if bit {
+                    Self { label: (1u32 << len) - 1, m, n: len }
+                } else {
+                    Self { label: 0, m, n: len }
+                }
             } else {
-                HmLabel { label: 0, m, n: len }
+                let len = reader.read_bits(len_bits(m)).unwrap() as u32;
+                let label= reader.read_bits(len).unwrap() as u32;
+
+                Self { label, m, n: len }
             }
         } else {
-            let len = reader.read_bits(len_bits(m)).unwrap() as u32;
-            let label= reader.read_bits(len).unwrap() as u32;
+            let Unary { n: len} = Unary::from_bit_reader(reader);
+            let label = reader.read_bits(len as u32).unwrap() as u32;
 
-            HmLabel { label, m, n: len }
+            Self { label, m, n: len as u32 }
         }
-    } else {
-        let Unary { n: len} = Unary::from_bit_reader(reader);
-        let label = reader.read_bits(len as u32).unwrap() as u32;
-
-        HmLabel { label, m, n: len as u32 }
     }
 }
 
@@ -74,7 +76,7 @@ pub enum HashmapNode <X> {
 #[cfg(test)]
 mod tests {
     use bitter::LittleEndianReader;
-    use crate::hashmap::{FromBitReader, HmLabel, read_hm_label, Unary};
+    use crate::hashmap::{FromBitReader, HmLabel, Unary};
 
     #[test]
     fn unary_zero_test() {
@@ -101,7 +103,7 @@ mod tests {
         let input = vec![0b1010_111_0];
         let mut reader = LittleEndianReader::new(&input);
 
-        let label: HmLabel = read_hm_label(32, &mut reader);
+        let label: HmLabel = HmLabel::read(32, &mut reader);
 
         assert_eq!(label.label, 0b00000101);
         assert_eq!(label.m, 32);
@@ -113,7 +115,7 @@ mod tests {
         let input = vec![0b101_011_01];
         let mut reader = LittleEndianReader::new(&input);
 
-        let label: HmLabel = read_hm_label(8, &mut reader);
+        let label: HmLabel = HmLabel::read(8, &mut reader);
 
         assert_eq!(label.label, 0b00000101);
         assert_eq!(label.m, 8);
@@ -125,7 +127,7 @@ mod tests {
         let input = vec![0b01000_1_11];
         let mut reader = LittleEndianReader::new(&input);
 
-        let label: HmLabel = read_hm_label(32, &mut reader);
+        let label: HmLabel = HmLabel::read(32, &mut reader);
 
         assert_eq!(label.label, 0b11111111);
         assert_eq!(label.m, 32);
