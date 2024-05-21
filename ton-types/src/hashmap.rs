@@ -1,10 +1,14 @@
 use bitter::{BitReader, LittleEndianReader};
 
+trait FromBitReader {
+    fn from_bit_reader(reader: &mut LittleEndianReader) -> Self;
+}
+
 pub struct Unary {
     n: usize
 }
 
-impl Unary {
+impl FromBitReader for Unary {
     fn from_bit_reader(reader: &mut LittleEndianReader) -> Self {
         let mut n = 0;
         loop {
@@ -23,7 +27,7 @@ pub struct HmLabel<const MAX: u32> {
     label: u64
 }
 
-impl<const MAX: u32> HmLabel<MAX> {
+impl<const MAX: u32> FromBitReader for HmLabel<MAX> {
     fn from_bit_reader(reader: &mut LittleEndianReader) -> Self {
         let bit = reader.read_bit().unwrap();
         if bit {
@@ -53,10 +57,23 @@ const fn len_bits(value: u32) -> u32 {
 }
 
 
+pub struct HmnLeaf<X> {
+    value: X
+}
+
+impl<X> FromBitReader for HmnLeaf<X> where X: FromBitReader {
+    fn from_bit_reader(reader: &mut LittleEndianReader) -> Self {
+        Self { value: X::from_bit_reader(reader) }
+    }
+}
+
+
+
+
 #[cfg(test)]
 mod tests {
     use bitter::LittleEndianReader;
-    use crate::hashmap::{HmLabel, Unary};
+    use crate::hashmap::{FromBitReader, HmLabel, Unary};
 
     #[test]
     fn unary_zero_test() {
