@@ -2,6 +2,8 @@ use bytes::Buf;
 use thiserror::Error;
 use crate::cell::Cell;
 
+pub type BitInput<'a> = (&'a [u8], usize);
+
 #[derive(Debug, Error)]
 pub enum DeserializerError {
     #[error("Unexpected constructor number: {0}")]
