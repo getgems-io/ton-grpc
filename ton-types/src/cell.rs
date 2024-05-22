@@ -4,7 +4,7 @@ pub type CellId = u8;
 
 #[derive(PartialEq, Eq)]
 pub struct Cell {
-    pub(crate) content: Vec<u8>,
+    content: Vec<u8>,
     refs: Vec<u8>
 }
 
@@ -15,6 +15,12 @@ impl Cell {
 
     pub fn refs(&self) -> &[u8] {
         &self.refs
+    }
+}
+
+impl AsRef<[u8]> for Cell {
+    fn as_ref(&self) -> &[u8] {
+        &self.content
     }
 }
 

@@ -33,7 +33,7 @@ pub struct CellInBag<'a> {
 
 impl<'a> AsRef<[u8]> for CellInBag<'a> {
     fn as_ref(&self) -> &[u8] {
-        &self.cell.content
+        &self.cell.as_ref()
     }
 }
 
@@ -47,7 +47,8 @@ impl Debug for CellInBag<'_> {
 
 impl<'a> CellInBag<'a> {
     pub fn children(&self) -> impl Iterator<Item=CellInBag<'a>> {
-        self.cell.refs()
+        self.cell
+            .refs()
             .iter()
             .filter_map(|node_id| self.bag.get(*node_id as usize))
     }
