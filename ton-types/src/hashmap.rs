@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 use std::convert::Infallible;
+use std::marker::PhantomData;
 use nom::complete::{bool, take};
 use nom::IResult;
+use nom::combinator::value;
 use crate::bag_of_cells::CellInBag;
 use crate::cell::CellId;
 use crate::deserializer::BitInput;
 
 trait FromBitReader: Sized {
-    fn from_bit_reader(reader: BitInput) -> IResult<BitInput, Self>;
+    fn from_bit_reader(input: BitInput) -> IResult<BitInput, Self>;
 }
 
 pub struct Unary {
@@ -154,11 +156,48 @@ bt_fork$1 {X:Type} left:^(BinTree X) right:^(BinTree X)
 **/
 
 
+struct CellAs<X> {
+    cell_id: CellId,
+    _phantom_data: PhantomData<X>
+}
+
+pub struct BinTree<X> {
+    inner: Vec<X>
+}
+
+impl<X> BinTree<X> where X : FromBitReader {
+    fn parse(cell: CellInBag) -> Self {
+        let mut output = Vec::new();
+        let mut stack = Vec::new();
+        stack.push(cell);
+
+        while let Some(current_cell) = stack.pop() {
+            let input = (current_cell.as_ref(), 0);
+            let (_, bit) = bool::<&[u8], ()>(input).unwrap();
+            if bit {
+                let mut iter = current_cell.children();
+                let left = iter.next().unwrap();
+                stack.push(left);
+
+                let right = iter.next().unwrap();
+                stack.push(right);
+            } else {
+                let (_, value) = X::from_bit_reader(input).unwrap();
+                output.push(value);
+            }
+        }
+
+        Self { inner: output }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use nom::complete::bool;
+    use nom::IResult;
     use crate::bag_of_cells::BagOfCells;
-    use crate::deserializer::from_bytes;
-    use crate::hashmap::{FromBitReader, HashmapE, HmLabel, Unary};
+    use crate::deserializer::{BitInput, from_bytes};
+    use crate::hashmap::{BinTree, FromBitReader, HashmapE, HmLabel, Unary};
 
     #[test]
     fn parser_ordering_test() {
