@@ -8,7 +8,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 bytes = { workspace = true }
 thiserror = { workspace = true }
 hex = { workspace = true }
-nom = "7.1.3"
+nom = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }
