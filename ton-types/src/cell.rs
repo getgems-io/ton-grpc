@@ -1,8 +1,10 @@
 use std::fmt::{Debug, Formatter};
 
+pub type CellId = u8;
+
 #[derive(PartialEq, Eq)]
 pub struct Cell {
-    content: Vec<u8>,
+    pub(crate) content: Vec<u8>,
     refs: Vec<u8>
 }
 

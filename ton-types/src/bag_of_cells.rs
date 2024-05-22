@@ -31,6 +31,12 @@ pub struct CellInBag<'a> {
     bag: &'a BagOfCells,
 }
 
+impl<'a> AsRef<[u8]> for CellInBag<'a> {
+    fn as_ref(&self) -> &[u8] {
+        &self.cell.content
+    }
+}
+
 impl Debug for CellInBag<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CellInBag")
