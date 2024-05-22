@@ -42,15 +42,13 @@ pub struct HmLabel {
 }
 
 impl HmLabel {
-    pub fn read<'a>(m: u32, input: BitInput<'a>) -> IResult<BitInput<'a>, Self> {
+    pub fn read(m: u32, input: BitInput) -> IResult<BitInput, Self> {
         let (input, bit) = bool(input)?;
         if bit {
             let (input, bit) = bool(input)?;
             if bit {
                 let (input, bit) = bool(input)?;
                 let (input, len): (_, u32) = take(len_bits(m + 1))(input)?;
-
-                println!("LENNNN: {} // {}", len, len_bits(m));
 
                 if bit {
                     Ok((input, Self { label: (1u32 << len) - 1, m, n: len }))
@@ -155,11 +153,6 @@ bt_fork$1 {X:Type} left:^(BinTree X) right:^(BinTree X)
 
 **/
 
-
-struct CellAs<X> {
-    cell_id: CellId,
-    _phantom_data: PhantomData<X>
-}
 
 pub struct BinTree<X> {
     inner: Vec<X>
