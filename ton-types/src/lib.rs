@@ -3,3 +3,4 @@ pub mod deserializer;
 mod cell;
 
 mod hashmap;
+mod shard_descr;

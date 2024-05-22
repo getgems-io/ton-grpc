@@ -8,7 +8,7 @@ use crate::bag_of_cells::CellInBag;
 use crate::cell::CellId;
 use crate::deserializer::BitInput;
 
-trait FromBitReader: Sized {
+pub(crate) trait FromBitReader: Sized {
     fn from_bit_reader(input: BitInput) -> IResult<BitInput, Self>;
 }
 
@@ -191,6 +191,7 @@ mod tests {
     use crate::bag_of_cells::BagOfCells;
     use crate::deserializer::{BitInput, from_bytes};
     use crate::hashmap::{BinTree, FromBitReader, HashmapE, HmLabel, Unary};
+    use crate::shard_descr::ShardDescr;
 
     #[test]
     fn parser_ordering_test() {
@@ -269,7 +270,8 @@ mod tests {
 
         println!("root: {:?}", root);
 
-        let hashmap = HashmapE::<32, bool>::parse(root);
+        // _ (HashmapE 32 ^(BinTree ShardDescr)) = ShardHashes;
+        let hashmap = HashmapE::<32, BinTree<ShardDescr>>::parse(root);
 
         assert_eq!(hashmap.inner.len(), 2);
     }
