@@ -122,6 +122,7 @@ struct HashmapE<const K: u32, X> {
 }
 
 impl<const K: u32, X> HashmapE<K, X> where X: FromBitReader {
+    // TODO[akostylev0]
     fn parse(input: &mut Slice) -> Result<Self, Error> {
         let mut inner = HashMap::new();
 
