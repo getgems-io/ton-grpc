@@ -1,7 +1,6 @@
-use nom::IResult;
-use crate::deserializer::BitInput;
-use crate::hashmap::FromBitReader;
+use crate::hashmap::{FromBitReader, Slice};
 
+#[derive(Debug)]
 pub enum FutureSplitMerge {
     None, // fsm_none$0 = FutureSplitMerge;
     Split { split_utime: u32, interval: u32 }, // fsm_split$10 split_utime:uint32 interval:uint32 = FutureSplitMerge;
@@ -9,19 +8,20 @@ pub enum FutureSplitMerge {
 }
 
 impl FromBitReader for FutureSplitMerge {
-    fn from_bit_reader(input: BitInput) -> IResult<BitInput, Self> {
-        let (input, bit) = nom::bits::complete::bool(input)?;
+    fn from_bit_reader(input: &mut Slice) -> Result<Self, crate::hashmap::Error> {
+        let bit = input.read_bit()?;
         if bit {
-            let (input, bit) = nom::bits::complete::bool(input)?;
-            let (input, utime) = nom::bits::complete::take(32_usize)(input)?;
-            let (input, interval) = nom::bits::complete::take(32_usize)(input)?;
+            let bit = input.read_bit()?;
+            let utime = input.read_bits(32)? as u32;
+            let interval = input.read_bits(32)? as u32;
+
             if bit {
-                Ok((input, FutureSplitMerge::Merge { merge_utime: utime, interval }))
+                Ok(FutureSplitMerge::Merge { merge_utime: utime, interval })
             } else {
-                Ok((input, FutureSplitMerge::Split { split_utime: utime, interval }))
+                Ok(FutureSplitMerge::Split { split_utime: utime, interval })
             }
         } else {
-            Ok((input, FutureSplitMerge::None))
+            Ok(FutureSplitMerge::None)
         }
     }
 }
@@ -66,6 +66,7 @@ currencies$_ grams:Grams other:ExtraCurrencyCollection
            = CurrencyCollection;
  **/
 
+#[derive(Debug)]
 pub struct ShardDescr {
     seq_no: u32,
     reg_mc_seqno: u32,
@@ -84,21 +85,25 @@ pub struct ShardDescr {
 }
 
 impl FromBitReader for ShardDescr {
-    fn from_bit_reader(input: BitInput) -> IResult<BitInput, Self> {
-        let (input, seq_no): (_, u32) = nom::bits::complete::take(32_u32)(input)?;
-        let (input, reg_mc_seqno): (_, u32) = nom::bits::complete::take(32_u32)(input)?;
-        let (input, start_lt): (_, u64) = nom::bits::complete::take(64_u64)(input)?;
-        let (input, end_lt): (_, u64) = nom::bits::complete::take(64_u64)(input)?;
-        let (input, root_hash) = <[u8; 32]>::from_bit_reader(input)?;
-        let (input, file_hash) = <[u8; 32]>::from_bit_reader(input)?;
-        let (input, flags): (_, u8) = nom::bits::complete::take(8_u8)(input)?;
-        let (input, next_catchain_seqno): (_, u32) = nom::bits::complete::take(32_u32)(input)?;
-        let (input, next_validator_shard): (_, u64) = nom::bits::complete::take(64_u64)(input)?;
-        let (input, min_ref_mc_seqno): (_, u32) = nom::bits::complete::take(32_u32)(input)?;
-        let (input, gen_utime): (_, u32) = nom::bits::complete::take(32_u32)(input)?;
-        let (input, split_merge_at): (_, FutureSplitMerge) = FutureSplitMerge::from_bit_reader(input)?;
+    fn from_bit_reader(input: &mut Slice) -> Result<Self, crate::hashmap::Error> {
+        let tag = input.read_bits(4)? as u8;
 
-        Ok((input, ShardDescr {
+        println!("input: {:?}", input);
+
+        let seq_no = input.read_bits(32)? as u32;
+        let reg_mc_seqno = input.read_bits(32)? as u32;
+        let start_lt = input.read_bits(64)? as u64;
+        let end_lt = input.read_bits(64)? as u64;
+        let root_hash = <[u8; 32]>::from_bit_reader(input)?;
+        let file_hash = <[u8; 32]>::from_bit_reader(input)?;
+        let flags = input.read_bits(8)? as u8;;
+        let next_catchain_seqno = input.read_bits(32)? as u32;
+        let next_validator_shard = input.read_bits(64)? as u64;
+        let min_ref_mc_seqno = input.read_bits(32)? as u32;
+        let gen_utime = input.read_bits(32)? as u32;
+        let split_merge_at = FutureSplitMerge::from_bit_reader(input)?;
+
+        Ok(ShardDescr {
             seq_no,
             reg_mc_seqno,
             start_lt,
@@ -111,19 +116,18 @@ impl FromBitReader for ShardDescr {
             min_ref_mc_seqno,
             gen_utime,
             split_merge_at,
-        }))
+        })
     }
 }
 
 impl FromBitReader for [u8; 32] {
-    fn from_bit_reader(input: BitInput) -> IResult<BitInput, Self> {
-        let mut input = input;
+    fn from_bit_reader(input: &mut Slice) -> Result<Self, crate::hashmap::Error> {
         let mut output = [0_u8; 32];
 
         for i in 0..32 {
-            (input, output[i]) = nom::bits::complete::take(8_usize)(input)?;
+            output[i] = input.read_bits(8)? as u8;
         }
 
-        Ok((input, output))
+        Ok(output)
     }
 }

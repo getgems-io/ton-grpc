@@ -1,6 +1,6 @@
 use std::fmt::{Debug, Formatter};
 use crate::cell::Cell;
-use crate::deserializer::{Deserialize, DeserializeBare, Deserializer, DeserializerError};
+use crate::deserializer::{BitInput, Deserialize, DeserializeBare, Deserializer, DeserializerError};
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BagOfCells {
@@ -8,6 +8,10 @@ pub struct BagOfCells {
 }
 
 impl BagOfCells {
+    pub fn new(cells: Vec<Cell>) -> Self {
+        Self { cells }
+    }
+
     pub fn root(&self) -> Option<CellInBag> {
         self.get(0)
     }
@@ -27,13 +31,13 @@ impl BagOfCells {
 }
 
 pub struct CellInBag<'a> {
-    cell: &'a Cell,
-    bag: &'a BagOfCells,
+    pub(crate) cell: &'a Cell,
+    pub(crate) bag: &'a BagOfCells,
 }
 
 impl<'a> AsRef<[u8]> for CellInBag<'a> {
     fn as_ref(&self) -> &[u8] {
-        &self.cell.as_ref()
+        self.cell.as_ref()
     }
 }
 
