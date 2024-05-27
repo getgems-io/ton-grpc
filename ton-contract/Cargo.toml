@@ -1,0 +1,17 @@
+[package]
+name = "ton-contract"
+version = "0.1.0"
+edition = "2021"
+authors = [
+    "Arseny Mitin <mitinarseny@gmail.com>",
+    "Andrei Kostylev <a.kostylev@pm.me>",
+]
+
+[dependencies]
+anyhow.workspace = true
+async-trait.workspace = true
+base64.workspace = true
+num-bigint.workspace = true
+thiserror.workspace = true
+tonlibjson-client.path = "../tonlibjson-client"
+toner.workspace = true

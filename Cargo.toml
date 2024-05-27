@@ -8,11 +8,12 @@ members = [
     "tvm-grpc",
     "adnl-tcp",
     "ton-liteserver-client",
-    "ton-types"
+    "ton-contract"
 ]
 
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"]}
+async-trait = "0.1"
 tower = { version = "0.4", features = ["full"] }
 tokio = { version = "1.37", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
@@ -27,6 +28,8 @@ base64 = "0.22"
 hex = "0.4"
 tracing-test = "0.2.4"
 async-stream = "0.3.5"
+toner = "0.2"
+num-bigint = "0.4"
 tonic = { version = "0.11", features = ["gzip"] }
 tonic-reflection = "0.11"
 tonic-health = "0.11"
