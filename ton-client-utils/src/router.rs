@@ -66,3 +66,47 @@ impl Route {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[derive(Debug, Clone, PartialEq, Eq)]
+    struct MyRouted {
+        contains: bool,
+        contains_not_available: bool,
+        last_seqno: Option<i32>
+    }
+
+    impl Routed for MyRouted {
+        fn contains(&self, chain: &i32, criteria: &BlockCriteria) -> bool { self.contains }
+        fn contains_not_available(&self, chain: &i32, criteria: &BlockCriteria) -> bool { self.contains_not_available }
+        fn last_seqno(&self) -> Option<i32> { self.last_seqno }
+    }
+
+    #[test]
+    fn route_latest_empty() {
+        let route = Route::Latest;
+        let from: HashMap<String, MyRouted> = HashMap::new();
+
+        let result = route.choose(&from).unwrap_err();
+
+        assert!(matches!(result, RouterError::RouteUnknown));
+    }
+
+    #[test]
+    fn route_block_available() {
+        let route = Route::Block { chain: 1, criteria: BlockCriteria::LogicalTime(100)  };
+        let mut from: HashMap<String, MyRouted> = HashMap::new();
+        let routed = MyRouted {
+            contains: true,
+            contains_not_available: true,
+            last_seqno: None,
+        };
+        from.insert("1".to_string(), routed.clone());
+
+        let result = route.choose(&from).unwrap();
+
+        assert_eq!(result, vec![routed]);
+    }
+}
