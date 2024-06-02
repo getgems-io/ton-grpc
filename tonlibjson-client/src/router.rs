@@ -65,26 +65,34 @@ impl Service<&Route> for Router {
     }
 
     fn call(&mut self, req: &Route) -> Self::Future {
-        match req.choose(&self.services) {
+        match req.choose(self.services.values()) {
             Ok(services) => {
+                let services = services.into_iter().cloned().collect();
                 return std::future::ready(Ok(services)).boxed()
             },
             Err(RouterError::RouteUnknown) => {
                 metrics::counter!("ton_router_miss_count").increment(1);
-                match Route::Latest.choose(&self.services) {
-                    Ok(services) => { std::future::ready(Ok(services)).boxed() }
+                match Route::Latest.choose(self.services.values()) {
+                    Ok(services) => {
+                        let services = services.into_iter().cloned().collect();
+                        std::future::ready(Ok(services)).boxed()
+                    }
                     Err(_) => { std::future::ready(Err(anyhow!("no services available for {:?}", req))).boxed() }
                 }
             },
+            // TODO[akostylev0]
             Err(RouterError::RouteNotAvailable) => {
                 metrics::counter!("ton_router_delayed_count").increment(1);
 
                 let req = *req;
                 let svcs = self.services.clone();
-                Retry::spawn(FibonacciBackoff::from_millis(32).map(jitter).take(10), move || {
-                    let svcs = svcs.clone();
 
-                    async move { req.choose(&svcs) }
+                Retry::spawn(FibonacciBackoff::from_millis(32).map(jitter).take(10), move || {
+                    let svcs: Vec<_> = svcs.values().cloned().collect();
+                    async move { req
+                        .choose(&svcs)
+                        .map(|s| s.into_iter().cloned().collect())
+                    }
                 })
                     .map_err(move |_| anyhow!("no services available for {:?}", req))
                     .boxed()
