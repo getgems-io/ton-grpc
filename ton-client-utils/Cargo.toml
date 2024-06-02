@@ -1,0 +1,7 @@
+[package]
+name = "ton-client-utils"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+
+[dependencies]

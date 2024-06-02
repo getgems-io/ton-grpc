@@ -1,14 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "tl_parser",
     "tonlibjson-sys",
+    "tl_parser",
+    "adnl-tcp",
+    "ton-client-utils",
     "tonlibjson-client",
+    "ton-liteserver-client",
+    "ton-contract",
     "ton-grpc",
     "tvm-grpc",
-    "adnl-tcp",
-    "ton-liteserver-client",
-    "ton-contract"
 ]
 
 [workspace.dependencies]

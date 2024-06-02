@@ -6,6 +6,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
 tonlibjson-sys = { path = "../tonlibjson-sys" }
+ton-client-utils = { path = "../ton-client-utils" }
 tower = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }

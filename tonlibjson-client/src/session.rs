@@ -3,7 +3,7 @@ use futures::future::BoxFuture;
 use futures::TryFutureExt;
 use futures::FutureExt;
 use tower::{Service, ServiceExt};
-use crate::router::Route;
+use ton_client_utils::router::Route;
 use crate::block::{AccountAddress, SmcBoxedMethodId, SmcLoad, SmcRunGetMethod, TvmBoxedStackEntry};
 use crate::error::Error;
 use crate::request::{Requestable, Callable};

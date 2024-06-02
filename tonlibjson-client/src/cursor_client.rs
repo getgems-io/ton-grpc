@@ -22,7 +22,7 @@ use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
 use tracing::{instrument};
-use crate::router::BlockCriteria;
+use ton_client_utils::router::BlockCriteria;
 use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;

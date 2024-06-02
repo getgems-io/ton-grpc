@@ -9,6 +9,7 @@ use dashmap::DashMap;
 use itertools::Itertools;
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
+use ton_client_utils::router::Route;
 use crate::cursor_client::CursorClient;
 use crate::discover::CursorClientDiscover;
 
@@ -47,18 +48,6 @@ impl Router {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum BlockCriteria {
-    Seqno { shard: i64, seqno: i32 },
-    LogicalTime(i64)
-}
-
-#[derive(Debug, Clone, Copy)]
-pub(crate) enum Route {
-    Block { chain: i32, criteria: BlockCriteria },
-    Latest
-}
-
 impl Service<&Route> for Router {
     type Response = Vec<CursorClient>;
     type Error = anyhow::Error;
@@ -77,13 +66,13 @@ impl Service<&Route> for Router {
     }
 
     fn call(&mut self, req: &Route) -> Self::Future {
-        match req.choose(&self.services) {
+        match choose(req, &self.services) {
             Ok(services) => {
                 return std::future::ready(Ok(services)).boxed()
             },
             Err(RouterError::RouteUnknown) => {
                 metrics::counter!("ton_router_miss_count").increment(1);
-                match Route::Latest.choose(&self.services) {
+                match choose(&Route::Latest, &self.services) {
                     Ok(services) => { std::future::ready(Ok(services)).boxed() }
                     Err(_) => { std::future::ready(Err(anyhow!("no services available for {:?}", req))).boxed() }
                 }
@@ -96,7 +85,7 @@ impl Service<&Route> for Router {
                 Retry::spawn(FibonacciBackoff::from_millis(32).map(jitter).take(10), move || {
                     let svcs = svcs.clone();
 
-                    async move { req.choose(&svcs) }
+                    async move { choose(&req, &svcs) }
                 })
                     .map_err(move |_| anyhow!("no services available for {:?}", req))
                     .boxed()
@@ -114,42 +103,40 @@ enum RouterError {
     RouteUnknown
 }
 
-impl Route {
-    fn choose(&self, services: &DashMap<String, CursorClient>) -> Result<Vec<CursorClient>, RouterError> {
-        match self {
-            Route::Block { chain, criteria } => {
-                let clients: Vec<CursorClient> = services
-                    .iter()
-                    .filter(|s| s.contains(chain, criteria))
-                    .map(|s| s.clone())
-                    .collect();
+fn choose(route: &Route, from: &DashMap<String, CursorClient>) -> Result<Vec<CursorClient>, RouterError> {
+    match route {
+        Route::Block { chain, criteria } => {
+            let clients: Vec<CursorClient> = from
+                .iter()
+                .filter(|s| s.contains(chain, criteria))
+                .map(|s| s.clone())
+                .collect();
 
-                if clients.is_empty() {
-                    if services.iter().any(|s| s.contains_not_available(chain, criteria)) {
-                        Err(RouterError::RouteNotAvailable)
-                    } else {
-                        Err(RouterError::RouteUnknown)
-                    }
+            if clients.is_empty() {
+                if from.iter().any(|s| s.contains_not_available(chain, criteria)) {
+                    Err(RouterError::RouteNotAvailable)
                 } else {
-                    Ok(clients)
+                    Err(RouterError::RouteUnknown)
                 }
-            },
-            Route::Latest => {
-                let groups = services
-                    .iter()
-                    .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
-                    .sorted_unstable_by_key(|(_, seqno)| -seqno)
-                    .chunk_by(|(_, seqno)| *seqno);
-
-                if let Some((_, group)) = (&groups).into_iter().next() {
-                    return Ok(group
-                        .into_iter()
-                        .map(|(s, _)| s.clone())
-                        .collect());
-                }
-
-                Err(RouterError::RouteUnknown)
+            } else {
+                Ok(clients)
             }
+        },
+        Route::Latest => {
+            let groups = from
+                .iter()
+                .filter_map(|s| s.last_seqno().map(|seqno| (s, seqno)))
+                .sorted_unstable_by_key(|(_, seqno)| -seqno)
+                .chunk_by(|(_, seqno)| *seqno);
+
+            if let Some((_, group)) = (&groups).into_iter().next() {
+                return Ok(group
+                    .into_iter()
+                    .map(|(s, _)| s.clone())
+                    .collect());
+            }
+
+            Err(RouterError::RouteUnknown)
         }
     }
 }
