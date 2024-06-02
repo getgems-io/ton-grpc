@@ -22,7 +22,7 @@ use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
 use tracing::{instrument};
-use ton_client_utils::router::BlockCriteria;
+use ton_client_utils::router::{BlockCriteria, Routed};
 use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
@@ -220,8 +220,16 @@ pub(crate) struct CursorClient {
     registry: Arc<Registry>
 }
 
-impl CursorClient {
-    pub(crate) fn last_seqno(&self) -> Option<Seqno> {
+impl Routed for CursorClient {
+    fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+        self.registry.contains(chain, criteria, false)
+    }
+
+    fn contains_not_available(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
+        self.registry.contains(chain, criteria, true)
+    }
+
+    fn last_seqno(&self) -> Option<Seqno> {
         let master_shard_id = self.masterchain_info_rx
             .borrow()
             .as_ref()
@@ -229,15 +237,9 @@ impl CursorClient {
 
         self.registry.get_last_seqno(&master_shard_id)
     }
+}
 
-    pub(crate) fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
-        self.registry.contains(chain, criteria, false)
-    }
-
-    pub(crate) fn contains_not_available(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
-        self.registry.contains(chain, criteria, true)
-    }
-
+impl CursorClient {
     pub(crate) fn edges_defined(&self) -> bool {
         let Some(master_shard_id) = self.masterchain_info_rx
             .borrow()

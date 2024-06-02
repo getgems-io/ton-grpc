@@ -5,3 +5,5 @@ edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
+thiserror = { workspace = true }
+itertools = { workspace = true }
