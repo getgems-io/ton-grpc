@@ -22,7 +22,7 @@ ed25519-dalek = { version = "2.1.1", features = ["rand_core", "hazmat"] }
 
 [dev-dependencies]
 base64 = { workspace = true }
-tracing-test = "0.2.4"
+tracing-test = "0.2.5"
 
 [features]
 default = ["client", "server"]
