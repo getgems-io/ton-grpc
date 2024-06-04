@@ -1,20 +1,32 @@
 use std::{pin::Pin, task::{Context, Poll}};
 use std::future::Future;
+use std::hash::Hash;
 use futures::{TryFutureExt, FutureExt};
 use derive_new::new;
 use tower::{Service, ServiceExt};
-use tower::discover::ServiceList;
+use tower::discover::{Discover, ServiceList};
 use tower::balance::p2c::Balance as TowerBalance;
 use crate::block::{BlocksGetMasterchainInfo, BlocksMasterchainInfo};
-use crate::cursor_client::InnerClient;
+use crate::cursor_client::{CursorClient, InnerClient};
 use crate::error::{Error, ErrorService};
 use crate::request::{Callable, Specialized};
 use crate::router::{Router, Routable};
 
 #[derive(new)]
-pub(crate) struct Balance { router: Router }
+pub(crate) struct Balance<D>
+    where
+        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        D::Key: Eq + Hash,
+{
+    router: Router<D>
+}
 
-impl<R> Service<R> for Balance where R: Routable + Callable<InnerClient> {
+impl<R, D> Service<R> for Balance<D>
+    where
+        R: Routable + Callable<InnerClient>,
+        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        D::Key: Eq + Hash,
+{
     type Response = R::Response;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -34,7 +46,11 @@ impl<R> Service<R> for Balance where R: Routable + Callable<InnerClient> {
     }
 }
 
-impl Service<Specialized<BlocksGetMasterchainInfo>> for Balance {
+impl<D> Service<Specialized<BlocksGetMasterchainInfo>> for Balance<D>
+    where
+        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        D::Key: Eq + Hash,
+{
     type Response = BlocksMasterchainInfo;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;

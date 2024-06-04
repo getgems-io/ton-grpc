@@ -1,25 +1,33 @@
 use std::collections::HashMap;
 use std::future::{Ready, ready};
+use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 use tower::discover::{Change, Discover};
 use tower::Service;
 use ton_client_utils::router::{Route, RouterError};
 use crate::cursor_client::CursorClient;
-use crate::discover::CursorClientDiscover;
 use crate::error::Error;
 
 pub(crate) trait Routable {
     fn route(&self) -> Route { Route::Latest }
 }
 
-pub(crate) struct Router {
-    discover: CursorClientDiscover,
-    services: HashMap<String, CursorClient>
+pub(crate) struct Router<D>
+    where
+        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        D::Key: Eq + Hash,
+{
+    discover: D,
+    services: HashMap<D::Key, CursorClient>
 }
 
-impl Router {
-    pub(crate) fn new(discover: CursorClientDiscover) -> Self {
+impl<D> Router<D>
+    where
+        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        D::Key: Eq + Hash,
+{
+    pub(crate) fn new(discover: D) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
         metrics::describe_counter!("ton_router_fallback_hit_count", "Count of fallback request hits in router");
         metrics::describe_counter!("ton_router_delayed_count", "Count of delayed requests in router");
@@ -44,7 +52,11 @@ impl Router {
     }
 }
 
-impl Service<&Route> for Router {
+impl<D> Service<&Route> for Router<D>
+    where
+        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        D::Key: Eq + Hash,
+{
     type Response = Vec<CursorClient>;
     type Error = Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;

@@ -43,7 +43,7 @@ pub fn default_ton_config_url() -> Url {
     Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/testnet-global.config.json").unwrap()
 }
 
-type SharedBalance = SharedService<Balance>;
+type SharedBalance = SharedService<Balance<CursorClientDiscover>>;
 
 #[derive(Clone)]
 pub struct TonClient {
