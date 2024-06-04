@@ -4,9 +4,10 @@ use futures::{TryFutureExt, FutureExt};
 use derive_new::new;
 use tower::{Service, ServiceExt};
 use tower::discover::ServiceList;
+use tower::balance::p2c::Balance as TowerBalance;
 use crate::block::{BlocksGetMasterchainInfo, BlocksMasterchainInfo};
 use crate::cursor_client::InnerClient;
-use crate::error::ErrorService;
+use crate::error::{Error, ErrorService};
 use crate::request::{Callable, Specialized};
 use crate::router::{Router, Routable};
 
@@ -15,7 +16,7 @@ pub(crate) struct Balance { router: Router }
 
 impl<R> Service<R> for Balance where R: Routable + Callable<InnerClient> {
     type Response = R::Response;
-    type Error = anyhow::Error;
+    type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -25,15 +26,17 @@ impl<R> Service<R> for Balance where R: Routable + Callable<InnerClient> {
     fn call(&mut self, req: R) -> Self::Future {
         self.router
             .call(&req.route())
-            .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(ServiceList::new::<R>(svc)))
-                .oneshot(req))
+            .and_then(|svc| ErrorService::new(TowerBalance::new(ServiceList::new::<R>(svc)))
+                .oneshot(req)
+                .map_err(|e| Error::Custom(e))
+            )
             .boxed()
     }
 }
 
 impl Service<Specialized<BlocksGetMasterchainInfo>> for Balance {
     type Response = BlocksMasterchainInfo;
-    type Error = anyhow::Error;
+    type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -43,8 +46,10 @@ impl Service<Specialized<BlocksGetMasterchainInfo>> for Balance {
     fn call(&mut self, req: Specialized<BlocksGetMasterchainInfo>) -> Self::Future {
         self.router
             .call(&req.route())
-            .and_then(|svc| ErrorService::new(tower::balance::p2c::Balance::new(
-                ServiceList::new::<Specialized<BlocksGetMasterchainInfo>>(svc))).oneshot(req))
+            .and_then(|svc| ErrorService::new(TowerBalance::new(ServiceList::new::<Specialized<BlocksGetMasterchainInfo>>(svc)))
+                .oneshot(req)
+                .map_err(Error::Custom)
+            )
             .boxed()
     }
 }

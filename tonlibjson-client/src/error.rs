@@ -3,27 +3,21 @@ use anyhow::anyhow;
 use derive_new::new;
 use futures::future::MapErr;
 use futures::TryFutureExt;
+use thiserror::Error;
 use tower::{Layer, Service};
+use ton_client_utils::router::RouterError;
 
-pub struct Error {
-    inner: anyhow::Error
-}
-
-impl From<anyhow::Error> for Error {
-    fn from(err: anyhow::Error) -> Self {
-        Self { inner: err }
-    }
+#[derive(Debug, Error)]
+pub enum Error {
+    #[error(transparent)]
+    Router(#[from] RouterError),
+    #[error(transparent)]
+    Custom(#[from] anyhow::Error)
 }
 
 impl From<tower::BoxError> for Error {
     fn from(err: tower::BoxError) -> Self {
-        Self { inner: anyhow!(err) }
-    }
-}
-
-impl From<Error> for anyhow::Error {
-    fn from(value: Error) -> Self {
-        value.inner
+        Self::Custom(anyhow!(err))
     }
 }
 
