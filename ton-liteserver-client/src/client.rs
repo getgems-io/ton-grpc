@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::net::SocketAddrV4;
@@ -5,7 +6,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use dashmap::DashMap;
 use tower::Service;
 use adnl_tcp::client::{Client, ServerKey};
 use futures::{ready, SinkExt, StreamExt};
@@ -25,6 +25,8 @@ use adnl_tcp::serializer::to_bytes_boxed;
 use crate::request::Requestable;
 use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery};
 
+pub type RequestId = Int256;
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("LiteServer error: {0}")]
@@ -39,22 +41,29 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub struct LiteServerClient {
-    responses: Arc<DashMap<Int256, oneshot::Sender<Bytes>>>,
-    tx: mpsc::UnboundedSender<AdnlMessageQuery>,
+    tx: mpsc::UnboundedSender<ClientActorMessage>,
     drop_guard: Arc<DropGuard>,
+}
+
+struct ClientActor {
+    receiver: mpsc::UnboundedReceiver<ClientActorMessage>,
+    responses: Arc<HashMap<RequestId, oneshot::Sender<Bytes>>>
+}
+
+enum ClientActorMessage {
+    Query { query: AdnlMessageQuery, oneshot: oneshot::Sender<Bytes> },
 }
 
 impl LiteServerClient {
     pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
         let mut inner = Client::connect(addr, server_key).await?;
-
-        let responses: Arc<DashMap<Int256, oneshot::Sender<Bytes>>> = Arc::new(DashMap::new());
         let cancel_token = CancellationToken::new();
 
         let inner_token = cancel_token.clone();
-        let responses_read_half = responses.clone();
-        let (tx, rx) = mpsc::unbounded_channel::<AdnlMessageQuery>();
+        let (tx, rx) = mpsc::unbounded_channel::<ClientActorMessage>();
         tokio::spawn(async move {
+            let mut responses: HashMap<RequestId, oneshot::Sender<Bytes>> = Default::default();
+
             let mut interval = tokio::time::interval(Duration::from_secs(5));
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
@@ -77,7 +86,7 @@ impl LiteServerClient {
                                 let adnl_answer = from_bytes_boxed::<AdnlMessageAnswer>(&packet.data)
                                     .expect("expect adnl answer packet");
 
-                                if let Some((_, oneshot)) = responses_read_half.remove(&adnl_answer.query_id) {
+                                if let Some(oneshot) = responses.remove(&adnl_answer.query_id) {
                                     oneshot
                                         .send(adnl_answer.answer)
                                         .expect("expect oneshot alive");
@@ -92,8 +101,10 @@ impl LiteServerClient {
                     },
                     Some(request) = stream.next() => {
                         match request {
-                            Ok(adnl_query) => {
-                                let data = to_bytes_boxed(&adnl_query);
+                            Ok(ClientActorMessage::Query { query, oneshot }) => {
+                                responses.insert(query.query_id, oneshot);
+
+                                let data = to_bytes_boxed(&query);
                                 inner.send(Packet::new(data)).await.expect("expect to send adnl query packet")
                             }
                             Err(_) => {
@@ -108,7 +119,7 @@ impl LiteServerClient {
         });
 
 
-        Ok(Self { responses, tx, drop_guard: Arc::new(cancel_token.drop_guard()) })
+        Ok(Self { tx, drop_guard: Arc::new(cancel_token.drop_guard()) })
     }
 }
 
@@ -131,17 +142,15 @@ impl<R> Service<R> for LiteServerClient where R: Requestable {
         let query = LiteServerQuery { data };
         let query = to_bytes_boxed(&query);
 
-        let query_id: Int256 = random();
-        let request = AdnlMessageQuery { query_id, query };
+        let query = AdnlMessageQuery { query_id: random(), query };
 
         let (tx, rx) = oneshot::channel();
 
-        self.responses.insert(query_id, tx);
-        if self.tx.send(request).is_err() {
+        if self.tx.send(ClientActorMessage::Query { query, oneshot: tx }).is_err() {
             return ResponseFuture::failed(Error::ChannelClosed);
         }
 
-        ResponseFuture::new(query_id, rx, self.responses.clone(), self.drop_guard.clone())
+        ResponseFuture::new(rx, self.drop_guard.clone())
     }
 }
 
@@ -152,37 +161,24 @@ pub enum ResponseState {
     Rx {
         #[pin]
         rx: oneshot::Receiver<Bytes>,
-        query_id: Int256,
-        responses: Arc<DashMap<Int256, oneshot::Sender<Bytes>>>,
         drop_guard: Arc<DropGuard>
     }
 }
 
-#[pin_project(PinnedDrop)]
+#[pin_project]
 pub struct ResponseFuture<Response> {
     #[pin]
     state: ResponseState,
-
     _phantom: PhantomData<Response>,
 }
 
 impl<Response> ResponseFuture<Response> {
-    fn new(query_id: Int256, rx: oneshot::Receiver<Bytes>, responses: Arc<DashMap<Int256, oneshot::Sender<Bytes>>>, drop_guard: Arc<DropGuard>) -> Self {
-        Self { state: ResponseState::Rx { query_id, responses, rx, drop_guard }, _phantom: PhantomData }
+    fn new(rx: oneshot::Receiver<Bytes>, drop_guard: Arc<DropGuard>) -> Self {
+        Self { state: ResponseState::Rx { rx, drop_guard }, _phantom: PhantomData }
     }
 
     fn failed(error: Error) -> Self {
         Self { state: ResponseState::Failed { error: Some(error) }, _phantom: PhantomData }
-    }
-}
-
-#[pin_project::pinned_drop]
-impl<Response> PinnedDrop for ResponseFuture<Response> {
-    fn drop(self: Pin<&mut Self>) {
-        match self.state {
-            ResponseState::Failed { .. } => {},
-            ResponseState::Rx { ref responses, ref query_id, .. } => { responses.remove(query_id); }
-        }
     }
 }
 
