@@ -36,7 +36,7 @@ impl Client {
         let cancel_token = CancellationToken::new();
         let child_token = cancel_token.child_token();
 
-        tokio::task::spawn_blocking(move || {
+        std::thread::spawn(move || {
             let timeout = Duration::from_secs(1);
             while !child_token.is_cancelled() {
                 if let Ok(packet) = client_recv.receive(timeout) {
