@@ -4,7 +4,10 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo};
-use toner::tlb::{ton::BoC, unpack_bytes};
+use toner::{
+    tlb::ton::BoC,
+    tlb::bits::de::unpack_bytes
+};
 use tower::{ServiceBuilder, ServiceExt};
 
 #[tokio::main]
