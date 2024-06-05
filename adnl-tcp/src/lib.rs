@@ -7,7 +7,7 @@ pub mod serializer;
 pub mod deserializer;
 #[cfg(feature = "server")]
 pub mod server;
+pub mod connection;
 mod codec;
 mod key;
-mod connection;
 mod aes_ctr;
