@@ -69,9 +69,8 @@ impl<S, D, Request> Service<&Request> for Router<S, D>
             .map_err(Error::Custom)?;
 
         for s in self.services.values_mut() {
-            match S::poll_ready(s, cx) {
-                Poll::Ready(Ok(())) => return Poll::Ready(Ok(())),
-                _ => {}
+            if let Poll::Ready(Ok(())) = s.poll_ready(cx) {
+                return Poll::Ready(Ok(()))
             }
         }
 
