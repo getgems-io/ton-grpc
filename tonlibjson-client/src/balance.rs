@@ -39,7 +39,7 @@ impl<R, D> Service<R> for Balance<D>
             .make_service(&req)
             .and_then(|svc| svc
                 .oneshot(req)
-                .map_err(|e| Error::Custom(e))
+                .map_err(Error::Custom)
             )
             .boxed()
     }
