@@ -3,12 +3,11 @@ use std::future::Future;
 use std::hash::Hash;
 use futures::{TryFutureExt, FutureExt};
 use derive_new::new;
-use tower::{Service, ServiceExt};
-use tower::discover::{Discover, ServiceList};
-use tower::balance::p2c::Balance as TowerBalance;
+use tower::{MakeService, Service, ServiceExt};
+use tower::discover::Discover;
 use crate::block::{BlocksGetMasterchainInfo, BlocksMasterchainInfo};
 use crate::cursor_client::{CursorClient, InnerClient};
-use crate::error::{Error, ErrorService};
+use crate::error::Error;
 use crate::request::{Callable, Specialized};
 use crate::router::{Router, Routable};
 
@@ -37,8 +36,8 @@ impl<R, D> Service<R> for Balance<D>
 
     fn call(&mut self, req: R) -> Self::Future {
         self.router
-            .call(&req)
-            .and_then(|svc| ErrorService::new(TowerBalance::new(ServiceList::new::<R>(svc)))
+            .make_service(&req)
+            .and_then(|svc| svc
                 .oneshot(req)
                 .map_err(|e| Error::Custom(e))
             )
@@ -61,8 +60,8 @@ impl<D> Service<Specialized<BlocksGetMasterchainInfo>> for Balance<D>
 
     fn call(&mut self, req: Specialized<BlocksGetMasterchainInfo>) -> Self::Future {
         self.router
-            .call(&req)
-            .and_then(|svc| ErrorService::new(TowerBalance::new(ServiceList::new::<Specialized<BlocksGetMasterchainInfo>>(svc)))
+            .make_service(&req)
+            .and_then(|svc| svc
                 .oneshot(req)
                 .map_err(Error::Custom)
             )

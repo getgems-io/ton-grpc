@@ -3,10 +3,11 @@ use std::future::{Ready, ready};
 use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
-use tower::discover::{Change, Discover};
+use tower::balance::p2c::Balance;
+use tower::discover::{Change, Discover, ServiceList};
 use tower::Service;
 use ton_client_utils::router::{Route, Routed, RouterError};
-use crate::error::Error;
+use crate::error::{Error, ErrorService};
 
 pub(crate) trait Routable {
     fn route(&self) -> Route { Route::Latest }
@@ -55,10 +56,11 @@ impl<S, D, Request> Service<&Request> for Router<S, D>
     where
         Request: Routable,
         S: Service<Request> + Routed + Clone,
+        S::Error: Into<tower::BoxError>,
         D: Discover<Service=S, Error = anyhow::Error> + Unpin,
         D::Key: Hash
 {
-    type Response = Vec<S>;
+    type Response = ErrorService<Balance<ServiceList<Vec<S>>, Request>>;
     type Error = Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
@@ -79,22 +81,28 @@ impl<S, D, Request> Service<&Request> for Router<S, D>
     }
 
     fn call(&mut self, req: &Request) -> Self::Future {
-        match req.route().choose(self.services.values()) {
-            Ok(services) => ready(Ok(services.into_iter().cloned().collect())),
+        ready(match req.route().choose(self.services.values()) {
+            Ok(services) => Ok(
+                ErrorService::new(Balance::new(ServiceList::new(
+                    services.into_iter().cloned().collect()
+                )))
+            ),
             Err(RouterError::RouteUnknown) => {
                 metrics::counter!("ton_router_miss_count").increment(1);
 
-                ready(
-                    Route::Latest.choose(self.services.values())
-                        .map(|services| services.into_iter().cloned().collect())
-                        .map_err(Error::Router)
-                )
+                Route::Latest.choose(self.services.values())
+                    .map(|services|
+                        ErrorService::new(Balance::new(ServiceList::new(
+                            services.into_iter().cloned().collect()
+                        )))
+                    )
+                    .map_err(Error::Router)
             },
             Err(RouterError::RouteNotAvailable) => {
                 metrics::counter!("ton_router_delayed_count").increment(1);
 
-                ready(Err(Error::Router(RouterError::RouteNotAvailable)))
+                Err(Error::Router(RouterError::RouteNotAvailable))
             },
-        }
+        })
     }
 }
