@@ -13,9 +13,10 @@ use pin_project::pin_project;
 use rand::random;
 use thiserror::Error;
 use tokio::select;
-use tokio::sync::mpsc::UnboundedSender;
-use tokio::sync::oneshot::{Receiver, Sender};
+use tokio::sync::mpsc;
+use tokio::sync::oneshot;
 use tokio::time::MissedTickBehavior;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
@@ -38,28 +39,35 @@ pub enum Error {
 
 #[derive(Debug, Clone)]
 pub struct LiteServerClient {
-    responses: Arc<DashMap<Int256, Sender<Bytes>>>,
-    tx: UnboundedSender<AdnlMessageQuery>,
+    responses: Arc<DashMap<Int256, oneshot::Sender<Bytes>>>,
+    tx: mpsc::UnboundedSender<AdnlMessageQuery>,
     drop_guard: Arc<DropGuard>,
 }
 
 impl LiteServerClient {
     pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
-        let inner = Client::connect(addr, server_key).await?;
-        let (mut write_half, mut read_half) = inner.split();
-        let responses: Arc<DashMap<Int256, Sender<Bytes>>> = Arc::new(DashMap::new());
+        let mut inner = Client::connect(addr, server_key).await?;
+
+        let responses: Arc<DashMap<Int256, oneshot::Sender<Bytes>>> = Arc::new(DashMap::new());
         let cancel_token = CancellationToken::new();
 
-        let read_token = cancel_token.clone();
+        let inner_token = cancel_token.clone();
         let responses_read_half = responses.clone();
+        let (tx, rx) = mpsc::unbounded_channel::<AdnlMessageQuery>();
         tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(5));
+            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+            let stream = UnboundedReceiverStream::new(rx);
+            let mut stream = tokio_stream::StreamExt::timeout_repeating(stream, interval);
+
             loop {
                 select! {
-                    _ = read_token.cancelled() => {
+                    _ = inner_token.cancelled() => {
                         tracing::error!("LiteServerClient cancelled");
                         break;
                     },
-                    Some(response) = read_half.next() => {
+                    Some(response) = inner.next() => {
                         match response {
                             Ok(packet) if is_pong_packet(&packet) => {
                                 tracing::trace!("pong packet received");
@@ -81,42 +89,22 @@ impl LiteServerClient {
                                 return
                             }
                         }
-                    }
-                }
-            }
-            tracing::trace!("read thread closed");
-        });
-
-        let write_token = cancel_token.clone();
-        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<AdnlMessageQuery>();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(5));
-            interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-            let stream = tokio_stream::wrappers::UnboundedReceiverStream::new(rx);
-            let mut stream = tokio_stream::StreamExt::timeout_repeating(stream, interval);
-
-            loop {
-                select! {
-                    _ = write_token.cancelled() => {
-                        tracing::error!("LiteServerClient cancelled");
-                        break;
                     },
                     Some(request) = stream.next() => {
                         match request {
                             Ok(adnl_query) => {
                                 let data = to_bytes_boxed(&adnl_query);
-                                write_half.send(Packet::new(data)).await.expect("expect to send adnl query packet")
+                                inner.send(Packet::new(data)).await.expect("expect to send adnl query packet")
                             }
                             Err(_) => {
-                                write_half.send(ping_packet()).await.expect("expect to send ping packet")
+                                inner.send(ping_packet()).await.expect("expect to send ping packet")
                             }
                         }
                     }
                 }
             }
 
-            tracing::trace!("write thread closed");
+            tracing::trace!("client inner actor closed");
         });
 
 
@@ -146,7 +134,7 @@ impl<R> Service<R> for LiteServerClient where R: Requestable {
         let query_id: Int256 = random();
         let request = AdnlMessageQuery { query_id, query };
 
-        let (tx, rx) = tokio::sync::oneshot::channel();
+        let (tx, rx) = oneshot::channel();
 
         self.responses.insert(query_id, tx);
         if self.tx.send(request).is_err() {
@@ -161,7 +149,13 @@ impl<R> Service<R> for LiteServerClient where R: Requestable {
 #[pin_project(project = ResponseStateProj)]
 pub enum ResponseState {
     Failed { error: Option<Error> },
-    Rx { #[pin] rx: Receiver<Bytes>, query_id: Int256, responses: Arc<DashMap<Int256, Sender<Bytes>>>, drop_guard: Arc<DropGuard> }
+    Rx {
+        #[pin]
+        rx: oneshot::Receiver<Bytes>,
+        query_id: Int256,
+        responses: Arc<DashMap<Int256, oneshot::Sender<Bytes>>>,
+        drop_guard: Arc<DropGuard>
+    }
 }
 
 #[pin_project(PinnedDrop)]
@@ -173,7 +167,7 @@ pub struct ResponseFuture<Response> {
 }
 
 impl<Response> ResponseFuture<Response> {
-    fn new(query_id: Int256, rx: Receiver<Bytes>, responses: Arc<DashMap<Int256, Sender<Bytes>>>, drop_guard: Arc<DropGuard>) -> Self {
+    fn new(query_id: Int256, rx: oneshot::Receiver<Bytes>, responses: Arc<DashMap<Int256, oneshot::Sender<Bytes>>>, drop_guard: Arc<DropGuard>) -> Self {
         Self { state: ResponseState::Rx { query_id, responses, rx, drop_guard }, _phantom: PhantomData }
     }
 
