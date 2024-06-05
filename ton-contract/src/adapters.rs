@@ -19,10 +19,10 @@ use tonlibjson_client::block::{
 use crate::TonContractError;
 
 pub trait TvmBoxedStackEntryExt: Sized {
-    fn into_boc(&self) -> Result<BoC, TonContractError>;
+    fn to_boc(&self) -> Result<BoC, TonContractError>;
     #[inline]
-    fn into_cell(&self) -> Result<Arc<Cell>, TonContractError> {
-        self.into_boc()?
+    fn to_cell(&self) -> Result<Arc<Cell>, TonContractError> {
+        self.to_boc()?
             .single_root()
             .ok_or_else(|| TonContractError::TLB(TlbError::custom("single root")))
             .cloned()
@@ -32,14 +32,14 @@ pub trait TvmBoxedStackEntryExt: Sized {
     where
         T: CellDeserializeOwned,
     {
-        self.into_cell()?.parse_fully().map_err(Into::into)
+        self.to_cell()?.parse_fully().map_err(Into::into)
     }
     #[inline]
     fn parse_cell_fully_as<T, As>(&self) -> Result<T, TonContractError>
     where
         As: CellDeserializeAsOwned<T>,
     {
-        self.into_cell()?
+        self.to_cell()?
             .parse_fully_as::<T, As>()
             .map_err(Into::into)
     }
@@ -63,7 +63,7 @@ pub trait TvmBoxedStackEntryExt: Sized {
         Self::from_cell(value.wrap_as::<As>().to_cell()?)
     }
 
-    fn into_number<T>(&self) -> Result<T, TonContractError>
+    fn to_number<T>(&self) -> Result<T, TonContractError>
     where
         T: FromStr,
         T::Err: StdError + Send + Sync + 'static;
@@ -73,7 +73,7 @@ pub trait TvmBoxedStackEntryExt: Sized {
 }
 
 impl TvmBoxedStackEntryExt for TvmBoxedStackEntry {
-    fn into_boc(&self) -> Result<BoC, TonContractError> {
+    fn to_boc(&self) -> Result<BoC, TonContractError> {
         let bytes = match self {
             Self::TvmStackEntrySlice(TvmStackEntrySlice {
                 slice: TvmSlice { bytes },
@@ -100,7 +100,7 @@ impl TvmBoxedStackEntryExt for TvmBoxedStackEntry {
         }))
     }
 
-    fn into_number<T>(&self) -> Result<T, TonContractError>
+    fn to_number<T>(&self) -> Result<T, TonContractError>
     where
         T: FromStr,
         T::Err: Display,

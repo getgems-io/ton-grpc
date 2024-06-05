@@ -26,7 +26,7 @@ impl JettonWalletContract for TonContract {
             .try_into()?;
 
         Ok(JettonWalletData {
-            balance: balance.into_number()?,
+            balance: balance.to_number()?,
             owner: owner.parse_cell_fully_as::<_, Data>()?,
             master: master.parse_cell_fully_as::<_, Data>()?,
         })

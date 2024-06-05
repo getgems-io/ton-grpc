@@ -11,6 +11,6 @@ pub trait WalletContract {
 impl WalletContract for TonContract {
     async fn seqno(&self) -> Result<u32, TonContractError> {
         let [seqno] = self.run_get_method("seqno", [].into()).await?.try_into()?;
-        seqno.into_number()
+        seqno.to_number()
     }
 }
