@@ -19,6 +19,7 @@ use tokio::time::MissedTickBehavior;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use adnl_tcp::packet::Packet;
+use adnl_tcp::connection::Connection;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
 use adnl_tcp::deserializer::{DeserializeBoxed, from_bytes_boxed};
 use adnl_tcp::serializer::to_bytes_boxed;
@@ -46,37 +47,33 @@ pub struct LiteServerClient {
 }
 
 struct ClientActor {
+    connection: Connection,
     receiver: mpsc::UnboundedReceiver<ClientActorMessage>,
-    responses: Arc<HashMap<RequestId, oneshot::Sender<Bytes>>>
+    cancellation_token: CancellationToken
 }
 
-enum ClientActorMessage {
-    Query { query: AdnlMessageQuery, oneshot: oneshot::Sender<Bytes> },
-}
+impl ClientActor {
+    pub fn new(connection: Connection, receiver: mpsc::UnboundedReceiver<ClientActorMessage>, cancellation_token: CancellationToken) -> Self {
+        Self { connection, receiver, cancellation_token }
+    }
 
-impl LiteServerClient {
-    pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
-        let mut inner = Client::connect(addr, server_key).await?;
-        let cancel_token = CancellationToken::new();
-
-        let inner_token = cancel_token.clone();
-        let (tx, rx) = mpsc::unbounded_channel::<ClientActorMessage>();
+    pub fn run(mut self) {
         tokio::spawn(async move {
             let mut responses: HashMap<RequestId, oneshot::Sender<Bytes>> = Default::default();
 
             let mut interval = tokio::time::interval(Duration::from_secs(5));
             interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-            let stream = UnboundedReceiverStream::new(rx);
+            let stream = UnboundedReceiverStream::new(self.receiver);
             let mut stream = tokio_stream::StreamExt::timeout_repeating(stream, interval);
 
             loop {
                 select! {
-                    _ = inner_token.cancelled() => {
+                    _ = self.cancellation_token.cancelled() => {
                         tracing::error!("LiteServerClient cancelled");
                         break;
                     },
-                    Some(response) = inner.next() => {
+                    Some(response) = self.connection.next() => {
                         match response {
                             Ok(packet) if is_pong_packet(&packet) => {
                                 tracing::trace!("pong packet received");
@@ -105,10 +102,10 @@ impl LiteServerClient {
                                 responses.insert(query.query_id, oneshot);
 
                                 let data = to_bytes_boxed(&query);
-                                inner.send(Packet::new(data)).await.expect("expect to send adnl query packet")
+                                self.connection.send(Packet::new(data)).await.expect("expect to send adnl query packet")
                             }
                             Err(_) => {
-                                inner.send(ping_packet()).await.expect("expect to send ping packet")
+                                self.connection.send(ping_packet()).await.expect("expect to send ping packet")
                             }
                         }
                     }
@@ -117,7 +114,19 @@ impl LiteServerClient {
 
             tracing::trace!("client inner actor closed");
         });
+    }
+}
 
+enum ClientActorMessage {
+    Query { query: AdnlMessageQuery, oneshot: oneshot::Sender<Bytes> },
+}
+
+impl LiteServerClient {
+    pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
+        let inner = Client::connect(addr, server_key).await?;
+        let cancel_token = CancellationToken::new();
+        let (tx, rx) = mpsc::unbounded_channel::<ClientActorMessage>();
+        ClientActor::new(inner, rx, cancel_token.clone()).run();
 
         Ok(Self { tx, drop_guard: Arc::new(cancel_token.drop_guard()) })
     }
