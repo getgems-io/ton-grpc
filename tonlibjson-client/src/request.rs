@@ -5,7 +5,8 @@ use serde::{Serialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service};
-use crate::router::{Routable, Route};
+use ton_client_utils::router::Route;
+use crate::router::Routable;
 use crate::error::Error;
 
 pub(crate) trait Callable<S> : Sized + Send + 'static {

@@ -20,9 +20,10 @@ use tracing::{instrument, trace};
 use url::Url;
 use std::str::FromStr;
 use tower::util::Either;
+use ton_client_utils::router::{BlockCriteria, Route};
 use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
-use crate::router::{BlockCriteria, Route, Router};
+use crate::router::Router;
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell, BlocksGetTransactionsExt, BlocksTransactionsExt};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
@@ -42,7 +43,7 @@ pub fn default_ton_config_url() -> Url {
     Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/testnet-global.config.json").unwrap()
 }
 
-type SharedBalance = SharedService<Balance>;
+type SharedBalance = SharedService<Balance<CursorClientDiscover>>;
 
 #[derive(Clone)]
 pub struct TonClient {

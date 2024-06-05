@@ -6,6 +6,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
 tonlibjson-sys = { path = "../tonlibjson-sys" }
+ton-client-utils = { path = "../ton-client-utils" }
 tower = { workspace = true }
 tokio = { workspace = true }
 anyhow = { workspace = true }
@@ -29,7 +30,7 @@ bytes = { workspace = true }
 thiserror = { workspace = true }
 reqwest = { version = "0.12.4", features = ["rustls-tls", "hickory-dns"], default-features = false }
 hickory-resolver = { version = "0.24.1", features = ["tokio-runtime"] }
-itertools = "0.13"
+itertools = { workspace = true }
 derive-new = "0.6.0"
 tokio-retry = "0.3"
 crc = "3.2.1"

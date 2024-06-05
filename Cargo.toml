@@ -1,14 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "tl_parser",
     "tonlibjson-sys",
+    "tl_parser",
+    "adnl-tcp",
+    "ton-client-utils",
     "tonlibjson-client",
+    "ton-liteserver-client",
+    "ton-contract",
     "ton-grpc",
     "tvm-grpc",
-    "adnl-tcp",
-    "ton-liteserver-client",
-    "ton-contract"
 ]
 
 [workspace.dependencies]
@@ -45,3 +46,4 @@ pin-project = "1.1"
 rand = "0.8"
 bytes = "1.6"
 thiserror = "1.0.61"
+itertools = "0.13"
