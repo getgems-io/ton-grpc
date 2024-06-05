@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::future::{Ready, ready};
 use std::hash::Hash;
-use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 use tower::discover::{Change, Discover};
@@ -13,22 +12,19 @@ pub(crate) trait Routable {
     fn route(&self) -> Route { Route::Latest }
 }
 
-pub(crate) struct Router<S, D, Request>
+pub(crate) struct Router<S, D>
     where
-        S: Service<Request>,
         D: Discover<Service=S>,
-        D::Key: Eq + Hash,
+        D::Key: Hash,
 {
     discover: D,
-    services: HashMap<D::Key, S>,
-    _phantom_data: PhantomData<Request>
+    services: HashMap<D::Key, S>
 }
 
-impl<S, D, Request, E> Router<S, D, Request>
+impl<S, D, E> Router<S, D>
     where
-        S: Service<Request>,
         D: Discover<Service=S, Error = E> + Unpin,
-        D::Key: Eq + Hash,
+        D::Key: Hash,
 {
     pub(crate) fn new(discover: D) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
@@ -37,7 +33,7 @@ impl<S, D, Request, E> Router<S, D, Request>
         metrics::describe_counter!("ton_router_delayed_hit_count", "Count of delayed request hits in router");
         metrics::describe_counter!("ton_router_delayed_miss_count", "Count of delayed request misses in router");
 
-        Router { discover, services: Default::default(), _phantom_data: Default::default() }
+        Router { discover, services: Default::default() }
     }
 
     fn update_pending_from_discover(&mut self, cx: &mut Context<'_>, ) -> Poll<Option<Result<(), E>>> {
@@ -55,11 +51,12 @@ impl<S, D, Request, E> Router<S, D, Request>
     }
 }
 
-impl<S, D, Request> Service<&Route> for Router<S, D, Request>
+impl<S, D, Request> Service<&Request> for Router<S, D>
     where
+        Request: Routable,
         S: Service<Request> + Routed + Clone,
         D: Discover<Service=S, Error = anyhow::Error> + Unpin,
-        D::Key: Eq + Hash
+        D::Key: Hash
 {
     type Response = Vec<S>;
     type Error = Error;
@@ -81,8 +78,8 @@ impl<S, D, Request> Service<&Route> for Router<S, D, Request>
         Poll::Pending
     }
 
-    fn call(&mut self, req: &Route) -> Self::Future {
-        match req.choose(self.services.values()) {
+    fn call(&mut self, req: &Request) -> Self::Future {
+        match req.route().choose(self.services.values()) {
             Ok(services) => ready(Ok(services.into_iter().cloned().collect())),
             Err(RouterError::RouteUnknown) => {
                 metrics::counter!("ton_router_miss_count").increment(1);

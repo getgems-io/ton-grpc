@@ -18,7 +18,7 @@ pub(crate) struct Balance<D>
         D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
 {
-    router: Router<CursorClient, D, BlocksGetMasterchainInfo>
+    router: Router<CursorClient, D>
 }
 
 impl<R, D> Service<R> for Balance<D>
@@ -32,12 +32,12 @@ impl<R, D> Service<R> for Balance<D>
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.router.poll_ready(cx)
+        <Router<CursorClient, D> as Service<&R>>::poll_ready(&mut self.router, cx)
     }
 
     fn call(&mut self, req: R) -> Self::Future {
         self.router
-            .call(&req.route())
+            .call(&req)
             .and_then(|svc| ErrorService::new(TowerBalance::new(ServiceList::new::<R>(svc)))
                 .oneshot(req)
                 .map_err(|e| Error::Custom(e))
@@ -56,12 +56,12 @@ impl<D> Service<Specialized<BlocksGetMasterchainInfo>> for Balance<D>
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.router.poll_ready(cx)
+        <Router<CursorClient, D> as Service<&Specialized<BlocksGetMasterchainInfo>>>::poll_ready(&mut self.router, cx)
     }
 
     fn call(&mut self, req: Specialized<BlocksGetMasterchainInfo>) -> Self::Future {
         self.router
-            .call(&req.route())
+            .call(&req)
             .and_then(|svc| ErrorService::new(TowerBalance::new(ServiceList::new::<Specialized<BlocksGetMasterchainInfo>>(svc)))
                 .oneshot(req)
                 .map_err(Error::Custom)
