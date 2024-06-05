@@ -18,7 +18,7 @@ pub(crate) struct Balance<D>
         D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
 {
-    router: Router<D, BlocksGetMasterchainInfo>
+    router: Router<CursorClient, D, BlocksGetMasterchainInfo>
 }
 
 impl<R, D> Service<R> for Balance<D>

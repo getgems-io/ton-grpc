@@ -6,8 +6,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 use tower::discover::{Change, Discover};
 use tower::Service;
-use ton_client_utils::router::{Route, RouterError};
-use crate::cursor_client::CursorClient;
+use ton_client_utils::router::{Route, Routed, RouterError};
 use crate::error::Error;
 use crate::request::Requestable;
 
@@ -15,19 +14,21 @@ pub(crate) trait Routable {
     fn route(&self) -> Route { Route::Latest }
 }
 
-pub(crate) struct Router<D, Request>
+pub(crate) struct Router<S, D, Request>
     where
-        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        S: Service<Request>,
+        D: Discover<Service=S, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
 {
     discover: D,
-    services: HashMap<D::Key, CursorClient>,
+    services: HashMap<D::Key, S>,
     _phantom_data: PhantomData<Request>
 }
 
-impl<D, Request> Router<D, Request>
+impl<S, D, Request> Router<S, D, Request>
     where
-        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        S: Service<Request> + Routed + Clone,
+        D: Discover<Service=S, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
 {
     pub(crate) fn new(discover: D) -> Self {
@@ -37,7 +38,7 @@ impl<D, Request> Router<D, Request>
         metrics::describe_counter!("ton_router_delayed_hit_count", "Count of delayed request hits in router");
         metrics::describe_counter!("ton_router_delayed_miss_count", "Count of delayed request misses in router");
 
-        Router { discover, services: Default::default(), _phantom_data: PhantomData }
+        Router { discover, services: Default::default(), _phantom_data: Default::default() }
     }
 
     fn update_pending_from_discover(&mut self, cx: &mut Context<'_>, ) -> Poll<Option<Result<(), anyhow::Error>>> {
@@ -55,13 +56,14 @@ impl<D, Request> Router<D, Request>
     }
 }
 
-impl<D, Request> Service<&Route> for Router<D, Request>
+impl<S, D, Request> Service<&Route> for Router<S, D, Request>
     where
-        D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
+        S: Service<Request> + Routed + Clone,
+        D: Discover<Service=S, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
         Request: Requestable + 'static
 {
-    type Response = Vec<CursorClient>;
+    type Response = Vec<S>;
     type Error = Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
@@ -70,7 +72,7 @@ impl<D, Request> Service<&Route> for Router<D, Request>
             .map_err(Error::Custom)?;
 
         for s in self.services.values_mut() {
-            match <CursorClient as Service<Request>>::poll_ready(s, cx) {
+            match S::poll_ready(s, cx) {
                 Poll::Ready(Ok(())) => return Poll::Ready(Ok(())),
                 _ => {}
             }
