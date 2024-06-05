@@ -19,7 +19,6 @@ tokio = { workspace = true }
 tokio-util = { workspace = true }
 tower = { workspace = true }
 tracing = { workspace = true }
-dashmap = { workspace = true }
 bytes = { workspace = true }
 pin-project = { workspace = true }
 rand = { workspace = true }
