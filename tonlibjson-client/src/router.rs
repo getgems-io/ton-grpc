@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::future::{Ready, ready};
 use std::hash::Hash;
+use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 use tower::discover::{Change, Discover};
@@ -8,21 +9,23 @@ use tower::Service;
 use ton_client_utils::router::{Route, RouterError};
 use crate::cursor_client::CursorClient;
 use crate::error::Error;
+use crate::request::Requestable;
 
 pub(crate) trait Routable {
     fn route(&self) -> Route { Route::Latest }
 }
 
-pub(crate) struct Router<D>
+pub(crate) struct Router<D, Request>
     where
         D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
 {
     discover: D,
-    services: HashMap<D::Key, CursorClient>
+    services: HashMap<D::Key, CursorClient>,
+    _phantom_data: PhantomData<Request>
 }
 
-impl<D> Router<D>
+impl<D, Request> Router<D, Request>
     where
         D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
@@ -34,7 +37,7 @@ impl<D> Router<D>
         metrics::describe_counter!("ton_router_delayed_hit_count", "Count of delayed request hits in router");
         metrics::describe_counter!("ton_router_delayed_miss_count", "Count of delayed request misses in router");
 
-        Router { discover, services: Default::default() }
+        Router { discover, services: Default::default(), _phantom_data: PhantomData }
     }
 
     fn update_pending_from_discover(&mut self, cx: &mut Context<'_>, ) -> Poll<Option<Result<(), anyhow::Error>>> {
@@ -52,10 +55,11 @@ impl<D> Router<D>
     }
 }
 
-impl<D> Service<&Route> for Router<D>
+impl<D, Request> Service<&Route> for Router<D, Request>
     where
         D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
+        Request: Requestable + 'static
 {
     type Response = Vec<CursorClient>;
     type Error = Error;
@@ -65,13 +69,16 @@ impl<D> Service<&Route> for Router<D>
         let _ = self.update_pending_from_discover(cx)
             .map_err(Error::Custom)?;
 
-        if self.services.values().any(|s| s.edges_defined()) {
-            Poll::Ready(Ok(()))
-        } else {
-            cx.waker().wake_by_ref();
-
-            Poll::Pending
+        for s in self.services.values_mut() {
+            match <CursorClient as Service<Request>>::poll_ready(s, cx) {
+                Poll::Ready(Ok(())) => return Poll::Ready(Ok(())),
+                _ => {}
+            }
         }
+
+        cx.waker().wake_by_ref();
+
+        Poll::Pending
     }
 
     fn call(&mut self, req: &Route) -> Self::Future {

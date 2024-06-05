@@ -240,15 +240,6 @@ impl Routed for CursorClient {
 }
 
 impl CursorClient {
-    pub(crate) fn edges_defined(&self) -> bool {
-        let Some(master_shard_id) = self.masterchain_info_rx
-            .borrow()
-            .as_ref()
-            .map(|info| (info.last.workchain, info.last.shard)) else { return false };
-
-        self.registry.edges_defined(&master_shard_id)
-    }
-
     pub(crate) fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
         metrics::describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
         metrics::describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
@@ -299,6 +290,15 @@ impl CursorClient {
 
         discover.discover()
     }
+
+    fn edges_defined(&self) -> bool {
+        let Some(master_shard_id) = self.masterchain_info_rx
+            .borrow()
+            .as_ref()
+            .map(|info| (info.last.workchain, info.last.shard)) else { return false };
+
+        self.registry.edges_defined(&master_shard_id)
+    }
 }
 
 impl Service<Specialized<BlocksGetMasterchainInfo>> for CursorClient {
@@ -307,7 +307,7 @@ impl Service<Specialized<BlocksGetMasterchainInfo>> for CursorClient {
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
-        if self.masterchain_info_rx.borrow().is_some() {
+        if self.masterchain_info_rx.borrow().is_some() && self.edges_defined() {
             Poll::Ready(Ok(()))
         } else {
             cx.waker().wake_by_ref();
