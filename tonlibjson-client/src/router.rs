@@ -8,7 +8,6 @@ use tower::discover::{Change, Discover};
 use tower::Service;
 use ton_client_utils::router::{Route, Routed, RouterError};
 use crate::error::Error;
-use crate::request::Requestable;
 
 pub(crate) trait Routable {
     fn route(&self) -> Route { Route::Latest }
@@ -17,7 +16,7 @@ pub(crate) trait Routable {
 pub(crate) struct Router<S, D, Request>
     where
         S: Service<Request>,
-        D: Discover<Service=S, Error = anyhow::Error> + Unpin,
+        D: Discover<Service=S>,
         D::Key: Eq + Hash,
 {
     discover: D,
@@ -25,10 +24,10 @@ pub(crate) struct Router<S, D, Request>
     _phantom_data: PhantomData<Request>
 }
 
-impl<S, D, Request> Router<S, D, Request>
+impl<S, D, Request, E> Router<S, D, Request>
     where
-        S: Service<Request> + Routed + Clone,
-        D: Discover<Service=S, Error = anyhow::Error> + Unpin,
+        S: Service<Request>,
+        D: Discover<Service=S, Error = E> + Unpin,
         D::Key: Eq + Hash,
 {
     pub(crate) fn new(discover: D) -> Self {
@@ -41,7 +40,7 @@ impl<S, D, Request> Router<S, D, Request>
         Router { discover, services: Default::default(), _phantom_data: Default::default() }
     }
 
-    fn update_pending_from_discover(&mut self, cx: &mut Context<'_>, ) -> Poll<Option<Result<(), anyhow::Error>>> {
+    fn update_pending_from_discover(&mut self, cx: &mut Context<'_>, ) -> Poll<Option<Result<(), E>>> {
         loop {
             match ready!(Pin::new(&mut self.discover).poll_discover(cx)).transpose()? {
                 None => return Poll::Ready(None),
@@ -60,8 +59,7 @@ impl<S, D, Request> Service<&Route> for Router<S, D, Request>
     where
         S: Service<Request> + Routed + Clone,
         D: Discover<Service=S, Error = anyhow::Error> + Unpin,
-        D::Key: Eq + Hash,
-        Request: Requestable + 'static
+        D::Key: Eq + Hash
 {
     type Response = Vec<S>;
     type Error = Error;
