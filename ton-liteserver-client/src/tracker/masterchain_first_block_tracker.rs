@@ -25,20 +25,35 @@ impl MasterchainFirstBlockTrackerActor {
 
     pub fn run(mut self) {
         tokio::spawn(async move {
+            let mut last_block_id = None;
             let mut current_seqno = None;
-            let mut last_block_id = self.last_block_tracker
-                .wait_masterchain_info()
-                .await
-                .expect("expect to receive masterchain info");
 
             loop {
-                let fut = Self::find_first_blocks(&mut self.client, &last_block_id.last, current_seqno, current_seqno.map(|q| q + 32));
                 select! {
                     _ = self.cancellation_token.cancelled() => {
                         tracing::error!("MasterChainLastBlockTrackerActor cancelled");
                         break;
                     }
-                    result = fut => {
+                    result = async {
+                        self.last_block_tracker.wait_masterchain_info().await
+                    }, if last_block_id.is_none() => {
+                        match result {
+                            Ok(masterchain_info) => {
+                                last_block_id.replace(masterchain_info.last);
+                            },
+                            Err(error) => {
+                                tracing::error!(?error);
+                            }
+                        }
+                    },
+                    result = async {
+                        Self::find_first_blocks(
+                            &mut self.client,
+                            last_block_id.as_ref().unwrap(),
+                            current_seqno,
+                            current_seqno.map(|q| q + 32)
+                        ).await
+                    }, if last_block_id.is_some() => {
                         match result {
                             Ok(block) => {
                                 current_seqno.replace(block.id.seqno);
@@ -46,8 +61,8 @@ impl MasterchainFirstBlockTrackerActor {
 
                                 tokio::time::sleep(Duration::from_secs(30)).await;
                             }
-                            Err(e) => {
-                                tracing::error!("MasterChainLastBlockTrackerActor error: {}", e);
+                            Err(error) => {
+                                tracing::error!(?error);
                             }
                         }
                     }
