@@ -219,7 +219,7 @@ impl<Response> Future for ResponseFuture<Response> where Response: DeserializeBo
 
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::net::Ipv4Addr;
     use base64::Engine;
     use tower::ServiceExt;
@@ -335,7 +335,7 @@ mod tests {
         Ok(())
     }
 
-    async fn provided_client() -> anyhow::Result<LiteServerClient> {
+    pub(crate) async fn provided_client() -> anyhow::Result<LiteServerClient> {
         let ip: i32 = -2018135749;
         let ip = Ipv4Addr::from(ip as u32);
         let port = 53312;
