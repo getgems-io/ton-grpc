@@ -35,7 +35,7 @@ impl MasterchainLastBlockTrackerActor {
 
                 select! {
                     _ = self.cancellation_token.cancelled() => {
-                        tracing::error!("MasterChainLastBlockTrackerActor cancelled");
+                        tracing::error!("MasterchainLastBlockTrackerActor cancelled");
                         break;
                     }
                     response = fut => {

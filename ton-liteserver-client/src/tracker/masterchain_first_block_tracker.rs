@@ -31,7 +31,7 @@ impl MasterchainFirstBlockTrackerActor {
             loop {
                 select! {
                     _ = self.cancellation_token.cancelled() => {
-                        tracing::error!("MasterChainLastBlockTrackerActor cancelled");
+                        tracing::error!("MasterchainFirstBlockTrackerActor cancelled");
                         break;
                     }
                     result = async {
