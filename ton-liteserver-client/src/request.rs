@@ -1,7 +1,7 @@
 use adnl_tcp::deserializer::DeserializeBoxed;
 use adnl_tcp::serializer::{SerializeBoxed, Serializer};
-use adnl_tcp::types::Functional;
-use crate::tl::LiteServerWaitMasterchainSeqno;
+use adnl_tcp::types::{Functional, Int, Long};
+use crate::tl::{LiteServerGetBlock, LiteServerLookupBlock, LiteServerWaitMasterchainSeqno, TonNodeBlockId, TonNodeBlockIdExt};
 
 pub trait Requestable: SerializeBoxed + Send {
     type Response: DeserializeBoxed + Send + 'static;
@@ -25,6 +25,29 @@ impl<R> WaitSeqno<R> where R: Requestable {
 
     pub fn with_timeout(request: R, seqno: i32, timeout_ms: i32) -> Self {
         Self { prefix: LiteServerWaitMasterchainSeqno { seqno, timeout_ms }, request }
+    }
+}
+
+impl TonNodeBlockId {
+    pub fn new(workchain: Int, shard: Long, seqno: Int) -> Self {
+        Self { workchain, shard, seqno }
+    }
+}
+
+impl LiteServerLookupBlock {
+    pub fn seqno(block_id: TonNodeBlockId) -> Self {
+        Self {
+            mode: 1,
+            id: block_id,
+            lt: None,
+            utime: None,
+        }
+    }
+}
+
+impl LiteServerGetBlock {
+    pub fn new(id: TonNodeBlockIdExt) -> Self {
+        Self { id }
     }
 }
 

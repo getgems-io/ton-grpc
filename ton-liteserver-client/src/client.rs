@@ -335,11 +335,24 @@ pub(crate) mod tests {
         Ok(())
     }
 
-    pub(crate) async fn provided_client() -> anyhow::Result<LiteServerClient> {
+    pub(crate) async fn provided_archive_client() -> anyhow::Result<LiteServerClient> {
         let ip: i32 = -2018135749;
         let ip = Ipv4Addr::from(ip as u32);
         let port = 53312;
         let key: ServerKey = base64::engine::general_purpose::STANDARD.decode("aF91CuUHuuOv9rm2W5+O/4h38M3sRm40DtSdRxQhmtQ=")?.as_slice().try_into()?;
+
+        tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
+
+        let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), &key).await?;
+
+        Ok(client)
+    }
+
+    pub(crate) async fn provided_client() -> anyhow::Result<LiteServerClient> {
+        let ip: i32 = 1091931623;
+        let ip = Ipv4Addr::from(ip as u32);
+        let port = 17728;
+        let key: ServerKey = base64::engine::general_purpose::STANDARD.decode("BYSVpL7aPk0kU5CtlsIae/8mf2B/NrBi7DKmepcjX6Q=")?.as_slice().try_into()?;
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
