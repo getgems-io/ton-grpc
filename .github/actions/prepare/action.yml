@@ -17,7 +17,7 @@ runs:
         LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+\.\d+.\d+')
         LLVM_MAJOR_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+')
         echo "LLVM_VERSION=$LLVM_VERSION" >> $GITHUB_OUTPUT
-        echi "LLVM_MAJOR_VERSION=$LLVM_MAJOR_VERSION" >>> $GITHUB_OUTPUT
+        echo "LLVM_MAJOR_VERSION=$LLVM_MAJOR_VERSION" >> $GITHUB_OUTPUT
     - name: Install LLVM and Clang
       shell: bash
       run: |
