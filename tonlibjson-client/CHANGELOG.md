@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.18.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.17.2...tonlibjson-client-v0.18.0) (2024-06-10)
+
+
+### Features
+
+* ton-client-utils crate ([#863](https://github.com/getgems-io/ton-grpc/issues/863)) ([ae4f442](https://github.com/getgems-io/ton-grpc/commit/ae4f44289be9340f62897711bb2c8f8edce6a89e))
+
+
+### Bug Fixes
+
+* **deps:** bump hickory-resolver from 0.24.0 to 0.24.1 ([a21eabd](https://github.com/getgems-io/ton-grpc/commit/a21eabdf5a5427232f27711cd8eeb227004f7627))
+* **deps:** bump itertools from 0.12.1 to 0.13.0 ([5784e2a](https://github.com/getgems-io/ton-grpc/commit/5784e2aae5b2b70af8322f0e5c90e0eb49095108))
+* **deps:** bump metrics from 0.22.3 to 0.23.0 ([1c9c8b3](https://github.com/getgems-io/ton-grpc/commit/1c9c8b3a21d0b7512ad892901265b8505c4b54f3))
+* **deps:** bump prettyplease from 0.2.17 to 0.2.19 ([df9d9c1](https://github.com/getgems-io/ton-grpc/commit/df9d9c107a49387642b9a432c3669f65afcc4954))
+* **deps:** bump prettyplease from 0.2.19 to 0.2.20 ([704ca01](https://github.com/getgems-io/ton-grpc/commit/704ca0117db22acaaca6fcc121f1a2fa9114606a))
+* **deps:** bump syn from 2.0.58 to 2.0.59 ([6278621](https://github.com/getgems-io/ton-grpc/commit/6278621f2d72fe1e8f2a196c04dadaac760648e0))
+* **deps:** bump syn from 2.0.59 to 2.0.60 ([d29101a](https://github.com/getgems-io/ton-grpc/commit/d29101a9d0ec51766c8ebcdb2f39b680c72efc2e))
+* **deps:** bump syn from 2.0.60 to 2.0.63 ([7594574](https://github.com/getgems-io/ton-grpc/commit/759457488245deea841e50e2152ff9f850f3ac33))
+* **deps:** bump syn from 2.0.63 to 2.0.64 ([289f2ae](https://github.com/getgems-io/ton-grpc/commit/289f2aeeed230c14c3c8b8b65299aab3bf79add4))
+* **deps:** bump syn from 2.0.64 to 2.0.65 ([4bbd4d3](https://github.com/getgems-io/ton-grpc/commit/4bbd4d32cd9e1a78dec42544dc5cf0a50fd8c498))
+* **deps:** bump syn from 2.0.65 to 2.0.66 ([69b336b](https://github.com/getgems-io/ton-grpc/commit/69b336b1eaadb058078c449960b01839b3894c92))
+* **deps:** bump thiserror from 1.0.58 to 1.0.59 ([92a8dab](https://github.com/getgems-io/ton-grpc/commit/92a8dab819651ac7c5b8c17acf0c76b371da833d))
+* fix broken tests and ignore expensive tests ([d0af855](https://github.com/getgems-io/ton-grpc/commit/d0af8552336cfbe5b9890ef5c5b2529e9cd1ecc9))
+* **tl_parser:** field id return type ([fc41a26](https://github.com/getgems-io/ton-grpc/commit/fc41a26737e9bc14654c41d55ad711983e0e0050))
+* **tonlibjson-client:** drop inner recv only when there are no more waiting futures ([c04173e](https://github.com/getgems-io/ton-grpc/commit/c04173ef11dbf89b388adf23ad6d3e90bd5f879a))
+* **tonlibjson-client:** fix possible blocked tokio thread pool ([eaa0336](https://github.com/getgems-io/ton-grpc/commit/eaa0336e6972d543ddd3f35425129aa2fc2bb2bd))
+
 ## [0.17.2](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.17.1...tonlibjson-client-v0.17.2) (2024-04-14)
 
 

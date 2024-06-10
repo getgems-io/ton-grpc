@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.4.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.3.1...tonlibjson-sys-v0.4.0) (2024-06-10)
+
+
+### Features
+
+* **tonlibjson-sys:** add TONLIBJSON_SYS_TARGET_CPU_NATIVE, TONLIBJSON_SYS_LLD, TONLIBJSON_SYS_LTO build envs instead of target-cpu-native, lto and lld features ([10f8d95](https://github.com/getgems-io/ton-grpc/commit/10f8d9552332437185e60f222a80055ab0f84834))
+* **tonlibjson-sys:** lto and lld features ([28cff10](https://github.com/getgems-io/ton-grpc/commit/28cff103946650f22c600b31e8c50be87ef163c3))
+* **tonlibjson-sys:** neative-target-cpu feature ([9729a04](https://github.com/getgems-io/ton-grpc/commit/9729a04db1c7f1fa4d7c3f25514df039620ac3a4))
+
+
+### Bug Fixes
+
+* **build.rs:** add support for macos ([63d8dbf](https://github.com/getgems-io/ton-grpc/commit/63d8dbfbdf3458266718b0da4ecb0ad2f9255a7f))
+* **build.rs:** cargo backwards compatible ([43eedcf](https://github.com/getgems-io/ton-grpc/commit/43eedcf45f21eaed69ac8f8569afbdc5af9b820a))
+* **build.rs:** do not rerun-if-changed for build dir ([ab1f538](https://github.com/getgems-io/ton-grpc/commit/ab1f53825b87ecc1858387e1014e3228101a2ed6))
+* **build.rs:** generate files, link lz4 statically ([75f2cf3](https://github.com/getgems-io/ton-grpc/commit/75f2cf3ecabb236ae2e6f5b92955514c012d2966))
+* **build.rs:** native TON_ARCH by default ([ce0f4ff](https://github.com/getgems-io/ton-grpc/commit/ce0f4ff47c679ab9afa80c2559ce360a41f837ab))
+* **build.rs:** reuse cmake config ([9519969](https://github.com/getgems-io/ton-grpc/commit/95199697c2b6034f849c37261aeff3666cfabdcf))
+* **deps:** bump tonlibjson-sys/ton from `4cfe1d1` to `5c392e0` ([8c4f128](https://github.com/getgems-io/ton-grpc/commit/8c4f128ffedd8b33f5db9b7f10e85290b6f5abcd))
+* **deps:** bump tonlibjson-sys/ton-testnet from `037053f` to `3827409` ([885c98d](https://github.com/getgems-io/ton-grpc/commit/885c98de42943673fed1ddf0dd270be5d33e91ba))
+* **deps:** bump tonlibjson-sys/ton-testnet from `25f61df` to `9a543c6` ([c4d1f1a](https://github.com/getgems-io/ton-grpc/commit/c4d1f1a6f2c1c2a24e706ff829fdc7f376b1a855))
+* **deps:** bump tonlibjson-sys/ton-testnet from `3827409` to `7a74888` ([d2c83b3](https://github.com/getgems-io/ton-grpc/commit/d2c83b34f7a2893265a293e49885734210eab8b6))
+* **deps:** bump tonlibjson-sys/ton-testnet from `7a74888` to `6250662` ([df02354](https://github.com/getgems-io/ton-grpc/commit/df023544b02165c20d3a4dba592dc955d034c79a))
+* **deps:** bump tonlibjson-sys/ton-testnet from `9a543c6` to `037053f` ([a6bbacf](https://github.com/getgems-io/ton-grpc/commit/a6bbacff189a6cdf9961cce72c5d28d680b354d6))
+* **deps:** bump tonlibjson-sys/ton-testnet from `c073560` to `25f61df` ([e7438ae](https://github.com/getgems-io/ton-grpc/commit/e7438ae6c647c7d5fdaf951427ce3a72d9ac0272))
+* **tonlibjson-sys:** copy ton sources to OUT_DIR before build ([ed97615](https://github.com/getgems-io/ton-grpc/commit/ed97615efd6ffd07261004c95e7576987c782f86))
+* **tonlibjson-sys:** fix macos release build, pass lto flag only on linux ([77b315a](https://github.com/getgems-io/ton-grpc/commit/77b315aefc15b0252b58e4a50227f8e2540a241d))
+* **tonlibjson-sys:** fix(?) lz4 lib ([a1a300a](https://github.com/getgems-io/ton-grpc/commit/a1a300a03129a819606effb286bf53694a0b93fd))
+
 ## [0.3.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.3.0...tonlibjson-sys-v0.3.1) (2024-04-14)
 
 

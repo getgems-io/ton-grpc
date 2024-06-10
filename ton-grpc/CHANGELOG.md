@@ -40,6 +40,16 @@
 
 
 
+## [0.10.4](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.10.3...ton-grpc-v0.10.4) (2024-06-10)
+
+
+### Bug Fixes
+
+* **deps:** bump either from 1.10.0 to 1.11.0 ([6de9483](https://github.com/getgems-io/ton-grpc/commit/6de948349af4bd89e971e07c4b37417c8f6a6de4))
+* **deps:** bump either from 1.11.0 to 1.12.0 ([60eaa99](https://github.com/getgems-io/ton-grpc/commit/60eaa99a344fb85c7404ca35c2c4d695b966cee0))
+* **deps:** bump metrics-exporter-prometheus from 0.14.0 to 0.15.0 ([28f5bf5](https://github.com/getgems-io/ton-grpc/commit/28f5bf510c8cab6bf4160b317a13500470bb90e1))
+* fix broken tests and ignore expensive tests ([d0af855](https://github.com/getgems-io/ton-grpc/commit/d0af8552336cfbe5b9890ef5c5b2529e9cd1ecc9))
+
 ## [0.10.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.9.7...ton-grpc-v0.10.0) (2024-03-19)
 
 
