@@ -17,24 +17,20 @@ runs:
         LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+\.\d+.\d+')
         LLVM_MAJOR_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+')
         echo "LLVM_VERSION=$LLVM_VERSION" >> $GITHUB_OUTPUT
-        echi "LLVM_MAJOR_VERSION=$LLVM_MAJOR_VERSION" >>> $GITHUB_OUTPUT
+        echo "LLVM_MAJOR_VERSION=$LLVM_MAJOR_VERSION" >> $GITHUB_OUTPUT
     - name: Install LLVM and Clang
       shell: bash
       run: |
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-        sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-$LLVM_MAJOR_VERSION main"
-    - uses: awalsh128/cache-apt-pkgs-action@latest
-      with:
-        packages: libsecp256k1-dev libsodium-dev liblz4-dev
-#    - shell: bash
-#      run: |
-#        sudo apt install --yes libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
+        sudo add-apt-repository "deb http://apt.llvm.org/jammy/ llvm-toolchain-jammy-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} main"
+        sudo apt-get update
+        sudo apt-get install --yes libsecp256k1-dev libsodium-dev liblz4-dev clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libunwind-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev
     - uses: arduino/setup-protoc@v2
       with:
         repo-token: ${{ inputs.token }}
-#    - shell: bash
-#      run: |
-#        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
-#        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
+    - shell: bash
+      run: |
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
     - name: Run sccache-cache
       uses: mozilla-actions/sccache-action@v0.0.3
