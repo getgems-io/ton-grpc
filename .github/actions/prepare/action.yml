@@ -15,13 +15,14 @@ runs:
       shell: bash
       run: |
         LLVM_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+\.\d+.\d+')
+        LLVM_MAJOR_VERSION=$(rustc --verbose --version | grep -Po 'LLVM version: \K\d+')
         echo "LLVM_VERSION=$LLVM_VERSION" >> $GITHUB_OUTPUT
+        echi "LLVM_MAJOR_VERSION=$LLVM_MAJOR_VERSION" >>> $GITHUB_OUTPUT
     - name: Install LLVM and Clang
-      uses: KyleMayes/install-llvm-action@v1
-      with:
-        version: "${{ steps.llvm_setup.outputs.LLVM_VERSION }}"
-        force-version: true
-        ubuntu-version: 22.04
+      shell: bash
+      run: |
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+        sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-$LLVM_MAJOR_VERSION main"
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: libsecp256k1-dev libsodium-dev liblz4-dev
