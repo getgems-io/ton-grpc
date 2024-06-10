@@ -24,7 +24,7 @@ runs:
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
         sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-$LLVM_MAJOR_VERSION main"
       env:
-        LLVM_MAJOR_VERSION: ${{ steps.llvm_setup.outputs.LLVM_VERSION }}
+        LLVM_MAJOR_VERSION: ${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: libsecp256k1-dev libsodium-dev liblz4-dev
