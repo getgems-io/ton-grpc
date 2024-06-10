@@ -6,9 +6,12 @@ use cmake::Config;
 use walkdir::WalkDir;
 
 fn main() {
-    let use_native_arch = env::var("TONLIBJSON_SYS_TARGET_CPU_NATIVE").is_ok_and(|v| v == "1" || v == "true");
-    let use_lld = env::var("TONLIBJSON_SYS_LLD").is_ok_and(|v| v == "1" || v == "true");
-    let use_lto = env::var("TONLIBJSON_SYS_LTO").is_ok_and(|v| v == "1" || v == "true");
+    let use_native_arch = env::var("TONLIBJSON_SYS_TARGET_CPU_NATIVE")
+        .is_ok_and(|v| v == "1" || v == "true");
+    let use_lld = env::var("TONLIBJSON_SYS_LLD")
+        .is_ok_and(|v| v == "1" || v == "true");
+    let use_lto = env::var("TONLIBJSON_SYS_LTO")
+        .is_ok_and(|v| v == "1" || v == "true");
 
     println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_TARGET_CPU_NATIVE");
     println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_LLD");
