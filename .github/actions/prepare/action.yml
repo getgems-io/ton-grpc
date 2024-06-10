@@ -24,7 +24,7 @@ runs:
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
         sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} main"
         sudo apt-get update
-        sudo apt-get install --yes libsecp256k1-dev libsodium-dev liblz4-dev clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libunwind-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev
+        sudo apt-get install --yes libsecp256k1-dev libsodium-dev liblz4-dev clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} llvm-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev lldb-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libunwind-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev
     - uses: arduino/setup-protoc@v2
       with:
         repo-token: ${{ inputs.token }}
