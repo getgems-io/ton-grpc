@@ -22,21 +22,20 @@ runs:
       shell: bash
       run: |
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-        sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-$LLVM_MAJOR_VERSION main"
-      env:
-        LLVM_MAJOR_VERSION: ${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}
+        sudo add-apt-repository "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} main"
+        sudo apt-get update
+    - uses: awalsh128/cache-apt-pkgs-action@latest
+      with:
+        packages: clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libunwind-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev
     - uses: awalsh128/cache-apt-pkgs-action@latest
       with:
         packages: libsecp256k1-dev libsodium-dev liblz4-dev
-#    - shell: bash
-#      run: |
-#        sudo apt install --yes libc++abi-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev libc++-${{ steps.llvm_setup.outputs.LLVM_VERSION }}-dev
     - uses: arduino/setup-protoc@v2
       with:
         repo-token: ${{ inputs.token }}
-#    - shell: bash
-#      run: |
-#        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
-#        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
+    - shell: bash
+      run: |
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_VERSION }} 101
     - name: Run sccache-cache
       uses: mozilla-actions/sccache-action@v0.0.3
