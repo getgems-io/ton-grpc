@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use toner::tlb::bits::bitvec::field::BitField;
+use toner::tlb::bits::bitvec::order::Msb0;
+use toner::tlb::bits::bitvec::vec::BitVec;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::r#as::{NoArgs, ParseFully, Ref};
 use toner::tlb::ton::bin_tree::BinTree;
@@ -7,17 +11,27 @@ use crate::tlb::shard_descr::ShardDescr;
 /// ```tlb
 /// _ (HashmapE 32 ^(BinTree ShardDescr)) = ShardHashes;
 /// ```
+/// NOT[akosyulev0]: next_validator_shard == shard_id
 #[derive(Debug)]
 pub struct ShardHashes {
-    inner: HashmapE<Vec<ShardDescr>>
+    inner: HashMap<u32, Vec<ShardDescr>>
 }
 
 impl<'de> CellDeserialize<'de> for ShardHashes {
     fn parse(parser: &mut CellParser<'de>) -> Result<Self, CellParserError<'de>> {
-        Ok(Self { inner: parser.parse_as_with::<
-            _,
-            HashmapE<Ref<ParseFully<BinTree<NoArgs<_>>>>, NoArgs<_>>
-        >((32, (), ()))? })
+        let hashmap = parser.parse_as_with::<
+            HashMap<BitVec<u8, Msb0>, _>,
+            HashmapE<Ref<ParseFully<BinTree<NoArgs<_>>>>, ()>
+        >((32, ()))?;
+
+        let inner = hashmap
+            .into_iter()
+            .map(|(k, v)|
+                (k.load_be::<u32>(), v)
+            )
+            .collect();
+
+        Ok(Self { inner })
     }
 }
 
@@ -37,7 +51,10 @@ mod tests {
         let root = boc.single_root().unwrap();
 
         let shard_hashes: ShardHashes = root.parse_fully().unwrap();
+        let inner = shard_hashes.inner;
 
-        println!("{:?}", shard_hashes);
+        assert_eq!(1, inner.len());
+        assert!(inner.contains_key(&0));
+        assert_eq!(4, inner.get(&0).unwrap().len());
     }
 }
