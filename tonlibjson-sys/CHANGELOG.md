@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.0...tonlibjson-sys-v0.4.1) (2024-06-10)
+
+
+### Bug Fixes
+
+* trigger build ([8e5a317](https://github.com/getgems-io/ton-grpc/commit/8e5a3175d776ba4761fd289c9b62f5d140453421))
+
 ## [0.4.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.3.1...tonlibjson-sys-v0.4.0) (2024-06-10)
 
 
