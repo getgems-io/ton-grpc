@@ -79,7 +79,6 @@ impl ClientActor {
                                 tracing::trace!("pong packet received");
                             },
                             Ok(packet) => {
-                                tracing::trace!(?packet);
                                 let adnl_answer = from_bytes_boxed::<AdnlMessageAnswer>(&packet.data)
                                     .expect("expect adnl answer packet");
 

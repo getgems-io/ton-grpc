@@ -1,3 +1,3 @@
-mod shard_descr;
-mod future_split_merge;
-mod shard_hashes;
+pub mod shard_descr;
+pub mod future_split_merge;
+pub mod shard_hashes;

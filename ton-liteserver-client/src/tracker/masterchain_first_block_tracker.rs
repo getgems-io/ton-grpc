@@ -9,6 +9,7 @@ use tower::ServiceExt;
 use crate::client::{Error, LiteServerClient};
 use crate::request::WaitSeqno;
 use crate::tl::{LiteServerBlockData, LiteServerBlockHeader, LiteServerGetBlock, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo, LiteServerLookupBlock, LiteServerMasterchainInfo, TonNodeBlockId, TonNodeBlockIdExt};
+use crate::tracker::find_first_block::find_first_block_header;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 
 struct MasterchainFirstBlockTrackerActor {
@@ -47,7 +48,7 @@ impl MasterchainFirstBlockTrackerActor {
                         }
                     },
                     result = async {
-                        Self::find_first_blocks(
+                        find_first_block_header(
                             &mut self.client,
                             last_block_id.as_ref().unwrap(),
                             current_seqno,
@@ -72,62 +73,6 @@ impl MasterchainFirstBlockTrackerActor {
             tracing::warn!("stop first block tracker actor");
         });
     }
-
-    async fn find_first_blocks(client: &mut LiteServerClient, start: &TonNodeBlockIdExt, lhs: Option<i32>, cur: Option<i32>) -> Result<LiteServerBlockHeader, Error> {
-        let length = start.seqno;
-        let mut rhs = length;
-        let mut lhs = lhs.unwrap_or(1);
-        let mut cur = cur.unwrap_or(start.seqno - 200000);
-
-        let workchain = start.workchain;
-        let shard = start.shard;
-
-        let mut block = Self::check_block_available(client, TonNodeBlockId::new(workchain, shard, cur)).await;
-        let mut success = None;
-
-        let mut hops = 0;
-
-        while lhs < rhs {
-            // TODO[akostylev0] specify error
-            if block.is_err() {
-                lhs = cur + 1;
-            } else {
-                rhs = cur;
-            }
-
-            cur = (lhs + rhs) / 2;
-            if cur == 0 { break; }
-
-            block = Self::check_block_available(client, TonNodeBlockId::new(workchain, shard, cur)).await;
-            if block.is_ok() {
-                success = Some(block.as_ref().unwrap().clone());
-            }
-
-            hops += 1;
-        }
-
-        let delta = 4;
-        let (header, _) = match block {
-            Ok(b) => { b },
-            Err(e) => match success {
-                Some(b) if b.0.id.seqno - cur <= delta => { b },
-                _ => { return Err(e) },
-            }
-        };
-
-        tracing::trace!(hops = hops, seqno = header.id.seqno, "first seqno");
-
-        Ok(header)
-    }
-
-    async fn check_block_available(client: &mut LiteServerClient, block_id: TonNodeBlockId) -> Result<(LiteServerBlockHeader, LiteServerBlockData), Error> {
-        // TODO[akostylev0] research
-        let block_header = client.oneshot(LiteServerLookupBlock::seqno(block_id)).await?;
-        let block = client.oneshot(LiteServerGetBlock::new(block_header.id.clone())).await?;
-
-        Ok((block_header, block))
-    }
-
 }
 
 pub struct MasterchainFirstBlockTracker {

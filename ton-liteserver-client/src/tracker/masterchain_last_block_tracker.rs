@@ -78,14 +78,13 @@ impl MasterchainLastBlockTracker {
         self.receiver.clone()
     }
 
-    pub async fn wait_masterchain_info(&self) -> Result<LiteServerMasterchainInfo, RecvError> {
-        let mut receiver = self.receiver.clone();
+    pub async fn wait_masterchain_info(&mut self) -> Result<LiteServerMasterchainInfo, RecvError> {
         loop {
             if let Some(info) = self.receiver.borrow().as_ref() {
                 return Ok(info.clone());
             }
 
-            receiver.changed().await?;
+            self.receiver.changed().await?;
         }
     }
 }

@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::ops::Deref;
 use toner::tlb::bits::bitvec::field::BitField;
 use toner::tlb::bits::bitvec::order::Msb0;
 use toner::tlb::bits::bitvec::vec::BitVec;
@@ -11,10 +12,16 @@ use crate::tlb::shard_descr::ShardDescr;
 /// ```tlb
 /// _ (HashmapE 32 ^(BinTree ShardDescr)) = ShardHashes;
 /// ```
-/// NOT[akosyulev0]: next_validator_shard == shard_id
+/// NOTE[akosyulev0]: next_validator_shard == shard_id
 #[derive(Debug)]
-pub struct ShardHashes {
-    inner: HashMap<u32, Vec<ShardDescr>>
+pub struct ShardHashes(HashMap<u32, Vec<ShardDescr>>);
+
+impl Deref for ShardHashes {
+    type Target = HashMap<u32, Vec<ShardDescr>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
 }
 
 impl<'de> CellDeserialize<'de> for ShardHashes {
@@ -31,7 +38,7 @@ impl<'de> CellDeserialize<'de> for ShardHashes {
             )
             .collect();
 
-        Ok(Self { inner })
+        Ok(Self(inner))
     }
 }
 
@@ -50,11 +57,10 @@ mod tests {
         let mut boc: BoC = unpack_fully(&bit_packed).unwrap();
         let root = boc.single_root().unwrap();
 
-        let shard_hashes: ShardHashes = root.parse_fully().unwrap();
-        let inner = shard_hashes.inner;
+        let actual: ShardHashes = root.parse_fully().unwrap();
 
-        assert_eq!(1, inner.len());
-        assert!(inner.contains_key(&0));
-        assert_eq!(4, inner.get(&0).unwrap().len());
+        assert_eq!(1, actual.len());
+        assert!(actual.contains_key(&0));
+        assert_eq!(4, actual.get(&0).unwrap().len());
     }
 }
