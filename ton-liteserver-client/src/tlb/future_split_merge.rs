@@ -1,5 +1,4 @@
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
-use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 
 /// ```tlb
 /// fsm_none$0 = FutureSplitMerge;

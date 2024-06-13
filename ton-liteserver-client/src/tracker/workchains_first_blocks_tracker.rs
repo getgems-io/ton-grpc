@@ -1,32 +1,22 @@
-use crate::client::{Error, LiteServerClient};
-use crate::request::WaitSeqno;
-use crate::tl::{
-    LiteServerBlockData, LiteServerBlockHeader, LiteServerGetBlock, LiteServerGetBlockHeader,
-    LiteServerGetMasterchainInfo, LiteServerLookupBlock, LiteServerMasterchainInfo, TonNodeBlockId,
-    TonNodeBlockIdExt,
-};
+use crate::client::LiteServerClient;
+use crate::tl::LiteServerBlockHeader;
 use crate::tracker::find_first_block::find_first_block_header;
-use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
 use adnl_tcp::types::{Int, Long};
-use futures::future::Either;
 use futures::stream::FuturesUnordered;
-use futures::{try_join, FutureExt, StreamExt};
+use futures::StreamExt;
 use std::collections::HashMap;
-use std::ops::Deref;
 use std::time::Duration;
 use tokio::select;
-use tokio::sync::{broadcast, watch};
+use tokio::sync::broadcast;
 use tokio::time::Instant;
-use tokio_stream::wrappers::WatchStream;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use tower::ServiceExt;
-
+use ton_client_utils::actor::cancellable_actor::CancellableActor;
+use ton_client_utils::actor::Actor;
 struct WorkchainsFirstBlocksTrackerActor {
     client: LiteServerClient,
     last_block_tracker: WorkchainsLastBlocksTracker,
     sender: broadcast::Sender<LiteServerBlockHeader>,
-    cancellation_token: CancellationToken,
 }
 
 impl WorkchainsFirstBlocksTrackerActor {
@@ -34,53 +24,47 @@ impl WorkchainsFirstBlocksTrackerActor {
         client: LiteServerClient,
         last_block_tracker: WorkchainsLastBlocksTracker,
         sender: broadcast::Sender<LiteServerBlockHeader>,
-        cancellation_token: CancellationToken,
     ) -> Self {
         Self {
             client,
             last_block_tracker,
             sender,
-            cancellation_token,
         }
     }
+}
 
-    pub fn run(mut self) {
-        tokio::spawn(async move {
-            let mut futures = FuturesUnordered::new();
-            let mut receiver = self.last_block_tracker.receiver();
-            let mut timeouts: HashMap<(Int, Long), Instant> = HashMap::default();
+impl Actor for WorkchainsFirstBlocksTrackerActor {
+    type Output = ();
 
-            loop {
-                select! {
-                    _ = self.cancellation_token.cancelled() => {
-                        tracing::error!("MasterchainFirstBlockTrackerActor cancelled");
-                        break;
+    async fn run(self) -> <Self as Actor>::Output {
+        let mut futures = FuturesUnordered::new();
+        let mut receiver = self.last_block_tracker.receiver();
+        let mut timeouts: HashMap<(Int, Long), Instant> = HashMap::default();
+
+        loop {
+            select! {
+                Ok(block_id) = receiver.recv() => {
+                    let shard_id = (block_id.workchain, block_id.shard);
+
+                    if timeouts
+                        .get(&shard_id)
+                        .filter(|time| time.elapsed() < Duration::from_secs(60))
+                        .is_none()
+                    {
+                        timeouts.remove(&shard_id);
+                        timeouts.insert(shard_id, Instant::now());
+
+                        futures.push(find_first_block_header(self.client.clone(), block_id, None, None));
                     }
-                    Ok(block_id) = receiver.recv() => {
-                        let shard_id = (block_id.workchain, block_id.shard);
-
-                        if timeouts
-                            .get(&shard_id)
-                            .filter(|time| time.elapsed() < Duration::from_secs(60))
-                            .is_none()
-                        {
-                            timeouts.remove(&shard_id);
-                            timeouts.insert(shard_id, Instant::now());
-
-                            futures.push(find_first_block_header(self.client.clone(), block_id, None, None));
-                        }
-                    },
-                    Some(result) = futures.next() => {
-                        match result {
-                            Ok(resolved) => { let _ = self.sender.send(resolved).unwrap(); },
-                            Err(e) => { tracing::error!("Error: {:?}", e); }
-                        }
+                },
+                Some(result) = futures.next() => {
+                    match result {
+                        Ok(resolved) => { let _ = self.sender.send(resolved).unwrap(); },
+                        Err(e) => { tracing::error!("Error: {:?}", e); }
                     }
                 }
             }
-
-            tracing::warn!("stop first block tracker actor");
-        });
+        }
     }
 }
 
@@ -94,13 +78,11 @@ impl WorkchainsFirstBlocksTracker {
         let cancellation_token = CancellationToken::new();
         let (sender, receiver) = broadcast::channel(64);
 
-        WorkchainsFirstBlocksTrackerActor::new(
-            client,
-            last_block_tracker,
-            sender,
+        CancellableActor::new(
+            WorkchainsFirstBlocksTrackerActor::new(client, last_block_tracker, sender),
             cancellation_token.clone(),
         )
-        .run();
+        .spawn();
 
         Self {
             receiver,

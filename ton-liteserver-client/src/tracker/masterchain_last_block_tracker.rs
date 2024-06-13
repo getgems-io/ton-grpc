@@ -1,67 +1,63 @@
-use std::ops::Deref;
-use std::sync::Arc;
-use futures::future::Either;
-use tokio::select;
-use tokio::sync::watch;
-use tokio::sync::watch::error::RecvError;
-use tokio_util::sync::{CancellationToken, DropGuard};
-use tower::ServiceExt;
 use crate::client::LiteServerClient;
 use crate::request::WaitSeqno;
 use crate::tl::{LiteServerGetMasterchainInfo, LiteServerMasterchainInfo};
+use futures::future::Either;
+use std::sync::Arc;
+use tokio::sync::watch;
+use tokio::sync::watch::error::RecvError;
+use tokio_util::sync::{CancellationToken, DropGuard};
+use ton_client_utils::actor::cancellable_actor::CancellableActor;
+use ton_client_utils::actor::Actor;
+use tower::ServiceExt;
 
 struct MasterchainLastBlockTrackerActor {
     client: LiteServerClient,
     sender: watch::Sender<Option<LiteServerMasterchainInfo>>,
-    cancellation_token: CancellationToken
 }
 
 impl MasterchainLastBlockTrackerActor {
-    pub fn new(client: LiteServerClient, sender: watch::Sender<Option<LiteServerMasterchainInfo>>, cancellation_token: CancellationToken) -> Self {
-        Self { client, sender, cancellation_token }
+    pub fn new(
+        client: LiteServerClient,
+        sender: watch::Sender<Option<LiteServerMasterchainInfo>>,
+    ) -> Self {
+        Self { client, sender }
     }
+}
 
-    pub fn run(mut self) {
-        tokio::spawn(async move {
-            let mut current_seqno = None;
+impl Actor for MasterchainLastBlockTrackerActor {
+    type Output = ();
 
-            loop {
-                let fut = match current_seqno {
-                    None => Either::Left((&mut self.client)
-                        .oneshot(LiteServerGetMasterchainInfo::default())),
-                    Some(last) => Either::Right((&mut self.client)
-                        .oneshot(WaitSeqno::new(LiteServerGetMasterchainInfo::default(), last + 1)))
-                };
+    async fn run(mut self) {
+        let mut current_seqno = None;
 
-                select! {
-                    _ = self.cancellation_token.cancelled() => {
-                        tracing::error!("MasterchainLastBlockTrackerActor cancelled");
-                        break;
-                    }
-                    response = fut => {
-                        match response {
-                            Ok(info) => {
-                                current_seqno.replace(info.last.seqno);
-
-                                let _ = self.sender.send(Some(info));
-                            },
-                            Err(error) => {
-                                tracing::error!(?error);
-                            }
-                        }
-                    }
-                }
+        loop {
+            let response = match current_seqno {
+                None => Either::Left(
+                    (&mut self.client).oneshot(LiteServerGetMasterchainInfo::default()),
+                ),
+                Some(last) => Either::Right((&mut self.client).oneshot(WaitSeqno::new(
+                    LiteServerGetMasterchainInfo::default(),
+                    last + 1,
+                ))),
             }
+                .await;
 
-            tracing::warn!("stop last block tracker actor");
-        });
+            match response {
+                Ok(info) => {
+                    current_seqno.replace(info.last.seqno);
+
+                    let _ = self.sender.send(Some(info));
+                }
+                Err(error) => tracing::error!(?error),
+            };
+        }
     }
 }
 
 #[derive(Debug, Clone)]
 pub struct MasterchainLastBlockTracker {
     receiver: watch::Receiver<Option<LiteServerMasterchainInfo>>,
-    _cancellation_token: Arc<DropGuard>
+    _cancellation_token: Arc<DropGuard>,
 }
 
 impl MasterchainLastBlockTracker {
@@ -69,9 +65,16 @@ impl MasterchainLastBlockTracker {
         let cancellation_token = CancellationToken::new();
         let (sender, receiver) = watch::channel(None);
 
-        MasterchainLastBlockTrackerActor::new(client, sender, cancellation_token.clone()).run();
+        CancellableActor::new(
+            MasterchainLastBlockTrackerActor::new(client, sender),
+            cancellation_token.clone(),
+        )
+        .spawn();
 
-        Self { receiver, _cancellation_token: Arc::new(cancellation_token.drop_guard()) }
+        Self {
+            receiver,
+            _cancellation_token: Arc::new(cancellation_token.drop_guard()),
+        }
     }
 
     pub fn receiver(&self) -> watch::Receiver<Option<LiteServerMasterchainInfo>> {
@@ -91,9 +94,9 @@ impl MasterchainLastBlockTracker {
 
 #[cfg(test)]
 mod test {
-    use tracing_test::traced_test;
-    use crate::client::tests::provided_client;
     use super::MasterchainLastBlockTracker;
+    use crate::client::tests::provided_client;
+    use tracing_test::traced_test;
 
     #[ignore]
     #[tokio::test]
