@@ -1,3 +1,4 @@
+use std::time::Duration;
 use adnl_tcp::deserializer::DeserializeBoxed;
 use adnl_tcp::serializer::{SerializeBoxed, Serializer};
 use adnl_tcp::types::{Functional, Int, Long};
@@ -20,11 +21,11 @@ pub struct WaitSeqno<R> {
 
 impl<R> WaitSeqno<R> where R: Requestable {
     pub fn new(request: R, seqno: i32) -> Self {
-        Self::with_timeout(request, seqno, 3000)
+        Self::with_timeout(request, seqno, Duration::from_secs(3))
     }
 
-    pub fn with_timeout(request: R, seqno: i32, timeout_ms: i32) -> Self {
-        Self { prefix: LiteServerWaitMasterchainSeqno { seqno, timeout_ms }, request }
+    pub fn with_timeout(request: R, seqno: i32, timeout: Duration) -> Self {
+        Self { prefix: LiteServerWaitMasterchainSeqno { seqno, timeout_ms: timeout.as_millis() as i32 }, request }
     }
 }
 

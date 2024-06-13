@@ -2,8 +2,8 @@ use crate::client::LiteServerClient;
 use crate::tl::LiteServerBlockHeader;
 use crate::tracker::find_first_block::find_first_block_header;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
+use futures::TryFutureExt;
 use std::time::Duration;
-use tokio::select;
 use tokio::sync::watch;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
@@ -33,44 +33,30 @@ impl Actor for MasterchainFirstBlockTrackerActor {
     type Output = ();
 
     async fn run(mut self) -> <Self as Actor>::Output {
-        let mut last_block_id = None;
         let mut current_seqno = None;
+        let last_block_id = self
+            .last_block_tracker
+            .wait_masterchain_info()
+            .await
+            .expect("expect to get masterchain info")
+            .last;
 
         loop {
-            select! {
-                result = async {
-                    self.last_block_tracker.wait_masterchain_info().await
-                }, if last_block_id.is_none() => {
-                    match result {
-                        Ok(masterchain_info) => {
-                            last_block_id.replace(masterchain_info.last);
-                        },
-                        Err(error) => {
-                            tracing::error!(?error);
-                        }
-                    }
-                },
-                result = async {
-                    find_first_block_header(
-                        &mut self.client,
-                        last_block_id.as_ref().unwrap(),
-                        current_seqno,
-                        current_seqno.map(|q| q + 32)
-                    ).await
-                }, if last_block_id.is_some() => {
-                    match result {
-                        Ok(block) => {
-                            current_seqno.replace(block.id.seqno);
-                            self.sender.send(Some(block)).unwrap();
+            let _ = find_first_block_header(
+                &mut self.client,
+                &last_block_id,
+                current_seqno,
+                current_seqno.map(|q| q + 1024),
+            )
+            .map_ok(|block| {
+                current_seqno.replace(block.id.seqno);
 
-                            tokio::time::sleep(Duration::from_secs(30)).await;
-                        }
-                        Err(error) => {
-                            tracing::error!(?error);
-                        }
-                    }
-                }
-            }
+                let _ = self.sender.send(Some(block));
+            })
+            .inspect_err(|error| tracing::error!(?error))
+            .await;
+
+            tokio::time::sleep(Duration::from_secs(60)).await;
         }
     }
 }

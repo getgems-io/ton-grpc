@@ -3,7 +3,6 @@ use crate::tl::{LiteServerGetAllShardsInfo, TonNodeBlockIdExt};
 use crate::tlb::shard_descr::ShardDescr;
 use crate::tlb::shard_hashes::ShardHashes;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
-use tokio::select;
 use tokio::sync::broadcast;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
@@ -65,43 +64,43 @@ impl WorkchainsLastBlocksTracker {
 impl Actor for WorkchainsLastBlocksActor {
     type Output = ();
 
-    async fn run(self) -> <Self as Actor>::Output {
-        let mut client = self.client;
+    async fn run(mut self) -> <Self as Actor>::Output {
         let mut receiver = self.masterchain_last_block_tracker.receiver();
-        loop {
-            select! {
-                Ok(_) = receiver.changed() => {
-                    let info = receiver.borrow().clone().unwrap();
 
-                    let shards_description = (&mut client)
-                        .oneshot(LiteServerGetAllShardsInfo::new(info.last.clone()))
-                        .await
-                        .unwrap();
+        while receiver.changed().await.is_ok() {
+            let last_block_id = receiver
+                .borrow()
+                .as_ref()
+                .expect("expect to get masterchain info")
+                .last
+                .clone();
 
-                    let boc: BoC = unpack_bytes_fully(&shards_description.data).unwrap();
-                    let root = boc.single_root().unwrap();
-                    let shard_hashes: ShardHashes = root.parse_fully().unwrap();
+            let shards_description = (&mut self.client)
+                .oneshot(LiteServerGetAllShardsInfo::new(last_block_id))
+                .await
+                .unwrap();
 
-                    // TODO[akostylev0]: verify proofs
-                    shard_hashes
+            let boc: BoC = unpack_bytes_fully(&shards_description.data).unwrap();
+            let root = boc.single_root().unwrap();
+            let shard_hashes: ShardHashes = root.parse_fully().unwrap();
+
+            // TODO[akostylev0]: verify proofs
+            shard_hashes
+                .iter()
+                .flat_map(|(chain_id, shards)| {
+                    shards
                         .iter()
-                        .map(|(chain_id, shards)| {
-                            shards
-                                .into_iter()
-                                .map(move |shard: &ShardDescr| TonNodeBlockIdExt {
-                                    workchain: *chain_id as i32,
-                                    shard: shard.next_validator_shard as i64,
-                                    seqno: shard.seq_no as i32,
-                                    root_hash: shard.root_hash,
-                                    file_hash: shard.file_hash,
-                                })
+                        .map(move |shard: &ShardDescr| TonNodeBlockIdExt {
+                            workchain: *chain_id as i32,
+                            shard: shard.next_validator_shard as i64,
+                            seqno: shard.seq_no as i32,
+                            root_hash: shard.root_hash,
+                            file_hash: shard.file_hash,
                         })
-                        .flatten()
-                        .for_each(|shard_id| {
-                            let _ = self.sender.send(shard_id).expect("expec to send shard_id");
-                        });
-                }
-            }
+                })
+                .for_each(|shard_id| {
+                    let _ = self.sender.send(shard_id).expect("expect to send shard_id");
+                });
         }
     }
 }

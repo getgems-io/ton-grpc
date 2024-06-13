@@ -3,6 +3,7 @@ use crate::request::WaitSeqno;
 use crate::tl::{LiteServerGetMasterchainInfo, LiteServerMasterchainInfo};
 use futures::future::Either;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::watch;
 use tokio::sync::watch::error::RecvError;
 use tokio_util::sync::{CancellationToken, DropGuard};
@@ -35,14 +36,14 @@ impl Actor for MasterchainLastBlockTrackerActor {
                 None => Either::Left(
                     (&mut self.client).oneshot(LiteServerGetMasterchainInfo::default()),
                 ),
-                Some(last) => Either::Right((&mut self.client).oneshot(WaitSeqno::new(
+                Some(last) => Either::Right((&mut self.client).oneshot(WaitSeqno::with_timeout(
                     LiteServerGetMasterchainInfo::default(),
                     last + 1,
+                    Duration::from_secs(10),
                 ))),
-            }
-                .await;
+            };
 
-            match response {
+            match response.await {
                 Ok(info) => {
                     current_seqno.replace(info.last.seqno);
 
