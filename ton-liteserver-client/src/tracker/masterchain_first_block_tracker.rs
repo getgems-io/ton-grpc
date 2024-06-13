@@ -5,6 +5,7 @@ use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use futures::TryFutureExt;
 use std::time::Duration;
 use tokio::sync::watch;
+use tokio::sync::watch::Ref;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
 use ton_client_utils::actor::Actor;
@@ -81,6 +82,10 @@ impl MasterchainFirstBlockTracker {
             receiver,
             _cancellation_token: cancellation_token.drop_guard(),
         }
+    }
+
+    pub fn borrow(&self) -> Ref<Option<LiteServerBlockHeader>> {
+        self.receiver.borrow()
     }
 
     pub fn receiver(&self) -> watch::Receiver<Option<LiteServerBlockHeader>> {

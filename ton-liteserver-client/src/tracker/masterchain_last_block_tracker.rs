@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch;
 use tokio::sync::watch::error::RecvError;
+use tokio::sync::watch::Ref;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
 use ton_client_utils::actor::Actor;
@@ -76,6 +77,10 @@ impl MasterchainLastBlockTracker {
             receiver,
             _cancellation_token: Arc::new(cancellation_token.drop_guard()),
         }
+    }
+
+    pub fn borrow(&self) -> Ref<'_, Option<LiteServerMasterchainInfo>> {
+        self.receiver.borrow()
     }
 
     pub fn receiver(&self) -> watch::Receiver<Option<LiteServerMasterchainInfo>> {

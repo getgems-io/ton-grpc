@@ -3,6 +3,8 @@ use crate::tl::{LiteServerGetAllShardsInfo, TonNodeBlockIdExt};
 use crate::tlb::shard_descr::ShardDescr;
 use crate::tlb::shard_hashes::ShardHashes;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
+use dashmap::DashMap;
+use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
@@ -10,11 +12,13 @@ use ton_client_utils::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::tlb::ton::BoC;
 use tower::ServiceExt;
+use crate::tracker::ShardId;
 
 struct WorkchainsLastBlocksActor {
     client: LiteServerClient,
     masterchain_last_block_tracker: MasterchainLastBlockTracker,
     sender: broadcast::Sender<TonNodeBlockIdExt>,
+    state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
 }
 
 impl WorkchainsLastBlocksActor {
@@ -22,18 +26,31 @@ impl WorkchainsLastBlocksActor {
         client: LiteServerClient,
         masterchain_last_block_tracker: MasterchainLastBlockTracker,
         sender: broadcast::Sender<TonNodeBlockIdExt>,
+        state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
     ) -> Self {
         Self {
             client,
             masterchain_last_block_tracker,
             sender,
+            state,
         }
     }
 }
 
 pub struct WorkchainsLastBlocksTracker {
     receiver: broadcast::Receiver<TonNodeBlockIdExt>,
-    _cancellation_token: DropGuard,
+    state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
+    _cancellation_token: Arc<DropGuard>,
+}
+
+impl Clone for WorkchainsLastBlocksTracker {
+    fn clone(&self) -> Self {
+        Self {
+            receiver: self.receiver.resubscribe(),
+            state: Arc::clone(&self.state),
+            _cancellation_token: Arc::clone(&self._cancellation_token)
+        }
+    }
 }
 
 impl WorkchainsLastBlocksTracker {
@@ -41,19 +58,25 @@ impl WorkchainsLastBlocksTracker {
         client: LiteServerClient,
         masterchain_last_block_tracker: MasterchainLastBlockTracker,
     ) -> Self {
+        let state = Arc::new(DashMap::default());
         let cancellation_token = CancellationToken::new();
 
         let (sender, receiver) = broadcast::channel(64);
         CancellableActor::new(
-            WorkchainsLastBlocksActor::new(client, masterchain_last_block_tracker, sender),
+            WorkchainsLastBlocksActor::new(client, masterchain_last_block_tracker, sender, Arc::clone(&state)),
             cancellation_token.clone(),
         )
         .spawn();
 
         Self {
             receiver,
-            _cancellation_token: cancellation_token.drop_guard(),
+            state,
+            _cancellation_token: Arc::new(cancellation_token.drop_guard()),
         }
+    }
+
+    pub fn get_last_block_id_for_shard(&self, shard_id: &ShardId) -> Option<TonNodeBlockIdExt> {
+        self.state.view(shard_id, |_, block_id| block_id.clone())
     }
 
     pub fn receiver(&self) -> broadcast::Receiver<TonNodeBlockIdExt> {
@@ -98,8 +121,11 @@ impl Actor for WorkchainsLastBlocksActor {
                             file_hash: shard.file_hash,
                         })
                 })
-                .for_each(|shard_id| {
-                    let _ = self.sender.send(shard_id).expect("expect to send shard_id");
+                .for_each(|shard_block_id| {
+                    let shard_id = (shard_block_id.workchain, shard_block_id.shard);
+                    self.state.insert(shard_id, shard_block_id.clone());
+
+                    let _ = self.sender.send(shard_block_id).expect("expect to send shard_id");
                 });
         }
     }

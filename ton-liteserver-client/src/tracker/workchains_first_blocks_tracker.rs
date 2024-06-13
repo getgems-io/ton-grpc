@@ -1,21 +1,27 @@
 use crate::client::LiteServerClient;
-use crate::tl::LiteServerBlockHeader;
+use crate::tl::{LiteServerBlockHeader, TonNodeBlockIdExt};
 use crate::tracker::find_first_block::find_first_block_header;
 use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
 use adnl_tcp::types::{Int, Long};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::collections::HashMap;
+use std::os::linux::raw::stat;
+use std::sync::Arc;
 use std::time::Duration;
+use dashmap::DashMap;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::time::Instant;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
 use ton_client_utils::actor::Actor;
+use crate::tracker::ShardId;
+
 struct WorkchainsFirstBlocksTrackerActor {
     client: LiteServerClient,
     last_block_tracker: WorkchainsLastBlocksTracker,
+    state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
     sender: broadcast::Sender<LiteServerBlockHeader>,
 }
 
@@ -23,11 +29,13 @@ impl WorkchainsFirstBlocksTrackerActor {
     pub fn new(
         client: LiteServerClient,
         last_block_tracker: WorkchainsLastBlocksTracker,
+        state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
         sender: broadcast::Sender<LiteServerBlockHeader>,
     ) -> Self {
         Self {
             client,
             last_block_tracker,
+            state,
             sender,
         }
     }
@@ -59,7 +67,12 @@ impl Actor for WorkchainsFirstBlocksTrackerActor {
                 },
                 Some(result) = futures.next() => {
                     match result {
-                        Ok(resolved) => { let _ = self.sender.send(resolved).unwrap(); },
+                        Ok(resolved) => {
+                            let shard_id = (resolved.id.workchain, resolved.id.shard);
+                            self.state.insert(shard_id, resolved.id.clone());
+
+                            let _ = self.sender.send(resolved).unwrap();
+                        },
                         Err(e) => { tracing::error!("Error: {:?}", e); }
                     }
                 }
@@ -70,28 +83,35 @@ impl Actor for WorkchainsFirstBlocksTrackerActor {
 
 pub struct WorkchainsFirstBlocksTracker {
     receiver: broadcast::Receiver<LiteServerBlockHeader>,
+    state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
     _cancellation_token: DropGuard,
 }
 
 impl WorkchainsFirstBlocksTracker {
     pub fn new(client: LiteServerClient, last_block_tracker: WorkchainsLastBlocksTracker) -> Self {
+        let state = Arc::new(DashMap::default());
         let cancellation_token = CancellationToken::new();
         let (sender, receiver) = broadcast::channel(64);
 
         CancellableActor::new(
-            WorkchainsFirstBlocksTrackerActor::new(client, last_block_tracker, sender),
+            WorkchainsFirstBlocksTrackerActor::new(client, last_block_tracker, Arc::clone(&state), sender),
             cancellation_token.clone(),
         )
         .spawn();
 
         Self {
             receiver,
+            state,
             _cancellation_token: cancellation_token.drop_guard(),
         }
     }
 
     pub fn receiver(&self) -> broadcast::Receiver<LiteServerBlockHeader> {
         self.receiver.resubscribe()
+    }
+
+    pub fn get_first_block_id_for_shard(&self, shard_id: &ShardId) -> Option<TonNodeBlockIdExt> {
+        self.state.view(shard_id, |_, block_id| block_id.clone())
     }
 }
 

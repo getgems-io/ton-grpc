@@ -26,6 +26,7 @@ rand = { workspace = true }
 thiserror = { workspace = true }
 futures = { workspace = true }
 tokio-stream = { workspace = true }
+dashmap = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }
