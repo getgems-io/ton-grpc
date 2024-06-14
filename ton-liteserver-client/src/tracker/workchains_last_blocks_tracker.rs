@@ -3,6 +3,7 @@ use crate::tl::{LiteServerGetAllShardsInfo, TonNodeBlockIdExt};
 use crate::tlb::shard_descr::ShardDescr;
 use crate::tlb::shard_hashes::ShardHashes;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
+use crate::tracker::ShardId;
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -12,13 +13,12 @@ use ton_client_utils::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::tlb::ton::BoC;
 use tower::ServiceExt;
-use crate::tracker::ShardId;
 
 struct WorkchainsLastBlocksActor {
     client: LiteServerClient,
     masterchain_last_block_tracker: MasterchainLastBlockTracker,
     sender: broadcast::Sender<TonNodeBlockIdExt>,
-    state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
+    state: Arc<DashMap<ShardId, ShardDescr>>,
 }
 
 impl WorkchainsLastBlocksActor {
@@ -26,7 +26,7 @@ impl WorkchainsLastBlocksActor {
         client: LiteServerClient,
         masterchain_last_block_tracker: MasterchainLastBlockTracker,
         sender: broadcast::Sender<TonNodeBlockIdExt>,
-        state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
+        state: Arc<DashMap<ShardId, ShardDescr>>,
     ) -> Self {
         Self {
             client,
@@ -39,7 +39,7 @@ impl WorkchainsLastBlocksActor {
 
 pub struct WorkchainsLastBlocksTracker {
     receiver: broadcast::Receiver<TonNodeBlockIdExt>,
-    state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
+    state: Arc<DashMap<ShardId, ShardDescr>>,
     _cancellation_token: Arc<DropGuard>,
 }
 
@@ -48,7 +48,7 @@ impl Clone for WorkchainsLastBlocksTracker {
         Self {
             receiver: self.receiver.resubscribe(),
             state: Arc::clone(&self.state),
-            _cancellation_token: Arc::clone(&self._cancellation_token)
+            _cancellation_token: Arc::clone(&self._cancellation_token),
         }
     }
 }
@@ -63,7 +63,12 @@ impl WorkchainsLastBlocksTracker {
 
         let (sender, receiver) = broadcast::channel(64);
         CancellableActor::new(
-            WorkchainsLastBlocksActor::new(client, masterchain_last_block_tracker, sender, Arc::clone(&state)),
+            WorkchainsLastBlocksActor::new(
+                client,
+                masterchain_last_block_tracker,
+                sender,
+                Arc::clone(&state),
+            ),
             cancellation_token.clone(),
         )
         .spawn();
@@ -75,8 +80,8 @@ impl WorkchainsLastBlocksTracker {
         }
     }
 
-    pub fn get_last_block_id_for_shard(&self, shard_id: &ShardId) -> Option<TonNodeBlockIdExt> {
-        self.state.view(shard_id, |_, block_id| block_id.clone())
+    pub fn get_shard(&self, shard_id: &ShardId) -> Option<ShardDescr> {
+        self.state.view(shard_id, |_, shard| shard.clone())
     }
 
     pub fn receiver(&self) -> broadcast::Receiver<TonNodeBlockIdExt> {
@@ -110,22 +115,21 @@ impl Actor for WorkchainsLastBlocksActor {
             // TODO[akostylev0]: verify proofs
             shard_hashes
                 .iter()
-                .flat_map(|(chain_id, shards)| {
-                    shards
-                        .iter()
-                        .map(move |shard: &ShardDescr| TonNodeBlockIdExt {
+                .flat_map(|(chain_id, shards)| shards.iter().map(move |shard| (chain_id, shard)))
+                .for_each(|(chain_id, shard)| {
+                    let shard_id = (*chain_id as i32, shard.next_validator_shard as i64);
+                    self.state.insert(shard_id, shard.clone());
+
+                    let _ = self
+                        .sender
+                        .send(TonNodeBlockIdExt {
                             workchain: *chain_id as i32,
                             shard: shard.next_validator_shard as i64,
                             seqno: shard.seq_no as i32,
                             root_hash: shard.root_hash,
                             file_hash: shard.file_hash,
                         })
-                })
-                .for_each(|shard_block_id| {
-                    let shard_id = (shard_block_id.workchain, shard_block_id.shard);
-                    self.state.insert(shard_id, shard_block_id.clone());
-
-                    let _ = self.sender.send(shard_block_id).expect("expect to send shard_id");
+                        .expect("expect to send shard_id");
                 });
         }
     }

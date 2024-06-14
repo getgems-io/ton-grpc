@@ -31,7 +31,7 @@ use crate::tlb::future_split_merge::FutureSplitMerge;
 /// split_merge_at:FutureSplitMerge
 /// fees_collected:CurrencyCollection funds_created:CurrencyCollection = ShardDescr;
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ShardDescr {
     pub seq_no: u32,
     pub reg_mc_seqno: u32,

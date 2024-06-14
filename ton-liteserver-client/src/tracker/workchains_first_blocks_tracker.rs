@@ -6,7 +6,6 @@ use adnl_tcp::types::{Int, Long};
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::collections::HashMap;
-use std::os::linux::raw::stat;
 use std::sync::Arc;
 use std::time::Duration;
 use dashmap::DashMap;

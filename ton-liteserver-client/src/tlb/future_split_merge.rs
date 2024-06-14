@@ -5,7 +5,7 @@ use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 /// fsm_split$10 split_utime:uint32 interval:uint32 = FutureSplitMerge;
 /// fsm_merge$11 merge_utime:uint32 interval:uint32 = FutureSplitMerge;
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FutureSplitMerge {
     None, // fsm_none$0
     Split { split_utime: u32, interval: u32 }, // fsm_split$10

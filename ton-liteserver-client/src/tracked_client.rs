@@ -4,7 +4,6 @@ use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use crate::tracker::workchains_first_blocks_tracker::WorkchainsFirstBlocksTracker;
 use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
 use ton_client_utils::router::{BlockCriteria, Routed};
-use tower::load::Load;
 
 pub struct TrackedClient {
     inner: LiteServerClient,
@@ -61,12 +60,14 @@ impl Routed for TrackedClient {
                     self
                         .workchains_first_blocks_tracker
                         .get_first_block_id_for_shard(&shard_id)
-                        .zip(self.workchains_last_blocks_tracker.get_last_block_id_for_shard(&shard_id))
+                        .zip(self.workchains_last_blocks_tracker.get_shard(&shard_id))
                         .is_some_and(|(lhs, rhs)| {
-                            lhs.seqno <= *seqno && *seqno <= rhs.seqno
+                            lhs.seqno <= *seqno && *seqno <= rhs.seq_no as i32
                         })
                 }
                 BlockCriteria::LogicalTime(_) => {
+                    // TODO[akostylev0] add account ad to criteria and apply shard_id as prefix
+
                     unimplemented!()
                 }
             },
