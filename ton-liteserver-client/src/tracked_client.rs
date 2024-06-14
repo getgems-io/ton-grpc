@@ -8,6 +8,7 @@ use ton_client_utils::router::{BlockCriteria, Routed};
 pub struct TrackedClient {
     inner: LiteServerClient,
     masterchain_last_block_tracker: MasterchainLastBlockTracker,
+    masterchain_last_block_header_tracker: MasterchainFirstBlockTracker,
     masterchain_first_block_tracker: MasterchainFirstBlockTracker,
     workchains_last_blocks_tracker: WorkchainsLastBlocksTracker,
     workchains_first_blocks_tracker: WorkchainsFirstBlocksTracker,
@@ -16,6 +17,10 @@ pub struct TrackedClient {
 impl TrackedClient {
     pub fn new(inner: LiteServerClient) -> Self {
         let masterchain_last_block_tracker = MasterchainLastBlockTracker::new(inner.clone());
+        let masterchain_last_block_header_tracker = MasterchainFirstBlockTracker::new(
+            inner.clone(),
+            masterchain_last_block_tracker.clone(),
+        );
         let masterchain_first_block_tracker = MasterchainFirstBlockTracker::new(
             inner.clone(),
             masterchain_last_block_tracker.clone(),
@@ -30,9 +35,10 @@ impl TrackedClient {
         Self {
             inner,
             masterchain_last_block_tracker,
+            masterchain_last_block_header_tracker,
             masterchain_first_block_tracker,
             workchains_last_blocks_tracker,
-            workchains_first_blocks_tracker
+            workchains_first_blocks_tracker,
         }
     }
 }
@@ -41,35 +47,28 @@ impl Routed for TrackedClient {
     fn contains(&self, chain: &i32, criteria: &BlockCriteria) -> bool {
         match chain {
             // masterchain
-            -1 => match criteria {
-                BlockCriteria::Seqno { seqno, .. } => self
-                    .masterchain_first_block_tracker
-                    .borrow()
-                    .as_ref()
-                    .zip(self.masterchain_last_block_tracker.borrow().as_ref())
-                    .is_some_and(|(header, info)| {
-                        header.id.seqno <= *seqno && *seqno <= info.last.seqno
-                    }),
-                BlockCriteria::LogicalTime(lt) => {
-                    unimplemented!()
-                }
-            },
-            chain_id => match criteria {
-                BlockCriteria::Seqno { shard, seqno } => {
-                    let shard_id = (*chain_id, *shard);
-                    self
-                        .workchains_first_blocks_tracker
-                        .get_first_block_id_for_shard(&shard_id)
-                        .zip(self.workchains_last_blocks_tracker.get_shard(&shard_id))
-                        .is_some_and(|(lhs, rhs)| {
-                            lhs.seqno <= *seqno && *seqno <= rhs.seq_no as i32
-                        })
-                }
-                BlockCriteria::LogicalTime(_) => {
-                    // TODO[akostylev0] add account ad to criteria and apply shard_id as prefix
-
-                    unimplemented!()
-                }
+            -1 => self
+                .masterchain_first_block_tracker
+                .borrow()
+                .as_ref()
+                .zip(self.masterchain_last_block_header_tracker.borrow().as_ref())
+                .is_some_and(|(lhs, rhs)| match criteria {
+                    BlockCriteria::Seqno { seqno, .. } => {
+                        lhs.info.seq_no as i32 <= *seqno && *seqno <= rhs.info.seq_no as i32
+                    }
+                    BlockCriteria::LogicalTime(lt) => {
+                        lhs.info.start_lt as i64 <= *lt && *lt <= rhs.info.end_lt as i64
+                    }
+                }),
+            chain_id => {
+                // TODO[akostylev0] lt routing based on shard or account id
+                let shard_id = (*chain_id, *shard);
+                self.workchains_first_blocks_tracker
+                    .get_first_block_id_for_shard(&shard_id)
+                    .zip(self.workchains_last_blocks_tracker.get_shard(&shard_id))
+                    .is_some_and(|(lhs, rhs)| {
+                        lhs.seqno <= *seqno && *seqno <= rhs.seq_no as i32
+                    })
             },
         }
     }

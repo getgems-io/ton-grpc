@@ -7,20 +7,23 @@ use std::time::Duration;
 use tokio::sync::watch;
 use tokio::sync::watch::Ref;
 use tokio_util::sync::{CancellationToken, DropGuard};
+use toner::tlb::bits::de::unpack_bytes;
+use toner::tlb::ton::BoC;
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
 use ton_client_utils::actor::Actor;
+use crate::tlb::block_header::BlockHeader;
 
 struct MasterchainFirstBlockTrackerActor {
     client: LiteServerClient,
     last_block_tracker: MasterchainLastBlockTracker,
-    sender: watch::Sender<Option<LiteServerBlockHeader>>,
+    sender: watch::Sender<Option<BlockHeader>>,
 }
 
 impl MasterchainFirstBlockTrackerActor {
     pub fn new(
         client: LiteServerClient,
         last_block_tracker: MasterchainLastBlockTracker,
-        sender: watch::Sender<Option<LiteServerBlockHeader>>,
+        sender: watch::Sender<Option<BlockHeader>>,
     ) -> Self {
         Self {
             client,
@@ -52,7 +55,12 @@ impl Actor for MasterchainFirstBlockTrackerActor {
             .map_ok(|block| {
                 current_seqno.replace(block.id.seqno);
 
-                let _ = self.sender.send(Some(block));
+                let boc: BoC = unpack_bytes(&block.header_proof).unwrap();
+                let root = boc.single_root().unwrap();
+
+                let header: BlockHeader = root.parse_fully().unwrap();
+
+                let _ = self.sender.send(Some(header));
             })
             .inspect_err(|error| tracing::error!(?error))
             .await;
@@ -63,7 +71,7 @@ impl Actor for MasterchainFirstBlockTrackerActor {
 }
 
 pub struct MasterchainFirstBlockTracker {
-    receiver: watch::Receiver<Option<LiteServerBlockHeader>>,
+    receiver: watch::Receiver<Option<BlockHeader>>,
     _cancellation_token: DropGuard,
 }
 
@@ -84,11 +92,11 @@ impl MasterchainFirstBlockTracker {
         }
     }
 
-    pub fn borrow(&self) -> Ref<Option<LiteServerBlockHeader>> {
+    pub fn borrow(&self) -> Ref<Option<BlockHeader>> {
         self.receiver.borrow()
     }
 
-    pub fn receiver(&self) -> watch::Receiver<Option<LiteServerBlockHeader>> {
+    pub fn receiver(&self) -> watch::Receiver<Option<BlockHeader>> {
         self.receiver.clone()
     }
 }

@@ -13,23 +13,26 @@ use tokio::select;
 use tokio::sync::broadcast;
 use tokio::time::Instant;
 use tokio_util::sync::{CancellationToken, DropGuard};
+use toner::tlb::bits::de::unpack_bytes_fully;
+use toner::tlb::ton::BoC;
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
 use ton_client_utils::actor::Actor;
+use crate::tlb::block_header::BlockHeader;
 use crate::tracker::ShardId;
 
 struct WorkchainsFirstBlocksTrackerActor {
     client: LiteServerClient,
     last_block_tracker: WorkchainsLastBlocksTracker,
-    state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
-    sender: broadcast::Sender<LiteServerBlockHeader>,
+    state: Arc<DashMap<ShardId, BlockHeader>>,
+    sender: broadcast::Sender<BlockHeader>,
 }
 
 impl WorkchainsFirstBlocksTrackerActor {
     pub fn new(
         client: LiteServerClient,
         last_block_tracker: WorkchainsLastBlocksTracker,
-        state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
-        sender: broadcast::Sender<LiteServerBlockHeader>,
+        state: Arc<DashMap<ShardId, BlockHeader>>,
+        sender: broadcast::Sender<BlockHeader>,
     ) -> Self {
         Self {
             client,
@@ -68,9 +71,14 @@ impl Actor for WorkchainsFirstBlocksTrackerActor {
                     match result {
                         Ok(resolved) => {
                             let shard_id = (resolved.id.workchain, resolved.id.shard);
-                            self.state.insert(shard_id, resolved.id.clone());
 
-                            let _ = self.sender.send(resolved).unwrap();
+                            let boc: BoC = unpack_bytes_fully(&resolved.header_proof).unwrap();
+                            let root = boc.single_root().unwrap();
+                            let block_header: BlockHeader = root.parse_fully().unwrap();
+
+                            self.state.insert(shard_id, block_header.clone());
+
+                            let _ = self.sender.send(block_header).unwrap();
                         },
                         Err(e) => { tracing::error!("Error: {:?}", e); }
                     }
@@ -81,8 +89,8 @@ impl Actor for WorkchainsFirstBlocksTrackerActor {
 }
 
 pub struct WorkchainsFirstBlocksTracker {
-    receiver: broadcast::Receiver<LiteServerBlockHeader>,
-    state: Arc<DashMap<ShardId, TonNodeBlockIdExt>>,
+    receiver: broadcast::Receiver<BlockHeader>,
+    state: Arc<DashMap<ShardId, BlockHeader>>,
     _cancellation_token: DropGuard,
 }
 
@@ -105,12 +113,12 @@ impl WorkchainsFirstBlocksTracker {
         }
     }
 
-    pub fn receiver(&self) -> broadcast::Receiver<LiteServerBlockHeader> {
+    pub fn receiver(&self) -> broadcast::Receiver<BlockHeader> {
         self.receiver.resubscribe()
     }
 
-    pub fn get_first_block_id_for_shard(&self, shard_id: &ShardId) -> Option<TonNodeBlockIdExt> {
-        self.state.view(shard_id, |_, block_id| block_id.clone())
+    pub fn get_first_block_id_for_shard(&self, shard_id: &ShardId) -> Option<BlockHeader> {
+        self.state.view(shard_id, |_, header| header.clone())
     }
 }
 
