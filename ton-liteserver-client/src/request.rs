@@ -2,7 +2,7 @@ use std::time::Duration;
 use adnl_tcp::deserializer::DeserializeBoxed;
 use adnl_tcp::serializer::{SerializeBoxed, Serializer};
 use adnl_tcp::types::{Functional, Int, Long};
-use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlock, LiteServerLookupBlock, LiteServerWaitMasterchainSeqno, TonNodeBlockId, TonNodeBlockIdExt};
+use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlock, LiteServerGetBlockHeader, LiteServerLookupBlock, LiteServerWaitMasterchainSeqno, TonNodeBlockId, TonNodeBlockIdExt};
 
 pub trait Requestable: SerializeBoxed + Send {
     type Response: DeserializeBoxed + Send + 'static;
@@ -43,6 +43,12 @@ impl LiteServerLookupBlock {
             lt: None,
             utime: None,
         }
+    }
+}
+
+impl LiteServerGetBlockHeader {
+    pub fn new(id: TonNodeBlockIdExt) -> Self {
+        Self { id, mode: 0 }
     }
 }
 
