@@ -1,10 +1,7 @@
+use crate::{TonContract, TonContractError, TvmBoxedStackEntryExt};
 use async_trait::async_trait;
 use num_bigint::BigUint;
-use toner::{
-    ton::MsgAddress,
-    tlb::r#as::Data
-};
-use crate::{TonContract, TonContractError, TvmBoxedStackEntryExt};
+use toner::{tlb::r#as::Data, ton::MsgAddress};
 
 pub struct JettonWalletData {
     pub balance: BigUint,
