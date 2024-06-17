@@ -1,15 +1,15 @@
+use base64::{engine::general_purpose::STANDARD, Engine};
 use core::{fmt::Display, str::FromStr};
 use std::{error::Error as StdError, sync::Arc};
-use base64::{engine::general_purpose::STANDARD, Engine};
 use toner::{
-    tlb::{Error as TlbError, Cell},
     tlb::bits::de::unpack_bytes,
     tlb::bits::ser::pack_with,
-    tlb::de::CellDeserializeOwned,
     tlb::de::r#as::CellDeserializeAsOwned,
-    tlb::ser::{CellSerialize, CellSerializeExt},
+    tlb::de::CellDeserializeOwned,
     tlb::ser::r#as::{CellSerializeAs, CellSerializeWrapAsExt},
-    ton::boc::{BoC, BagOfCellsArgs}
+    tlb::ser::{CellSerialize, CellSerializeExt},
+    tlb::{Cell, Error as TlbError},
+    ton::boc::{BagOfCellsArgs, BoC},
 };
 
 use tonlibjson_client::block::{
@@ -93,10 +93,16 @@ impl TvmBoxedStackEntryExt for TvmBoxedStackEntry {
     fn from_boc(boc: BoC) -> Result<Self, TonContractError> {
         Ok(Self::TvmStackEntrySlice(TvmStackEntrySlice {
             slice: TvmSlice {
-                bytes: STANDARD.encode(pack_with(boc, BagOfCellsArgs {
-                    has_idx: false,
-                    has_crc32c: false,
-                })?.as_raw_slice()),
+                bytes: STANDARD.encode(
+                    pack_with(
+                        boc,
+                        BagOfCellsArgs {
+                            has_idx: false,
+                            has_crc32c: false,
+                        },
+                    )?
+                    .as_raw_slice(),
+                ),
             },
         }))
     }
