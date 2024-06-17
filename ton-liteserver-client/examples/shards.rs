@@ -5,8 +5,8 @@ use std::time::Duration;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo};
 use toner::{
-    tlb::ton::BoC,
-    tlb::bits::de::unpack_bytes
+    tlb::bits::de::unpack_bytes,
+    ton::boc::BoC
 };
 use tower::{ServiceBuilder, ServiceExt};
 
