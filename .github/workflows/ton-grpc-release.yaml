@@ -61,7 +61,7 @@ jobs:
             type=match,pattern=ton-grpc-v(.*),group=1
             
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           file: ton-grpc/Dockerfile
           context: .

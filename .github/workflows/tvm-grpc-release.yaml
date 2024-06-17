@@ -61,7 +61,7 @@ jobs:
             type=match,pattern=tvm-grpc-v(.*),group=1
             
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           file: tvm-grpc/Dockerfile
           context: .
