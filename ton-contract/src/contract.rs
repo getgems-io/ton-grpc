@@ -1,4 +1,4 @@
-use toner::tlb::ton::MsgAddress;
+use toner::ton::MsgAddress;
 use tonlibjson_client::{
     block::{SmcRunResult, TvmBoxedStackEntry},
     ton::TonClient,

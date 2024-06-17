@@ -2,14 +2,14 @@ use core::{fmt::Display, str::FromStr};
 use std::{error::Error as StdError, sync::Arc};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use toner::{
-    tlb::{ton::BoC, Error as TlbError, Cell},
+    tlb::{Error as TlbError, Cell},
     tlb::bits::de::unpack_bytes,
     tlb::bits::ser::pack_with,
     tlb::de::CellDeserializeOwned,
     tlb::de::r#as::CellDeserializeAsOwned,
     tlb::ser::{CellSerialize, CellSerializeExt},
     tlb::ser::r#as::{CellSerializeAs, CellSerializeWrapAsExt},
-    tlb::ton::BagOfCellsArgs
+    ton::boc::{BoC, BagOfCellsArgs}
 };
 
 use tonlibjson_client::block::{
