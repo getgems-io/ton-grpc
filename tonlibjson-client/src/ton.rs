@@ -20,7 +20,7 @@ use tracing::{instrument, trace};
 use url::Url;
 use std::str::FromStr;
 use tower::util::Either;
-use ton_client_utils::router::{BlockCriteria, Route};
+use ton_client_util::router::{BlockCriteria, Route};
 use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
 use crate::router::Router;

@@ -9,8 +9,8 @@ use tokio::sync::watch::Ref;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use toner::tlb::bits::de::unpack_bytes;
 use toner::ton::boc::BoC;
-use ton_client_utils::actor::cancellable_actor::CancellableActor;
-use ton_client_utils::actor::Actor;
+use ton_client_util::actor::cancellable_actor::CancellableActor;
+use ton_client_util::actor::Actor;
 use crate::tlb::block_header::BlockHeader;
 
 struct MasterchainFirstBlockTrackerActor {

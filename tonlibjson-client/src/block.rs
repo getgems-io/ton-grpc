@@ -8,7 +8,7 @@ use anyhow::anyhow;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
-use ton_client_utils::router::{BlockCriteria, Route};
+use ton_client_util::router::{BlockCriteria, Route};
 use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
 use crate::router::Routable;
 use crate::request::Requestable;

@@ -5,7 +5,7 @@ use futures::FutureExt;
 use tower::retry::budget::Budget;
 use tower::retry::Policy;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
-use ton_client_utils::router::RouterError;
+use ton_client_util::router::RouterError;
 use crate::block::{RawSendMessage, RawSendMessageReturnHash};
 use crate::error::Error;
 

@@ -4,7 +4,7 @@ members = [
     "tonlibjson-sys",
     "tl_parser",
     "adnl-tcp",
-    "ton-client-utils",
+    "ton-client-util",
     "tonlibjson-client",
     "ton-liteserver-client",
     "ton-contract",

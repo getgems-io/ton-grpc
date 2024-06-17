@@ -2433,7 +2433,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ton-client-utils"
+name = "ton-client-util"
 version = "0.1.0"
 dependencies = [
  "itertools 0.13.0",
@@ -2524,7 +2524,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
- "ton-client-utils",
+ "ton-client-util",
  "toner",
  "tower",
  "tracing",
@@ -2642,7 +2642,7 @@ dependencies = [
  "tokio-retry",
  "tokio-stream",
  "tokio-util",
- "ton-client-utils",
+ "ton-client-util",
  "tonlibjson-sys",
  "tower",
  "tracing",

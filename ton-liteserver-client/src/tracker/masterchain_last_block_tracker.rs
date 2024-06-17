@@ -8,8 +8,8 @@ use tokio::sync::watch;
 use tokio::sync::watch::error::RecvError;
 use tokio::sync::watch::Ref;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use ton_client_utils::actor::cancellable_actor::CancellableActor;
-use ton_client_utils::actor::Actor;
+use ton_client_util::actor::cancellable_actor::CancellableActor;
+use ton_client_util::actor::Actor;
 use tower::ServiceExt;
 
 struct MasterchainLastBlockTrackerActor {

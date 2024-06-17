@@ -6,7 +6,7 @@ use std::task::{Context, Poll, ready};
 use tower::balance::p2c::Balance;
 use tower::discover::{Change, Discover, ServiceList};
 use tower::Service;
-use ton_client_utils::router::{Route, Routed, RouterError};
+use ton_client_util::router::{Route, Routed, RouterError};
 use crate::error::{Error, ErrorService};
 
 pub(crate) trait Routable {

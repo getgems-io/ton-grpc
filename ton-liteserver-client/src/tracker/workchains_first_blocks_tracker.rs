@@ -15,8 +15,8 @@ use tokio::time::Instant;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
-use ton_client_utils::actor::cancellable_actor::CancellableActor;
-use ton_client_utils::actor::Actor;
+use ton_client_util::actor::cancellable_actor::CancellableActor;
+use ton_client_util::actor::Actor;
 use crate::tlb::block_header::BlockHeader;
 use crate::tracker::ShardId;
 

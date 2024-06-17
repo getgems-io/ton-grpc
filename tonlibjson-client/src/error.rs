@@ -5,7 +5,7 @@ use futures::future::MapErr;
 use futures::TryFutureExt;
 use thiserror::Error;
 use tower::{Layer, Service};
-use ton_client_utils::router::RouterError;
+use ton_client_util::router::RouterError;
 
 #[derive(Debug, Error)]
 pub enum Error {

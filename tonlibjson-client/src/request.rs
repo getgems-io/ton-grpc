@@ -5,7 +5,7 @@ use serde::{Serialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service};
-use ton_client_utils::router::Route;
+use ton_client_util::router::Route;
 use crate::router::Routable;
 use crate::error::Error;
 
