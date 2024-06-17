@@ -9,6 +9,7 @@ use toner::{
     ton::boc::BoC
 };
 use tower::{ServiceBuilder, ServiceExt};
+use ton_liteserver_client::tlb::shard_hashes::ShardHashes;
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
@@ -30,8 +31,14 @@ async fn main() -> Result<(), tower::BoxError> {
         .unwrap();
 
     let boc: BoC = unpack_bytes(&shards.data)?;
+    let root = boc.single_root().unwrap();
+    let shards: ShardHashes = root.parse_fully().unwrap();
 
-    tracing::info!("Got BOC: {:?}", boc);
+    for (workchain_id, shards) in shards.iter() {
+        for shard in shards {
+            println!("workchain_id = {}, shard_id = {:x}", workchain_id, shard.next_validator_shard);
+        }
+    }
 
     Ok(())
 }
