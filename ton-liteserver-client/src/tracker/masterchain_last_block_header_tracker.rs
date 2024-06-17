@@ -8,7 +8,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
 use ton_client_utils::actor::Actor;
 use toner::tlb::bits::de::{unpack_bytes, unpack_bytes_fully};
-use toner::tlb::ton::BoC;
+use toner::ton::boc::BoC;
 use tower::ServiceExt;
 
 struct MasterchainLastBlockHeaderTrackerActor {

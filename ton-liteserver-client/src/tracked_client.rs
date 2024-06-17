@@ -61,14 +61,15 @@ impl Routed for TrackedClient {
                     }
                 }),
             chain_id => {
-                // TODO[akostylev0] lt routing based on shard or account id
-                let shard_id = (*chain_id, *shard);
-                self.workchains_first_blocks_tracker
-                    .get_first_block_id_for_shard(&shard_id)
-                    .zip(self.workchains_last_blocks_tracker.get_shard(&shard_id))
-                    .is_some_and(|(lhs, rhs)| {
-                        lhs.seqno <= *seqno && *seqno <= rhs.seq_no as i32
-                    })
+                todo!()
+                // // TODO[akostylev0] lt routing based on shard or account id
+                // let shard_id = (*chain_id, *shard);
+                // self.workchains_first_blocks_tracker
+                //     .get_first_block_id_for_shard(&shard_id)
+                //     .zip(self.workchains_last_blocks_tracker.get_shard(&shard_id))
+                //     .is_some_and(|(lhs, rhs)| {
+                //         lhs.seqno <= *seqno && *seqno <= rhs.seq_no as i32
+                //     })
             },
         }
     }

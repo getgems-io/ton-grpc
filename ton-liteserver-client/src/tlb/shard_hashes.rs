@@ -5,8 +5,8 @@ use toner::tlb::bits::bitvec::order::Msb0;
 use toner::tlb::bits::bitvec::vec::BitVec;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::r#as::{NoArgs, ParseFully, Ref};
-use toner::tlb::ton::bin_tree::BinTree;
-use toner::tlb::ton::hashmap::HashmapE;
+use toner::ton::bin_tree::BinTree;
+use toner::ton::hashmap::HashmapE;
 use crate::tlb::shard_descr::ShardDescr;
 
 /// ```tlb

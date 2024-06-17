@@ -14,7 +14,7 @@ use tokio::sync::broadcast;
 use tokio::time::Instant;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use toner::tlb::bits::de::unpack_bytes_fully;
-use toner::tlb::ton::BoC;
+use toner::ton::boc::BoC;
 use ton_client_utils::actor::cancellable_actor::CancellableActor;
 use ton_client_utils::actor::Actor;
 use crate::tlb::block_header::BlockHeader;

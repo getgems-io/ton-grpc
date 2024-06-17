@@ -2,7 +2,7 @@ use toner::tlb::bits::de::{BitReader, BitReaderExt};
 use toner::tlb::bits::r#as::NBits;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::r#as::{ParseFully, Ref};
-use toner::tlb::ton::currency::CurrencyCollection;
+use toner::ton::currency::CurrencyCollection;
 use adnl_tcp::types::Int256;
 use crate::tlb::future_split_merge::FutureSplitMerge;
 
