@@ -1,13 +1,12 @@
 use std::net::{Ipv4Addr, SocketAddrV4};
 use base64::Engine;
 use toner::tlb::bits::de::unpack_bytes;
-use toner::tlb::ton::BoC;
+use toner::ton::boc::BoC;
 use tower::ServiceExt;
 use adnl_tcp::client::ServerKey;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetBlockHeader, LiteServerGetMasterchainInfo};
 use ton_liteserver_client::tlb::block_header::BlockHeader;
-use ton_liteserver_client::tlb::block_proof::BlockProof;
 use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
 
 #[tokio::main]

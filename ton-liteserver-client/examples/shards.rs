@@ -2,14 +2,15 @@ use adnl_tcp::client::ServerKey;
 use base64::Engine;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
+use anyhow::anyhow;
 use ton_liteserver_client::client::LiteServerClient;
-use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetMasterchainInfo};
-use toner::{
-    tlb::bits::de::unpack_bytes,
-    ton::boc::BoC
-};
-use tower::{ServiceBuilder, ServiceExt};
+use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo, LiteServerGetTransactions, TonNodeBoxedBlockIdExt};
 use ton_liteserver_client::tlb::shard_hashes::ShardHashes;
+use toner::{tlb::bits::de::unpack_bytes, ton::boc::BoC};
+use toner::tlb::bits::de::unpack_bytes_fully;
+use tower::{ServiceBuilder, ServiceExt};
+use ton_liteserver_client::tlb::block_header::BlockHeader;
+use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
@@ -27,16 +28,35 @@ async fn main() -> Result<(), tower::BoxError> {
         .last;
     let shards = (&mut svc)
         .oneshot(LiteServerGetAllShardsInfo { id })
-        .await
-        .unwrap();
+        .await?;
 
     let boc: BoC = unpack_bytes(&shards.data)?;
-    let root = boc.single_root().unwrap();
-    let shards: ShardHashes = root.parse_fully().unwrap();
+    let root = boc.single_root().ok_or_else(|| anyhow!("single root expected"))?;
+    let shards: ShardHashes = root.parse_fully()?;
 
     for (workchain_id, shards) in shards.iter() {
         for shard in shards {
-            println!("workchain_id = {}, shard_id = {:x}", workchain_id, shard.next_validator_shard);
+            println!(
+                "workchain_id = {}, shard_id = {:x}",
+                workchain_id, shard.next_validator_shard
+            );
+
+            let block_id = TonNodeBoxedBlockIdExt {
+                workchain: *workchain_id as i32,
+                shard: shard.next_validator_shard as i64,
+                seqno: shard.seq_no as i32,
+                root_hash: shard.root_hash,
+                file_hash: shard.file_hash,
+            };
+
+            let header = (&mut svc)
+                .oneshot(LiteServerGetBlockHeader::new(block_id))
+                .await?;
+
+            let boc: BoC = unpack_bytes_fully(header.header_proof)?;
+            let header: MerkleProof = boc.single_root().unwrap().parse_fully()?;
+
+            println!("header = {:?}", header);
         }
     }
 
