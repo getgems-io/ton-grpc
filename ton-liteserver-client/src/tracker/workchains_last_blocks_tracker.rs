@@ -13,6 +13,7 @@ use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use tower::ServiceExt;
+use ton_client_util::router::shards::Prefix;
 
 struct WorkchainsLastBlocksActor {
     client: LiteServerClient,
@@ -86,6 +87,17 @@ impl WorkchainsLastBlocksTracker {
 
     pub fn receiver(&self) -> broadcast::Receiver<TonNodeBlockIdExt> {
         self.receiver.resubscribe()
+    }
+
+    pub fn find_max_lt_by_address(&self, chain_id: i32, address: &[u8; 32]) -> Option<u64> {
+        self.state
+            .iter()
+            .filter_map(|kv| {
+                let key = kv.key();
+
+                (key.0 == chain_id && Prefix::from_shard_id(key.1 as u64).matches(address)).then(|| kv.value().end_lt)
+            })
+            .max()
     }
 }
 

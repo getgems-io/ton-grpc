@@ -17,6 +17,7 @@ use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
+use ton_client_util::router::shards::Prefix;
 use crate::tlb::block_header::BlockHeader;
 use crate::tracker::ShardId;
 
@@ -119,6 +120,17 @@ impl WorkchainsFirstBlocksTracker {
 
     pub fn get_first_block_id_for_shard(&self, shard_id: &ShardId) -> Option<BlockHeader> {
         self.state.view(shard_id, |_, header| header.clone())
+    }
+
+    pub fn find_min_lt_by_address(&self, chain_id: i32, address: &[u8; 32]) -> Option<u64> {
+        self.state
+            .iter()
+            .filter_map(|kv| {
+                let key = kv.key();
+
+                (key.0 == chain_id && Prefix::from_shard_id(key.1 as u64).matches(address)).then(|| kv.value().info.start_lt)
+            })
+            .min()
     }
 }
 
