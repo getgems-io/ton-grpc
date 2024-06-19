@@ -1,11 +1,11 @@
-mod shards;
+pub mod shards;
 
 use itertools::Itertools;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BlockCriteria {
     Seqno { shard: i64, seqno: i32 },
-    LogicalTime(i64),
+    LogicalTime { address: [u8; 32], lt: i64 },
 }
 
 #[derive(Debug, Clone, Copy)]
