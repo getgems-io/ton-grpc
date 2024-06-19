@@ -10,4 +10,4 @@ itertools = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
-
+bitvec = "1.0.1"

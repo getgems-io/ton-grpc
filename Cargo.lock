@@ -2436,6 +2436,7 @@ dependencies = [
 name = "ton-client-util"
 version = "0.1.0"
 dependencies = [
+ "bitvec",
  "itertools 0.13.0",
  "thiserror",
  "tokio",
