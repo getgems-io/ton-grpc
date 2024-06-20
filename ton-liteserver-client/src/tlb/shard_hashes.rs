@@ -47,7 +47,7 @@ mod tests {
     use toner::tlb::bits::bitvec::order::Msb0;
     use toner::tlb::bits::bitvec::vec::BitVec;
     use toner::tlb::bits::de::unpack_fully;
-    use toner::tlb::ton::BoC;
+    use toner::ton::boc::BoC;
     use crate::tlb::shard_hashes::ShardHashes;
 
     #[test]

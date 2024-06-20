@@ -122,7 +122,7 @@ mod test {
         for _ in 0..5 {
             receiver.changed().await.unwrap();
 
-            let current_seqno = receiver.borrow().as_ref().unwrap().id.seqno;
+            let current_seqno = receiver.borrow().as_ref().unwrap().info.seq_no;
             println!("current_seqno = {}", current_seqno);
             if let Some(seqno) = prev_seqno {
                 assert!(current_seqno >= seqno);
