@@ -5,11 +5,12 @@ use futures::{TryFutureExt, FutureExt};
 use derive_new::new;
 use tower::{MakeService, Service, ServiceExt};
 use tower::discover::Discover;
+use ton_client_util::router::route::ToRoute;
 use crate::block::{BlocksGetMasterchainInfo, BlocksMasterchainInfo};
 use crate::cursor_client::{CursorClient, InnerClient};
 use crate::error::Error;
 use crate::request::{Callable, Specialized};
-use crate::router::{Router, Routable};
+use crate::router::Router;
 
 #[derive(new)]
 pub(crate) struct Balance<D>
@@ -22,7 +23,7 @@ pub(crate) struct Balance<D>
 
 impl<R, D> Service<R> for Balance<D>
     where
-        R: Routable + Callable<InnerClient>,
+        R: ToRoute + Callable<InnerClient>,
         D: Discover<Service=CursorClient, Error = anyhow::Error> + Unpin,
         D::Key: Eq + Hash,
 {
