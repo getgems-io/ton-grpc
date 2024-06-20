@@ -107,7 +107,7 @@ mod tests {
 
     #[test]
     fn given_block_available() {
-        let route = Route::Block { chain: 1, criteria: BlockCriteria::LogicalTime(100) };
+        let route = Route::Block { chain: 1, criteria: BlockCriteria::LogicalTime { address: [0; 32], lt: 100 } };
         let routed = MyRouted {
             contains: true,
             contains_not_available: true,
@@ -122,7 +122,7 @@ mod tests {
 
     #[test]
     fn given_block_unknown() {
-        let route = Route::Block { chain: 1, criteria: BlockCriteria::LogicalTime(100) };
+        let route = Route::Block { chain: 1, criteria: BlockCriteria::LogicalTime { address: [0; 32], lt: 100 } };
         let from = vec![MyRouted {
             contains: false,
             contains_not_available: false,
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn given_block_not_available() {
-        let route = Route::Block { chain: 1, criteria: BlockCriteria::LogicalTime(100) };
+        let route = Route::Block { chain: 1, criteria: BlockCriteria::LogicalTime { address: [0; 32], lt: 100 } };
         let from = vec![MyRouted {
             contains: false,
             contains_not_available: true,
