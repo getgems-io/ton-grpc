@@ -56,29 +56,29 @@ impl Routed for TrackedClient {
                     BlockCriteria::Seqno { seqno, .. } => {
                         lhs.info.seq_no as i32 <= *seqno && *seqno <= rhs.info.seq_no as i32
                     }
-                    BlockCriteria::LogicalTime{ lt, .. } => {
+                    BlockCriteria::LogicalTime { lt, .. } => {
                         lhs.info.start_lt as i64 <= *lt && *lt <= rhs.info.end_lt as i64
                     }
                 }),
-            chain_id => {
-                match criteria {
-                    BlockCriteria::Seqno { shard, seqno } => {
-                        self.workchains_first_blocks_tracker
-                           .get_first_block_id_for_shard(&(*chain_id, *shard))
-                           .zip(self.workchains_last_blocks_tracker.get_shard(&(*chain_id, *shard)))
-                           .is_some_and(|(lhs, rhs)| {
-                                lhs.info.seq_no <= *seqno as u32 && *seqno as u32 <= rhs.seq_no
-                            })
-                    }
-                    BlockCriteria::LogicalTime { address, lt } => {
-                        self.workchains_first_blocks_tracker
-                            .find_min_lt_by_address(*chain_id, address)
-                            .zip(self.workchains_last_blocks_tracker.find_max_lt_by_address(*chain_id, address))
-                            .is_some_and(|(lhs, rhs)| {
-                                lhs <= *lt as u64 && *lt as u64 <= rhs
-                            })
-                    }
-                }
+            chain_id => match criteria {
+                BlockCriteria::Seqno { shard, seqno } => self
+                    .workchains_first_blocks_tracker
+                    .get_first_block_id_for_shard(&(*chain_id, *shard))
+                    .zip(
+                        self.workchains_last_blocks_tracker
+                            .get_shard(&(*chain_id, *shard)),
+                    )
+                    .is_some_and(|(lhs, rhs)| {
+                        lhs.info.seq_no <= *seqno as u32 && *seqno as u32 <= rhs.seq_no
+                    }),
+                BlockCriteria::LogicalTime { address, lt } => self
+                    .workchains_first_blocks_tracker
+                    .find_min_lt_by_address(*chain_id, address)
+                    .zip(
+                        self.workchains_last_blocks_tracker
+                            .find_max_lt_by_address(*chain_id, address),
+                    )
+                    .is_some_and(|(lhs, rhs)| lhs <= *lt as u64 && *lt as u64 <= rhs),
             },
         }
     }
