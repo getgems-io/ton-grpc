@@ -5,8 +5,7 @@ use serde::{Serialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tower::{Service};
-use ton_client_util::router::Route;
-use crate::router::Routable;
+use ton_client_util::router::route::{Route, ToRoute};
 use crate::error::Error;
 
 pub(crate) trait Callable<S> : Sized + Send + 'static {
@@ -61,8 +60,8 @@ impl<T: Serialize> Serialize for Forward<T> {
     }
 }
 
-impl<T> Routable for Forward<T> {
-    fn route(&self) -> Route { self.route }
+impl<T> ToRoute for Forward<T> {
+    fn to_route(&self) -> Route { self.route }
 }
 
 impl<T> Requestable for Forward<T> where T : Requestable {
@@ -75,8 +74,8 @@ pub(crate) struct Specialized<T> {
     inner: T
 }
 
-impl<T> Routable for Specialized<T> where T : Routable {
-    fn route(&self) -> Route {
-        self.inner.route()
+impl<T> ToRoute for Specialized<T> where T : ToRoute {
+    fn to_route(&self) -> Route {
+        self.inner.to_route()
     }
 }

@@ -3,11 +3,10 @@ use futures::future::BoxFuture;
 use futures::TryFutureExt;
 use futures::FutureExt;
 use tower::{Service, ServiceExt};
-use ton_client_util::router::Route;
+use ton_client_util::router::route::{Route, ToRoute};
 use crate::block::{AccountAddress, SmcBoxedMethodId, SmcLoad, SmcRunGetMethod, TvmBoxedStackEntry};
 use crate::error::Error;
 use crate::request::{Requestable, Callable};
-use crate::router::Routable;
 
 #[derive(new, Clone)]
 pub struct RunGetMethod {
@@ -39,6 +38,6 @@ impl<S, E: Into<Error> + Send + 'static> Callable<S> for RunGetMethod
     }
 }
 
-impl Routable for RunGetMethod {
-    fn route(&self) -> Route { Route::Latest }
+impl ToRoute for RunGetMethod {
+    fn to_route(&self) -> Route { Route::Latest }
 }

@@ -6,12 +6,9 @@ use std::task::{Context, Poll, ready};
 use tower::balance::p2c::Balance;
 use tower::discover::{Change, Discover, ServiceList};
 use tower::Service;
-use ton_client_util::router::{Route, Routed, RouterError};
+use ton_client_util::router::{Routed, RouterError};
+use ton_client_util::router::route::{Route, ToRoute};
 use crate::error::{Error, ErrorService};
-
-pub(crate) trait Routable {
-    fn route(&self) -> Route { Route::Latest }
-}
 
 pub(crate) struct Router<S, D>
     where
@@ -54,7 +51,7 @@ impl<S, D, E> Router<S, D>
 
 impl<S, D, Request> Service<&Request> for Router<S, D>
     where
-        Request: Routable,
+        Request: ToRoute,
         S: Service<Request> + Routed + Clone,
         S::Error: Into<tower::BoxError>,
         D: Discover<Service=S, Error = anyhow::Error> + Unpin,
@@ -80,7 +77,7 @@ impl<S, D, Request> Service<&Request> for Router<S, D>
     }
 
     fn call(&mut self, req: &Request) -> Self::Future {
-        ready(match req.route().choose(self.services.values()) {
+        ready(match req.to_route().choose(self.services.values()) {
             Ok(services) => Ok(
                 ErrorService::new(Balance::new(ServiceList::new(
                     services.into_iter().cloned().collect()

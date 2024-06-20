@@ -3,7 +3,8 @@ use crate::tracker::masterchain_first_block_tracker::MasterchainFirstBlockTracke
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use crate::tracker::workchains_first_blocks_tracker::WorkchainsFirstBlocksTracker;
 use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
-use ton_client_util::router::{BlockCriteria, Routed};
+use ton_client_util::router::route::BlockCriteria;
+use ton_client_util::router::Routed;
 
 pub struct TrackedClient {
     inner: LiteServerClient,
