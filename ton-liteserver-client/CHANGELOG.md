@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.1](https://github.com/getgems-io/ton-grpc/compare/ton-liteserver-client-v0.1.0...ton-liteserver-client-v0.1.1) (2024-06-24)
+
+
+### Bug Fixes
+
+* **deps:** bump syn from 2.0.66 to 2.0.68 ([fec6f2d](https://github.com/getgems-io/ton-grpc/commit/fec6f2d61f5c74d89b87b57d1aaf6b4bbe7896f7))
+
 ## 0.1.0 (2024-06-10)
 
 

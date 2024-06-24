@@ -2,6 +2,14 @@
 
 
 
+## [0.18.2](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.18.1...tonlibjson-client-v0.18.2) (2024-06-24)
+
+
+### Bug Fixes
+
+* **deps:** bump reqwest from 0.12.4 to 0.12.5 ([ed059c8](https://github.com/getgems-io/ton-grpc/commit/ed059c82270539ea012ef31e72fa66541e83207f))
+* **deps:** bump syn from 2.0.66 to 2.0.68 ([fec6f2d](https://github.com/getgems-io/ton-grpc/commit/fec6f2d61f5c74d89b87b57d1aaf6b4bbe7896f7))
+
 ## [0.18.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.17.2...tonlibjson-client-v0.18.0) (2024-06-10)
 
 
