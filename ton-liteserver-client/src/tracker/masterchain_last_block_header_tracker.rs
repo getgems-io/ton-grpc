@@ -2,8 +2,9 @@ use crate::client::LiteServerClient;
 use crate::tl::LiteServerGetBlockHeader;
 use crate::tlb::block_header::BlockHeader;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
-use std::future::Future;
+use std::sync::Arc;
 use tokio::sync::watch;
+use tokio::sync::watch::Ref;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
@@ -61,9 +62,10 @@ impl Actor for MasterchainLastBlockHeaderTrackerActor {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct MasterchainLastBlockHeaderTracker {
     receiver: watch::Receiver<Option<BlockHeader>>,
-    _cancellation_token: DropGuard,
+    _cancellation_token: Arc<DropGuard>,
 }
 
 impl MasterchainLastBlockHeaderTracker {
@@ -79,7 +81,11 @@ impl MasterchainLastBlockHeaderTracker {
 
         Self {
             receiver,
-            _cancellation_token: cancellation_token.drop_guard(),
+            _cancellation_token: Arc::new(cancellation_token.drop_guard()),
         }
+    }
+
+    pub fn borrow(&self) -> Ref<'_, Option<BlockHeader>> {
+        self.receiver.borrow()
     }
 }

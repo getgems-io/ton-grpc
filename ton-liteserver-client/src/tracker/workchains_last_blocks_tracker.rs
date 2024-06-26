@@ -38,6 +38,7 @@ impl WorkchainsLastBlocksActor {
     }
 }
 
+#[derive(Debug)]
 pub struct WorkchainsLastBlocksTracker {
     receiver: broadcast::Receiver<TonNodeBlockIdExt>,
     state: Arc<DashMap<ShardId, ShardDescr>>,

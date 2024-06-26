@@ -5,7 +5,7 @@ use futures::FutureExt;
 use tower::retry::budget::Budget;
 use tower::retry::Policy;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
-use ton_client_util::router::RouterError;
+use ton_client_util::router::route::Error as RouterError;
 use crate::block::{RawSendMessage, RawSendMessageReturnHash};
 use crate::error::Error;
 
@@ -56,7 +56,7 @@ impl<T: Clone, Res> Policy<T, Res, Error> for RetryPolicy {
 
                 None
             },
-            Err(Error::Router(RouterError::RouteUnknown)) => None,
+            Err(Error::Route(RouterError::RouteUnknown)) => None,
             Err(_) => {
                 let request_type: &str = std::any::type_name::<T>();
 

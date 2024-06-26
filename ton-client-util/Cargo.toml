@@ -10,4 +10,7 @@ itertools = { workspace = true }
 tracing = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
-bitvec = "1.0.1"
+bitvec = { workspace = true }
+tower = { workspace = true }
+metrics = { workspace = true }
+pin-project = { workspace = true }
