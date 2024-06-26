@@ -2548,9 +2548,12 @@ version = "0.1.0"
 dependencies = [
  "bitvec",
  "itertools 0.13.0",
+ "metrics",
+ "pin-project",
  "thiserror",
  "tokio",
  "tokio-util",
+ "tower",
  "tracing",
 ]
 

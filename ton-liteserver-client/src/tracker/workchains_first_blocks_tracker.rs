@@ -1,5 +1,4 @@
 use crate::client::LiteServerClient;
-use crate::tl::{LiteServerBlockHeader, TonNodeBlockIdExt};
 use crate::tracker::find_first_block::find_first_block_header;
 use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
 use adnl_tcp::types::{Int, Long};
@@ -89,10 +88,21 @@ impl Actor for WorkchainsFirstBlocksTrackerActor {
     }
 }
 
+#[derive(Debug)]
 pub struct WorkchainsFirstBlocksTracker {
     receiver: broadcast::Receiver<BlockHeader>,
     state: Arc<DashMap<ShardId, BlockHeader>>,
-    _cancellation_token: DropGuard,
+    _cancellation_token: Arc<DropGuard>,
+}
+
+impl Clone for WorkchainsFirstBlocksTracker {
+    fn clone(&self) -> Self {
+        Self {
+            receiver: self.receiver.resubscribe(),
+            state: Arc::clone(&self.state),
+            _cancellation_token: Arc::clone(&self._cancellation_token),
+        }
+    }
 }
 
 impl WorkchainsFirstBlocksTracker {
@@ -110,7 +120,7 @@ impl WorkchainsFirstBlocksTracker {
         Self {
             receiver,
             state,
-            _cancellation_token: cancellation_token.drop_guard(),
+            _cancellation_token: Arc::new(cancellation_token.drop_guard()),
         }
     }
 

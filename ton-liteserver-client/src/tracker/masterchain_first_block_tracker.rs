@@ -1,5 +1,5 @@
+use std::sync::Arc;
 use crate::client::LiteServerClient;
-use crate::tl::LiteServerBlockHeader;
 use crate::tracker::find_first_block::find_first_block_header;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use futures::TryFutureExt;
@@ -70,9 +70,10 @@ impl Actor for MasterchainFirstBlockTrackerActor {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct MasterchainFirstBlockTracker {
     receiver: watch::Receiver<Option<BlockHeader>>,
-    _cancellation_token: DropGuard,
+    _cancellation_token: Arc<DropGuard>,
 }
 
 impl MasterchainFirstBlockTracker {
@@ -88,7 +89,7 @@ impl MasterchainFirstBlockTracker {
 
         Self {
             receiver,
-            _cancellation_token: cancellation_token.drop_guard(),
+            _cancellation_token: Arc::new(cancellation_token.drop_guard()),
         }
     }
 

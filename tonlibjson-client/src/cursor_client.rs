@@ -30,7 +30,7 @@ use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
 use crate::request::{Specialized, Callable};
-use crate::shared::SharedService;
+use ton_client_util::service::shared::SharedService;
 
 pub(crate) type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
 

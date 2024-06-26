@@ -21,9 +21,9 @@ use url::Url;
 use std::str::FromStr;
 use tower::util::Either;
 use ton_client_util::router::route::{BlockCriteria, Route};
+use ton_client_util::router::Router;
 use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
-use crate::router::Router;
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell, BlocksGetTransactionsExt, BlocksTransactionsExt};
 use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
@@ -31,7 +31,7 @@ use crate::helper::Side;
 use crate::request::{Forward, Specialized};
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
-use crate::shared::SharedService;
+use ton_client_util::service::shared::SharedService;
 
 #[cfg(not(feature = "testnet"))]
 pub fn default_ton_config_url() -> Url {

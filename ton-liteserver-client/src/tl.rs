@@ -5,6 +5,7 @@ use std::fmt::{Debug, Display, Formatter};
 use adnl_tcp::deserializer::{Deserialize, DeserializeBoxed, Deserializer, DeserializerBoxedError};
 use adnl_tcp::serializer::{Serialize, SerializeBoxed, Serializer};
 pub use adnl_tcp::types::*;
+use ton_client_util::router::route::{Route, ToRoute};
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
@@ -15,6 +16,12 @@ impl Display for LiteServerError {
 }
 
 impl std::error::Error for LiteServerError {}
+
+impl ToRoute for LiteServerGetMasterchainInfo {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
 
 #[cfg(test)]
 mod tests {
