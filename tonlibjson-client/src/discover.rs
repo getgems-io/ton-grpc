@@ -1,5 +1,4 @@
 use crate::make::{CursorClientFactory, ClientFactory};
-use crate::ton_config::{load_ton_config, read_ton_config, TonConfig};
 use reqwest::Url;
 use std::time::Duration;
 use std::{
@@ -19,9 +18,9 @@ use hickory_resolver::TokioAsyncResolver;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::{Interval, MissedTickBehavior};
 use tokio_stream::wrappers::IntervalStream;
+use ton_client_util::discover::config::{LiteServer, load_ton_config, read_ton_config, TonConfig};
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
-use crate::ton_config::Liteserver;
 
 type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 
@@ -75,7 +74,7 @@ impl ClientDiscover {
         while let Ok(Some(new_config)) = stream.try_next().await {
             tracing::info!("tick service discovery");
 
-            let mut liteserver_new: HashSet<Liteserver> = HashSet::default();
+            let mut liteserver_new: HashSet<LiteServer> = HashSet::default();
             for ls in new_config.liteservers.iter() {
                 match Self::apply_dns(dns.clone(), ls.clone()).await {
                     Err(e) => tracing::error!("dns error: {:?}", e),
@@ -84,9 +83,9 @@ impl ClientDiscover {
             }
 
             let remove = liteservers.difference(&liteserver_new)
-                .collect::<Vec<&Liteserver>>();
+                .collect::<Vec<&LiteServer>>();
             let insert = liteserver_new.difference(&liteservers)
-                .collect::<Vec<&Liteserver>>();
+                .collect::<Vec<&LiteServer>>();
 
             tracing::info!("Discovered {} liteservers, remove {}, insert {}", liteserver_new.len(), remove.len(), insert.len());
             for ls in liteservers.difference(&liteserver_new) {
@@ -106,7 +105,7 @@ impl ClientDiscover {
         }
     }
 
-    async fn apply_dns(dns_resolver: TokioAsyncResolver, ls: Liteserver) -> anyhow::Result<Liteserver> {
+    async fn apply_dns(dns_resolver: TokioAsyncResolver, ls: LiteServer) -> anyhow::Result<LiteServer> {
         if let Some(host) = &ls.host {
             let records = dns_resolver.lookup_ip(host).await?;
 

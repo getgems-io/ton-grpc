@@ -6,11 +6,11 @@ use tower::limit::ConcurrencyLimitLayer;
 use tower::{Layer, Service, ServiceExt};
 use tower::load::PeakEwma;
 use tracing::debug;
+use ton_client_util::discover::config::TonConfig;
 use crate::block::BlocksGetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use ton_client_util::service::shared::SharedLayer;
-use crate::ton_config::TonConfig;
 
 #[derive(Default, Debug)]
 pub(crate) struct ClientFactory;
