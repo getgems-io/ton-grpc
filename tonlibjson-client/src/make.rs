@@ -9,7 +9,7 @@ use tracing::debug;
 use crate::block::BlocksGetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
-use crate::shared::SharedLayer;
+use ton_client_util::service::shared::SharedLayer;
 use crate::ton_config::TonConfig;
 
 #[derive(Default, Debug)]

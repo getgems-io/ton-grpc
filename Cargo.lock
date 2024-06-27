@@ -2433,11 +2433,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "ton-client-utils"
+name = "ton-client-util"
 version = "0.1.0"
 dependencies = [
+ "bitvec",
  "itertools 0.13.0",
+ "metrics",
+ "pin-project",
  "thiserror",
+ "tokio",
+ "tokio-util",
+ "tower",
+ "tracing",
 ]
 
 [[package]]
@@ -2508,6 +2515,7 @@ dependencies = [
  "base64 0.22.1",
  "bytes",
  "convert_case",
+ "dashmap",
  "futures",
  "hex",
  "pin-project",
@@ -2520,6 +2528,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-util",
+ "ton-client-util",
  "toner",
  "tower",
  "tracing",
@@ -2637,7 +2646,7 @@ dependencies = [
  "tokio-retry",
  "tokio-stream",
  "tokio-util",
- "ton-client-utils",
+ "ton-client-util",
  "tonlibjson-sys",
  "tower",
  "tracing",

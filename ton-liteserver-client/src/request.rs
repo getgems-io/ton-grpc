@@ -1,7 +1,8 @@
+use std::time::Duration;
 use adnl_tcp::deserializer::DeserializeBoxed;
 use adnl_tcp::serializer::{SerializeBoxed, Serializer};
-use adnl_tcp::types::Functional;
-use crate::tl::LiteServerWaitMasterchainSeqno;
+use adnl_tcp::types::{Functional, Int, Long};
+use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlock, LiteServerGetBlockHeader, LiteServerLookupBlock, LiteServerWaitMasterchainSeqno, TonNodeBlockId, TonNodeBlockIdExt};
 
 pub trait Requestable: SerializeBoxed + Send {
     type Response: DeserializeBoxed + Send + 'static;
@@ -20,11 +21,46 @@ pub struct WaitSeqno<R> {
 
 impl<R> WaitSeqno<R> where R: Requestable {
     pub fn new(request: R, seqno: i32) -> Self {
-        Self::with_timeout(request, seqno, 3000)
+        Self::with_timeout(request, seqno, Duration::from_secs(3))
     }
 
-    pub fn with_timeout(request: R, seqno: i32, timeout_ms: i32) -> Self {
-        Self { prefix: LiteServerWaitMasterchainSeqno { seqno, timeout_ms }, request }
+    pub fn with_timeout(request: R, seqno: i32, timeout: Duration) -> Self {
+        Self { prefix: LiteServerWaitMasterchainSeqno { seqno, timeout_ms: timeout.as_millis() as i32 }, request }
+    }
+}
+
+impl TonNodeBlockId {
+    pub fn new(workchain: Int, shard: Long, seqno: Int) -> Self {
+        Self { workchain, shard, seqno }
+    }
+}
+
+impl LiteServerLookupBlock {
+    pub fn seqno(block_id: TonNodeBlockId) -> Self {
+        Self {
+            mode: 1,
+            id: block_id,
+            lt: None,
+            utime: None,
+        }
+    }
+}
+
+impl LiteServerGetBlockHeader {
+    pub fn new(id: TonNodeBlockIdExt) -> Self {
+        Self { id, mode: 0 }
+    }
+}
+
+impl LiteServerGetBlock {
+    pub fn new(id: TonNodeBlockIdExt) -> Self {
+        Self { id }
+    }
+}
+
+impl LiteServerGetAllShardsInfo {
+    pub fn new(block_id: TonNodeBlockIdExt) -> Self {
+        Self { id: block_id }
     }
 }
 

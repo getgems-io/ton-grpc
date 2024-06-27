@@ -22,13 +22,15 @@ use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
 use tracing::{instrument};
-use ton_client_utils::router::{BlockCriteria, Routed};
+use ton_client_util::router::Routed;
+use ton_client_util::router::route::BlockCriteria;
+use ton_client_util::router::shards::Prefix;
 use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
 use crate::request::{Specialized, Callable};
-use crate::shared::SharedService;
+use ton_client_util::service::shared::SharedService;
 
 pub(crate) type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
 
@@ -184,12 +186,17 @@ impl Registry {
 
     fn contains(&self, chain: &ChainId, criteria: &BlockCriteria, not_available: bool) -> bool {
         match criteria {
-            BlockCriteria::LogicalTime(lt) => {
+            BlockCriteria::LogicalTime { address, lt } => {
                 self.shard_registry
                     .get(chain)
                     .map(|shard_ids| shard_ids
                         .iter()
-                        .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id))
+                        .filter_map(|shard_id|
+                            Prefix::from_shard_id(shard_id.1 as u64)
+                                .matches(address)
+                                .then(|| self.shard_bounds_registry.get(&shard_id))
+                                .flatten()
+                        )
                         .any(|bounds| bounds.contains_lt(*lt, not_available))
                     ).unwrap_or(false)
             },
