@@ -1,15 +1,21 @@
-use std::borrow::{Borrow, BorrowMut};
-use crate::client::{Error, LiteServerClient};
-use crate::tl::{LiteServerBlockData, LiteServerBlockHeader, LiteServerError, LiteServerGetBlock, LiteServerLookupBlock, TonNodeBlockId, TonNodeBlockIdExt};
-use tower::ServiceExt;
+use crate::client::Error;
+use crate::tl::{
+    LiteServerBlockData, LiteServerBlockHeader, LiteServerError, LiteServerGetBlock,
+    LiteServerLookupBlock, TonNodeBlockId, TonNodeBlockIdExt,
+};
+use std::borrow::Borrow;
+use tower::{Service, ServiceExt};
 
-pub async fn find_first_block_header(
-    mut client: impl BorrowMut<LiteServerClient>,
+pub async fn find_first_block_header<S>(
+    client: &mut S,
     start: impl Borrow<TonNodeBlockIdExt>,
     lhs: Option<i32>,
     cur: Option<i32>,
-) -> Result<LiteServerBlockHeader, Error> {
-    let client = client.borrow_mut();
+) -> Result<LiteServerBlockHeader, Error>
+where
+    S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = Error>,
+    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = Error>,
+{
     let start = start.borrow();
     let mut rhs = start.seqno;
     let mut lhs = lhs.unwrap_or(1);
@@ -27,7 +33,7 @@ pub async fn find_first_block_header(
         match block {
             Ok(_) => rhs = cur,
             Err(Error::LiteServerError(LiteServerError { code: 651, .. })) => lhs = cur + 1,
-            Err(e) => return Err(e)
+            Err(e) => return Err(e),
         }
 
         cur = (lhs + rhs) / 2;
@@ -57,10 +63,14 @@ pub async fn find_first_block_header(
     Ok(header)
 }
 
-async fn check_block_available(
-    client: &mut LiteServerClient,
+async fn check_block_available<S, E>(
+    client: &mut S,
     block_id: TonNodeBlockId,
-) -> Result<(LiteServerBlockHeader, LiteServerBlockData), Error> {
+) -> Result<(LiteServerBlockHeader, LiteServerBlockData), E>
+where
+    S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = E>,
+    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = E>,
+{
     // TODO[akostylev0] research
     let block_header = client
         .oneshot(LiteServerLookupBlock::seqno(block_id))

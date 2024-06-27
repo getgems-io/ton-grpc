@@ -1,7 +1,7 @@
-use crate::client::LiteServerClient;
-use crate::tl::LiteServerGetBlockHeader;
+use crate::tl::{LiteServerBoxedBlockHeader, LiteServerGetBlockHeader};
 use crate::tlb::block_header::BlockHeader;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
+use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::watch;
 use tokio::sync::watch::Ref;
@@ -10,17 +10,17 @@ use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
-use tower::ServiceExt;
+use tower::{Service, ServiceExt};
 
-struct MasterchainLastBlockHeaderTrackerActor {
-    client: LiteServerClient,
+pub struct MasterchainLastBlockHeaderTrackerActor<S> {
+    client: S,
     masterchain_info_tracker: MasterchainLastBlockTracker,
     sender: watch::Sender<Option<BlockHeader>>,
 }
 
-impl MasterchainLastBlockHeaderTrackerActor {
+impl<S> MasterchainLastBlockHeaderTrackerActor<S> {
     pub fn new(
-        client: LiteServerClient,
+        client: S,
         masterchain_info_tracker: MasterchainLastBlockTracker,
         sender: watch::Sender<Option<BlockHeader>>,
     ) -> Self {
@@ -32,7 +32,16 @@ impl MasterchainLastBlockHeaderTrackerActor {
     }
 }
 
-impl Actor for MasterchainLastBlockHeaderTrackerActor {
+impl<S> Actor for MasterchainLastBlockHeaderTrackerActor<S>
+where
+    S: Send + 'static,
+    S: Service<
+        LiteServerGetBlockHeader,
+        Response = LiteServerBoxedBlockHeader,
+        Error: Error,
+        Future: Send,
+    >,
+{
     type Output = ();
 
     async fn run(mut self) -> <Self as Actor>::Output {
@@ -69,7 +78,10 @@ pub struct MasterchainLastBlockHeaderTracker {
 }
 
 impl MasterchainLastBlockHeaderTracker {
-    pub fn new(client: LiteServerClient, last_block_tracker: MasterchainLastBlockTracker) -> Self {
+    pub fn new<S>(client: S, last_block_tracker: MasterchainLastBlockTracker) -> Self
+    where
+        MasterchainLastBlockHeaderTrackerActor<S>: Actor,
+    {
         let cancellation_token = CancellationToken::new();
         let (sender, receiver) = watch::channel(None);
 

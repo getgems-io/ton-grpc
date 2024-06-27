@@ -1,30 +1,30 @@
-use crate::client::LiteServerClient;
-use crate::tl::{LiteServerGetAllShardsInfo, TonNodeBlockIdExt};
+use crate::tl::{LiteServerAllShardsInfo, LiteServerGetAllShardsInfo, TonNodeBlockIdExt};
 use crate::tlb::shard_descr::ShardDescr;
 use crate::tlb::shard_hashes::ShardHashes;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use crate::tracker::ShardId;
 use dashmap::DashMap;
+use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
+use ton_client_util::router::shards::Prefix;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
-use tower::ServiceExt;
-use ton_client_util::router::shards::Prefix;
+use tower::{Service, ServiceExt};
 
-struct WorkchainsLastBlocksActor {
-    client: LiteServerClient,
+pub struct WorkchainsLastBlocksActor<S> {
+    client: S,
     masterchain_last_block_tracker: MasterchainLastBlockTracker,
     sender: broadcast::Sender<TonNodeBlockIdExt>,
     state: Arc<DashMap<ShardId, ShardDescr>>,
 }
 
-impl WorkchainsLastBlocksActor {
+impl<S> WorkchainsLastBlocksActor<S> {
     pub fn new(
-        client: LiteServerClient,
+        client: S,
         masterchain_last_block_tracker: MasterchainLastBlockTracker,
         sender: broadcast::Sender<TonNodeBlockIdExt>,
         state: Arc<DashMap<ShardId, ShardDescr>>,
@@ -38,71 +38,16 @@ impl WorkchainsLastBlocksActor {
     }
 }
 
-#[derive(Debug)]
-pub struct WorkchainsLastBlocksTracker {
-    receiver: broadcast::Receiver<TonNodeBlockIdExt>,
-    state: Arc<DashMap<ShardId, ShardDescr>>,
-    _cancellation_token: Arc<DropGuard>,
-}
-
-impl Clone for WorkchainsLastBlocksTracker {
-    fn clone(&self) -> Self {
-        Self {
-            receiver: self.receiver.resubscribe(),
-            state: Arc::clone(&self.state),
-            _cancellation_token: Arc::clone(&self._cancellation_token),
-        }
-    }
-}
-
-impl WorkchainsLastBlocksTracker {
-    pub fn new(
-        client: LiteServerClient,
-        masterchain_last_block_tracker: MasterchainLastBlockTracker,
-    ) -> Self {
-        let state = Arc::new(DashMap::default());
-        let cancellation_token = CancellationToken::new();
-
-        let (sender, receiver) = broadcast::channel(64);
-        CancellableActor::new(
-            WorkchainsLastBlocksActor::new(
-                client,
-                masterchain_last_block_tracker,
-                sender,
-                Arc::clone(&state),
-            ),
-            cancellation_token.clone(),
-        )
-        .spawn();
-
-        Self {
-            receiver,
-            state,
-            _cancellation_token: Arc::new(cancellation_token.drop_guard()),
-        }
-    }
-
-    pub fn get_shard(&self, shard_id: &ShardId) -> Option<ShardDescr> {
-        self.state.view(shard_id, |_, shard| shard.clone())
-    }
-
-    pub fn receiver(&self) -> broadcast::Receiver<TonNodeBlockIdExt> {
-        self.receiver.resubscribe()
-    }
-
-    pub fn find_max_lt_by_address(&self, chain_id: i32, address: &[u8; 32]) -> Option<u64> {
-        self.state
-            .iter()
-            .filter_map(|kv| {
-                let key = kv.key();
-
-                (key.0 == chain_id && Prefix::from_shard_id(key.1 as u64).matches(address)).then(|| kv.value().end_lt)
-            })
-            .max()
-    }
-}
-
-impl Actor for WorkchainsLastBlocksActor {
+impl<S> Actor for WorkchainsLastBlocksActor<S>
+where
+    S: Send + 'static,
+    S: Service<
+        LiteServerGetAllShardsInfo,
+        Response = LiteServerAllShardsInfo,
+        Error: Error,
+        Future: Send,
+    >,
+{
     type Output = ();
 
     async fn run(mut self) -> <Self as Actor>::Output {
@@ -145,6 +90,71 @@ impl Actor for WorkchainsLastBlocksActor {
                         .expect("expect to send shard_id");
                 });
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct WorkchainsLastBlocksTracker {
+    receiver: broadcast::Receiver<TonNodeBlockIdExt>,
+    state: Arc<DashMap<ShardId, ShardDescr>>,
+    _cancellation_token: Arc<DropGuard>,
+}
+
+impl Clone for WorkchainsLastBlocksTracker {
+    fn clone(&self) -> Self {
+        Self {
+            receiver: self.receiver.resubscribe(),
+            state: Arc::clone(&self.state),
+            _cancellation_token: Arc::clone(&self._cancellation_token),
+        }
+    }
+}
+
+impl WorkchainsLastBlocksTracker {
+    pub fn new<S>(client: S, masterchain_last_block_tracker: MasterchainLastBlockTracker) -> Self
+    where
+        WorkchainsLastBlocksActor<S>: Actor,
+    {
+        let state = Arc::new(DashMap::default());
+        let cancellation_token = CancellationToken::new();
+
+        let (sender, receiver) = broadcast::channel(64);
+        CancellableActor::new(
+            WorkchainsLastBlocksActor::new(
+                client,
+                masterchain_last_block_tracker,
+                sender,
+                Arc::clone(&state),
+            ),
+            cancellation_token.clone(),
+        )
+        .spawn();
+
+        Self {
+            receiver,
+            state,
+            _cancellation_token: Arc::new(cancellation_token.drop_guard()),
+        }
+    }
+
+    pub fn get_shard(&self, shard_id: &ShardId) -> Option<ShardDescr> {
+        self.state.view(shard_id, |_, shard| shard.clone())
+    }
+
+    pub fn receiver(&self) -> broadcast::Receiver<TonNodeBlockIdExt> {
+        self.receiver.resubscribe()
+    }
+
+    pub fn find_max_lt_by_address(&self, chain_id: i32, address: &[u8; 32]) -> Option<u64> {
+        self.state
+            .iter()
+            .filter_map(|kv| {
+                let key = kv.key();
+
+                (key.0 == chain_id && Prefix::from_shard_id(key.1 as u64).matches(address))
+                    .then(|| kv.value().end_lt)
+            })
+            .max()
     }
 }
 

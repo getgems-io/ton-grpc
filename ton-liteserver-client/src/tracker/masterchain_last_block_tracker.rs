@@ -1,7 +1,7 @@
-use crate::client::LiteServerClient;
 use crate::request::WaitSeqno;
 use crate::tl::{LiteServerGetMasterchainInfo, LiteServerMasterchainInfo};
 use futures::future::Either;
+use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch;
@@ -10,23 +10,36 @@ use tokio::sync::watch::Ref;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
-use tower::ServiceExt;
+use tower::{Service, ServiceExt};
 
-struct MasterchainLastBlockTrackerActor {
-    client: LiteServerClient,
+pub struct MasterchainLastBlockTrackerActor<S> {
+    client: S,
     sender: watch::Sender<Option<LiteServerMasterchainInfo>>,
 }
 
-impl MasterchainLastBlockTrackerActor {
-    pub fn new(
-        client: LiteServerClient,
-        sender: watch::Sender<Option<LiteServerMasterchainInfo>>,
-    ) -> Self {
+impl<S> MasterchainLastBlockTrackerActor<S> {
+    pub fn new(client: S, sender: watch::Sender<Option<LiteServerMasterchainInfo>>) -> Self {
         Self { client, sender }
     }
 }
 
-impl Actor for MasterchainLastBlockTrackerActor {
+impl<S, E> Actor for MasterchainLastBlockTrackerActor<S>
+where
+    E: Error,
+    S: Send + 'static,
+    S: Service<
+        LiteServerGetMasterchainInfo,
+        Response = LiteServerMasterchainInfo,
+        Error = E,
+        Future: Send,
+    >,
+    S: Service<
+        WaitSeqno<LiteServerGetMasterchainInfo>,
+        Response = LiteServerMasterchainInfo,
+        Error = E,
+        Future: Send,
+    >,
+{
     type Output = ();
 
     async fn run(mut self) {
@@ -63,7 +76,10 @@ pub struct MasterchainLastBlockTracker {
 }
 
 impl MasterchainLastBlockTracker {
-    pub fn new(client: LiteServerClient) -> Self {
+    pub fn new<S>(client: S) -> Self
+    where
+        MasterchainLastBlockTrackerActor<S>: Actor,
+    {
         let cancellation_token = CancellationToken::new();
         let (sender, receiver) = watch::channel(None);
 
