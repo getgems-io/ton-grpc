@@ -1,35 +1,38 @@
-use crate::client::LiteServerClient;
+use crate::tl::{
+    LiteServerBlockData, LiteServerBlockHeader, LiteServerGetBlock, LiteServerLookupBlock,
+};
+use crate::tlb::block_header::BlockHeader;
 use crate::tracker::find_first_block::find_first_block_header;
 use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
+use crate::tracker::ShardId;
 use adnl_tcp::types::{Int, Long};
+use dashmap::DashMap;
 use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use dashmap::DashMap;
 use tokio::select;
 use tokio::sync::broadcast;
 use tokio::time::Instant;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use toner::tlb::bits::de::unpack_bytes_fully;
-use toner::ton::boc::BoC;
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
 use ton_client_util::router::shards::Prefix;
-use crate::tlb::block_header::BlockHeader;
-use crate::tracker::ShardId;
+use toner::tlb::bits::de::unpack_bytes_fully;
+use toner::ton::boc::BoC;
+use tower::Service;
 
-struct WorkchainsFirstBlocksTrackerActor {
-    client: LiteServerClient,
+pub struct WorkchainsFirstBlocksTrackerActor<S> {
+    client: S,
     last_block_tracker: WorkchainsLastBlocksTracker,
     state: Arc<DashMap<ShardId, BlockHeader>>,
     sender: broadcast::Sender<BlockHeader>,
 }
 
-impl WorkchainsFirstBlocksTrackerActor {
+impl<S> WorkchainsFirstBlocksTrackerActor<S> {
     pub fn new(
-        client: LiteServerClient,
+        client: S,
         last_block_tracker: WorkchainsLastBlocksTracker,
         state: Arc<DashMap<ShardId, BlockHeader>>,
         sender: broadcast::Sender<BlockHeader>,
@@ -43,7 +46,22 @@ impl WorkchainsFirstBlocksTrackerActor {
     }
 }
 
-impl Actor for WorkchainsFirstBlocksTrackerActor {
+impl<S> Actor for WorkchainsFirstBlocksTrackerActor<S>
+where
+    S: Sync + Send + Clone + 'static,
+    S: Service<
+        LiteServerLookupBlock,
+        Response = LiteServerBlockHeader,
+        Error = crate::client::Error,
+        Future: Send,
+    >,
+    S: Service<
+        LiteServerGetBlock,
+        Response = LiteServerBlockData,
+        Error = crate::client::Error,
+        Future: Send,
+    >,
+{
     type Output = ();
 
     async fn run(self) -> <Self as Actor>::Output {
@@ -64,7 +82,10 @@ impl Actor for WorkchainsFirstBlocksTrackerActor {
                         timeouts.remove(&shard_id);
                         timeouts.insert(shard_id, Instant::now());
 
-                        futures.push(find_first_block_header(self.client.clone(), block_id, None, None));
+                        futures.push(async {
+                            let mut client = self.client.clone();
+                            find_first_block_header(&mut client, block_id, None, None).await
+                        });
                     }
                 },
                 Some(result) = futures.next() => {
@@ -106,13 +127,21 @@ impl Clone for WorkchainsFirstBlocksTracker {
 }
 
 impl WorkchainsFirstBlocksTracker {
-    pub fn new(client: LiteServerClient, last_block_tracker: WorkchainsLastBlocksTracker) -> Self {
+    pub fn new<S>(client: S, last_block_tracker: WorkchainsLastBlocksTracker) -> Self
+    where
+        WorkchainsFirstBlocksTrackerActor<S>: Actor,
+    {
         let state = Arc::new(DashMap::default());
         let cancellation_token = CancellationToken::new();
         let (sender, receiver) = broadcast::channel(64);
 
         CancellableActor::new(
-            WorkchainsFirstBlocksTrackerActor::new(client, last_block_tracker, Arc::clone(&state), sender),
+            WorkchainsFirstBlocksTrackerActor::new(
+                client,
+                last_block_tracker,
+                Arc::clone(&state),
+                sender,
+            ),
             cancellation_token.clone(),
         )
         .spawn();
@@ -138,7 +167,8 @@ impl WorkchainsFirstBlocksTracker {
             .filter_map(|kv| {
                 let key = kv.key();
 
-                (key.0 == chain_id && Prefix::from_shard_id(key.1 as u64).matches(address)).then(|| kv.value().info.start_lt)
+                (key.0 == chain_id && Prefix::from_shard_id(key.1 as u64).matches(address))
+                    .then(|| kv.value().info.start_lt)
             })
             .min()
     }

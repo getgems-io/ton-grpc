@@ -118,21 +118,20 @@ where
         loop {
             match this.state.as_mut().project() {
                 ResponseStateProj::Locking { service } => {
-                    let future;
-
-                    {
+                    let future = {
                         if let Ok(mut guard) = service.try_lock() {
                             let req = this
                                 .request
                                 .take()
                                 .expect("Future was polled after completion");
-                            future = guard.call(req);
+
+                            guard.call(req)
                         } else {
                             cx.waker().wake_by_ref();
 
                             return Poll::Pending;
                         }
-                    }
+                    };
 
                     this.state.set(ResponseState::Waiting { future });
                 }

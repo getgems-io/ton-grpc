@@ -334,6 +334,7 @@ pub(crate) mod tests {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub(crate) async fn provided_archive_client() -> anyhow::Result<LiteServerClient> {
         let ip: i32 = -2018135749;
         let ip = Ipv4Addr::from(ip as u32);

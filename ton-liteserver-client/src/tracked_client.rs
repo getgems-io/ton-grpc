@@ -31,6 +31,7 @@ impl Load for TrackedClient {
         self.inner.load()
     }
 }
+
 impl TrackedClient {
     pub fn new(inner: LiteServerClient) -> Self {
         let masterchain_last_block_tracker = MasterchainLastBlockTracker::new(inner.clone());
