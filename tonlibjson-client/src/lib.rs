@@ -6,7 +6,6 @@ pub mod block;
 mod client;
 mod cursor_client;
 mod deserialize;
-mod discover;
 mod error;
 mod helper;
 mod make;

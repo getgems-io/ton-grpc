@@ -3,6 +3,7 @@ use std::collections::{Bound, HashMap};
 use std::future::IntoFuture;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
+use std::pin::Pin;
 use std::time::Duration;
 use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, TryFutureExt, FutureExt};
 use anyhow::anyhow;
@@ -19,19 +20,25 @@ use tower::timeout::Timeout;
 use tracing::{instrument, trace};
 use url::Url;
 use std::str::FromStr;
+use tokio::time::MissedTickBehavior;
+use tokio_util::either;
+use tower::discover::Change;
 use tower::util::Either;
+use ton_client_util::discover::{LiteServerDiscover, read_ton_config_from_file_stream, read_ton_config_from_url_stream};
+use ton_client_util::discover::config::LiteServerId;
 use ton_client_util::router::route::{BlockCriteria, Route};
 use ton_client_util::router::Router;
 use crate::address::InternalAccountAddress;
 use crate::balance::Balance;
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell, BlocksGetTransactionsExt, BlocksTransactionsExt};
-use crate::discover::{ClientDiscover, CursorClientDiscover};
 use crate::error::ErrorService;
 use crate::helper::Side;
 use crate::request::{Forward, Specialized};
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use ton_client_util::service::shared::SharedService;
+use crate::cursor_client::CursorClient;
+use crate::make::{ClientFactory, CursorClientFactory};
 
 #[cfg(not(feature = "testnet"))]
 pub fn default_ton_config_url() -> Url {
@@ -43,7 +50,8 @@ pub fn default_ton_config_url() -> Url {
     Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/testnet-global.config.json").unwrap()
 }
 
-type SharedBalance = SharedService<Balance<CursorClientDiscover>>;
+type BoxCursorClientDiscover = Pin<Box<dyn Stream<Item=Result<Change<LiteServerId, CursorClient>, anyhow::Error>> + Send>>;
+type SharedBalance = SharedService<Balance<BoxCursorClientDiscover>>;
 
 #[derive(Clone)]
 pub struct TonClient {
@@ -158,10 +166,28 @@ impl TonClientBuilder {
     }
 
     pub async fn build(self) -> anyhow::Result<TonClient> {
-        let client_discover = match self.config_source {
-            ConfigSource::FromFile { path } => { ClientDiscover::from_path(path).await? }
-            ConfigSource::FromUrl { url, interval } => { ClientDiscover::new(url, interval).await? }
+        let stream = match self.config_source {
+            ConfigSource::FromFile { path } => {
+                let mut interval = tokio::time::interval(Duration::from_secs(1));
+                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+                either::Either::Left(read_ton_config_from_file_stream(path, interval))
+            }
+            ConfigSource::FromUrl { url, interval } => {
+                let mut interval = tokio::time::interval(interval);
+                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+
+                either::Either::Right(read_ton_config_from_url_stream(url.clone(), interval))
+            }
         };
+        let lite_server_discover = LiteServerDiscover::new(stream);
+        let client_discover = lite_server_discover.then(|s| async {
+            match s {
+                Ok(Change::Insert(k, v)) => ClientFactory.oneshot(v).await.map(|v| Change::Insert(k, v)),
+                Ok(Change::Remove(k)) => Ok(Change::Remove(k)),
+                Err(_) => unreachable!()
+            }
+        });
 
         let ewma_discover = PeakEwmaDiscover::new::<Value>(
             client_discover,
@@ -170,9 +196,15 @@ impl TonClientBuilder {
             tower::load::CompleteOnResponse::default(),
         );
 
-        let cursor_client_discover = CursorClientDiscover::new(ewma_discover);
+        let cursor_client_discover = ewma_discover.then(|s| async {
+            match s {
+                Ok(Change::Insert(k, v)) => Ok(Change::Insert(k.clone(), CursorClientFactory::create(k, v))),
+                Ok(Change::Remove(k)) => Ok(Change::Remove(k)),
+                Err(e) => Err(e)
+            }
+        });
 
-        let router = Router::new(cursor_client_discover);
+        let router = Router::new(cursor_client_discover.boxed());
         let client = Balance::new(router);
 
         let client = SharedService::new(client);

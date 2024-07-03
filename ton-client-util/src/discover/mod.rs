@@ -50,15 +50,18 @@ impl<S, E> Actor for LiteServerDiscoverActor<S>
 where
     E: Send,
     S: Send + 'static,
-    S: Stream<Item = Result<TonConfig, E>> + Unpin,
+    S: Stream<Item = Result<TonConfig, E>>,
 {
     type Output = ();
 
-    async fn run(mut self) -> <Self as Actor>::Output {
+    async fn run(self) -> <Self as Actor>::Output {
+        let stream = self.stream;
+        tokio::pin!(stream);
+
         let dns = dns_resolver();
         let mut liteservers = HashSet::default();
 
-        while let Ok(Some(new_config)) = self.stream.try_next().await {
+        while let Ok(Some(new_config)) = stream.try_next().await {
             tracing::info!("tick service discovery");
 
             let mut liteserver_new: HashSet<LiteServer> = HashSet::default();
@@ -86,13 +89,13 @@ where
             );
             for ls in liteservers.difference(&liteserver_new) {
                 tracing::info!("remove {:?}", ls.id());
-                let _ = self.sender.send(Change::Remove(ls.id.clone()));
+                let _ = self.sender.send(Change::Remove(ls.id.clone())).await;
             }
 
             for ls in liteserver_new.difference(&liteservers) {
                 tracing::info!("insert {:?}", ls.id());
 
-                let _ = self.sender.send(Change::Insert(ls.id.clone(), new_config.with_liteserver(ls.clone())));
+                let _ = self.sender.send(Change::Insert(ls.id.clone(), new_config.with_liteserver(ls.clone()))).await;
             }
 
             liteservers.clone_from(&liteserver_new);

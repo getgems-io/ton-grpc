@@ -37,6 +37,12 @@ pub struct LiteServerId {
     pub key: String,
 }
 
+impl Display for LiteServerId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.r#type, self.key)
+    }
+}
+
 #[derive(Deserialize, Serialize, Hash, Eq, PartialEq, Clone, Debug)]
 pub struct LiteServer {
     pub id: LiteServerId,
