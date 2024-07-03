@@ -20,3 +20,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true }
 hickory-resolver = { workspace = true }
+tokio-stream = { workspace = true }

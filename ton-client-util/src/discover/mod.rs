@@ -1,29 +1,47 @@
+use crate::actor::cancellable_actor::CancellableActor;
 use crate::actor::Actor;
-use crate::discover::config::{LiteServer, LiteServerId, TonConfig};
-use futures::{Stream, TryStreamExt};
+use crate::discover::config::{LiteServer, LiteServerId, load_ton_config, read_ton_config, TonConfig};
+use futures::{Stream, StreamExt, TryStreamExt};
 use hickory_resolver::error::ResolveError;
 use hickory_resolver::system_conf::read_system_conf;
 use hickory_resolver::TokioAsyncResolver;
 use std::collections::HashSet;
 use std::convert::Infallible;
 use std::net::IpAddr;
+use std::path::PathBuf;
 use std::pin::Pin;
-use std::task::{Context, Poll, ready};
+use std::task::{ready, Context, Poll};
 use std::time::Duration;
+use reqwest::Url;
 use tokio::sync::mpsc;
+use tokio::time::Interval;
+use tokio_stream::wrappers::IntervalStream;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use tower::discover::Change;
-use crate::actor::cancellable_actor::CancellableActor;
+
+// TODO[akostylev0] pass config to the caller
 
 pub mod config;
 
+pub fn read_ton_config_from_file_stream(path: PathBuf, interval: Interval) -> impl Stream<Item = Result<TonConfig, anyhow::Error>> {
+    IntervalStream::new(interval)
+        .map(move |_| { path.clone() })
+        .then(read_ton_config)
+}
+
+pub fn read_ton_config_from_url_stream(url: Url, interval: Interval) -> impl Stream<Item = Result<TonConfig, anyhow::Error>> {
+    IntervalStream::new(interval)
+        .map(move |_| { url.clone() })
+        .then(load_ton_config)
+}
+
 pub struct LiteServerDiscoverActor<S> {
     stream: S,
-    sender: mpsc::Sender<Change<LiteServerId, LiteServer>>,
+    sender: mpsc::Sender<Change<LiteServerId, TonConfig>>,
 }
 
 impl<S> LiteServerDiscoverActor<S> {
-    pub fn new(stream: S, sender: mpsc::Sender<Change<LiteServerId, LiteServer>>) -> Self {
+    pub fn new(stream: S, sender: mpsc::Sender<Change<LiteServerId, TonConfig>>) -> Self {
         Self { stream, sender }
     }
 }
@@ -74,7 +92,7 @@ where
             for ls in liteserver_new.difference(&liteservers) {
                 tracing::info!("insert {:?}", ls.id());
 
-                let _ = self.sender.send(Change::Insert(ls.id.clone(), ls.clone()));
+                let _ = self.sender.send(Change::Insert(ls.id.clone(), new_config.with_liteserver(ls.clone())));
             }
 
             liteservers.clone_from(&liteserver_new);
@@ -83,8 +101,8 @@ where
 }
 
 pub struct LiteServerDiscover {
-    receiver: mpsc::Receiver<Change<LiteServerId, LiteServer>>,
-    _drop_guard: DropGuard
+    receiver: mpsc::Receiver<Change<LiteServerId, TonConfig>>,
+    _drop_guard: DropGuard,
 }
 
 impl LiteServerDiscover {
@@ -98,13 +116,13 @@ impl LiteServerDiscover {
 
         Self {
             receiver: rx,
-            _drop_guard: token.drop_guard()
+            _drop_guard: token.drop_guard(),
         }
     }
 }
 
 impl Stream for LiteServerDiscover {
-    type Item = Result<Change<LiteServerId, LiteServer>, Infallible>;
+    type Item = Result<Change<LiteServerId, TonConfig>, Infallible>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let change = ready!(self.receiver.poll_recv(cx)).map(Ok);
@@ -125,7 +143,7 @@ async fn apply_dns(
     dns_resolver: TokioAsyncResolver,
     ls: LiteServer,
 ) -> Result<LiteServer, ResolveError> {
-    if let Some(host) = &ls.host {
+    if let Some(host) = ls.host.as_ref() {
         let records = dns_resolver.lookup_ip(host).await?;
 
         for record in records {

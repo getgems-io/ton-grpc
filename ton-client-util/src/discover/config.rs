@@ -12,9 +12,9 @@ pub struct TonConfig {
 }
 
 impl TonConfig {
-    pub fn with_liteserver(&self, liteserver: &LiteServer) -> Self {
+    pub fn with_liteserver(&self, liteserver: LiteServer) -> Self {
         TonConfig {
-            liteservers: vec![liteserver.clone()],
+            liteservers: vec![liteserver],
             data: self.data.clone(),
         }
     }

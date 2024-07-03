@@ -1,6 +1,6 @@
-use crate::make::{CursorClientFactory, ClientFactory};
-use reqwest::Url;
-use std::time::Duration;
+use crate::client::Client;
+use crate::cursor_client::CursorClient;
+use crate::make::{ClientFactory, CursorClientFactory};
 use std::{
     pin::Pin,
     task::{Context, Poll},
@@ -8,19 +8,19 @@ use std::{
 use std::collections::HashSet;
 use std::net::IpAddr;
 use std::path::PathBuf;
-use futures::{TryStreamExt, StreamExt};
-use tokio_stream::{Stream};
-use tower::discover::Change;
-use tower::load::PeakEwmaDiscover;
-use tower::ServiceExt;
+use std::time::Duration;
+use futures::{StreamExt, TryStreamExt};
 use hickory_resolver::system_conf::read_system_conf;
 use hickory_resolver::TokioAsyncResolver;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::time::{Interval, MissedTickBehavior};
+use tokio_stream::Stream;
 use tokio_stream::wrappers::IntervalStream;
+use tower::discover::Change;
+use tower::load::PeakEwmaDiscover;
+use tower::ServiceExt;
+use url::Url;
 use ton_client_util::discover::config::{LiteServer, load_ton_config, read_ton_config, TonConfig};
-use crate::client::Client;
-use crate::cursor_client::CursorClient;
 
 type DiscoverResult<C> = Result<Change<String, C>, anyhow::Error>;
 
@@ -96,7 +96,7 @@ impl ClientDiscover {
             for ls in liteserver_new.difference(&liteservers) {
                 tracing::info!("insert {:?}", ls.id());
 
-                if let Ok(client) = (&mut factory).oneshot(new_config.with_liteserver(ls)).await {
+                if let Ok(client) = (&mut factory).oneshot(new_config.with_liteserver(ls.clone())).await {
                     let _ = tx.send(Ok(Change::Insert(ls.id(), client)));
                 }
             }
@@ -134,13 +134,13 @@ impl Stream for ClientDiscover {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.rx.poll_recv(cx) {
             Poll::Ready(Some(Ok(change))) => Poll::Ready(Some(Ok(change))),
-            _ => Poll::Pending
+            _ => Poll::Pending,
         }
     }
 }
 
 pub(crate) struct CursorClientDiscover {
-    discover: PeakEwmaDiscover<ClientDiscover>
+    discover: PeakEwmaDiscover<ClientDiscover>,
 }
 
 impl CursorClientDiscover {
@@ -156,12 +156,13 @@ impl Stream for CursorClientDiscover {
         let c = &mut self.discover;
         match Pin::new(&mut *c).poll_next(cx) {
             Poll::Ready(Some(Ok(change))) => match change {
-                Change::Insert(k, client) => Poll::Ready(Some(Ok(
-                    Change::Insert(k.clone(), CursorClientFactory::create(k, client))
-                ))),
+                Change::Insert(k, client) => Poll::Ready(Some(Ok(Change::Insert(
+                    k.clone(),
+                    CursorClientFactory::create(k, client),
+                )))),
                 Change::Remove(k) => Poll::Ready(Some(Ok(Change::Remove(k)))),
             },
-            _ => Poll::Pending
+            _ => Poll::Pending,
         }
     }
 }
