@@ -56,12 +56,186 @@ impl LiteServerGetAllShardsInfo {
     }
 }
 
+/// ```tl
+/// liteServer.getMasterchainInfo = liteServer.MasterchainInfo;
+/// ```
 impl ToRoute for LiteServerGetMasterchainInfo {
     fn to_route(&self) -> Route {
         Route::Latest
     }
 }
 
+/// ```tl
+/// liteServer.getMasterchainInfoExt mode:# = liteServer.MasterchainInfoExt;
+/// ```
+impl ToRoute for LiteServerGetMasterchainInfoExt {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+
+/// ```tl
+/// liteServer.getBlock id:tonNode.blockIdExt = liteServer.BlockData;
+/// ```
+impl ToRoute for LiteServerGetBlock {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getState id:tonNode.blockIdExt = liteServer.BlockState;
+/// ```
+impl ToRoute for LiteServerGetState {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getBlockHeader id:tonNode.blockIdExt mode:# = liteServer.BlockHeader;
+/// ```
+impl ToRoute for LiteServerGetBlockHeader {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.sendMessage body:bytes = liteServer.SendMsgStatus;
+/// ```
+impl ToRoute for LiteServerSendMessage {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+
+/// ```tl
+/// liteServer.getAccountState id:tonNode.blockIdExt account:liteServer.accountId = liteServer.AccountState;
+/// ```
+impl ToRoute for LiteServerGetAccountState {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getAccountStatePrunned id:tonNode.blockIdExt account:liteServer.accountId = liteServer.AccountState;
+/// ```
+impl ToRoute for LiteServerGetAccountStatePrunned {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.runSmcMethod mode:# id:tonNode.blockIdExt account:liteServer.accountId method_id:long params:bytes = liteServer.RunMethodResult;
+/// ```
+impl ToRoute for LiteServerRunSmcMethod {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getShardInfo id:tonNode.blockIdExt workchain:int shard:long exact:Bool = liteServer.ShardInfo;
+/// ```
+impl ToRoute for LiteServerGetShardInfo {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getAllShardsInfo id:tonNode.blockIdExt = liteServer.AllShardsInfo;
+/// ```
+impl ToRoute for LiteServerGetAllShardsInfo {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getOneTransaction id:tonNode.blockIdExt account:liteServer.accountId lt:long = liteServer.TransactionInfo;
+/// ```
+impl ToRoute for LiteServerGetOneTransaction {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getTransactions count:# account:liteServer.accountId lt:long hash:int256 = liteServer.TransactionList;
+/// ```
+impl ToRoute for LiteServerGetTransactions {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.account.workchain,
+            criteria: BlockCriteria::LogicalTime {
+                address: self.account.id,
+                lt: self.lt,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.lookupBlock mode:# id:tonNode.blockId lt:mode.1?long utime:mode.2?int = liteServer.BlockHeader;
+/// ```
 impl ToRoute for LiteServerLookupBlock {
     fn to_route(&self) -> Route {
         let criteria = match self.lt.as_ref() {
@@ -86,6 +260,166 @@ impl ToRoute for LiteServerLookupBlock {
         }
     }
 }
+
+/// ```tl
+/// liteServer.lookupBlockWithProof mode:# id:tonNode.blockId mc_block_id:tonNode.blockIdExt lt:mode.1?long utime:mode.2?int = liteServer.LookupBlockResult;
+/// ```
+impl ToRoute for LiteServerLookupBlockWithProof {
+    fn to_route(&self) -> Route {
+        let criteria = match self.lt.as_ref() {
+            None => BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+            Some(_) => {
+                let mut address = [0_u8; 32];
+                address[0..8].copy_from_slice(&self.id.shard.to_be_bytes());
+
+                BlockCriteria::LogicalTime {
+                    address,
+                    lt: self.lt.expect("lt must be defined"),
+                }
+            }
+        };
+
+        Route::Block {
+            chain: self.id.workchain,
+            criteria,
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.listBlockTransactions id:tonNode.blockIdExt mode:# count:# after:mode.7?liteServer.transactionId3 reverse_order:mode.6?true want_proof:mode.5?true = liteServer.BlockTransactions;
+/// ```
+impl ToRoute for LiteServerListBlockTransactions {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.listBlockTransactionsExt id:tonNode.blockIdExt mode:# count:# after:mode.7?liteServer.transactionId3 reverse_order:mode.6?true want_proof:mode.5?true = liteServer.BlockTransactionsExt;
+/// ```
+impl ToRoute for LiteServerListBlockTransactionsExt {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getBlockProof mode:# known_block:tonNode.blockIdExt target_block:mode.0?tonNode.blockIdExt = liteServer.PartialBlockProof;
+/// ```
+impl ToRoute for LiteServerGetBlockProof {
+    // TODO[akostylev0] maybe we should use target block if it's defined
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.known_block.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.known_block.shard,
+                seqno: self.known_block.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getConfigAll mode:# id:tonNode.blockIdExt = liteServer.ConfigInfo;
+/// ```
+impl ToRoute for LiteServerGetConfigAll {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getConfigParams mode:# id:tonNode.blockIdExt param_list:(vector int) = liteServer.ConfigInfo;
+/// ```
+impl ToRoute for LiteServerGetConfigParams {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getValidatorStats#091a58bc mode:# id:tonNode.blockIdExt limit:int start_after:mode.0?int256 modified_after:mode.2?int = liteServer.ValidatorStats;
+/// ```
+impl ToRoute for LiteServerGetValidatorStats {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getLibraries library_list:(vector int256) = liteServer.LibraryResult;
+/// ```
+impl ToRoute for LiteServerGetLibraries {
+    // TODO[akostylev0] I'm not sure if this is correct to implement ToRoute for this kind of request
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+
+/// ```tl
+/// liteServer.getLibrariesWithProof id:tonNode.blockIdExt mode:# library_list:(vector int256) = liteServer.LibraryResultWithProof;
+/// ```
+impl ToRoute for LiteServerGetLibrariesWithProof {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
+/// ```tl
+/// liteServer.getShardBlockProof id:tonNode.blockIdExt = liteServer.ShardBlockProof;
+/// ```
+impl ToRoute for LiteServerGetShardBlockProof {
+    fn to_route(&self) -> Route {
+        Route::Block {
+            chain: self.id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+        }
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
