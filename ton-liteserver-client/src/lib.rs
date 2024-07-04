@@ -5,3 +5,4 @@ pub mod tracker;
 pub mod tlb;
 pub mod tracked_client;
 pub mod balance;
+pub mod wait_seqno;

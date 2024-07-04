@@ -1,4 +1,3 @@
-use crate::request::WaitSeqno;
 use crate::tl::{LiteServerGetMasterchainInfo, LiteServerMasterchainInfo};
 use futures::future::Either;
 use std::error::Error;
@@ -11,6 +10,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
 use tower::{Service, ServiceExt};
+use crate::wait_seqno::WaitSeqno;
 
 pub struct MasterchainLastBlockTrackerActor<S> {
     client: S,
