@@ -17,6 +17,45 @@ impl Display for LiteServerError {
 
 impl std::error::Error for LiteServerError {}
 
+impl TonNodeBlockId {
+    pub fn new(workchain: Int, shard: Long, seqno: Int) -> Self {
+        Self {
+            workchain,
+            shard,
+            seqno,
+        }
+    }
+}
+
+impl LiteServerLookupBlock {
+    pub fn seqno(block_id: TonNodeBlockId) -> Self {
+        Self {
+            mode: 1,
+            id: block_id,
+            lt: None,
+            utime: None,
+        }
+    }
+}
+
+impl LiteServerGetBlockHeader {
+    pub fn new(id: TonNodeBlockIdExt) -> Self {
+        Self { id, mode: 0 }
+    }
+}
+
+impl LiteServerGetBlock {
+    pub fn new(id: TonNodeBlockIdExt) -> Self {
+        Self { id }
+    }
+}
+
+impl LiteServerGetAllShardsInfo {
+    pub fn new(block_id: TonNodeBlockIdExt) -> Self {
+        Self { id: block_id }
+    }
+}
+
 impl ToRoute for LiteServerGetMasterchainInfo {
     fn to_route(&self) -> Route {
         Route::Latest
