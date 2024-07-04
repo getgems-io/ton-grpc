@@ -19,8 +19,6 @@ use tokio_stream::wrappers::IntervalStream;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use tower::discover::Change;
 
-// TODO[akostylev0] pass config to the caller
-
 pub mod config;
 
 pub fn read_ton_config_from_file_stream(path: PathBuf, interval: Interval) -> impl Stream<Item = Result<TonConfig, anyhow::Error>> {

@@ -23,6 +23,12 @@ impl ToRoute for LiteServerGetMasterchainInfo {
     }
 }
 
+impl ToRoute for LiteServerLookupBlock {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use base64::Engine;

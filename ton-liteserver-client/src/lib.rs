@@ -4,4 +4,4 @@ pub mod request;
 pub mod tracker;
 pub mod tlb;
 pub mod tracked_client;
-mod balance;
+pub mod balance;

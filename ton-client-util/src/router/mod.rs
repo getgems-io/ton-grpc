@@ -3,6 +3,7 @@ pub mod shards;
 
 use crate::router::route::{BlockCriteria, Route, ToRoute};
 use std::collections::HashMap;
+use std::fmt::Debug;
 use std::future::{ready, Ready};
 use std::hash::Hash;
 use std::pin::Pin;
@@ -38,6 +39,7 @@ impl<S, D, E> Router<S, D>
 where
     D: Discover<Service = S, Error = E> + Unpin,
     D::Key: Hash,
+    E: Debug
 {
     pub fn new(discover: D) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
@@ -69,13 +71,16 @@ where
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<(), E>>> {
         loop {
-            match ready!(Pin::new(&mut self.discover).poll_discover(cx)).transpose()? {
-                None => return Poll::Ready(None),
-                Some(Change::Remove(key)) => {
+            match ready!(Pin::new(&mut self.discover).poll_discover(cx)).transpose() {
+                Ok(None) => return Poll::Ready(None),
+                Ok(Some(Change::Remove(key))) => {
                     self.services.remove(&key);
                 }
-                Some(Change::Insert(key, svc)) => {
+                Ok(Some(Change::Insert(key, svc))) => {
                     self.services.insert(key, svc);
+                }
+                Err(error) => {
+                    tracing::warn!(?error);
                 }
             }
         }
@@ -87,7 +92,7 @@ where
     Request: ToRoute,
     S: Service<Request> + Routed + Clone,
     S::Error: Into<tower::BoxError>,
-    D: Discover<Service = S, Error: Into<tower::BoxError>> + Unpin,
+    D: Discover<Service = S, Error: Into<tower::BoxError> + Debug> + Unpin,
     D::Key: Hash,
 {
     type Response = Balance<ServiceList<Vec<S>>, Request>;

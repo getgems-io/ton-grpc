@@ -26,6 +26,18 @@ where
     router: Router<TrackedClient, D>,
 }
 
+impl<D> Balance<D>
+where
+    D: Discover<Service = TrackedClient, Error = anyhow::Error> + Unpin,
+    D::Key: Eq + Hash,
+{
+    pub fn new(discover: D) -> Self {
+        Self {
+            router: Router::new(discover),
+        }
+    }
+}
+
 impl<R, D> Service<R> for Balance<D>
 where
     R: ToRoute + Requestable + 'static,

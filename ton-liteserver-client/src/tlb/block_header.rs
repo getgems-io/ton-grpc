@@ -24,7 +24,7 @@ impl<'de> CellDeserialize<'de> for BlockHeader {
     fn parse(parser: &mut CellParser<'de>) -> Result<Self, CellParserError<'de>> {
         let tag: u32 = parser.unpack_as::<_, NBits<32>>()?;
         if tag != 0x11ef55aa {
-            unimplemented!()
+            unimplemented!("actual tag is {:x}", tag)
         };
 
         let global_id = parser.unpack()?;

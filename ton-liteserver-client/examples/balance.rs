@@ -1,44 +1,82 @@
-use std::net::{Ipv4Addr, SocketAddrV4};
-use std::time::Duration;
-use base64::Engine;
-use futures::{stream, StreamExt};
-use tower::{ServiceBuilder, ServiceExt};
 use adnl_tcp::client::ServerKey;
+use base64::Engine;
+use futures::{stream, StreamExt, TryStreamExt};
+use std::convert::Infallible;
+use std::net::{Ipv4Addr, SocketAddrV4};
+use std::str::FromStr;
+use std::time::Duration;
+use tokio::time::Instant;
+use ton_client_util::discover::config::{LiteServerId, TonConfig};
+use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDiscover};
+use ton_liteserver_client::balance::Balance;
 use ton_liteserver_client::client::LiteServerClient;
-use ton_liteserver_client::tl::{LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId};
+use ton_liteserver_client::tl::{
+    LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId,
+};
+use ton_liteserver_client::tracked_client::TrackedClient;
+use tower::discover::Change;
+use tower::{ServiceBuilder, ServiceExt};
+use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
     tracing_subscriber::fmt::init();
 
-    let client = provided_client().await.expect("cannot connect");
+    let discovery = LiteServerDiscover::new(read_ton_config_from_url_stream(
+        "https://ton.org/global-config.json".parse()?,
+        tokio::time::interval_at(Instant::now(), Duration::from_secs(30)),
+    ))
+    .then(|change| async {
+        match change {
+            Ok(Change::Insert(k, v)) => {
+                let liteservers = v.liteservers;
+                let Some(ls) = liteservers.first().cloned() else {
+                    unreachable!()
+                };
+
+                let mut secret_key: [u8; 32] = [0; 32];
+                base64::engine::general_purpose::STANDARD
+                    .decode_slice(&ls.id.key, &mut secret_key[..])?;
+                let client = LiteServerClient::connect(ls.into(), &secret_key).await?;
+                let client = TrackedClient::new(client);
+
+                anyhow::Ok(Change::Insert(k, client))
+            }
+            Ok(Change::Remove(k)) => Ok(Change::Remove(k)),
+            Err(_) => unreachable!(),
+        }
+    });
+
+    let svc = Balance::new(discovery.boxed());
     let mut svc = ServiceBuilder::new()
-        .concurrency_limit(10)
-        .timeout(Duration::from_secs(3))
-        .service(client);
+        .concurrency_limit(10000)
+        .service(svc);
 
-    let last = (&mut svc).oneshot(LiteServerGetMasterchainInfo::default()).await?.last;
+    let last = (&mut svc)
+        .oneshot(LiteServerGetMasterchainInfo::default())
+        .await?
+        .last;
 
-    let requests = stream::iter((1 .. last.seqno).rev())
-        .map(|seqno| LiteServerLookupBlock { mode: 1, id: TonNodeBlockId { workchain: last.workchain, shard: last.shard, seqno }, lt: None, utime: None });
+    let requests = stream::iter((1..last.seqno).rev()).map(|seqno| LiteServerLookupBlock {
+        mode: 1,
+        id: TonNodeBlockId {
+            workchain: last.workchain,
+            shard: last.shard,
+            seqno,
+        },
+        lt: None,
+        utime: None,
+    });
 
     let mut responses = svc.call_all(requests).unordered();
 
-    while let Some(item) = responses.next().await.transpose().inspect_err(|e| tracing::error!(e))? {
+    while let Some(item) = responses
+        .next()
+        .await
+        .transpose()
+        .inspect_err(|e| tracing::error!(e))?
+    {
         tracing::info!(?item.id.seqno);
     }
     Ok(())
-}
-
-async fn provided_client() -> anyhow::Result<LiteServerClient> {
-    let ip: i32 = -2018135749;
-    let ip = Ipv4Addr::from(ip as u32);
-    let port = 53312;
-    let key: ServerKey = base64::engine::general_purpose::STANDARD.decode("aF91CuUHuuOv9rm2W5+O/4h38M3sRm40DtSdRxQhmtQ=")?.as_slice().try_into()?;
-
-    tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
-
-    let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), &key).await?;
-
-    Ok(client)
 }

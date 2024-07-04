@@ -11,6 +11,7 @@ use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use tower::{Service, ServiceExt};
+use crate::tlb::merkle_proof::MerkleProof;
 
 pub struct MasterchainLastBlockHeaderTrackerActor<S> {
     client: S,
@@ -64,9 +65,9 @@ where
             let boc: BoC = unpack_bytes_fully(&header_bytes).unwrap();
             let root = boc.single_root().unwrap();
 
-            let header: BlockHeader = root.parse_fully().unwrap();
+            let header: MerkleProof = root.parse_fully().unwrap();
 
-            self.sender.send(Some(header)).unwrap();
+            self.sender.send(Some(header.virtual_root)).unwrap();
         }
     }
 }

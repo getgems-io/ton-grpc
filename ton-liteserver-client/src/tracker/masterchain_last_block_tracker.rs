@@ -63,7 +63,7 @@ where
 
                     let _ = self.sender.send(Some(info));
                 }
-                Err(error) => tracing::error!(?error),
+                Err(error) => tracing::warn!(?error),
             };
         }
     }

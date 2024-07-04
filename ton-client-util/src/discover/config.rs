@@ -2,6 +2,7 @@ use reqwest::IntoUrl;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::{Display, Formatter};
+use std::net::SocketAddrV4;
 use std::path::Path;
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
@@ -63,6 +64,13 @@ impl LiteServer {
             host: self.host.clone(),
             port: self.port,
         }
+    }
+}
+
+// TODO[akostylev0] json liteserver view
+impl From<LiteServer> for SocketAddrV4 {
+    fn from(value: LiteServer) -> Self {
+        SocketAddrV4::new((value.ip.unwrap() as u32).into(), value.port)
     }
 }
 

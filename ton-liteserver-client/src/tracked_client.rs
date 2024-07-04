@@ -127,6 +127,12 @@ where
     type Future = <SharedService<PeakEwma<LiteServerClient>> as Service<Request>>::Future;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.masterchain_last_block_tracker.borrow().is_none() {
+            cx.waker().wake_by_ref();
+
+            return Poll::Pending;
+        }
+
         Service::<Request>::poll_ready(&mut self.inner, cx)
     }
 

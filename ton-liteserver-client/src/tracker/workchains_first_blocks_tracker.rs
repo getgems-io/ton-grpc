@@ -22,6 +22,7 @@ use ton_client_util::router::shards::Prefix;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use tower::Service;
+use crate::tlb::merkle_proof::MerkleProof;
 
 pub struct WorkchainsFirstBlocksTrackerActor<S> {
     client: S,
@@ -95,11 +96,11 @@ where
 
                             let boc: BoC = unpack_bytes_fully(&resolved.header_proof).unwrap();
                             let root = boc.single_root().unwrap();
-                            let block_header: BlockHeader = root.parse_fully().unwrap();
+                            let block_header: MerkleProof = root.parse_fully().unwrap();
 
-                            self.state.insert(shard_id, block_header.clone());
+                            self.state.insert(shard_id, block_header.virtual_root.clone());
 
-                            let _ = self.sender.send(block_header).unwrap();
+                            let _ = self.sender.send(block_header.virtual_root).unwrap();
                         },
                         Err(e) => { tracing::error!("Error: {:?}", e); }
                     }

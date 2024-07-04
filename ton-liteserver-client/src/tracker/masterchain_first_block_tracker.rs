@@ -15,6 +15,7 @@ use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes;
 use toner::ton::boc::BoC;
 use tower::Service;
+use crate::tlb::merkle_proof::MerkleProof;
 
 pub struct MasterchainFirstBlockTrackerActor<S> {
     client: S,
@@ -76,9 +77,9 @@ where
                 let boc: BoC = unpack_bytes(&block.header_proof).unwrap();
                 let root = boc.single_root().unwrap();
 
-                let header: BlockHeader = root.parse_fully().unwrap();
+                let header: MerkleProof = root.parse_fully().unwrap();
 
-                let _ = self.sender.send(Some(header));
+                let _ = self.sender.send(Some(header.virtual_root));
             })
             .inspect_err(|error| tracing::error!(?error))
             .await;
