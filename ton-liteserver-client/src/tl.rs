@@ -1,11 +1,11 @@
 #![allow(dead_code)]
 #![allow(unused_mut)]
 
-use std::fmt::{Debug, Display, Formatter};
 use adnl_tcp::deserializer::{Deserialize, DeserializeBoxed, Deserializer, DeserializerBoxedError};
 use adnl_tcp::serializer::{Serialize, SerializeBoxed, Serializer};
 pub use adnl_tcp::types::*;
-use ton_client_util::router::route::{Route, ToRoute};
+use std::fmt::{Debug, Display, Formatter};
+use ton_client_util::router::route::{BlockCriteria, Route, ToRoute};
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
@@ -25,22 +25,46 @@ impl ToRoute for LiteServerGetMasterchainInfo {
 
 impl ToRoute for LiteServerLookupBlock {
     fn to_route(&self) -> Route {
-        Route::Latest
+        let criteria = match self.lt.as_ref() {
+            None => BlockCriteria::Seqno {
+                shard: self.id.shard,
+                seqno: self.id.seqno,
+            },
+            Some(_) => {
+                let mut address = [0_u8; 32];
+                address[0..8].copy_from_slice(&self.id.shard.to_be_bytes());
+
+                BlockCriteria::LogicalTime {
+                    address,
+                    lt: self.lt.expect("lt must be defined"),
+                }
+            }
+        };
+
+        Route::Block {
+            chain: self.id.workchain,
+            criteria,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use base64::Engine;
-    use adnl_tcp::deserializer::from_bytes_boxed;
-    use adnl_tcp::serializer::{to_bytes_boxed};
     use super::*;
+    use adnl_tcp::deserializer::from_bytes_boxed;
+    use adnl_tcp::serializer::to_bytes_boxed;
+    use base64::Engine;
 
     #[test]
     fn serialize_adnl_query_test() {
         let query = AdnlMessageQuery {
-            query_id: hex::decode("77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4").unwrap().try_into().unwrap(),
-            query: hex::decode("df068c79042ee6b589000000").unwrap()
+            query_id: hex::decode(
+                "77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4",
+            )
+            .unwrap()
+            .try_into()
+            .unwrap(),
+            query: hex::decode("df068c79042ee6b589000000").unwrap(),
         };
 
         let bytes = to_bytes_boxed(&query);
@@ -74,10 +98,18 @@ mod tests {
 
         let query = from_bytes_boxed::<AdnlMessageQuery>(&bytes).unwrap();
 
-        assert_eq!(query, AdnlMessageQuery {
-            query_id: hex::decode("77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4").unwrap().try_into().unwrap(),
-            query: hex::decode("df068c79042ee6b589000000").unwrap()
-        })
+        assert_eq!(
+            query,
+            AdnlMessageQuery {
+                query_id: hex::decode(
+                    "77c1545b96fa136b8e01cc08338bec47e8a43215492dda6d4d7e286382bb00c4"
+                )
+                .unwrap()
+                .try_into()
+                .unwrap(),
+                query: hex::decode("df068c79042ee6b589000000").unwrap()
+            }
+        )
     }
 
     #[test]
@@ -86,23 +118,63 @@ mod tests {
 
         let masterchain_info = from_bytes_boxed::<LiteServerMasterchainInfo>(&bytes).unwrap();
 
-        eprintln!("{}", base64::engine::general_purpose::STANDARD.encode(hex::decode("e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4").unwrap()));
-        eprintln!("{}", base64::engine::general_purpose::STANDARD.encode(hex::decode("876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e0123517").unwrap()));
+        eprintln!(
+            "{}",
+            base64::engine::general_purpose::STANDARD.encode(
+                hex::decode("e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4")
+                    .unwrap()
+            )
+        );
+        eprintln!(
+            "{}",
+            base64::engine::general_purpose::STANDARD.encode(
+                hex::decode("876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e0123517")
+                    .unwrap()
+            )
+        );
 
-        assert_eq!(masterchain_info, LiteServerMasterchainInfo {
-            last: TonNodeBlockIdExt {
-                workchain: 0xffffffff_u32.to_be() as i32,
-                shard: 0x00000000000080_u64.to_be() as i64,
-                seqno: 0x27405801_u32.to_be() as i32,
-                root_hash: hex::decode("e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4").unwrap().try_into().unwrap(),
-                file_hash: hex::decode("876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e0123517").unwrap().try_into().unwrap(),
-            },
-            state_root_hash: hex::decode("8b4d3b38b06bb484015faf9821c3ba1c609a25b74f30e1e585b8c8e820ef0976").unwrap().try_into().unwrap(),
-            init: TonNodeZeroStateIdExt {
-                workchain: 0xffffffff_u32.to_be() as i32,
-                root_hash: hex::decode("17a3a92992aabea785a7a090985a265cd31f323d849da51239737e321fb05569").unwrap().try_into().unwrap(),
-                file_hash: hex::decode("5e994fcf4d425c0a6ce6a792594b7173205f740a39cd56f537defd28b48a0f6e").unwrap().try_into().unwrap(),
-            },
-        })
+        assert_eq!(
+            masterchain_info,
+            LiteServerMasterchainInfo {
+                last: TonNodeBlockIdExt {
+                    workchain: 0xffffffff_u32.to_be() as i32,
+                    shard: 0x00000000000080_u64.to_be() as i64,
+                    seqno: 0x27405801_u32.to_be() as i32,
+                    root_hash: hex::decode(
+                        "e585a47bd5978f6a4fb2b56aa2082ec9deac33aaae19e78241b97522e1fb43d4"
+                    )
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+                    file_hash: hex::decode(
+                        "876851b60521311853f59c002d46b0bd80054af4bce340787a00bd04e0123517"
+                    )
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+                },
+                state_root_hash: hex::decode(
+                    "8b4d3b38b06bb484015faf9821c3ba1c609a25b74f30e1e585b8c8e820ef0976"
+                )
+                .unwrap()
+                .try_into()
+                .unwrap(),
+                init: TonNodeZeroStateIdExt {
+                    workchain: 0xffffffff_u32.to_be() as i32,
+                    root_hash: hex::decode(
+                        "17a3a92992aabea785a7a090985a265cd31f323d849da51239737e321fb05569"
+                    )
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+                    file_hash: hex::decode(
+                        "5e994fcf4d425c0a6ce6a792594b7173205f740a39cd56f537defd28b48a0f6e"
+                    )
+                    .unwrap()
+                    .try_into()
+                    .unwrap(),
+                },
+            }
+        )
     }
 }
