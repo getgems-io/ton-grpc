@@ -35,11 +35,10 @@ where
     services: HashMap<D::Key, S>,
 }
 
-impl<S, D, E> Router<S, D>
+impl<S, D> Router<S, D>
 where
-    D: Discover<Service = S, Error = E> + Unpin,
+    D: Discover<Service = S>,
     D::Key: Hash,
-    E: Debug
 {
     pub fn new(discover: D) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
@@ -65,7 +64,14 @@ where
             services: Default::default(),
         }
     }
+}
 
+impl<S, D, E> Router<S, D>
+where
+    D: Discover<Service = S, Error = E> + Unpin,
+    D::Key: Hash,
+    E: Debug,
+{
     fn update_pending_from_discover(
         &mut self,
         cx: &mut Context<'_>,

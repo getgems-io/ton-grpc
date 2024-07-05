@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use crate::request::Requestable;
 use crate::tracked_client::TrackedClient;
 use futures::{FutureExt, TryFutureExt};
@@ -18,18 +19,18 @@ pub enum Error {
     Router(#[from] ton_client_util::router::Error),
 }
 
-pub struct Balance<D>
+pub struct Balance<D, E>
 where
-    D: Discover<Service = TrackedClient, Error = anyhow::Error> + Unpin,
+    D: Discover<Service = TrackedClient, Error = E> + Unpin,
     D::Key: Eq + Hash,
 {
     router: Router<TrackedClient, D>,
 }
 
-impl<D> Balance<D>
+impl<D, E> Balance<D, E>
 where
-    D: Discover<Service = TrackedClient, Error = anyhow::Error> + Unpin,
-    D::Key: Eq + Hash,
+    D: Discover<Service = TrackedClient, Error = E> + Unpin,
+    D::Key: Eq + Hash
 {
     pub fn new(discover: D) -> Self {
         Self {
@@ -38,11 +39,12 @@ where
     }
 }
 
-impl<R, D> Service<R> for Balance<D>
+impl<R, D, E> Service<R> for Balance<D, E>
 where
     R: ToRoute + Requestable + 'static,
-    D: Discover<Service = TrackedClient, Error = anyhow::Error> + Unpin,
+    D: Discover<Service = TrackedClient, Error = E> + Unpin,
     D::Key: Eq + Hash,
+    E: Into<Error> + Into<tower::BoxError> + Debug
 {
     type Response = R::Response;
     type Error = Error;
