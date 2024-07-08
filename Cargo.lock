@@ -2436,10 +2436,16 @@ dependencies = [
 name = "ton-client-util"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "bitvec",
+ "futures",
+ "hickory-resolver",
  "itertools 0.13.0",
  "metrics",
  "pin-project",
+ "reqwest",
+ "serde",
+ "serde_json",
  "thiserror",
  "tokio",
  "tokio-util",
