@@ -119,7 +119,11 @@ impl AccountAddress {
     }
 }
 
-impl ToRoute for GetShardAccountCell {}
+impl ToRoute for GetShardAccountCell {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
 impl ToRoute for GetShardAccountCellByTransaction {
     fn to_route(&self) -> Route {
         let data = self.account_address
@@ -132,7 +136,11 @@ impl ToRoute for GetShardAccountCellByTransaction {
         }
     }
 }
-impl ToRoute for RawGetAccountState {}
+impl ToRoute for RawGetAccountState {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
 impl ToRoute for RawGetAccountStateByTransaction {
     fn to_route(&self) -> Route {
         let data = self.account_address
@@ -145,8 +153,16 @@ impl ToRoute for RawGetAccountStateByTransaction {
         }
     }
 }
-impl ToRoute for GetAccountState {}
-impl ToRoute for BlocksGetMasterchainInfo {}
+impl ToRoute for GetAccountState {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+impl ToRoute for BlocksGetMasterchainInfo {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
 impl ToRoute for BlocksLookupBlock {
     fn to_route(&self) -> Route {
         let criteria = match self.mode {
@@ -276,9 +292,21 @@ impl TryFrom<&RawTransaction> for BlocksAccountTransactionId {
     }
 }
 
-impl ToRoute for RawSendMessage {}
-impl ToRoute for RawSendMessageReturnHash {}
-impl ToRoute for SmcLoad {}
+impl ToRoute for RawSendMessage {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+impl ToRoute for RawSendMessageReturnHash {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+impl ToRoute for SmcLoad {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
 
 impl SmcBoxedMethodId {
     pub fn by_name(name: &str) -> Self { Self::SmcMethodIdName(SmcMethodIdName { name: name.to_owned() })}
