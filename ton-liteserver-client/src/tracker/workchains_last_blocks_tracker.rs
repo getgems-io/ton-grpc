@@ -15,14 +15,14 @@ use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use tower::{Service, ServiceExt};
 
-pub struct WorkchainsLastBlocksActor<S> {
+pub struct WorkchainsLastBlocksTrackerActor<S> {
     client: S,
     masterchain_last_block_tracker: MasterchainLastBlockTracker,
     sender: broadcast::Sender<TonNodeBlockIdExt>,
     state: Arc<DashMap<ShardId, ShardDescr>>,
 }
 
-impl<S> WorkchainsLastBlocksActor<S> {
+impl<S> WorkchainsLastBlocksTrackerActor<S> {
     pub fn new(
         client: S,
         masterchain_last_block_tracker: MasterchainLastBlockTracker,
@@ -38,7 +38,7 @@ impl<S> WorkchainsLastBlocksActor<S> {
     }
 }
 
-impl<S> Actor for WorkchainsLastBlocksActor<S>
+impl<S> Actor for WorkchainsLastBlocksTrackerActor<S>
 where
     S: Send + 'static,
     S: Service<
@@ -113,14 +113,14 @@ impl Clone for WorkchainsLastBlocksTracker {
 impl WorkchainsLastBlocksTracker {
     pub fn new<S>(client: S, masterchain_last_block_tracker: MasterchainLastBlockTracker) -> Self
     where
-        WorkchainsLastBlocksActor<S>: Actor,
+        WorkchainsLastBlocksTrackerActor<S>: Actor,
     {
         let state = Arc::new(DashMap::default());
         let cancellation_token = CancellationToken::new();
 
         let (sender, receiver) = broadcast::channel(64);
         CancellableActor::new(
-            WorkchainsLastBlocksActor::new(
+            WorkchainsLastBlocksTrackerActor::new(
                 client,
                 masterchain_last_block_tracker,
                 sender,

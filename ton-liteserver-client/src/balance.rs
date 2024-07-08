@@ -1,14 +1,14 @@
-use std::fmt::Debug;
 use crate::request::Requestable;
-use crate::tracked_client::TrackedClient;
 use futures::{FutureExt, TryFutureExt};
+use std::fmt::Debug;
 use std::future::Future;
 use std::hash::Hash;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use ton_client_util::router::route::ToRoute;
-use ton_client_util::router::Router;
+use ton_client_util::router::{Routed, Router};
 use tower::discover::Discover;
+use tower::load::Load;
 use tower::{MakeService, Service, ServiceExt};
 
 #[derive(Debug, thiserror::Error)]
@@ -19,18 +19,18 @@ pub enum Error {
     Router(#[from] ton_client_util::router::Error),
 }
 
-pub struct Balance<D, E>
+pub struct Balance<S, D, E>
 where
-    D: Discover<Service = TrackedClient, Error = E> + Unpin,
+    D: Discover<Service = S, Error = E>,
     D::Key: Eq + Hash,
 {
-    router: Router<TrackedClient, D>,
+    router: Router<S, D>,
 }
 
-impl<D, E> Balance<D, E>
+impl<S, D, E> Balance<S, D, E>
 where
-    D: Discover<Service = TrackedClient, Error = E> + Unpin,
-    D::Key: Eq + Hash
+    D: Discover<Service = S, Error = E>,
+    D::Key: Eq + Hash,
 {
     pub fn new(discover: D) -> Self {
         Self {
@@ -39,20 +39,24 @@ where
     }
 }
 
-impl<R, D, E> Service<R> for Balance<D, E>
+impl<S, R, D, SE, DE> Service<R> for Balance<S, D, DE>
 where
     R: ToRoute + Requestable + 'static,
-    D: Discover<Service = TrackedClient, Error = E> + Unpin,
+    D: Discover<Service = S, Error = DE> + Unpin,
     D::Key: Eq + Hash,
-    E: Into<Error> + Into<tower::BoxError> + Debug
+    DE: Into<tower::BoxError> + Debug,
+    S: Clone + Routed + Debug + Load + Send + 'static,
+    S: Service<R, Response = R::Response, Error = SE>,
+    S::Future: Send,
+    <S as Load>::Metric: Debug,
+    SE: Into<tower::BoxError> + Debug + 'static,
 {
     type Response = R::Response;
     type Error = Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        <Router<TrackedClient, D> as Service<&R>>::poll_ready(&mut self.router, cx)
-            .map_err(Into::into)
+        <Router<S, D> as Service<&R>>::poll_ready(&mut self.router, cx).map_err(Into::into)
     }
 
     fn call(&mut self, req: R) -> Self::Future {

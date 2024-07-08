@@ -1,22 +1,32 @@
-use crate::client::LiteServerClient;
 use crate::request::Requestable;
-use crate::tracker::masterchain_first_block_tracker::MasterchainFirstBlockTracker;
-use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
-use crate::tracker::workchains_first_blocks_tracker::WorkchainsFirstBlocksTracker;
-use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
+use crate::tracker::masterchain_first_block_tracker::{
+    MasterchainFirstBlockTracker, MasterchainFirstBlockTrackerActor,
+};
+use crate::tracker::masterchain_last_block_header_tracker::{
+    MasterchainLastBlockHeaderTracker, MasterchainLastBlockHeaderTrackerActor,
+};
+use crate::tracker::masterchain_last_block_tracker::{
+    MasterchainLastBlockTracker, MasterchainLastBlockTrackerActor,
+};
+use crate::tracker::workchains_first_blocks_tracker::{
+    WorkchainsFirstBlocksTracker, WorkchainsFirstBlocksTrackerActor,
+};
+use crate::tracker::workchains_last_blocks_tracker::{
+    WorkchainsLastBlocksTracker, WorkchainsLastBlocksTrackerActor,
+};
 use std::task::{Context, Poll};
 use std::time::Duration;
+use ton_client_util::actor::Actor;
 use ton_client_util::router::route::BlockCriteria;
 use ton_client_util::router::Routed;
 use ton_client_util::service::shared::SharedService;
+use tower::load::peak_ewma::Cost;
 use tower::load::{CompleteOnResponse, Load, PeakEwma};
 use tower::Service;
-use tower::load::peak_ewma::Cost;
-use crate::tracker::masterchain_last_block_header_tracker::MasterchainLastBlockHeaderTracker;
 
 #[derive(Debug, Clone)]
-pub struct TrackedClient {
-    inner: SharedService<PeakEwma<LiteServerClient>>,
+pub struct TrackedClient<S> {
+    inner: SharedService<PeakEwma<S>>,
     masterchain_last_block_tracker: MasterchainLastBlockTracker,
     masterchain_last_block_header_tracker: MasterchainLastBlockHeaderTracker,
     masterchain_first_block_tracker: MasterchainFirstBlockTracker,
@@ -24,7 +34,7 @@ pub struct TrackedClient {
     workchains_first_blocks_tracker: WorkchainsFirstBlocksTracker,
 }
 
-impl Load for TrackedClient {
+impl<S> Load for TrackedClient<S> {
     type Metric = Cost;
 
     fn load(&self) -> Self::Metric {
@@ -32,8 +42,16 @@ impl Load for TrackedClient {
     }
 }
 
-impl TrackedClient {
-    pub fn new(inner: LiteServerClient) -> Self {
+impl<S> TrackedClient<S>
+where
+    S: Clone,
+    MasterchainLastBlockTrackerActor<S>: Actor,
+    MasterchainLastBlockHeaderTrackerActor<S>: Actor,
+    MasterchainFirstBlockTrackerActor<S>: Actor,
+    WorkchainsLastBlocksTrackerActor<S>: Actor,
+    WorkchainsFirstBlocksTrackerActor<S>: Actor,
+{
+    pub fn new(inner: S) -> Self {
         let masterchain_last_block_tracker = MasterchainLastBlockTracker::new(inner.clone());
         let masterchain_last_block_header_tracker = MasterchainLastBlockHeaderTracker::new(
             inner.clone(),
@@ -66,7 +84,7 @@ impl TrackedClient {
     }
 }
 
-impl Routed for TrackedClient {
+impl<S> Routed for TrackedClient<S> {
     fn contains(&self, chain: &i32, criteria: &BlockCriteria) -> bool {
         match chain {
             // masterchain
@@ -118,13 +136,14 @@ impl Routed for TrackedClient {
     }
 }
 
-impl<Request> Service<Request> for TrackedClient
+impl<S, Request> Service<Request> for TrackedClient<S>
 where
     Request: Requestable,
+    S: Service<Request, Response = Request::Response>,
 {
-    type Response = Request::Response;
-    type Error = crate::client::Error;
-    type Future = <SharedService<PeakEwma<LiteServerClient>> as Service<Request>>::Future;
+    type Response = <SharedService<PeakEwma<S>> as Service<Request>>::Response;
+    type Error = <SharedService<PeakEwma<S>> as Service<Request>>::Error;
+    type Future = <SharedService<PeakEwma<S>> as Service<Request>>::Future;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.masterchain_last_block_tracker.borrow().is_none() {

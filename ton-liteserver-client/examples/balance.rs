@@ -1,12 +1,7 @@
-use adnl_tcp::client::ServerKey;
 use base64::Engine;
-use futures::{stream, StreamExt, TryStreamExt};
-use std::convert::Infallible;
-use std::net::{Ipv4Addr, SocketAddrV4};
-use std::str::FromStr;
+use futures::{stream, StreamExt};
 use std::time::Duration;
 use tokio::time::Instant;
-use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDiscover};
 use ton_liteserver_client::balance::Balance;
 use ton_liteserver_client::client::LiteServerClient;
@@ -15,8 +10,8 @@ use ton_liteserver_client::tl::{
 };
 use ton_liteserver_client::tracked_client::TrackedClient;
 use tower::discover::Change;
-use tower::{ServiceBuilder, ServiceExt};
-use url::Url;
+use tower::limit::ConcurrencyLimit;
+use tower::ServiceExt;
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
@@ -38,6 +33,7 @@ async fn main() -> Result<(), tower::BoxError> {
                 base64::engine::general_purpose::STANDARD
                     .decode_slice(&ls.id.key, &mut secret_key[..])?;
                 let client = LiteServerClient::connect(ls.into(), &secret_key).await?;
+                let client = ConcurrencyLimit::new(client, 1000);
                 let client = TrackedClient::new(client);
 
                 anyhow::Ok(Change::Insert(k, client))
@@ -47,10 +43,7 @@ async fn main() -> Result<(), tower::BoxError> {
         }
     });
 
-    let svc = Balance::new(discovery.boxed());
-    let mut svc = ServiceBuilder::new()
-        .concurrency_limit(10000)
-        .service(svc);
+    let mut svc = Balance::new(discovery.boxed());
 
     let last = (&mut svc)
         .oneshot(LiteServerGetMasterchainInfo::default())
