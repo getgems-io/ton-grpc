@@ -88,15 +88,17 @@ pub async fn read_ton_config(path: impl AsRef<Path>) -> anyhow::Result<TonConfig
     Ok(config)
 }
 
-
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Value};
     use crate::discover::config::{load_ton_config, TonConfig};
+    use serde_json::{json, Value};
 
     #[test]
     fn ton_config_to_string() {
-        let input = TonConfig { liteservers: vec![], data: Value::Null };
+        let input = TonConfig {
+            liteservers: vec![],
+            data: Value::Null,
+        };
 
         let actual = input.to_string();
 
@@ -121,7 +123,8 @@ mod tests {
                 "a": 3,
                 "k": 3,
             }
-        })).unwrap();
+        }))
+        .unwrap();
         let config_rhs = TonConfig {
             liteservers: vec![],
             data: json!({
@@ -130,7 +133,7 @@ mod tests {
                     "a": 3,
                     "k": 3,
                 }
-            })
+            }),
         };
 
         assert_eq!(config_lhs, config_rhs);
