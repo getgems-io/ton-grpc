@@ -123,17 +123,13 @@ where
 
     fn call(&mut self, req: &Request) -> Self::Future {
         ready(match req.to_route().choose(self.services.values()) {
-            Ok(services) => Ok(Balance::new(ServiceList::new(
-                services.into_iter().cloned().collect(),
-            ))),
+            Ok(services) => Ok(Balance::new(ServiceList::new(services))),
             Err(route::Error::RouteUnknown) => {
                 metrics::counter!("ton_router_miss_count").increment(1);
 
                 Route::Latest
                     .choose(self.services.values())
-                    .map(|services| {
-                        Balance::new(ServiceList::new(services.into_iter().cloned().collect()))
-                    })
+                    .map(|services| Balance::new(ServiceList::new(services)))
                     .map_err(Into::into)
             }
             Err(route::Error::RouteNotAvailable) => {
