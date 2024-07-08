@@ -87,6 +87,8 @@ where
                 }
                 Err(error) => {
                     tracing::warn!(?error);
+
+                    return Poll::Pending
                 }
             }
         }
