@@ -1,10 +1,13 @@
 use crate::actor::cancellable_actor::CancellableActor;
 use crate::actor::Actor;
-use crate::discover::config::{LiteServer, LiteServerId, load_ton_config, read_ton_config, TonConfig};
+use crate::discover::config::{
+    load_ton_config, read_ton_config, LiteServer, LiteServerId, TonConfig,
+};
 use futures::{Stream, StreamExt, TryStreamExt};
 use hickory_resolver::error::ResolveError;
 use hickory_resolver::system_conf::read_system_conf;
 use hickory_resolver::TokioAsyncResolver;
+use reqwest::Url;
 use std::collections::HashSet;
 use std::convert::Infallible;
 use std::net::IpAddr;
@@ -12,7 +15,6 @@ use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 use std::time::Duration;
-use reqwest::Url;
 use tokio::sync::mpsc;
 use tokio::time::Interval;
 use tokio_stream::wrappers::IntervalStream;
@@ -21,15 +23,21 @@ use tower::discover::Change;
 
 pub mod config;
 
-pub fn read_ton_config_from_file_stream(path: PathBuf, interval: Interval) -> impl Stream<Item = Result<TonConfig, anyhow::Error>> {
+pub fn read_ton_config_from_file_stream(
+    path: PathBuf,
+    interval: Interval,
+) -> impl Stream<Item = Result<TonConfig, anyhow::Error>> {
     IntervalStream::new(interval)
-        .map(move |_| { path.clone() })
+        .map(move |_| path.clone())
         .then(read_ton_config)
 }
 
-pub fn read_ton_config_from_url_stream(url: Url, interval: Interval) -> impl Stream<Item = Result<TonConfig, anyhow::Error>> {
+pub fn read_ton_config_from_url_stream(
+    url: Url,
+    interval: Interval,
+) -> impl Stream<Item = Result<TonConfig, anyhow::Error>> {
     IntervalStream::new(interval)
-        .map(move |_| { url.clone() })
+        .map(move |_| url.clone())
         .then(load_ton_config)
 }
 
@@ -93,7 +101,13 @@ where
             for ls in liteserver_new.difference(&liteservers) {
                 tracing::info!("insert {:?}", ls.id());
 
-                let _ = self.sender.send(Change::Insert(ls.id.clone(), new_config.with_liteserver(ls.clone()))).await;
+                let _ = self
+                    .sender
+                    .send(Change::Insert(
+                        ls.id.clone(),
+                        new_config.with_liteserver(ls.clone()),
+                    ))
+                    .await;
             }
 
             liteservers.clone_from(&liteserver_new);
