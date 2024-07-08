@@ -1,6 +1,6 @@
+use crate::actor::Actor;
 use tokio::select;
 use tokio_util::sync::CancellationToken;
-use crate::actor::Actor;
 
 pub struct CancellableActor<T> {
     cancellation_token: CancellationToken,
@@ -9,12 +9,17 @@ pub struct CancellableActor<T> {
 
 impl<T> CancellableActor<T> {
     pub fn new(inner: T, cancellation_token: CancellationToken) -> Self {
-        Self { inner, cancellation_token }
+        Self {
+            inner,
+            cancellation_token,
+        }
     }
 }
 
 impl<T> Actor for CancellableActor<T>
-    where T: Actor {
+where
+    T: Actor,
+{
     type Output = ();
 
     async fn run(self) {
