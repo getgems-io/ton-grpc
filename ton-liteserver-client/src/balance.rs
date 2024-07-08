@@ -53,10 +53,10 @@ where
 {
     type Response = R::Response;
     type Error = Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        <Router<S, D> as Service<&R>>::poll_ready(&mut self.router, cx).map_err(Into::into)
+        MakeService::poll_ready(&mut self.router, cx).map_err(Into::into)
     }
 
     fn call(&mut self, req: R) -> Self::Future {
