@@ -4,7 +4,7 @@ pub mod shards;
 use crate::router::route::{BlockCriteria, Route, ToRoute};
 use std::collections::HashMap;
 use std::convert::Infallible;
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::future::{ready, Ready};
 use std::hash::Hash;
 use std::pin::Pin;
@@ -72,8 +72,8 @@ where
             match ready!(Pin::new(&mut self.discover).poll_discover(cx)).transpose() {
                 Ok(None) => {
                     tracing::info!("No more services to discover");
-                    return Poll::Ready(None)
-                },
+                    return Poll::Ready(None);
+                }
                 Ok(Some(Change::Remove(key))) => {
                     tracing::info!("Removing service");
                     self.services.remove(&key);
