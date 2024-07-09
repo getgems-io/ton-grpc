@@ -1,6 +1,5 @@
 use crate::tl::{LiteServerGetMasterchainInfo, LiteServerMasterchainInfo};
 use futures::future::Either;
-use std::error::Error;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch;
@@ -23,20 +22,19 @@ impl<S> MasterchainLastBlockTrackerActor<S> {
     }
 }
 
-impl<S, E> Actor for MasterchainLastBlockTrackerActor<S>
+impl<S> Actor for MasterchainLastBlockTrackerActor<S>
 where
-    E: Error,
     S: Send + 'static,
     S: Service<
         LiteServerGetMasterchainInfo,
         Response = LiteServerMasterchainInfo,
-        Error = E,
+        Error = tower::BoxError,
         Future: Send,
     >,
     S: Service<
         WaitSeqno<LiteServerGetMasterchainInfo>,
         Response = LiteServerMasterchainInfo,
-        Error = E,
+        Error = tower::BoxError,
         Future: Send,
     >,
 {
@@ -53,7 +51,7 @@ where
                 Some(last) => Either::Right((&mut self.client).oneshot(WaitSeqno::with_timeout(
                     LiteServerGetMasterchainInfo::default(),
                     last + 1,
-                    Duration::from_secs(10),
+                    Duration::from_secs(5),
                 ))),
             };
 

@@ -11,14 +11,6 @@ use tower::discover::Discover;
 use tower::load::Load;
 use tower::{MakeService, Service, ServiceExt};
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error(transparent)]
-    TrackedClient(#[from] crate::client::Error),
-    #[error(transparent)]
-    Router(#[from] ton_client_util::router::Error),
-}
-
 pub struct Balance<S, D, E>
 where
     D: Discover<Service = S, Error = E>,
@@ -52,7 +44,7 @@ where
     SE: Into<tower::BoxError> + Debug + 'static,
 {
     type Response = R::Response;
-    type Error = Error;
+    type Error = tower::BoxError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>>>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {

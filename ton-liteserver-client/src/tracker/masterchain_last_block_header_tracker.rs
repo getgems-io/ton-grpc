@@ -1,7 +1,6 @@
 use crate::tl::{LiteServerBoxedBlockHeader, LiteServerGetBlockHeader};
 use crate::tlb::block_header::BlockHeader;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
-use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::watch;
 use tokio::sync::watch::Ref;
@@ -39,7 +38,7 @@ where
     S: Service<
         LiteServerGetBlockHeader,
         Response = LiteServerBoxedBlockHeader,
-        Error: Error,
+        Error = tower::BoxError,
         Future: Send,
     >,
 {

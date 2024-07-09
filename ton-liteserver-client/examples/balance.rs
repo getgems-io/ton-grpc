@@ -10,8 +10,7 @@ use ton_liteserver_client::tl::{
 };
 use ton_liteserver_client::tracked_client::TrackedClient;
 use tower::discover::Change;
-use tower::limit::ConcurrencyLimit;
-use tower::ServiceExt;
+use tower::{ServiceBuilder, ServiceExt};
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
@@ -32,9 +31,12 @@ async fn main() -> Result<(), tower::BoxError> {
                 let mut secret_key: [u8; 32] = [0; 32];
                 base64::engine::general_purpose::STANDARD
                     .decode_slice(&ls.id.key, &mut secret_key[..])?;
-                let client = LiteServerClient::connect(ls.into(), &secret_key).await?;
-                let client = ConcurrencyLimit::new(client, 1000);
-                let client = TrackedClient::new(client);
+
+                let client = ServiceBuilder::new()
+                    .layer_fn(TrackedClient::new)
+                    .concurrency_limit(100)
+                    .timeout(Duration::from_secs(5))
+                    .service(LiteServerClient::connect(ls.into(), &secret_key).await?);
 
                 anyhow::Ok(Change::Insert(k, client))
             }

@@ -1,20 +1,20 @@
-use crate::client::Error;
 use crate::tl::{
     LiteServerBlockData, LiteServerBlockHeader, LiteServerError, LiteServerGetBlock,
     LiteServerLookupBlock, TonNodeBlockId, TonNodeBlockIdExt,
 };
 use std::borrow::Borrow;
 use tower::{Service, ServiceExt};
+use crate::client;
 
 pub async fn find_first_block_header<S>(
     client: &mut S,
     start: impl Borrow<TonNodeBlockIdExt>,
     lhs: Option<i32>,
     cur: Option<i32>,
-) -> Result<LiteServerBlockHeader, Error>
+) -> Result<LiteServerBlockHeader, tower::BoxError>
 where
-    S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = Error>,
-    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = Error>,
+    S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = tower::BoxError>,
+    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = tower::BoxError>,
 {
     let start = start.borrow();
     let mut rhs = start.seqno;
@@ -32,7 +32,11 @@ where
     while lhs < rhs {
         match block {
             Ok(_) => rhs = cur,
-            Err(Error::LiteServerError(LiteServerError { code: 651, .. })) => lhs = cur + 1,
+            Err(ref e) if e.is::<client::Error>() => {
+                if let Some(client::Error::LiteServerError(LiteServerError { code: 651, .. })) = e.downcast_ref::<client::Error>() {
+                    lhs = cur + 1
+                }
+            },
             Err(e) => return Err(e),
         }
 
@@ -63,13 +67,13 @@ where
     Ok(header)
 }
 
-async fn check_block_available<S, E>(
+async fn check_block_available<S>(
     client: &mut S,
     block_id: TonNodeBlockId,
-) -> Result<(LiteServerBlockHeader, LiteServerBlockData), E>
+) -> Result<(LiteServerBlockHeader, LiteServerBlockData), tower::BoxError>
 where
-    S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = E>,
-    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = E>,
+    S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = tower::BoxError>,
+    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = tower::BoxError>,
 {
     // TODO[akostylev0] research
     let block_header = client

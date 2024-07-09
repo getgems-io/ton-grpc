@@ -15,15 +15,6 @@ pub enum Error {
     Tower(#[from] tower::BoxError)
 }
 
-impl From<ton_client_util::router::Error> for Error {
-    fn from(value: ton_client_util::router::Error) -> Self {
-        match value {
-            ton_client_util::router::Error::Route(e) => Error::Route(e),
-            ton_client_util::router::Error::Discover(e) => Error::Tower(e),
-        }
-    }
-}
-
 #[derive(Default)]
 pub struct ErrorLayer;
 

@@ -1,3 +1,16 @@
+use crate::request::Requestable;
+use crate::tl::{
+    AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery,
+};
+use adnl_tcp::client::{Client, ServerKey};
+use adnl_tcp::connection::Connection;
+use adnl_tcp::deserializer::{from_bytes_boxed, DeserializeBoxed};
+use adnl_tcp::packet::Packet;
+use adnl_tcp::ping::{is_pong_packet, ping_packet};
+use adnl_tcp::serializer::to_bytes_boxed;
+use futures::{ready, SinkExt, StreamExt};
+use pin_project::pin_project;
+use rand::random;
 use std::collections::HashMap;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -6,11 +19,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tower::Service;
-use adnl_tcp::client::{Client, ServerKey};
-use futures::{ready, SinkExt, StreamExt};
-use pin_project::pin_project;
-use rand::random;
 use thiserror::Error;
 use tokio::select;
 use tokio::sync::mpsc;
@@ -18,13 +26,7 @@ use tokio::sync::oneshot;
 use tokio::time::MissedTickBehavior;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use adnl_tcp::packet::Packet;
-use adnl_tcp::connection::Connection;
-use adnl_tcp::ping::{is_pong_packet, ping_packet};
-use adnl_tcp::deserializer::{DeserializeBoxed, from_bytes_boxed};
-use adnl_tcp::serializer::to_bytes_boxed;
-use crate::request::Requestable;
-use crate::tl::{AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery};
+use tower::Service;
 
 pub type RequestId = Int256;
 
@@ -49,12 +51,20 @@ pub struct LiteServerClient {
 struct ClientActor {
     connection: Connection,
     receiver: mpsc::UnboundedReceiver<ClientActorMessage>,
-    cancellation_token: CancellationToken
+    cancellation_token: CancellationToken,
 }
 
 impl ClientActor {
-    pub fn new(connection: Connection, receiver: mpsc::UnboundedReceiver<ClientActorMessage>, cancellation_token: CancellationToken) -> Self {
-        Self { connection, receiver, cancellation_token }
+    pub fn new(
+        connection: Connection,
+        receiver: mpsc::UnboundedReceiver<ClientActorMessage>,
+        cancellation_token: CancellationToken,
+    ) -> Self {
+        Self {
+            connection,
+            receiver,
+            cancellation_token,
+        }
     }
 
     pub fn run(mut self) {
@@ -83,9 +93,7 @@ impl ClientActor {
                                     .expect("expect adnl answer packet");
 
                                 if let Some(oneshot) = responses.remove(&adnl_answer.query_id) {
-                                    oneshot
-                                        .send(adnl_answer.answer)
-                                        .expect("expect oneshot alive");
+                                    let _ = oneshot.send(adnl_answer.answer);
                                 }
                             }
                             Err(error) => {
@@ -117,7 +125,10 @@ impl ClientActor {
 }
 
 enum ClientActorMessage {
-    Query { query: AdnlMessageQuery, oneshot: oneshot::Sender<Bytes> },
+    Query {
+        query: AdnlMessageQuery,
+        oneshot: oneshot::Sender<Bytes>,
+    },
 }
 
 impl LiteServerClient {
@@ -127,18 +138,24 @@ impl LiteServerClient {
         let (tx, rx) = mpsc::unbounded_channel::<ClientActorMessage>();
         ClientActor::new(inner, rx, cancel_token.clone()).run();
 
-        Ok(Self { tx, drop_guard: Arc::new(cancel_token.drop_guard()) })
+        Ok(Self {
+            tx,
+            drop_guard: Arc::new(cancel_token.drop_guard()),
+        })
     }
 }
 
-impl<R> Service<R> for LiteServerClient where R: Requestable {
+impl<R> Service<R> for LiteServerClient
+where
+    R: Requestable,
+{
     type Response = R::Response;
     type Error = Error;
     type Future = ResponseFuture<R::Response>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.tx.is_closed() {
-            return Poll::Ready(Err(Error::ChannelClosed))
+            return Poll::Ready(Err(Error::ChannelClosed));
         }
 
         Poll::Ready(Ok(()))
@@ -150,11 +167,18 @@ impl<R> Service<R> for LiteServerClient where R: Requestable {
         let query = LiteServerQuery { data };
         let query = to_bytes_boxed(&query);
 
-        let query = AdnlMessageQuery { query_id: random(), query };
+        let query = AdnlMessageQuery {
+            query_id: random(),
+            query,
+        };
 
         let (tx, rx) = oneshot::channel();
 
-        if self.tx.send(ClientActorMessage::Query { query, oneshot: tx }).is_err() {
+        if self
+            .tx
+            .send(ClientActorMessage::Query { query, oneshot: tx })
+            .is_err()
+        {
             return ResponseFuture::failed(Error::ChannelClosed);
         }
 
@@ -162,15 +186,16 @@ impl<R> Service<R> for LiteServerClient where R: Requestable {
     }
 }
 
-
 #[pin_project(project = ResponseStateProj)]
 pub enum ResponseState {
-    Failed { error: Option<Error> },
+    Failed {
+        error: Option<Error>,
+    },
     Rx {
         #[pin]
         rx: oneshot::Receiver<Bytes>,
-        drop_guard: Arc<DropGuard>
-    }
+        drop_guard: Arc<DropGuard>,
+    },
 }
 
 #[pin_project]
@@ -182,15 +207,24 @@ pub struct ResponseFuture<Response> {
 
 impl<Response> ResponseFuture<Response> {
     fn new(rx: oneshot::Receiver<Bytes>, drop_guard: Arc<DropGuard>) -> Self {
-        Self { state: ResponseState::Rx { rx, drop_guard }, _phantom: PhantomData }
+        Self {
+            state: ResponseState::Rx { rx, drop_guard },
+            _phantom: PhantomData,
+        }
     }
 
     fn failed(error: Error) -> Self {
-        Self { state: ResponseState::Failed { error: Some(error) }, _phantom: PhantomData }
+        Self {
+            state: ResponseState::Failed { error: Some(error) },
+            _phantom: PhantomData,
+        }
     }
 }
 
-impl<Response> Future for ResponseFuture<Response> where Response: DeserializeBoxed {
+impl<Response> Future for ResponseFuture<Response>
+where
+    Response: DeserializeBoxed,
+{
     type Output = Result<Response, Error>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -199,35 +233,38 @@ impl<Response> Future for ResponseFuture<Response> where Response: DeserializeBo
         return match this.state.as_mut().project() {
             ResponseStateProj::Failed { error } => {
                 Poll::Ready(Err(error.take().expect("polled after error")))
-            },
-            ResponseStateProj::Rx { rx, .. } => return match ready!(rx.poll(cx)) {
-                Ok(response) => {
-                    let response = from_bytes_boxed::<Result<Response, LiteServerError>>(&response)
-                        .map_err(|_| Error::Deserialize)?
-                        .map_err(Error::LiteServerError)?;
+            }
+            ResponseStateProj::Rx { rx, .. } => {
+                return match ready!(rx.poll(cx)) {
+                    Ok(response) => {
+                        let response =
+                            from_bytes_boxed::<Result<Response, LiteServerError>>(&response)
+                                .map_err(|_| Error::Deserialize)?
+                                .map_err(Error::LiteServerError)?;
 
-                    Poll::Ready(Ok(response))
-                }
-                Err(_) => {
-                    Poll::Ready(Err(Error::OneshotClosed))
+                        Poll::Ready(Ok(response))
+                    }
+                    Err(_) => Poll::Ready(Err(Error::OneshotClosed)),
                 }
             }
-        }
+        };
     }
 }
 
-
 #[cfg(test)]
 pub(crate) mod tests {
-    use std::net::Ipv4Addr;
+    use super::*;
+    use crate::tl::{
+        LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo,
+        LiteServerGetMasterchainInfoExt, LiteServerGetVersion,
+    };
+    use crate::wait_seqno::WaitSeqno;
     use base64::Engine;
-    use tower::ServiceExt;
-    use tracing_test::traced_test;
+    use std::net::Ipv4Addr;
     use std::time::SystemTime;
     use std::time::UNIX_EPOCH;
-    use crate::request::WaitSeqno;
-    use crate::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo, LiteServerGetMasterchainInfoExt, LiteServerGetVersion};
-    use super::*;
+    use tower::ServiceExt;
+    use tracing_test::traced_test;
 
     #[tokio::test]
     #[traced_test]
@@ -235,7 +272,9 @@ pub(crate) mod tests {
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot(LiteServerGetMasterchainInfo::default()).await?;
+        let response = client
+            .oneshot(LiteServerGetMasterchainInfo::default())
+            .await?;
 
         assert_eq!(response.last.workchain, -1);
         assert_eq!(response.last.shard, -9223372036854775808);
@@ -248,9 +287,16 @@ pub(crate) mod tests {
     #[ignore]
     async fn client_wait_seqno_info() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let current = (&mut client).oneshot(LiteServerGetMasterchainInfo::default()).await?;
+        let current = (&mut client)
+            .oneshot(LiteServerGetMasterchainInfo::default())
+            .await?;
 
-        let actual = (&mut client).oneshot(WaitSeqno::new(LiteServerGetMasterchainInfo::default(), current.last.seqno + 1)).await?;
+        let actual = (&mut client)
+            .oneshot(WaitSeqno::new(
+                LiteServerGetMasterchainInfo::default(),
+                current.last.seqno + 1,
+            ))
+            .await?;
 
         assert_eq!(actual.last.workchain, -1);
         assert_eq!(actual.last.shard, -9223372036854775808);
@@ -263,11 +309,13 @@ pub(crate) mod tests {
     #[ignore]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let response = (&mut client).oneshot(LiteServerGetMasterchainInfo::default()).await?;
+        let response = (&mut client)
+            .oneshot(LiteServerGetMasterchainInfo::default())
+            .await?;
 
-        let response = (&mut client).oneshot(LiteServerGetAllShardsInfo {
-            id: response.last
-        }).await?;
+        let response = (&mut client)
+            .oneshot(LiteServerGetAllShardsInfo { id: response.last })
+            .await?;
 
         assert_eq!(response.id.workchain, -1);
         assert_eq!(response.id.shard, -9223372036854775808);
@@ -283,7 +331,13 @@ pub(crate) mod tests {
 
         let response = client.oneshot(LiteServerGetVersion::default()).await?;
 
-        assert!(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs().abs_diff(response.now as u64) <= 10);
+        assert!(
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)?
+                .as_secs()
+                .abs_diff(response.now as u64)
+                <= 10
+        );
 
         Ok(())
     }
@@ -294,10 +348,16 @@ pub(crate) mod tests {
     async fn client_error_test() -> anyhow::Result<()> {
         let client = provided_client().await?;
 
-        let response = client.oneshot(LiteServerGetMasterchainInfoExt { mode: 1 }).await;
+        let response = client
+            .oneshot(LiteServerGetMasterchainInfoExt { mode: 1 })
+            .await;
 
         assert!(response.is_err());
-        assert_eq!(response.unwrap_err().to_string(), "LiteServer error: Error code: -400, message: \"unsupported getMasterchainInfo mode\"".to_owned());
+        assert_eq!(
+            response.unwrap_err().to_string(),
+            "LiteServer error: Error code: -400, message: \"unsupported getMasterchainInfo mode\""
+                .to_owned()
+        );
 
         Ok(())
     }
@@ -307,9 +367,16 @@ pub(crate) mod tests {
     #[ignore]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
         let mut client = provided_client().await?;
-        let known_block = (&mut client).oneshot(LiteServerGetMasterchainInfo::default()).await?.last;
+        let known_block = (&mut client)
+            .oneshot(LiteServerGetMasterchainInfo::default())
+            .await?
+            .last;
 
-        let request = LiteServerGetBlockProof { mode: 0, known_block: known_block.clone(), target_block: None };
+        let request = LiteServerGetBlockProof {
+            mode: 0,
+            known_block: known_block.clone(),
+            target_block: None,
+        };
         let response = client.oneshot(request).await?;
 
         assert_eq!(&response.from.seqno, &known_block.seqno);
@@ -339,7 +406,10 @@ pub(crate) mod tests {
         let ip: i32 = -2018135749;
         let ip = Ipv4Addr::from(ip as u32);
         let port = 53312;
-        let key: ServerKey = base64::engine::general_purpose::STANDARD.decode("aF91CuUHuuOv9rm2W5+O/4h38M3sRm40DtSdRxQhmtQ=")?.as_slice().try_into()?;
+        let key: ServerKey = base64::engine::general_purpose::STANDARD
+            .decode("aF91CuUHuuOv9rm2W5+O/4h38M3sRm40DtSdRxQhmtQ=")?
+            .as_slice()
+            .try_into()?;
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
@@ -352,7 +422,10 @@ pub(crate) mod tests {
         let ip: i32 = 1091931623;
         let ip = Ipv4Addr::from(ip as u32);
         let port = 17728;
-        let key: ServerKey = base64::engine::general_purpose::STANDARD.decode("BYSVpL7aPk0kU5CtlsIae/8mf2B/NrBi7DKmepcjX6Q=")?.as_slice().try_into()?;
+        let key: ServerKey = base64::engine::general_purpose::STANDARD
+            .decode("BYSVpL7aPk0kU5CtlsIae/8mf2B/NrBi7DKmepcjX6Q=")?
+            .as_slice()
+            .try_into()?;
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 

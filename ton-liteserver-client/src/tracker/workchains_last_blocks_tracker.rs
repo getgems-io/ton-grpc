@@ -4,7 +4,6 @@ use crate::tlb::shard_hashes::ShardHashes;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use crate::tracker::ShardId;
 use dashmap::DashMap;
-use std::error::Error;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_util::sync::{CancellationToken, DropGuard};
@@ -44,7 +43,7 @@ where
     S: Service<
         LiteServerGetAllShardsInfo,
         Response = LiteServerAllShardsInfo,
-        Error: Error,
+        Error = tower::BoxError,
         Future: Send,
     >,
 {

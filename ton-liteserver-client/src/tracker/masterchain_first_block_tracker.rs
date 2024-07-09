@@ -43,13 +43,13 @@ where
     S: Service<
         LiteServerLookupBlock,
         Response = LiteServerBlockHeader,
-        Error = crate::client::Error,
+        Error = tower::BoxError,
         Future: Send,
     >,
     S: Service<
         LiteServerGetBlock,
         Response = LiteServerBlockData,
-        Error = crate::client::Error,
+        Error = tower::BoxError,
         Future: Send,
     >,
 {
