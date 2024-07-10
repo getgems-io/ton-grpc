@@ -11,7 +11,6 @@ use std::{
     task::{Context, Poll},
 };
 use ton_client_util::router::route::ToRoute;
-use ton_client_util::router::Router;
 use tower::discover::Discover;
 use tower::{MakeService, Service, ServiceExt};
 

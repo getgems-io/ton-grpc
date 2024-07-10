@@ -31,7 +31,7 @@ impl Route {
         from: I,
     ) -> Result<Vec<&'a mut S>, Error>
     where
-        S: Routed + Clone + 'a,
+        S: Routed + 'a,
         I: IntoIterator<Item = &'a mut S>,
     {
         match self {

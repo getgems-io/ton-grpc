@@ -92,12 +92,10 @@ where
 
 impl<S, D, Request> Service<Request> for Balance<S, D>
 where
-    Request: ToRoute + Send + 'static,
-    S: Service<Request, Response: Send + 'static, Future: Send>
+    Request: ToRoute + 'static,
+    S: Service<Request, Response: Send + 'static, Future: Send + 'static>
         + Routed
-        + Clone
         + Load
-        + Send
         + 'static,
     S::Error: Into<tower::BoxError>,
     D: Discover<Service = S, Error: Into<tower::BoxError> + Debug> + Unpin,
