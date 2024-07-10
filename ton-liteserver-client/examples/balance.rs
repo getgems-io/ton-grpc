@@ -6,7 +6,7 @@ use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDisco
 use ton_client_util::router::balance::Balance;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{
-    LiteServerBoxedBlockHeader, LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId,
+    LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId,
 };
 use ton_liteserver_client::tracked_client::TrackedClient;
 use tower::discover::Change;
