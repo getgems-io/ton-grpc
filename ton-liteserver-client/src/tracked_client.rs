@@ -1,4 +1,3 @@
-use crate::request::Requestable;
 use crate::tracker::masterchain_first_block_tracker::{
     MasterchainFirstBlockTracker, MasterchainFirstBlockTrackerActor,
 };
@@ -138,8 +137,7 @@ impl<S> Routed for TrackedClient<S> {
 
 impl<S, Request> Service<Request> for TrackedClient<S>
 where
-    Request: Requestable,
-    S: Service<Request, Response = Request::Response>,
+    S: Service<Request>,
 {
     type Response = <SharedService<PeakEwma<S>> as Service<Request>>::Response;
     type Error = <SharedService<PeakEwma<S>> as Service<Request>>::Error;
@@ -152,10 +150,10 @@ where
             return Poll::Pending;
         }
 
-        Service::<Request>::poll_ready(&mut self.inner, cx)
+        self.inner.poll_ready(cx)
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
-        Service::call(&mut self.inner, req)
+        self.inner.call(req)
     }
 }
