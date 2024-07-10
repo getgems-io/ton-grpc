@@ -18,7 +18,7 @@ use tokio::time::Instant;
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
-use ton_client_util::router::shards::Prefix;
+use ton_client_util::router::shard_prefix::ShardPrefix;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use tower::Service;
@@ -168,7 +168,7 @@ impl WorkchainsFirstBlocksTracker {
             .filter_map(|kv| {
                 let key = kv.key();
 
-                (key.0 == chain_id && Prefix::from_shard_id(key.1 as u64).matches(address))
+                (key.0 == chain_id && ShardPrefix::from_shard_id(key.1 as u64).matches(address))
                     .then(|| kv.value().info.start_lt)
             })
             .min()

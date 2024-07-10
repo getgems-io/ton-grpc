@@ -1,6 +1,6 @@
 pub mod balance;
 pub mod route;
-pub mod shards;
+pub mod shard_prefix;
 
 use crate::router::route::BlockCriteria;
 

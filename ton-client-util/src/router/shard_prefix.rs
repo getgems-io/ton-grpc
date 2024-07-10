@@ -3,9 +3,9 @@ use bitvec::vec::BitVec;
 use bitvec::view::AsBits;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Prefix(BitVec<u8, Msb0>);
+pub struct ShardPrefix(BitVec<u8, Msb0>);
 
-impl Prefix {
+impl ShardPrefix {
     pub fn new(inner: BitVec<u8, Msb0>) -> Self {
         Self(inner)
     }
@@ -23,45 +23,45 @@ impl Prefix {
 
 #[cfg(test)]
 mod tests {
-    use crate::router::shards::Prefix;
+    use crate::router::shard_prefix::ShardPrefix;
     use bitvec::bitvec;
     use bitvec::prelude::Msb0;
 
     #[test]
     fn prefix_from_shard_id_test() {
         assert_eq!(
-            Prefix::from_shard_id(
+            ShardPrefix::from_shard_id(
                 0b1000000000000000000000000000000000000000000000000000000000000000_u64
             ),
-            Prefix::new(bitvec![u8, Msb0;])
+            ShardPrefix::new(bitvec![u8, Msb0;])
         );
         assert_eq!(
-            Prefix::from_shard_id(
+            ShardPrefix::from_shard_id(
                 0b0100000000000000000000000000000000000000000000000000000000000000_u64
             ),
-            Prefix::new(bitvec![u8, Msb0; 0])
+            ShardPrefix::new(bitvec![u8, Msb0; 0])
         );
         assert_eq!(
-            Prefix::from_shard_id(
+            ShardPrefix::from_shard_id(
                 0b1100000000000000000000000000000000000000000000000000000000000000_u64
             ),
-            Prefix::new(bitvec![u8, Msb0; 1])
+            ShardPrefix::new(bitvec![u8, Msb0; 1])
         );
         assert_eq!(
-            Prefix::from_shard_id(
+            ShardPrefix::from_shard_id(
                 0b1110000000000000000000000000000000000000000000000000000000000000_u64
             ),
-            Prefix::new(bitvec![u8, Msb0; 1, 1])
+            ShardPrefix::new(bitvec![u8, Msb0; 1, 1])
         );
         assert_eq!(
-            Prefix::from_shard_id(u64::MAX),
-            Prefix::new(bitvec![u8, Msb0; 1; 63])
+            ShardPrefix::from_shard_id(u64::MAX),
+            ShardPrefix::new(bitvec![u8, Msb0; 1; 63])
         );
     }
 
     #[test]
     fn empty_prefix_matches_address() {
-        let prefix = Prefix::from_shard_id(
+        let prefix = ShardPrefix::from_shard_id(
             0b1000000000000000000000000000000000000000000000000000000000000000_u64,
         );
 

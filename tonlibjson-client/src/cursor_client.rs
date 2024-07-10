@@ -24,7 +24,7 @@ use tower::load::Load;
 use tracing::{instrument};
 use ton_client_util::router::Routed;
 use ton_client_util::router::route::BlockCriteria;
-use ton_client_util::router::shards::Prefix;
+use ton_client_util::router::shard_prefix::ShardPrefix;
 use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
@@ -192,7 +192,7 @@ impl Registry {
                     .map(|shard_ids| shard_ids
                         .iter()
                         .filter_map(|shard_id|
-                            Prefix::from_shard_id(shard_id.1 as u64)
+                            ShardPrefix::from_shard_id(shard_id.1 as u64)
                                 .matches(address)
                                 .then(|| self.shard_bounds_registry.get(&shard_id))
                                 .flatten()
