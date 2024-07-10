@@ -120,12 +120,17 @@ where
                 ResponseStateProj::Locking { service } => {
                     let future = {
                         if let Ok(mut guard) = service.try_lock() {
-                            let req = this
-                                .request
-                                .take()
-                                .expect("Future was polled after completion");
+                            match ready!(guard.poll_ready(cx)) {
+                                Ok(()) => {
+                                    let req = this
+                                        .request
+                                        .take()
+                                        .expect("Future was polled after completion");
 
-                            guard.call(req)
+                                    guard.call(req)
+                                }
+                                Err(e) => return Poll::Ready(Err(e))
+                            }
                         } else {
                             cx.waker().wake_by_ref();
 

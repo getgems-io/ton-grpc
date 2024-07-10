@@ -1,2 +1,2 @@
 pub mod shared;
-mod load_ref;
+pub mod load_ref;
