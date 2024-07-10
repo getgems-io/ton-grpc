@@ -1,7 +1,6 @@
 extern crate core;
 
 pub mod address;
-mod balance;
 pub mod block;
 mod client;
 mod cursor_client;

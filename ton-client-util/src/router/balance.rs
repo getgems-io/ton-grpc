@@ -157,11 +157,13 @@ where
         let mut balance =
             p2c::Balance::new(ServiceList::new(services.into_iter().map(LoadRef::new)));
 
+        // TODO[akostylev0] there are no async ops actually
+        let mut cx = Context::from_waker(futures::task::noop_waker_ref());
         loop {
-            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
             match balance.poll_ready(&mut cx) {
                 Poll::Ready(Ok(())) => break,
-                Poll::Ready(Err(_)) | Poll::Pending => unreachable!(),
+                Poll::Ready(Err(e)) => unreachable!("load balancer error: {}", e),
+                Poll::Pending => continue,
             }
         }
 

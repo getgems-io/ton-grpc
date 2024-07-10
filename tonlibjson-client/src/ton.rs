@@ -27,9 +27,8 @@ use tower::util::Either;
 use ton_client_util::discover::{LiteServerDiscover, read_ton_config_from_file_stream, read_ton_config_from_url_stream};
 use ton_client_util::discover::config::LiteServerId;
 use ton_client_util::router::route::{BlockCriteria, Route};
-use ton_client_util::router::Router;
+use ton_client_util::router::balance::Balance;
 use crate::address::InternalAccountAddress;
-use crate::balance::Balance;
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell, BlocksGetTransactionsExt, BlocksTransactionsExt};
 use crate::error::ErrorService;
 use crate::helper::Side;
@@ -51,7 +50,7 @@ pub fn default_ton_config_url() -> Url {
 }
 
 type BoxCursorClientDiscover = Pin<Box<dyn Stream<Item=Result<Change<LiteServerId, CursorClient>, anyhow::Error>> + Send>>;
-type SharedBalance = SharedService<Balance<BoxCursorClientDiscover>>;
+type SharedBalance = SharedService<Balance<CursorClient, BoxCursorClientDiscover>>;
 
 #[derive(Clone)]
 pub struct TonClient {
@@ -204,8 +203,7 @@ impl TonClientBuilder {
             }
         });
 
-        let router = Router::new(cursor_client_discover.boxed());
-        let client = Balance::new(router);
+        let client = Balance::new(cursor_client_discover.boxed());
 
         let client = SharedService::new(client);
         let client = tower::util::option_layer(if self.retry_enabled {
