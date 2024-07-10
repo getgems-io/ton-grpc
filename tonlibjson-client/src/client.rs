@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::block::TonError;
 use crate::request::Requestable;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Client {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<DashMap<RequestId, tokio::sync::oneshot::Sender<Response>>>,

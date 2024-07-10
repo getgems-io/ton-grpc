@@ -9,7 +9,7 @@ use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::Result;
 use dashmap::{DashMap, DashSet};
-use futures::{FutureExt, try_join, TryFutureExt};
+use futures::{FutureExt, try_join};
 use futures::future::ready;
 use futures::never::Never;
 use tokio::sync::mpsc::UnboundedSender;
@@ -29,7 +29,7 @@ use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, Bloc
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
-use crate::request::{Specialized, Callable};
+use crate::request::Specialized;
 use ton_client_util::service::shared::SharedService;
 
 pub(crate) type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
@@ -330,14 +330,15 @@ impl Service<Specialized<BlocksGetMasterchainInfo>> for CursorClient {
     }
 }
 
-impl<R : Callable<InnerClient>> Service<R> for CursorClient {
-    type Response = R::Response;
-    type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+impl<R> Service<R> for CursorClient
+where ConcurrencyLimit<SharedService<PeakEwma<Client>>>: Service<R> {
+    type Response = <InnerClient as Service<R>>::Response;
+    type Error = <InnerClient as Service<R>>::Error;
+    type Future = <InnerClient as Service<R>>::Future;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
         if self.edges_defined() {
-            return Service::<BlocksGetMasterchainInfo>::poll_ready(&mut self.client, cx);
+            return self.client.poll_ready(cx);
         }
 
         cx.waker().wake_by_ref();
@@ -346,7 +347,7 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        req.call(&mut self.client).map_err(|e| e.into().into()).boxed()
+        self.client.call(req)
     }
 }
 

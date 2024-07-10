@@ -1,34 +1,9 @@
-use std::future::Future;
 use std::time::Duration;
 use derive_new::new;
 use serde::{Serialize, Serializer};
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use tower::{Service};
 use ton_client_util::router::route::{Route, ToRoute};
-use crate::error::Error;
-
-pub(crate) trait Callable<S> : Sized + Send + 'static {
-    type Response : DeserializeOwned;
-    type Error: Into<Error>;
-    type Future : Future<Output=Result<Self::Response, Self::Error>> + Send;
-
-    fn call(self, client: &mut S) -> Self::Future;
-}
-
-impl<S, T, E: Into<Error>> Callable<S> for T
-    where T : Requestable + 'static,
-          S : Service<T, Response=T::Response, Error=E> + Send,
-          S::Future : Send + 'static,
-          S::Error: Send {
-    type Response = T::Response;
-    type Error = S::Error;
-    type Future = S::Future;
-
-    fn call(self, client: &mut S) -> Self::Future {
-        client.call(self)
-    }
-}
 
 pub(crate) trait Requestable where Self : Serialize + Send + Sync {
     type Response : DeserializeOwned + Send + Sync + 'static;

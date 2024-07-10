@@ -26,10 +26,7 @@ pub enum Error {
 }
 
 impl Route {
-    pub fn choose<'a, S: Routed, I: IntoIterator<Item = &'a mut S>>(
-        &self,
-        from: I,
-    ) -> Result<Vec<&'a mut S>, Error>
+    pub fn choose<'a, S, I>(&self, from: I) -> Result<Vec<&'a mut S>, Error>
     where
         S: Routed + 'a,
         I: IntoIterator<Item = &'a mut S>,
