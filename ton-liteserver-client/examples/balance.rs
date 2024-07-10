@@ -3,7 +3,7 @@ use futures::{stream, StreamExt};
 use std::time::Duration;
 use tokio::time::Instant;
 use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDiscover};
-use ton_liteserver_client::balance::Balance;
+use ton_client_util::router::balance::Balance;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{
     LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId,
@@ -51,6 +51,8 @@ async fn main() -> Result<(), tower::BoxError> {
         .oneshot(LiteServerGetMasterchainInfo::default())
         .await?
         .last;
+
+    tracing::info!("Last block: {}", last.seqno);
 
     let requests = stream::iter((1..last.seqno).rev()).map(|seqno| LiteServerLookupBlock {
         mode: 1,

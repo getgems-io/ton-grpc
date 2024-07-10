@@ -26,10 +26,13 @@ pub enum Error {
 }
 
 impl Route {
-    pub fn choose<'a, S, I>(&self, from: I) -> Result<Vec<S>, Error>
+    pub fn choose<'a, S: Routed, I: IntoIterator<Item = &'a mut S>>(
+        &self,
+        from: I,
+    ) -> Result<Vec<&'a mut S>, Error>
     where
         S: Routed + Clone + 'a,
-        I: IntoIterator<Item = &'a S>,
+        I: IntoIterator<Item = &'a mut S>,
     {
         match self {
             Route::Block { chain, criteria } => {
@@ -47,7 +50,6 @@ impl Route {
                             false
                         }
                     })
-                    .cloned()
                     .collect();
 
                 if clients.is_empty() {
@@ -68,7 +70,7 @@ impl Route {
                     .chunk_by(|(_, seqno)| *seqno);
 
                 if let Some((_, group)) = groups.into_iter().next() {
-                    return Ok(group.into_iter().map(|(s, _)| s).cloned().collect());
+                    return Ok(group.into_iter().map(|(s, _)| s).collect());
                 }
 
                 Err(Error::RouteUnknown)

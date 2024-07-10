@@ -1,19 +1,20 @@
 use crate::router::route::{Error, Route, ToRoute};
-use crate::router::{route, Routed, Router};
+use crate::router::{route, Routed};
+use crate::service::load_ref::LoadRef;
 use futures::future::BoxFuture;
 use futures::FutureExt;
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::fmt::Debug;
-use std::future::{ready, Ready};
+use std::future::ready;
 use std::hash::Hash;
+use std::mem;
 use std::pin::Pin;
-use std::process::Output;
 use std::task::{ready, Context, Poll};
+use tower::balance::p2c;
 use tower::discover::{Change, Discover, ServiceList};
 use tower::load::Load;
-use tower::util::Oneshot;
-use tower::{Service, ServiceExt};
+use tower::Service;
 
 pub struct Balance<S, D>
 where
@@ -22,6 +23,7 @@ where
 {
     discover: D,
     services: HashMap<D::Key, S>,
+    ready: HashMap<D::Key, S>,
 }
 
 impl<S, D> Balance<S, D>
@@ -51,6 +53,7 @@ where
         Self {
             discover,
             services: Default::default(),
+            ready: Default::default(),
         }
     }
 }
@@ -64,7 +67,6 @@ where
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<(), Infallible>>> {
         loop {
-            tracing::info!("Updating pending services");
             match ready!(Pin::new(&mut self.discover).poll_discover(cx)).transpose() {
                 Ok(None) => {
                     tracing::info!("No more services to discover");
@@ -73,6 +75,7 @@ where
                 Ok(Some(Change::Remove(key))) => {
                     tracing::info!("Removing service");
                     self.services.remove(&key);
+                    self.ready.remove(&key);
                 }
                 Ok(Some(Change::Insert(key, svc))) => {
                     tracing::info!("Adding service");
@@ -90,10 +93,15 @@ where
 impl<S, D, Request> Service<Request> for Balance<S, D>
 where
     Request: ToRoute + Send + 'static,
-    S: Service<Request, Response: Send + 'static, Future: Send> + Routed + Clone + Load + Send + 'static,
+    S: Service<Request, Response: Send + 'static, Future: Send>
+        + Routed
+        + Clone
+        + Load
+        + Send
+        + 'static,
     S::Error: Into<tower::BoxError>,
     D: Discover<Service = S, Error: Into<tower::BoxError> + Debug> + Unpin,
-    D::Key: Hash,
+    D::Key: Hash + Clone,
     <S as Load>::Metric: Debug,
 {
     type Response = S::Response;
@@ -102,27 +110,41 @@ where
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let _ = self.update_pending_from_discover(cx);
+        self.services.extend(mem::take(&mut self.ready));
 
-        for s in self.services.values_mut() {
+        let mut ready_keys = Vec::new();
+        for (k, s) in self.services.iter_mut() {
             if let Poll::Ready(Ok(())) = s.poll_ready(cx) {
-                return Poll::Ready(Ok(()));
+                ready_keys.push(k.clone());
             }
         }
 
-        tracing::info!("No available services at this moment");
+        if ready_keys.is_empty() {
+            cx.waker().wake_by_ref();
 
-        cx.waker().wake_by_ref();
+            Poll::Pending
+        } else {
+            for key in ready_keys {
+                if let Some(svc) = self.services.remove(&key) {
+                    self.ready.insert(key.clone(), svc);
+                }
+            }
 
-        Poll::Pending
+            Poll::Ready(Ok(()))
+        }
     }
 
     fn call(&mut self, req: Request) -> Self::Future {
-        let services = match req.to_route().choose(self.services.values_mut()) {
+        if self.ready.is_empty() {
+            panic!("called before ready")
+        }
+
+        let services = match req.to_route().choose(self.ready.values_mut()) {
             Ok(services) => services,
             Err(Error::RouteUnknown) => {
                 metrics::counter!("ton_router_miss_count").increment(1);
 
-                match Route::Latest.choose(self.services.values_mut()) {
+                match Route::Latest.choose(self.ready.values_mut()) {
                     Ok(services) => services,
                     Err(e) => return ready(Err(e.into())).boxed(),
                 }
@@ -133,7 +155,17 @@ where
                 return ready(Err(route::Error::RouteNotAvailable.into())).boxed();
             }
         };
-        let mut balance = tower::balance::p2c::Balance::new(ServiceList::new(services));
+
+        let mut balance =
+            p2c::Balance::new(ServiceList::new(services.into_iter().map(LoadRef::new)));
+
+        loop {
+            let mut cx = Context::from_waker(futures::task::noop_waker_ref());
+            match balance.poll_ready(&mut cx) {
+                Poll::Ready(Ok(())) => break,
+                Poll::Ready(Err(_)) | Poll::Pending => unreachable!(),
+            }
+        }
 
         balance.call(req).boxed()
     }
