@@ -6,7 +6,7 @@ use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDisco
 use ton_client_util::router::balance::Balance;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{
-    LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId,
+    LiteServerBoxedBlockHeader, LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId,
 };
 use ton_liteserver_client::tracked_client::TrackedClient;
 use tower::discover::Change;
@@ -34,7 +34,7 @@ async fn main() -> Result<(), tower::BoxError> {
 
                 let client = ServiceBuilder::new()
                     .layer_fn(TrackedClient::new)
-                    .concurrency_limit(100)
+                    .concurrency_limit(1000)
                     .timeout(Duration::from_secs(5))
                     .service(LiteServerClient::connect(ls.into(), &secret_key).await?);
 
@@ -67,13 +67,11 @@ async fn main() -> Result<(), tower::BoxError> {
 
     let mut responses = svc.call_all(requests).unordered();
 
-    while let Some(item) = responses
-        .next()
-        .await
-        .transpose()
-        .inspect_err(|e| tracing::error!(e))?
-    {
-        tracing::info!(?item.id.seqno);
+    while let Some(item) = responses.next().await {
+        match item {
+            Ok(response) => tracing::info!(?response.id.seqno),
+            Err(e) => tracing::error!(?e),
+        }
     }
     Ok(())
 }
