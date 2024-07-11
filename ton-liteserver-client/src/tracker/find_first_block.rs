@@ -67,13 +67,13 @@ where
     Ok(header)
 }
 
-async fn check_block_available<S>(
+async fn check_block_available<S, E>(
     client: &mut S,
     block_id: TonNodeBlockId,
-) -> Result<(LiteServerBlockHeader, LiteServerBlockData), tower::BoxError>
+) -> Result<(LiteServerBlockHeader, LiteServerBlockData), E>
 where
-    S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = tower::BoxError>,
-    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = tower::BoxError>,
+    S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = E>,
+    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = E>,
 {
     // TODO[akostylev0] research
     let block_header = client

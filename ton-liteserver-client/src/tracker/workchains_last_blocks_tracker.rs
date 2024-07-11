@@ -4,6 +4,7 @@ use crate::tlb::shard_hashes::ShardHashes;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use crate::tracker::ShardId;
 use dashmap::DashMap;
+use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio_util::sync::{CancellationToken, DropGuard};
@@ -43,7 +44,7 @@ where
     S: Service<
         LiteServerGetAllShardsInfo,
         Response = LiteServerAllShardsInfo,
-        Error = tower::BoxError,
+        Error: Debug,
         Future: Send,
     >,
 {
@@ -60,34 +61,39 @@ where
                 .last
                 .clone();
 
-            let shards_description = (&mut self.client)
+            match (&mut self.client)
                 .oneshot(LiteServerGetAllShardsInfo::new(last_block_id))
                 .await
-                .unwrap();
+            {
+                Ok(shards_description) => {
+                    let boc: BoC = unpack_bytes_fully(&shards_description.data).unwrap();
+                    let root = boc.single_root().unwrap();
+                    let shard_hashes: ShardHashes = root.parse_fully().unwrap();
 
-            let boc: BoC = unpack_bytes_fully(&shards_description.data).unwrap();
-            let root = boc.single_root().unwrap();
-            let shard_hashes: ShardHashes = root.parse_fully().unwrap();
-
-            // TODO[akostylev0]: verify proofs
-            shard_hashes
-                .iter()
-                .flat_map(|(chain_id, shards)| shards.iter().map(move |shard| (chain_id, shard)))
-                .for_each(|(chain_id, shard)| {
-                    let shard_id = (*chain_id as i32, shard.next_validator_shard as i64);
-                    self.state.insert(shard_id, shard.clone());
-
-                    let _ = self
-                        .sender
-                        .send(TonNodeBlockIdExt {
-                            workchain: *chain_id as i32,
-                            shard: shard.next_validator_shard as i64,
-                            seqno: shard.seq_no as i32,
-                            root_hash: shard.root_hash,
-                            file_hash: shard.file_hash,
+                    // TODO[akostylev0]: verify proofs
+                    shard_hashes
+                        .iter()
+                        .flat_map(|(chain_id, shards)| {
+                            shards.iter().map(move |shard| (chain_id, shard))
                         })
-                        .expect("expect to send shard_id");
-                });
+                        .for_each(|(chain_id, shard)| {
+                            let shard_id = (*chain_id as i32, shard.next_validator_shard as i64);
+                            self.state.insert(shard_id, shard.clone());
+
+                            let _ = self
+                                .sender
+                                .send(TonNodeBlockIdExt {
+                                    workchain: *chain_id as i32,
+                                    shard: shard.next_validator_shard as i64,
+                                    seqno: shard.seq_no as i32,
+                                    root_hash: shard.root_hash,
+                                    file_hash: shard.file_hash,
+                                })
+                                .expect("expect to send shard_id");
+                        });
+                }
+                Err(error) => tracing::warn!(?error),
+            }
         }
     }
 }

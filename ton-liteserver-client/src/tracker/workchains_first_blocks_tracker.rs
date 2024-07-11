@@ -2,6 +2,7 @@ use crate::tl::{
     LiteServerBlockData, LiteServerBlockHeader, LiteServerGetBlock, LiteServerLookupBlock,
 };
 use crate::tlb::block_header::BlockHeader;
+use crate::tlb::merkle_proof::MerkleProof;
 use crate::tracker::find_first_block::find_first_block_header;
 use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
 use crate::tracker::ShardId;
@@ -22,7 +23,6 @@ use ton_client_util::router::shard_prefix::ShardPrefix;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use tower::Service;
-use crate::tlb::merkle_proof::MerkleProof;
 
 pub struct WorkchainsFirstBlocksTrackerActor<S> {
     client: S,
@@ -83,9 +83,10 @@ where
                         timeouts.remove(&shard_id);
                         timeouts.insert(shard_id, Instant::now());
 
-                        futures.push(async {
+                        futures.push({
                             let mut client = self.client.clone();
-                            find_first_block_header(&mut client, block_id, None, None).await
+
+                            async move { find_first_block_header(&mut client, block_id, None, None).await }
                         });
                     }
                 },
@@ -102,7 +103,7 @@ where
 
                             let _ = self.sender.send(block_header.virtual_root).unwrap();
                         },
-                        Err(e) => { tracing::error!("Error: {:?}", e); }
+                        Err(error) => { tracing::warn!(?error); }
                     }
                 }
             }

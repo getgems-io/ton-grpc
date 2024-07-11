@@ -81,7 +81,7 @@ where
 
                 let _ = self.sender.send(Some(header.virtual_root));
             })
-            .inspect_err(|error| tracing::error!(?error))
+            .inspect_err(|error| tracing::warn!(?error))
             .await;
 
             tokio::time::sleep(Duration::from_secs(60)).await;
