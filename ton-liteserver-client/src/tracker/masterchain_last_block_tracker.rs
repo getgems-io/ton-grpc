@@ -1,5 +1,7 @@
 use crate::tl::{LiteServerGetMasterchainInfo, LiteServerMasterchainInfo};
+use crate::wait_seqno::WaitSeqno;
 use futures::future::Either;
+use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch;
@@ -9,7 +11,6 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
 use tower::{Service, ServiceExt};
-use crate::wait_seqno::WaitSeqno;
 
 pub struct MasterchainLastBlockTrackerActor<S> {
     client: S,
@@ -22,19 +23,20 @@ impl<S> MasterchainLastBlockTrackerActor<S> {
     }
 }
 
-impl<S> Actor for MasterchainLastBlockTrackerActor<S>
+impl<S, E> Actor for MasterchainLastBlockTrackerActor<S>
 where
+    E: Debug,
     S: Send + 'static,
     S: Service<
         LiteServerGetMasterchainInfo,
         Response = LiteServerMasterchainInfo,
-        Error = tower::BoxError,
+        Error = E,
         Future: Send,
     >,
     S: Service<
         WaitSeqno<LiteServerGetMasterchainInfo>,
         Response = LiteServerMasterchainInfo,
-        Error = tower::BoxError,
+        Error = E,
         Future: Send,
     >,
 {
