@@ -2,6 +2,7 @@ use crate::tl::{LiteServerBoxedBlockHeader, LiteServerGetBlockHeader};
 use crate::tlb::block_header::BlockHeader;
 use crate::tlb::merkle_proof::MerkleProof;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
+use std::fmt::Debug;
 use std::sync::Arc;
 use tokio::sync::watch;
 use tokio::sync::watch::Ref;
@@ -38,7 +39,7 @@ where
     S: Service<
         LiteServerGetBlockHeader,
         Response = LiteServerBoxedBlockHeader,
-        Error = tower::BoxError,
+        Error: Debug,
         Future: Send,
     >,
 {
@@ -55,21 +56,24 @@ where
                 .last
                 .clone();
 
-            let Ok(response) = (&mut self.client)
+            match (&mut self.client)
                 .oneshot(LiteServerGetBlockHeader::new(last_block_id))
                 .await
-            else {
-                continue;
-            };
+            {
+                Ok(response) => {
+                    let header_bytes = response.header_proof;
 
-            let header_bytes = response.header_proof;
+                    let boc: BoC = unpack_bytes_fully(&header_bytes).unwrap();
+                    let root = boc.single_root().unwrap();
 
-            let boc: BoC = unpack_bytes_fully(&header_bytes).unwrap();
-            let root = boc.single_root().unwrap();
+                    let header: MerkleProof = root.parse_fully().unwrap();
 
-            let header: MerkleProof = root.parse_fully().unwrap();
-
-            self.sender.send(Some(header.virtual_root)).unwrap();
+                    self.sender.send(Some(header.virtual_root)).unwrap();
+                }
+                Err(error) => {
+                    tracing::warn!(?error)
+                }
+            }
         }
     }
 }
