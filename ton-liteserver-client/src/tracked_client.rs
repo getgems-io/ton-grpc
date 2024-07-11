@@ -23,7 +23,7 @@ use tower::load::peak_ewma::Cost;
 use tower::load::{CompleteOnResponse, Load, PeakEwma};
 use tower::Service;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TrackedClient<S> {
     inner: SharedService<PeakEwma<S>>,
     masterchain_last_block_tracker: MasterchainLastBlockTracker,

@@ -1,5 +1,6 @@
 use crate::tl::{LiteServerBoxedBlockHeader, LiteServerGetBlockHeader};
 use crate::tlb::block_header::BlockHeader;
+use crate::tlb::merkle_proof::MerkleProof;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use std::sync::Arc;
 use tokio::sync::watch;
@@ -10,7 +11,6 @@ use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use tower::{Service, ServiceExt};
-use crate::tlb::merkle_proof::MerkleProof;
 
 pub struct MasterchainLastBlockHeaderTrackerActor<S> {
     client: S,
@@ -55,11 +55,14 @@ where
                 .last
                 .clone();
 
-            let header_bytes = (&mut self.client)
+            let Ok(response) = (&mut self.client)
                 .oneshot(LiteServerGetBlockHeader::new(last_block_id))
                 .await
-                .unwrap()
-                .header_proof;
+            else {
+                continue;
+            };
+
+            let header_bytes = response.header_proof;
 
             let boc: BoC = unpack_bytes_fully(&header_bytes).unwrap();
             let root = boc.single_root().unwrap();

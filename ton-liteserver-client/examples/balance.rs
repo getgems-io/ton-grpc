@@ -3,7 +3,6 @@ use futures::{stream, StreamExt};
 use std::time::Duration;
 use tokio::time::Instant;
 use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDiscover};
-use ton_client_util::router::balance::Balance;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{
     LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId,
@@ -11,6 +10,7 @@ use ton_liteserver_client::tl::{
 use ton_liteserver_client::tracked_client::TrackedClient;
 use tower::discover::Change;
 use tower::{ServiceBuilder, ServiceExt};
+use ton_client_util::router::balance::Balance;
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
@@ -34,7 +34,7 @@ async fn main() -> Result<(), tower::BoxError> {
 
                 let client = ServiceBuilder::new()
                     .layer_fn(TrackedClient::new)
-                    .concurrency_limit(1000)
+                    .concurrency_limit(10)
                     .timeout(Duration::from_secs(5))
                     .service(LiteServerClient::connect(ls.into(), &secret_key).await?);
 
@@ -65,7 +65,7 @@ async fn main() -> Result<(), tower::BoxError> {
         utime: None,
     });
 
-    let mut responses = svc.call_all(requests).unordered();
+    let mut responses = svc.call_all(requests);
 
     while let Some(item) = responses.next().await {
         match item {
