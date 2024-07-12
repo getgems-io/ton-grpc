@@ -23,6 +23,7 @@ use ton_client_util::router::shard_prefix::ShardPrefix;
 use toner::tlb::bits::de::unpack_bytes_fully;
 use toner::ton::boc::BoC;
 use tower::Service;
+use crate::client::Error;
 
 pub struct WorkchainsFirstBlocksTrackerActor<S> {
     client: S,
@@ -53,13 +54,13 @@ where
     S: Service<
         LiteServerLookupBlock,
         Response = LiteServerBlockHeader,
-        Error = tower::BoxError,
+        Error = Error,
         Future: Send,
     >,
     S: Service<
         LiteServerGetBlock,
         Response = LiteServerBlockData,
-        Error = tower::BoxError,
+        Error = Error,
         Future: Send,
     >,
 {

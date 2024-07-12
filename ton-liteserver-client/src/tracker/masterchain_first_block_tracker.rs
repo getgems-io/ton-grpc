@@ -15,6 +15,7 @@ use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes;
 use toner::ton::boc::BoC;
 use tower::Service;
+use crate::client::Error;
 use crate::tlb::merkle_proof::MerkleProof;
 
 pub struct MasterchainFirstBlockTrackerActor<S> {
@@ -43,13 +44,13 @@ where
     S: Service<
         LiteServerLookupBlock,
         Response = LiteServerBlockHeader,
-        Error = tower::BoxError,
+        Error = Error,
         Future: Send,
     >,
     S: Service<
         LiteServerGetBlock,
         Response = LiteServerBlockData,
-        Error = tower::BoxError,
+        Error = Error,
         Future: Send,
     >,
 {

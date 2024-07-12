@@ -16,12 +16,12 @@ pub type ServerKey = [u8; 32];
 pub struct Client;
 
 impl Client {
-    pub async fn connect<A: ToSocketAddrs>(addr: A, server_key: &ServerKey) -> anyhow::Result<Connection> {
+    pub async fn connect<A: ToSocketAddrs>(addr: A, server_key: ServerKey) -> anyhow::Result<Connection> {
         let mut stream = TcpStream::connect(addr).await?;
 
         let aes_ctr = AesCtr::generate();
-        let server_public_key = VerifyingKey::from_bytes(server_key)?;
-        let server_key_id = Ed25519KeyId::from_public_key_bytes(server_key);
+        let server_public_key = VerifyingKey::from_bytes(&server_key)?;
+        let server_key_id = Ed25519KeyId::from_public_key_bytes(&server_key);
         let client_key = Ed25519Key::generate();
 
         let (basis, checksum) = aes_ctr.encrypt(client_key.expanded_secret_key(), &server_public_key);

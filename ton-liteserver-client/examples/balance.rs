@@ -1,16 +1,20 @@
 use base64::Engine;
 use futures::{stream, StreamExt};
+use std::net::SocketAddrV4;
 use std::time::Duration;
 use tokio::time::Instant;
 use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDiscover};
-use ton_liteserver_client::client::LiteServerClient;
+use ton_client_util::router::balance::Balance;
+use ton_client_util::service::shared::SharedLayer;
+use ton_liteserver_client::client::{Error, LiteServerClient};
+use ton_liteserver_client::make::MakeClient;
 use ton_liteserver_client::tl::{
     LiteServerGetMasterchainInfo, LiteServerLookupBlock, TonNodeBlockId,
 };
 use ton_liteserver_client::tracked_client::TrackedClient;
 use tower::discover::Change;
-use tower::{ServiceBuilder, ServiceExt};
-use ton_client_util::router::balance::Balance;
+use tower::reconnect::Reconnect;
+use tower::{BoxError, ServiceBuilder, ServiceExt};
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
@@ -31,12 +35,21 @@ async fn main() -> Result<(), tower::BoxError> {
                 let mut secret_key: [u8; 32] = [0; 32];
                 base64::engine::general_purpose::STANDARD
                     .decode_slice(&ls.id.key, &mut secret_key[..])?;
+                let addr: SocketAddrV4 = ls.into();
 
                 let client = ServiceBuilder::new()
                     .layer_fn(TrackedClient::new)
                     .concurrency_limit(10)
-                    .timeout(Duration::from_secs(5))
-                    .service(LiteServerClient::connect(ls.into(), &secret_key).await?);
+                    .map_err(|e: BoxError| match e.downcast::<Error>() {
+                        Ok(e) => *e,
+                        Err(_) => Error::Elapsed,
+                    })
+                    .timeout(Duration::from_secs(10))
+                    .layer(SharedLayer)
+                    .service(Reconnect::new::<LiteServerClient, ()>(
+                        MakeClient::default(),
+                        (addr, secret_key.clone()),
+                    ));
 
                 anyhow::Ok(Change::Insert(k, client))
             }

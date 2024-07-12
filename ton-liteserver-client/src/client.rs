@@ -32,14 +32,16 @@ pub type RequestId = Int256;
 
 #[derive(Error, Debug)]
 pub enum Error {
-    #[error("LiteServer error: {0}")]
+    #[error("lite server error: {0}")]
     LiteServerError(#[from] LiteServerError),
-    #[error("Deserialize error")]
+    #[error("deserialize error")]
     Deserialize,
-    #[error("Inner channel is closed")]
+    #[error("inner channel is closed")]
     ChannelClosed,
-    #[error("Response oneshot channel is closed")]
+    #[error("response oneshot channel is closed")]
     OneshotClosed,
+    #[error("request timed out")]
+    Elapsed,
 }
 
 #[derive(Debug, Clone)]
@@ -132,7 +134,7 @@ enum ClientActorMessage {
 }
 
 impl LiteServerClient {
-    pub async fn connect(addr: SocketAddrV4, server_key: &ServerKey) -> anyhow::Result<Self> {
+    pub async fn connect(addr: SocketAddrV4, server_key: ServerKey) -> anyhow::Result<Self> {
         let inner = Client::connect(addr, server_key).await?;
         let cancel_token = CancellationToken::new();
         let (tx, rx) = mpsc::unbounded_channel::<ClientActorMessage>();

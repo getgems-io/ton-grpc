@@ -129,7 +129,7 @@ mod tests {
 
         let result = route.choose(&from).unwrap();
 
-        assert_eq!(result, vec![&routed]);
+        assert_eq!(result, vec![routed]);
     }
 
     #[test]
@@ -204,7 +204,7 @@ mod tests {
 
         assert_eq!(
             result,
-            vec![&MyRouted {
+            vec![MyRouted {
                 contains: false,
                 contains_not_available: true,
                 last_seqno: Some(100),
