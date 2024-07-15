@@ -7,7 +7,7 @@ use std::net::SocketAddrV4;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::time::{Sleep, sleep};
+use tokio::time::{sleep, Sleep};
 use tokio_retry::strategy::{jitter, ExponentialBackoff};
 use tower::Service;
 
@@ -52,7 +52,7 @@ impl Service<()> for MakeClient {
 
     fn call(&mut self, _: ()) -> Self::Future {
         if let Some(duration) = self.retry_strategy.as_mut().next() {
-            self.sleep.replace(sleep(duration).boxed());
+            self.sleep.replace(Box::pin(sleep(duration)));
         }
 
         LiteServerClient::connect(self.addr, self.key).boxed()
