@@ -51,8 +51,8 @@ async fn main() -> Result<(), tower::BoxError> {
                         Err(e) => Error::Connection(e.to_string()),
                     })
                     .service(Reconnect::new::<LiteServerClient, ()>(
-                        MakeClient::default(),
-                        (addr, secret_key.clone()),
+                        MakeClient::new(addr, secret_key),
+                        (),
                     ));
 
                 anyhow::Ok(Change::Insert(k, client))

@@ -2533,6 +2533,7 @@ dependencies = [
  "thiserror",
  "tl_parser",
  "tokio",
+ "tokio-retry",
  "tokio-stream",
  "tokio-util",
  "ton-client-util",
