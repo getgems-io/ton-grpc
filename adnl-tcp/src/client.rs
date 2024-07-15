@@ -79,7 +79,7 @@ mod tests {
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-        let client = Client::connect(SocketAddrV4::new(ip, port), &key).await;
+        let client = Client::connect(SocketAddrV4::new(ip, port), key).await;
 
         assert!(client.is_err());
         assert_eq!(client.err().unwrap().to_string(), "missed empty packet".to_string());
@@ -110,7 +110,7 @@ mod tests {
 
         tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-        let connection = Client::connect(SocketAddrV4::new(ip, port), &key).await?;
+        let connection = Client::connect(SocketAddrV4::new(ip, port), key).await?;
 
         Ok(connection)
     }

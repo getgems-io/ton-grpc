@@ -4,12 +4,11 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
 use anyhow::anyhow;
 use ton_liteserver_client::client::LiteServerClient;
-use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo, LiteServerGetTransactions, TonNodeBoxedBlockIdExt};
+use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo, TonNodeBoxedBlockIdExt};
 use ton_liteserver_client::tlb::shard_hashes::ShardHashes;
 use toner::{tlb::bits::de::unpack_bytes, ton::boc::BoC};
 use toner::tlb::bits::de::unpack_bytes_fully;
 use tower::{ServiceBuilder, ServiceExt};
-use ton_liteserver_client::tlb::block_header::BlockHeader;
 use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
 
 #[tokio::main]
@@ -74,7 +73,7 @@ async fn provided_client() -> anyhow::Result<LiteServerClient> {
 
     tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-    let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), &key).await?;
+    let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), key).await?;
 
     Ok(client)
 }

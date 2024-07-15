@@ -44,7 +44,7 @@ async fn provided_client() -> anyhow::Result<LiteServerClient> {
 
     tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
 
-    let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), &key).await?;
+    let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), key).await?;
 
     Ok(client)
 }

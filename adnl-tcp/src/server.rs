@@ -56,7 +56,7 @@ mod tests {
             let (stream, _) = listener.accept().await.unwrap();
             let (_client_public_key, _connection) = Server::handshake(stream, key).await.unwrap();
         });
-        let connected = Client::connect(format!("127.0.0.1:{}", port), server_public_key).await;
+        let connected = Client::connect(format!("127.0.0.1:{}", port), *server_public_key).await;
 
         assert!(connected.is_ok());
     }
