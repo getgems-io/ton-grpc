@@ -39,7 +39,7 @@ async fn main() -> Result<(), tower::BoxError> {
 
                 let client = ServiceBuilder::new()
                     .layer_fn(TrackedClient::new)
-                    .concurrency_limit(10)
+                    .concurrency_limit(1000)
                     .map_err(|e: BoxError| match e.downcast::<Error>() {
                         Ok(e) => *e,
                         Err(_) => Error::Elapsed,
@@ -62,7 +62,9 @@ async fn main() -> Result<(), tower::BoxError> {
         }
     });
 
-    let mut svc = Balance::new(discovery.boxed());
+    let mut svc = ServiceBuilder::new()
+        .concurrency_limit(100000)
+        .service(Balance::new(discovery.boxed()));
 
     let last = (&mut svc)
         .oneshot(LiteServerGetMasterchainInfo::default())
@@ -82,8 +84,7 @@ async fn main() -> Result<(), tower::BoxError> {
         utime: None,
     });
 
-    let mut responses = svc.call_all(requests);
-
+    let mut responses = svc.call_all(requests).unordered();
     while let Some(item) = responses.next().await {
         match item {
             Ok(response) => tracing::info!(?response.id.seqno),

@@ -61,7 +61,10 @@ where
                 Ok(info) => {
                     current_seqno.replace(info.last.seqno);
 
-                    let _ = self.sender.send(Some(info));
+                    let _ = self
+                        .sender
+                        .send(Some(info))
+                        .inspect_err(|e| tracing::error!(?e));
                 }
                 Err(error) => tracing::warn!(?error),
             };
