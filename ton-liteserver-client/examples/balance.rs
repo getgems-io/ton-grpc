@@ -46,6 +46,10 @@ async fn main() -> Result<(), tower::BoxError> {
                     })
                     .timeout(Duration::from_secs(10))
                     .layer(SharedLayer)
+                    .map_err(|e: BoxError| match e.downcast::<Error>() {
+                        Ok(e) => *e,
+                        Err(e) => Error::Connection(e.to_string()),
+                    })
                     .service(Reconnect::new::<LiteServerClient, ()>(
                         MakeClient::default(),
                         (addr, secret_key.clone()),

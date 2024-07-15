@@ -42,6 +42,8 @@ pub enum Error {
     OneshotClosed,
     #[error("request timed out")]
     Elapsed,
+    #[error("connection error: {0}")]
+    Connection(String),
 }
 
 #[derive(Debug, Clone)]
