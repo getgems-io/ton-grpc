@@ -1,24 +1,18 @@
 use std::task::{Context, Poll};
-use anyhow::anyhow;
 use derive_new::new;
 use futures::future::MapErr;
 use futures::TryFutureExt;
-use thiserror::Error;
 use tower::{Layer, Service};
-use ton_client_utils::router::RouterError;
+use ton_client_util::router::route::Error as RouteError;
 
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error(transparent)]
-    Router(#[from] RouterError),
+    Route(#[from] RouteError),
     #[error(transparent)]
-    Custom(#[from] anyhow::Error)
-}
-
-impl From<tower::BoxError> for Error {
-    fn from(err: tower::BoxError) -> Self {
-        Self::Custom(anyhow!(err))
-    }
+    Custom(#[from] anyhow::Error),
+    #[error(transparent)]
+    Tower(#[from] tower::BoxError)
 }
 
 #[derive(Default)]

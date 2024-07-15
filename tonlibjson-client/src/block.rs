@@ -8,9 +8,8 @@ use anyhow::anyhow;
 use derive_new::new;
 use serde::{Serialize, Deserialize};
 use serde::de::DeserializeOwned;
-use ton_client_utils::router::{BlockCriteria, Route};
+use ton_client_util::router::route::{BlockCriteria, Route, ToRoute};
 use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
-use crate::router::Routable;
 use crate::request::Requestable;
 use crate::deserialize::{deserialize_number_from_string, deserialize_default_as_none, deserialize_ton_account_balance, serialize_none_as_empty, deserialize_empty_as_none};
 
@@ -32,8 +31,8 @@ type Vector<T> = Vec<T>;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
-impl Routable for BlocksGetBlockHeader {
-    fn route(&self) -> Route {
+impl ToRoute for BlocksGetBlockHeader {
+    fn to_route(&self) -> Route {
         Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
     }
 }
@@ -104,6 +103,12 @@ impl AccountAddress {
         Ok(Self { account_address: Some(account_address.to_owned()) })
     }
 
+    pub fn to_data(&self) -> Option<AccountAddressData> {
+        self.account_address
+            .as_ref()
+            .and_then(|a| AccountAddressData::from_str(a).ok())
+    }
+
     // TODO[akostylev0]
     pub fn chain_id(&self) -> i32 {
         self.account_address
@@ -114,24 +119,59 @@ impl AccountAddress {
     }
 }
 
-impl Routable for GetShardAccountCell {}
-impl Routable for GetShardAccountCellByTransaction {
-    fn route(&self) -> Route {
-        Route::Block { chain: self.account_address.chain_id(), criteria: BlockCriteria::LogicalTime(self.transaction_id.lt) }
+impl ToRoute for GetShardAccountCell {
+    fn to_route(&self) -> Route {
+        Route::Latest
     }
 }
-impl Routable for RawGetAccountState {}
-impl Routable for RawGetAccountStateByTransaction {
-    fn route(&self) -> Route {
-        Route::Block { chain: self.account_address.chain_id(), criteria: BlockCriteria::LogicalTime(self.transaction_id.lt)  }
+impl ToRoute for GetShardAccountCellByTransaction {
+    fn to_route(&self) -> Route {
+        let data = self.account_address
+            .to_data()
+            .expect("invalid account address");
+
+        Route::Block {
+            chain: data.chain_id,
+            criteria: BlockCriteria::LogicalTime { address: data.bytes, lt: self.transaction_id.lt }
+        }
     }
 }
-impl Routable for GetAccountState {}
-impl Routable for BlocksGetMasterchainInfo {}
-impl Routable for BlocksLookupBlock {
-    fn route(&self) -> Route {
+impl ToRoute for RawGetAccountState {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+impl ToRoute for RawGetAccountStateByTransaction {
+    fn to_route(&self) -> Route {
+        let data = self.account_address
+            .to_data()
+            .expect("invalid account address");
+
+        Route::Block {
+            chain: data.chain_id,
+            criteria: BlockCriteria::LogicalTime { address: data.bytes, lt: self.transaction_id.lt }
+        }
+    }
+}
+impl ToRoute for GetAccountState {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+impl ToRoute for BlocksGetMasterchainInfo {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+impl ToRoute for BlocksLookupBlock {
+    fn to_route(&self) -> Route {
         let criteria = match self.mode {
-            2 => BlockCriteria::LogicalTime(self.lt),
+            2 => {
+                let mut address = [0_u8; 32];
+                address[0 .. 8].copy_from_slice(&self.id.shard.to_be_bytes());
+
+                BlockCriteria::LogicalTime { address, lt: self.lt }
+            },
             _ => BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno }
         };
 
@@ -149,8 +189,8 @@ impl BlocksLookupBlock {
     }
 }
 
-impl Routable for BlocksGetShards {
-    fn route(&self) -> Route {
+impl ToRoute for BlocksGetShards {
+    fn to_route(&self) -> Route {
         Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
     }
 }
@@ -185,8 +225,8 @@ impl BlocksGetTransactionsExt {
     }
 }
 
-impl Routable for BlocksGetTransactionsExt {
-    fn route(&self) -> Route {
+impl ToRoute for BlocksGetTransactionsExt {
+    fn to_route(&self) -> Route {
         Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
     }
 }
@@ -221,8 +261,8 @@ impl BlocksGetTransactions {
     }
 }
 
-impl Routable for BlocksGetTransactions {
-    fn route(&self) -> Route {
+impl ToRoute for BlocksGetTransactions {
+    fn to_route(&self) -> Route {
         Route::Block { chain: self.id.workchain, criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno } }
     }
 }
@@ -252,9 +292,21 @@ impl TryFrom<&RawTransaction> for BlocksAccountTransactionId {
     }
 }
 
-impl Routable for RawSendMessage {}
-impl Routable for RawSendMessageReturnHash {}
-impl Routable for SmcLoad {}
+impl ToRoute for RawSendMessage {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+impl ToRoute for RawSendMessageReturnHash {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
+impl ToRoute for SmcLoad {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
+}
 
 impl SmcBoxedMethodId {
     pub fn by_name(name: &str) -> Self { Self::SmcMethodIdName(SmcMethodIdName { name: name.to_owned() })}
@@ -274,11 +326,15 @@ impl<T> Requestable for T where T: Functional + Serialize + Send + std::marker::
     }
 }
 
-impl Routable for RawGetTransactionsV2 {
-    fn route(&self) -> Route {
+impl ToRoute for RawGetTransactionsV2 {
+    fn to_route(&self) -> Route {
+        let data = self.account_address
+            .to_data()
+            .expect("invalid account address");
+
         Route::Block {
-            chain: self.account_address.chain_id(),
-            criteria: BlockCriteria::LogicalTime(self.from_transaction_id.lt)
+            chain: data.chain_id,
+            criteria: BlockCriteria::LogicalTime { address: data.bytes, lt: self.from_transaction_id.lt }
         }
     }
 }
@@ -317,8 +373,8 @@ impl<T: Functional> Requestable for WithBlock<T> where T : Requestable {
     fn timeout(&self) -> Duration { self.function.timeout() }
 }
 
-impl<T: Functional> Routable for WithBlock<T> {
-    fn route(&self) -> Route {
+impl<T: Functional> ToRoute for WithBlock<T> {
+    fn to_route(&self) -> Route {
         Route::Block {
             chain: self.id.workchain,
             criteria: BlockCriteria::Seqno { shard: self.id.shard, seqno: self.id.seqno }

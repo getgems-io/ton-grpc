@@ -9,7 +9,7 @@ use std::time::Duration;
 use tower::{Service, ServiceExt};
 use anyhow::Result;
 use dashmap::{DashMap, DashSet};
-use futures::{FutureExt, try_join, TryFutureExt};
+use futures::{FutureExt, try_join};
 use futures::future::ready;
 use futures::never::Never;
 use tokio::sync::mpsc::UnboundedSender;
@@ -22,13 +22,15 @@ use tower::load::peak_ewma::Cost;
 use tower::load::PeakEwma;
 use tower::load::Load;
 use tracing::{instrument};
-use ton_client_utils::router::{BlockCriteria, Routed};
+use ton_client_util::router::Routed;
+use ton_client_util::router::route::BlockCriteria;
+use ton_client_util::router::shard_prefix::ShardPrefix;
 use crate::block::{BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt};
 use crate::block::{BlocksLookupBlock, BlocksGetBlockHeader};
 use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
-use crate::request::{Specialized, Callable};
-use crate::shared::SharedService;
+use crate::request::Specialized;
+use ton_client_util::service::shared::SharedService;
 
 pub(crate) type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
 
@@ -184,12 +186,17 @@ impl Registry {
 
     fn contains(&self, chain: &ChainId, criteria: &BlockCriteria, not_available: bool) -> bool {
         match criteria {
-            BlockCriteria::LogicalTime(lt) => {
+            BlockCriteria::LogicalTime { address, lt } => {
                 self.shard_registry
                     .get(chain)
                     .map(|shard_ids| shard_ids
                         .iter()
-                        .filter_map(|shard_id| self.shard_bounds_registry.get(&shard_id))
+                        .filter_map(|shard_id|
+                            ShardPrefix::from_shard_id(shard_id.1 as u64)
+                                .matches(address)
+                                .then(|| self.shard_bounds_registry.get(&shard_id))
+                                .flatten()
+                        )
                         .any(|bounds| bounds.contains_lt(*lt, not_available))
                     ).unwrap_or(false)
             },
@@ -323,14 +330,15 @@ impl Service<Specialized<BlocksGetMasterchainInfo>> for CursorClient {
     }
 }
 
-impl<R : Callable<InnerClient>> Service<R> for CursorClient {
-    type Response = R::Response;
-    type Error = anyhow::Error;
-    type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
+impl<R> Service<R> for CursorClient
+where ConcurrencyLimit<SharedService<PeakEwma<Client>>>: Service<R> {
+    type Response = <InnerClient as Service<R>>::Response;
+    type Error = <InnerClient as Service<R>>::Error;
+    type Future = <InnerClient as Service<R>>::Future;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<std::result::Result<(), Self::Error>> {
         if self.edges_defined() {
-            return Service::<BlocksGetMasterchainInfo>::poll_ready(&mut self.client, cx);
+            return self.client.poll_ready(cx);
         }
 
         cx.waker().wake_by_ref();
@@ -339,7 +347,7 @@ impl<R : Callable<InnerClient>> Service<R> for CursorClient {
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        req.call(&mut self.client).map_err(|e| e.into().into()).boxed()
+        self.client.call(req)
     }
 }
 

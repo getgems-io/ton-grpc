@@ -4,7 +4,7 @@ members = [
     "tonlibjson-sys",
     "tl_parser",
     "adnl-tcp",
-    "ton-client-utils",
+    "ton-client-util",
     "tonlibjson-client",
     "ton-liteserver-client",
     "ton-contract",
@@ -13,23 +13,23 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = { version = "1.0", features = ["backtrace"]}
+anyhow = { version = "1.0", features = ["backtrace"] }
 async-trait = "0.1"
 tower = { version = "0.4", features = ["full"] }
 tokio = { version = "1.38", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
-tokio-stream = { version = "0.1", features = ["sync"]}
+tokio-stream = { version = "0.1", features = ["sync"] }
 futures = "0.3"
 tracing = "0.1.40"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tracing-futures = { version = "0.2.5", features = ["std", "std-future", "futures-03"]}
+tracing-futures = { version = "0.2.5", features = ["std", "std-future", "futures-03"] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["serde_derive"] }
 base64 = "0.22"
 hex = "0.4"
 tracing-test = "0.2.5"
 async-stream = "0.3.5"
-toner = "0.2"
+toner = "0.2.22"
 num-bigint = "0.4"
 tonic = { version = "0.11", features = ["gzip"] }
 tonic-reflection = "0.11"
@@ -47,3 +47,8 @@ rand = "0.8"
 bytes = "1.6"
 thiserror = "1.0.61"
 itertools = "0.13"
+bitvec = "1.0.1"
+metrics = "0.23.0"
+reqwest = { version = "0.12.4", features = ["rustls-tls", "hickory-dns"], default-features = false }
+hickory-resolver = { version = "0.24.1", features = ["tokio-runtime"] }
+tokio-retry = "0.3"

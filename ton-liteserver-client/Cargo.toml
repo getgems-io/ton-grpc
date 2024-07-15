@@ -13,6 +13,7 @@ convert_case = "0.6.0"
 
 [dependencies]
 adnl-tcp = { path = "../adnl-tcp", features = ["client"] }
+ton-client-util = { path = "../ton-client-util" }
 toner.workspace = true
 anyhow = { workspace = true }
 tokio = { workspace = true }
@@ -25,6 +26,9 @@ rand = { workspace = true }
 thiserror = { workspace = true }
 futures = { workspace = true }
 tokio-stream = { workspace = true }
+dashmap = { workspace = true }
+tokio-retry = { workspace = true }
+url = "2.5.1"
 
 [dev-dependencies]
 hex = { workspace = true }

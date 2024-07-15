@@ -6,11 +6,11 @@ use tower::limit::ConcurrencyLimitLayer;
 use tower::{Layer, Service, ServiceExt};
 use tower::load::PeakEwma;
 use tracing::debug;
+use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use crate::block::BlocksGetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
-use crate::shared::SharedLayer;
-use crate::ton_config::TonConfig;
+use ton_client_util::service::shared::SharedLayer;
 
 #[derive(Default, Debug)]
 pub(crate) struct ClientFactory;
@@ -42,14 +42,14 @@ impl Service<TonConfig> for ClientFactory {
 pub(crate) struct CursorClientFactory;
 
 impl CursorClientFactory {
-    pub(crate) fn create(id: String, client: PeakEwma<Client>) -> CursorClient {
+    pub(crate) fn create(id: LiteServerId, client: PeakEwma<Client>) -> CursorClient {
         debug!("make new cursor client");
         let client = SharedLayer
             .layer(client);
         let client = ConcurrencyLimitLayer::new(256)
             .layer(client);
 
-        let client = CursorClient::new(id, client);
+        let client = CursorClient::new(id.to_string(), client);
 
         debug!("successfully made new cursor client");
 

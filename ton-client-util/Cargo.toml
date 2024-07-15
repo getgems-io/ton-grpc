@@ -1,0 +1,23 @@
+[package]
+name = "ton-client-util"
+version = "0.1.0"
+edition = "2021"
+authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+
+[dependencies]
+thiserror = { workspace = true }
+itertools = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+futures = { workspace = true }
+bitvec = { workspace = true }
+tower = { workspace = true }
+metrics = { workspace = true }
+pin-project = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+reqwest = { workspace = true }
+hickory-resolver = { workspace = true }
+tokio-stream = { workspace = true }

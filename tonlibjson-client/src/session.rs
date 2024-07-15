@@ -1,44 +1,45 @@
+use crate::block::{
+    AccountAddress, SmcBoxedMethodId, SmcLoad, SmcRunGetMethod, TvmBoxedStackEntry,
+};
+use crate::client::Client;
+use crate::request::Requestable;
 use derive_new::new;
 use futures::future::BoxFuture;
-use futures::TryFutureExt;
 use futures::FutureExt;
+use futures::TryFutureExt;
+use std::task::{Context, Poll};
+use ton_client_util::router::route::{Route, ToRoute};
 use tower::{Service, ServiceExt};
-use ton_client_utils::router::Route;
-use crate::block::{AccountAddress, SmcBoxedMethodId, SmcLoad, SmcRunGetMethod, TvmBoxedStackEntry};
-use crate::error::Error;
-use crate::request::{Requestable, Callable};
-use crate::router::Routable;
 
 #[derive(new, Clone)]
 pub struct RunGetMethod {
     address: AccountAddress,
     method: SmcBoxedMethodId,
-    stack: Vec<TvmBoxedStackEntry>
+    stack: Vec<TvmBoxedStackEntry>,
 }
 
-impl<S, E: Into<Error> + Send + 'static> Callable<S> for RunGetMethod
-    where S: Service<SmcLoad, Response=<SmcLoad as Requestable>::Response, Error=E>,
-          <S as Service<SmcLoad>>::Future: Send,
-          S: Service<SmcRunGetMethod, Response=<SmcRunGetMethod as Requestable>::Response, Error=E>,
-          <S as Service<SmcRunGetMethod>>::Future: Send,
-          S: Send + Clone + 'static {
+impl Service<RunGetMethod> for Client {
     type Response = <SmcRunGetMethod as Requestable>::Response;
-    type Error = Error;
+    type Error = anyhow::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn call(self, client: &mut S) -> Self::Future {
-        let clone = client.clone();
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        <Self as Service<SmcLoad>>::poll_ready(self, cx)
+    }
 
-        client.call(SmcLoad::new(self.address))
-            .map_err(Into::into)
+    fn call(&mut self, req: RunGetMethod) -> Self::Future {
+        let clone = self.clone();
+
+        self.call(SmcLoad::new(req.address))
             .and_then(move |info| {
-            clone
-                .oneshot(SmcRunGetMethod::new(info.id, self.method, self.stack))
-                .map_err(Into::into)
-        }).boxed()
+                clone.oneshot(SmcRunGetMethod::new(info.id, req.method, req.stack))
+            })
+            .boxed()
     }
 }
 
-impl Routable for RunGetMethod {
-    fn route(&self) -> Route { Route::Latest }
+impl ToRoute for RunGetMethod {
+    fn to_route(&self) -> Route {
+        Route::Latest
+    }
 }
