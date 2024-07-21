@@ -6,6 +6,7 @@ use tokio::time::Instant;
 use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDiscover};
 use ton_client_util::router::balance::Balance;
 use ton_client_util::service::shared::SharedLayer;
+use ton_client_util::service::timeout::TimeoutLayer;
 use ton_liteserver_client::client::{Error, LiteServerClient};
 use ton_liteserver_client::make::MakeClient;
 use ton_liteserver_client::tl::{
@@ -44,7 +45,7 @@ async fn main() -> Result<(), tower::BoxError> {
                         Ok(e) => *e,
                         Err(_) => Error::Elapsed,
                     })
-                    .timeout(Duration::from_secs(10))
+                    .layer(TimeoutLayer::new(Duration::from_secs(5)))
                     .layer(SharedLayer)
                     .map_err(|e: BoxError| match e.downcast::<Error>() {
                         Ok(e) => *e,
