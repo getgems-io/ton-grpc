@@ -6,6 +6,7 @@ use adnl_tcp::serializer::{Serialize, SerializeBoxed, Serializer};
 pub use adnl_tcp::types::*;
 use std::fmt::{Debug, Display, Formatter};
 use ton_client_util::router::route::{BlockCriteria, Route, ToRoute};
+use ton_client_util::service::timeout::ToTimeout;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 
@@ -65,6 +66,8 @@ impl ToRoute for LiteServerGetMasterchainInfo {
     }
 }
 
+impl ToTimeout for LiteServerGetMasterchainInfo {}
+
 /// ```tl
 /// liteServer.getMasterchainInfoExt mode:# = liteServer.MasterchainInfoExt;
 /// ```
@@ -73,6 +76,8 @@ impl ToRoute for LiteServerGetMasterchainInfoExt {
         Route::Latest
     }
 }
+
+impl ToTimeout for LiteServerGetMasterchainInfoExt {}
 
 /// ```tl
 /// liteServer.getBlock id:tonNode.blockIdExt = liteServer.BlockData;
@@ -89,6 +94,8 @@ impl ToRoute for LiteServerGetBlock {
     }
 }
 
+impl ToTimeout for LiteServerGetBlock {}
+
 /// ```tl
 /// liteServer.getState id:tonNode.blockIdExt = liteServer.BlockState;
 /// ```
@@ -103,6 +110,8 @@ impl ToRoute for LiteServerGetState {
         }
     }
 }
+
+impl ToTimeout for LiteServerGetState {}
 
 /// ```tl
 /// liteServer.getBlockHeader id:tonNode.blockIdExt mode:# = liteServer.BlockHeader;
@@ -119,6 +128,8 @@ impl ToRoute for LiteServerGetBlockHeader {
     }
 }
 
+impl ToTimeout for LiteServerGetBlockHeader {}
+
 /// ```tl
 /// liteServer.sendMessage body:bytes = liteServer.SendMsgStatus;
 /// ```
@@ -127,6 +138,8 @@ impl ToRoute for LiteServerSendMessage {
         Route::Latest
     }
 }
+
+impl ToTimeout for LiteServerSendMessage {}
 
 /// ```tl
 /// liteServer.getAccountState id:tonNode.blockIdExt account:liteServer.accountId = liteServer.AccountState;
@@ -143,6 +156,8 @@ impl ToRoute for LiteServerGetAccountState {
     }
 }
 
+impl ToTimeout for LiteServerGetAccountState {}
+
 /// ```tl
 /// liteServer.getAccountStatePrunned id:tonNode.blockIdExt account:liteServer.accountId = liteServer.AccountState;
 /// ```
@@ -157,6 +172,8 @@ impl ToRoute for LiteServerGetAccountStatePrunned {
         }
     }
 }
+
+impl ToTimeout for LiteServerGetAccountStatePrunned {}
 
 /// ```tl
 /// liteServer.runSmcMethod mode:# id:tonNode.blockIdExt account:liteServer.accountId method_id:long params:bytes = liteServer.RunMethodResult;
@@ -173,6 +190,8 @@ impl ToRoute for LiteServerRunSmcMethod {
     }
 }
 
+impl ToTimeout for LiteServerRunSmcMethod {}
+
 /// ```tl
 /// liteServer.getShardInfo id:tonNode.blockIdExt workchain:int shard:long exact:Bool = liteServer.ShardInfo;
 /// ```
@@ -187,6 +206,8 @@ impl ToRoute for LiteServerGetShardInfo {
         }
     }
 }
+
+impl ToTimeout for LiteServerGetShardInfo {}
 
 /// ```tl
 /// liteServer.getAllShardsInfo id:tonNode.blockIdExt = liteServer.AllShardsInfo;
@@ -203,6 +224,8 @@ impl ToRoute for LiteServerGetAllShardsInfo {
     }
 }
 
+impl ToTimeout for LiteServerGetAllShardsInfo {}
+
 /// ```tl
 /// liteServer.getOneTransaction id:tonNode.blockIdExt account:liteServer.accountId lt:long = liteServer.TransactionInfo;
 /// ```
@@ -218,6 +241,8 @@ impl ToRoute for LiteServerGetOneTransaction {
     }
 }
 
+impl ToTimeout for LiteServerGetOneTransaction {}
+
 /// ```tl
 /// liteServer.getTransactions count:# account:liteServer.accountId lt:long hash:int256 = liteServer.TransactionList;
 /// ```
@@ -232,6 +257,8 @@ impl ToRoute for LiteServerGetTransactions {
         }
     }
 }
+
+impl ToTimeout for LiteServerGetTransactions {}
 
 /// ```tl
 /// liteServer.lookupBlock mode:# id:tonNode.blockId lt:mode.1?long utime:mode.2?int = liteServer.BlockHeader;
@@ -261,6 +288,8 @@ impl ToRoute for LiteServerLookupBlock {
     }
 }
 
+impl ToTimeout for LiteServerLookupBlock {}
+
 /// ```tl
 /// liteServer.lookupBlockWithProof mode:# id:tonNode.blockId mc_block_id:tonNode.blockIdExt lt:mode.1?long utime:mode.2?int = liteServer.LookupBlockResult;
 /// ```
@@ -289,6 +318,8 @@ impl ToRoute for LiteServerLookupBlockWithProof {
     }
 }
 
+impl ToTimeout for LiteServerLookupBlockWithProof {}
+
 /// ```tl
 /// liteServer.listBlockTransactions id:tonNode.blockIdExt mode:# count:# after:mode.7?liteServer.transactionId3 reverse_order:mode.6?true want_proof:mode.5?true = liteServer.BlockTransactions;
 /// ```
@@ -304,6 +335,8 @@ impl ToRoute for LiteServerListBlockTransactions {
     }
 }
 
+impl ToTimeout for LiteServerListBlockTransactions {}
+
 /// ```tl
 /// liteServer.listBlockTransactionsExt id:tonNode.blockIdExt mode:# count:# after:mode.7?liteServer.transactionId3 reverse_order:mode.6?true want_proof:mode.5?true = liteServer.BlockTransactionsExt;
 /// ```
@@ -318,6 +351,8 @@ impl ToRoute for LiteServerListBlockTransactionsExt {
         }
     }
 }
+
+impl ToTimeout for LiteServerListBlockTransactionsExt {}
 
 /// ```tl
 /// liteServer.getBlockProof mode:# known_block:tonNode.blockIdExt target_block:mode.0?tonNode.blockIdExt = liteServer.PartialBlockProof;
@@ -335,6 +370,8 @@ impl ToRoute for LiteServerGetBlockProof {
     }
 }
 
+impl ToTimeout for LiteServerGetBlockProof {}
+
 /// ```tl
 /// liteServer.getConfigAll mode:# id:tonNode.blockIdExt = liteServer.ConfigInfo;
 /// ```
@@ -349,6 +386,8 @@ impl ToRoute for LiteServerGetConfigAll {
         }
     }
 }
+
+impl ToTimeout for LiteServerGetConfigAll {}
 
 /// ```tl
 /// liteServer.getConfigParams mode:# id:tonNode.blockIdExt param_list:(vector int) = liteServer.ConfigInfo;
@@ -365,6 +404,8 @@ impl ToRoute for LiteServerGetConfigParams {
     }
 }
 
+impl ToTimeout for LiteServerGetConfigParams {}
+
 /// ```tl
 /// liteServer.getValidatorStats#091a58bc mode:# id:tonNode.blockIdExt limit:int start_after:mode.0?int256 modified_after:mode.2?int = liteServer.ValidatorStats;
 /// ```
@@ -380,6 +421,8 @@ impl ToRoute for LiteServerGetValidatorStats {
     }
 }
 
+impl ToTimeout for LiteServerGetValidatorStats {}
+
 /// ```tl
 /// liteServer.getLibraries library_list:(vector int256) = liteServer.LibraryResult;
 /// ```
@@ -389,6 +432,8 @@ impl ToRoute for LiteServerGetLibraries {
         Route::Latest
     }
 }
+
+impl ToTimeout for LiteServerGetLibraries {}
 
 /// ```tl
 /// liteServer.getLibrariesWithProof id:tonNode.blockIdExt mode:# library_list:(vector int256) = liteServer.LibraryResultWithProof;
@@ -405,6 +450,8 @@ impl ToRoute for LiteServerGetLibrariesWithProof {
     }
 }
 
+impl ToTimeout for LiteServerGetLibrariesWithProof {}
+
 /// ```tl
 /// liteServer.getShardBlockProof id:tonNode.blockIdExt = liteServer.ShardBlockProof;
 /// ```
@@ -420,6 +467,7 @@ impl ToRoute for LiteServerGetShardBlockProof {
     }
 }
 
+impl ToTimeout for LiteServerGetShardBlockProof {}
 
 #[cfg(test)]
 mod tests {
