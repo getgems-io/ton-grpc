@@ -4,6 +4,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::time::{sleep, Sleep};
+use tower::load::Load;
 use tower::timeout::error::Elapsed;
 use tower::{BoxError, Layer, Service};
 
@@ -31,10 +32,22 @@ pub trait ToTimeout {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Timeout<T> {
     inner: T,
     default_timeout: Duration,
+}
+
+impl<T> Clone for Timeout<T>
+where
+    T: Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            default_timeout: self.default_timeout.clone(),
+        }
+    }
 }
 
 impl<T> Timeout<T> {
@@ -69,6 +82,14 @@ where
         let sleep = sleep(timeout);
 
         ResponseFuture::new(response, sleep)
+    }
+}
+
+impl<T> Load for Timeout<T> where T: Load {
+    type Metric = T::Metric;
+
+    fn load(&self) -> Self::Metric {
+        self.inner.load()
     }
 }
 

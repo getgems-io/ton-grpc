@@ -31,8 +31,10 @@ use crate::client::Client;
 use crate::metric::ConcurrencyMetric;
 use crate::request::Specialized;
 use ton_client_util::service::shared::SharedService;
+use ton_client_util::service::timeout::Timeout;
+use crate::error::ErrorService;
 
-pub(crate) type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<PeakEwma<Client>>>>;
+pub(crate) type InnerClient = ConcurrencyMetric<ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<Client>>>>>>;
 
 type ChainId = i32;
 type ShardId = (i32, i64);
@@ -247,7 +249,7 @@ impl Routed for CursorClient {
 }
 
 impl CursorClient {
-    pub(crate) fn new(id: String, client: ConcurrencyLimit<SharedService<PeakEwma<Client>>>) -> Self {
+    pub(crate) fn new(id: String, client: ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<Client>>>>>) -> Self {
         metrics::describe_counter!("ton_liteserver_last_seqno", "The seqno of the latest block that is available for the liteserver to sync");
         metrics::describe_counter!("ton_liteserver_synced_seqno", "The seqno of the last block with which the liteserver is actually synchronized");
         metrics::describe_counter!("ton_liteserver_first_seqno", "The seqno of the first block that is available for the liteserver to request");
@@ -331,7 +333,7 @@ impl Service<Specialized<BlocksGetMasterchainInfo>> for CursorClient {
 }
 
 impl<R> Service<R> for CursorClient
-where ConcurrencyLimit<SharedService<PeakEwma<Client>>>: Service<R> {
+where InnerClient: Service<R> {
     type Response = <InnerClient as Service<R>>::Response;
     type Error = <InnerClient as Service<R>>::Error;
     type Future = <InnerClient as Service<R>>::Future;
@@ -355,7 +357,7 @@ impl Load for CursorClient {
     type Metric = Cost;
 
     fn load(&self) -> Self::Metric {
-        self.client.get_ref().load()
+        self.client.get_ref().get_ref().load()
     }
 }
 
