@@ -3,6 +3,7 @@ use derive_new::new;
 use futures::future::MapErr;
 use futures::TryFutureExt;
 use tower::{Layer, Service};
+use tower::load::Load;
 use ton_client_util::router::route::Error as RouteError;
 
 #[derive(Debug, thiserror::Error)]
@@ -42,5 +43,14 @@ impl<S, Req, E: Into<Error>> Service<Req> for ErrorService<S> where
 
     fn call(&mut self, req: Req) -> Self::Future {
         self.inner.call(req).map_err(|e| e.into().into())
+    }
+}
+
+
+impl<T> Load for ErrorService<T> where T: Load {
+    type Metric = T::Metric;
+
+    fn load(&self) -> Self::Metric {
+        self.inner.load()
     }
 }

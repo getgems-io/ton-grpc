@@ -1,16 +1,18 @@
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
 use serde_json::{json, Value};
 use tower::limit::ConcurrencyLimitLayer;
-use tower::{Layer, Service, ServiceExt};
+use tower::{Service, ServiceBuilder, ServiceExt};
 use tower::load::PeakEwma;
-use tracing::debug;
 use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use crate::block::BlocksGetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor_client::CursorClient;
 use ton_client_util::service::shared::SharedLayer;
+use ton_client_util::service::timeout::TimeoutLayer;
+use crate::error::ErrorLayer;
 
 #[derive(Default, Debug)]
 pub(crate) struct ClientFactory;
@@ -43,17 +45,13 @@ pub(crate) struct CursorClientFactory;
 
 impl CursorClientFactory {
     pub(crate) fn create(id: LiteServerId, client: PeakEwma<Client>) -> CursorClient {
-        debug!("make new cursor client");
-        let client = SharedLayer
-            .layer(client);
-        let client = ConcurrencyLimitLayer::new(256)
-            .layer(client);
-
-        let client = CursorClient::new(id.to_string(), client);
-
-        debug!("successfully made new cursor client");
-
-        client
+        ServiceBuilder::new()
+            .layer_fn(|s| CursorClient::new(id.to_string(), s))
+            .layer(ConcurrencyLimitLayer::new(256))
+            .layer(SharedLayer)
+            .layer(ErrorLayer::default())
+            .layer(TimeoutLayer::new(Duration::from_secs(5)))
+            .service(client)
     }
 }
 
