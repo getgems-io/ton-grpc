@@ -59,52 +59,6 @@ impl<Res, E> Policy<RawSendMessage, Res, E> for RetryPolicy {
     }
 }
 
-impl<T: Clone, Res> Policy<T, Res, Error> for RetryPolicy {
-    type Future = BoxFuture<'static, Self>;
-
-    fn retry(&self, _: &T, result: Result<&Res, &Error>) -> Option<Self::Future> {
-        match result {
-            Ok(_) => {
-                self.budget.deposit();
-
-                None
-            }
-            Err(Error::Route(RouterError::RouteUnknown)) => None,
-            Err(_) => {
-                let request_type: &str = std::any::type_name::<T>();
-
-                match self.budget.withdraw() {
-                    Ok(_) => {
-                        metrics::counter!("ton_retry_budget_withdraw_success", "request_type" => request_type).increment(1);
-
-                        Some({
-                            let mut pol = self.clone();
-
-                            async move {
-                                let millis = pol.backoff.by_ref().map(jitter).next().unwrap();
-
-                                tokio::time::sleep(millis).await;
-
-                                pol
-                            }
-                            .boxed()
-                        })
-                    }
-                    Err(_) => {
-                        metrics::counter!("ton_retry_budget_withdraw_fail", "request_type" => request_type).increment(1);
-
-                        None
-                    }
-                }
-            }
-        }
-    }
-
-    fn clone_request(&self, req: &T) -> Option<T> {
-        Some(req.clone())
-    }
-}
-
 impl<T: Clone, Res> Policy<T, Res, tower::BoxError> for RetryPolicy {
     type Future = BoxFuture<'static, Self>;
 
