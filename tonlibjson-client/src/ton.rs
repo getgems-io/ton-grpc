@@ -450,10 +450,8 @@ impl TonClient {
     }
 
     pub fn get_block_tx_stream_unordered(&self, block: &TonBlockIdExt) -> impl Stream<Item=anyhow::Result<BlocksShortTxId>> + 'static {
-        let stream_map = StreamMap::from_iter([
-            (false, self.get_block_tx_id_stream(block, false).boxed()),
-            (true, self.get_block_tx_id_stream(block, true).boxed())
-        ]);
+        let stream_map = StreamMap::from_iter([false, true]
+            .map(|r| (r, self.get_block_tx_id_stream(block, r).boxed())));
 
         try_stream! {
             let mut last = HashMap::with_capacity(2);
@@ -781,11 +779,8 @@ impl TonClient {
 
     pub fn get_accounts_in_block_stream(&self, block: &TonBlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
         let chain = block.workchain;
-        let stream_map = StreamMap::from_iter([
-            (false, self.get_block_tx_id_stream(block, false).boxed()),
-            (true, self.get_block_tx_id_stream(block, true).boxed())
-        ]);
-
+        let stream_map = StreamMap::from_iter([false, true]
+            .map(|r| (r, self.get_block_tx_id_stream(block, r).boxed())));
 
         let stream = try_stream! {
             let mut last = HashMap::with_capacity(2);
