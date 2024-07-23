@@ -8,7 +8,6 @@ use anyhow::anyhow;
 use derive_new::new;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use std::any::TypeId;
 use std::cmp::Ordering;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -448,13 +447,6 @@ where
     T::Result: DeserializeOwned + Send + std::marker::Sync + 'static,
 {
     type Response = T::Result;
-    fn timeout(&self) -> Duration {
-        if TypeId::of::<T>() == TypeId::of::<Sync>() {
-            Duration::from_secs(5 * 60)
-        } else {
-            Duration::from_secs(3)
-        }
-    }
 }
 
 impl ToRoute for RawGetTransactionsV2 {
@@ -516,9 +508,6 @@ where
     T: Requestable,
 {
     type Response = T::Response;
-    fn timeout(&self) -> Duration {
-        self.function.timeout()
-    }
 }
 
 impl<T> ToTimeout for WithBlock<T>

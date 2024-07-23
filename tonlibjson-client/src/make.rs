@@ -49,7 +49,7 @@ impl CursorClientFactory {
             .layer_fn(|s| CursorClient::new(id.to_string(), s))
             .layer(ConcurrencyLimitLayer::new(256))
             .layer(SharedLayer)
-            .layer(ErrorLayer::default())
+            .layer(ErrorLayer)
             .layer(TimeoutLayer::new(Duration::from_secs(5)))
             .service(client)
     }
