@@ -29,7 +29,10 @@ impl<T> Forward<T> {
     }
 }
 
-impl<T: Serialize> Serialize for Forward<T> {
+impl<T> Serialize for Forward<T>
+where
+    T: Serialize,
+{
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -51,7 +54,10 @@ where
     type Response = T::Response;
 }
 
-impl<T> ToTimeout for Forward<T> where T: ToTimeout {
+impl<T> ToTimeout for Forward<T>
+where
+    T: ToTimeout,
+{
     fn to_timeout(&self) -> Option<Duration> {
         self.inner.to_timeout()
     }
