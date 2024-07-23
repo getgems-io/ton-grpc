@@ -8,9 +8,9 @@ use ton_client_util::service::timeout::ToTimeout;
 
 pub(crate) trait Requestable
 where
-    Self: Serialize + Send + Sync,
+    Self: Serialize,
 {
-    type Response: DeserializeOwned + Send + Sync + 'static;
+    type Response: DeserializeOwned;
 }
 
 impl Requestable for Value {

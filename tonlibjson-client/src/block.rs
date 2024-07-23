@@ -440,11 +440,10 @@ impl SmcBoxedMethodId {
 
 impl ToTimeout for SmcBoxedMethodId {}
 
-// TODO[akostylev0]
 impl<T> Requestable for T
 where
-    T: Functional + Serialize + Send + std::marker::Sync + 'static,
-    T::Result: DeserializeOwned + Send + std::marker::Sync + 'static,
+    T: Functional + Serialize,
+    T::Result: DeserializeOwned,
 {
     type Response = T::Result;
 }
