@@ -237,7 +237,6 @@ mod tests {
     use crate::client::{Client, Request};
     use serde_json::json;
     use std::str::FromStr;
-    use std::time::Duration;
     use tower::ServiceExt;
     use tracing_test::traced_test;
     use uuid::Uuid;
