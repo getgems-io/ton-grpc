@@ -11,10 +11,6 @@ where
     Self: Serialize + Send + Sync,
 {
     type Response: DeserializeOwned + Send + Sync + 'static;
-
-    fn timeout(&self) -> Duration {
-        Duration::from_secs(3)
-    }
 }
 
 impl Requestable for Value {

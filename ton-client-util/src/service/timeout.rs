@@ -45,7 +45,7 @@ where
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
-            default_timeout: self.default_timeout.clone(),
+            default_timeout: self.default_timeout,
         }
     }
 }
