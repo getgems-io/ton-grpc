@@ -4,7 +4,6 @@ mod client;
 mod cursor_client;
 mod deserialize;
 mod error;
-mod helper;
 mod make;
 mod metric;
 mod request;

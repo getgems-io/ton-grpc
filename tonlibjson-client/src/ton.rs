@@ -31,7 +31,6 @@ use ton_client_util::router::balance::Balance;
 use crate::address::InternalAccountAddress;
 use crate::block::{InternalTransactionId, RawTransaction, RawTransactions, BlocksShards, BlocksTransactions, RawSendMessage, AccountAddress, BlocksGetTransactions, BlocksLookupBlock, BlocksGetShards, BlocksGetBlockHeader, RawGetTransactionsV2, RawGetAccountState, GetAccountState, GetShardAccountCell, RawFullAccountState, WithBlock, RawGetAccountStateByTransaction, GetShardAccountCellByTransaction, RawSendMessageReturnHash, BlocksMasterchainInfo, BlocksGetMasterchainInfo, TonBlockIdExt, TonBlockId, BlocksHeader, FullAccountState, BlocksAccountTransactionId, BlocksShortTxId, TvmBoxedStackEntry, SmcRunResult, SmcBoxedMethodId, TvmCell, BlocksGetTransactionsExt, BlocksTransactionsExt};
 use crate::error::ErrorService;
-use crate::helper::Side;
 use crate::request::{Forward, Specialized};
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
@@ -451,17 +450,17 @@ impl TonClient {
     }
 
     pub fn get_block_tx_stream_unordered(&self, block: &TonBlockIdExt) -> impl Stream<Item=anyhow::Result<BlocksShortTxId>> + 'static {
-        let streams = Side::values().map(move |side| {
-            (side, self.get_block_tx_id_stream(block, side.is_right()).boxed())
-        });
-        let stream_map = StreamMap::from_iter(streams);
+        let stream_map = StreamMap::from_iter([
+            (false, self.get_block_tx_id_stream(block, false).boxed()),
+            (true, self.get_block_tx_id_stream(block, true).boxed())
+        ]);
 
-        async_stream::try_stream! {
+        try_stream! {
             let mut last = HashMap::with_capacity(2);
 
             for await (key, tx) in stream_map {
                 let tx = tx?;
-                if let Some(prev_tx) = last.get(&key.opposite()) {
+                if let Some(prev_tx) = last.get(&!key) {
                     if prev_tx == &tx {
                         return;
                     }
@@ -782,10 +781,11 @@ impl TonClient {
 
     pub fn get_accounts_in_block_stream(&self, block: &TonBlockIdExt) -> impl TryStream<Ok=InternalAccountAddress, Error=anyhow::Error> + 'static {
         let chain = block.workchain;
-        let streams = Side::values().map(move |side| {
-            (side, self.get_block_tx_id_stream(block, side.is_right()).boxed())
-        });
-        let stream_map = StreamMap::from_iter(streams);
+        let stream_map = StreamMap::from_iter([
+            (false, self.get_block_tx_id_stream(block, false).boxed()),
+            (true, self.get_block_tx_id_stream(block, true).boxed())
+        ]);
+
 
         let stream = try_stream! {
             let mut last = HashMap::with_capacity(2);
@@ -793,7 +793,7 @@ impl TonClient {
             for await (key, tx) in stream_map {
                 let tx = tx?;
 
-                if let Some(addr) = last.get(&key.opposite()) {
+                if let Some(addr) = last.get(&!key) {
                     if addr == tx.account() { return }
                 }
 
