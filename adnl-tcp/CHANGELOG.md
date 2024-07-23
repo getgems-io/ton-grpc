@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/getgems-io/ton-grpc/compare/adnl-tcp-v0.2.0...adnl-tcp-v0.3.0) (2024-07-23)
+
+
+### Features
+
+* **ton-liteserver-client:** chain state tracker ([#871](https://github.com/getgems-io/ton-grpc/issues/871)) ([2879cbe](https://github.com/getgems-io/ton-grpc/commit/2879cbe52eb7e08e1574a8e998d15ed152ae2fda))
+
 ## [0.2.0](https://github.com/getgems-io/ton-grpc/compare/adnl-tcp-v0.1.0...adnl-tcp-v0.2.0) (2024-06-10)
 
 
