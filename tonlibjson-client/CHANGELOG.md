@@ -2,6 +2,25 @@
 
 
 
+## [0.19.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.18.1...tonlibjson-client-v0.19.0) (2024-07-23)
+
+
+### Features
+
+* **ton-liteserver-client:** chain state tracker ([#871](https://github.com/getgems-io/ton-grpc/issues/871)) ([2879cbe](https://github.com/getgems-io/ton-grpc/commit/2879cbe52eb7e08e1574a8e998d15ed152ae2fda))
+* **tonlibjson-client:** relax requirements ([98d7b44](https://github.com/getgems-io/ton-grpc/commit/98d7b44954fbe81f0b20ab386b74bc9c21b0bef3))
+* **tonlibjson-client:** response future ([2894f2b](https://github.com/getgems-io/ton-grpc/commit/2894f2b0ac9d4d8a144a3900fcbd774392b5702e))
+* **tonlibjson-client:** timeout layer ([1d648bb](https://github.com/getgems-io/ton-grpc/commit/1d648bb6ab0780dbfa54872b73cdbce569da6434))
+
+
+### Bug Fixes
+
+* **deps:** bump reqwest from 0.12.4 to 0.12.5 ([ed059c8](https://github.com/getgems-io/ton-grpc/commit/ed059c82270539ea012ef31e72fa66541e83207f))
+* **deps:** bump syn from 2.0.66 to 2.0.68 ([fec6f2d](https://github.com/getgems-io/ton-grpc/commit/fec6f2d61f5c74d89b87b57d1aaf6b4bbe7896f7))
+* **deps:** bump syn from 2.0.68 to 2.0.69 ([12db6e3](https://github.com/getgems-io/ton-grpc/commit/12db6e3638caa5460e119e21f8abb4b7d4d715b8))
+* **deps:** bump syn from 2.0.69 to 2.0.71 ([68edeff](https://github.com/getgems-io/ton-grpc/commit/68edeff26546008bafe5ba0c5eb4ef582f5a49da))
+* **deps:** bump syn from 2.0.71 to 2.0.72 ([3c02301](https://github.com/getgems-io/ton-grpc/commit/3c023013336a6b7005e01ca150483e5d86881446))
+
 ## [0.18.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.17.2...tonlibjson-client-v0.18.0) (2024-06-10)
 
 

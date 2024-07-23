@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0](https://github.com/getgems-io/ton-grpc/compare/ton-liteserver-client-v0.1.0...ton-liteserver-client-v0.2.0) (2024-07-23)
+
+
+### Features
+
+* parametrized timeout layer ([59e96a9](https://github.com/getgems-io/ton-grpc/commit/59e96a9e7d4780e8771dfcac1d1c6d053448b113))
+* **ton-liteserver-client:** chain state tracker ([#871](https://github.com/getgems-io/ton-grpc/issues/871)) ([2879cbe](https://github.com/getgems-io/ton-grpc/commit/2879cbe52eb7e08e1574a8e998d15ed152ae2fda))
+
+
+### Bug Fixes
+
+* **deps:** bump syn from 2.0.66 to 2.0.68 ([fec6f2d](https://github.com/getgems-io/ton-grpc/commit/fec6f2d61f5c74d89b87b57d1aaf6b4bbe7896f7))
+* **deps:** bump syn from 2.0.68 to 2.0.69 ([12db6e3](https://github.com/getgems-io/ton-grpc/commit/12db6e3638caa5460e119e21f8abb4b7d4d715b8))
+* **deps:** bump syn from 2.0.69 to 2.0.71 ([68edeff](https://github.com/getgems-io/ton-grpc/commit/68edeff26546008bafe5ba0c5eb4ef582f5a49da))
+* **deps:** bump syn from 2.0.71 to 2.0.72 ([3c02301](https://github.com/getgems-io/ton-grpc/commit/3c023013336a6b7005e01ca150483e5d86881446))
+
 ## 0.1.0 (2024-06-10)
 
 
