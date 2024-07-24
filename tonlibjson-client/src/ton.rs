@@ -922,34 +922,34 @@ impl TonClient {
 
     pub fn get_accounts_in_block_stream(
         &self,
-        block: &TonBlockIdExt,
+        block: TonBlockIdExt,
     ) -> impl TryStream<Ok = InternalAccountAddress, Error = anyhow::Error> {
-        let chain = block.workchain;
-        let stream_map = StreamMap::from_iter(
-            [false, true].map(|r| (r, self.get_block_tx_id_stream(block, r).boxed())),
-        );
+        let left = self.get_block_tx_id_stream(&block, false);
+        let right = self.get_block_tx_id_stream(&block, true);
 
-        let stream = try_stream! {
-            let mut last = HashMap::with_capacity(2);
+        try_stream! {
+            tokio::pin!(left, right);
 
-            for await (key, tx) in stream_map {
+            let mut current_left = None;
+            let mut current_right = None;
+
+            for await (is_right, tx) in StreamMap::from_iter([(false, left), (true, right)]) {
                 let tx = tx?;
 
-                if let Some(addr) = last.get(&!key) {
-                    if addr == tx.account() { return }
-                }
+                match is_right {
+                    true if current_left.as_ref().is_some_and(|v| v == tx.account()) => return,
+                    false if current_right.as_ref().is_some_and(|v| v == tx.account()) => return,
 
-                if let Some(addr) = last.get(&key) {
-                    if addr == tx.account() { continue }
-                }
+                    true if current_right.as_ref().is_some_and(|v| v == tx.account()) => continue,
+                    false if current_left.as_ref().is_some_and(|v| v == tx.account()) => continue,
 
-                last.insert(key, tx.account().to_owned());
+                    true => current_right.replace(tx.account().to_owned()),
+                    false => current_left.replace(tx.account().to_owned()),
+                };
 
-                yield tx.into_internal(chain);
+                yield tx.into_internal(block.workchain);
             }
-        };
-
-        stream
+        }
     }
 
     #[instrument(skip_all, err)]
