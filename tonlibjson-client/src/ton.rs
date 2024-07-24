@@ -20,7 +20,7 @@ use async_stream::try_stream;
 use futures::{stream, try_join, Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt};
 use serde_json::Value;
 use std::cmp::min;
-use std::collections::{Bound, HashMap};
+use std::collections::{Bound};
 use std::ops::RangeBounds;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -510,21 +510,25 @@ impl TonClient {
         &self,
         block: &TonBlockIdExt,
     ) -> impl Stream<Item = anyhow::Result<BlocksShortTxId>> {
-        let stream_map = StreamMap::from_iter(
-            [false, true].map(|r| (r, self.get_block_tx_id_stream(block, r).boxed())),
-        );
+        let left = self.get_block_tx_id_stream(block, false);
+        let right = self.get_block_tx_id_stream(block, true);
 
         try_stream! {
-            let mut last = HashMap::with_capacity(2);
+            tokio::pin!(left, right);
 
-            for await (key, tx) in stream_map {
+            let mut current_left = None;
+            let mut current_right = None;
+
+            for await (is_right, tx) in StreamMap::from_iter([(false, left), (true, right)]) {
                 let tx = tx?;
-                if let Some(prev_tx) = last.get(&!key) {
-                    if prev_tx == &tx {
-                        return;
-                    }
-                }
-                last.insert(key, tx.clone());
+
+                match is_right {
+                    true if current_left.as_ref().is_some_and(|v| v == &tx) => return,
+                    false if current_right.as_ref().is_some_and(|v| v == &tx) => return,
+                    true => current_right.replace(tx.clone()),
+                    false => current_left.replace(tx.clone()),
+                };
+
                 yield tx;
             }
         }
@@ -922,10 +926,11 @@ impl TonClient {
 
     pub fn get_accounts_in_block_stream(
         &self,
-        block: TonBlockIdExt,
+        block: &TonBlockIdExt,
     ) -> impl TryStream<Ok = InternalAccountAddress, Error = anyhow::Error> {
-        let left = self.get_block_tx_id_stream(&block, false);
-        let right = self.get_block_tx_id_stream(&block, true);
+        let workchain = block.workchain;
+        let left = self.get_block_tx_id_stream(block, false);
+        let right = self.get_block_tx_id_stream(block, true);
 
         try_stream! {
             tokio::pin!(left, right);
@@ -947,7 +952,7 @@ impl TonClient {
                     false => current_left.replace(tx.account().to_owned()),
                 };
 
-                yield tx.into_internal(block.workchain);
+                yield tx.into_internal(workchain);
             }
         }
     }

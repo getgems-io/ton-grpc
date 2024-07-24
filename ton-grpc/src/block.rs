@@ -83,7 +83,7 @@ impl BaseBlockService for BlockService {
         let block_id = extend_block_id(&self.client, &msg).await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
-        let stream = self.client.get_accounts_in_block_stream(block_id)
+        let stream = self.client.get_accounts_in_block_stream(&block_id)
             .map_ok(|a| AccountAddress { address: a.to_string() })
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
