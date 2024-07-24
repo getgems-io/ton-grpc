@@ -18,7 +18,6 @@ use crate::session::RunGetMethod;
 use anyhow::anyhow;
 use async_stream::try_stream;
 use futures::{stream, try_join, Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt};
-use itertools::Itertools;
 use serde_json::Value;
 use std::cmp::min;
 use std::collections::{Bound, HashMap};
@@ -742,7 +741,7 @@ impl TonClient {
                 self.get_account_tx_range(address, (right_bound, left_bound))
                     .boxed()
             })
-            .collect_vec();
+            .collect::<Vec<_>>();
 
         Ok(stream::iter(streams).flatten_unordered(32))
     }

@@ -19,18 +19,13 @@ tokio-stream = { workspace = true }
 base64 = { workspace = true }
 hex = { workspace = true }
 async-stream = { workspace = true }
-quick_cache = { workspace = true }
 url = { workspace = true }
 uuid = { workspace = true }
 tokio-util = { workspace = true }
 dashmap = { workspace = true }
 pin-project = { workspace = true }
-rand = { workspace = true }
 bytes = { workspace = true }
 thiserror = { workspace = true }
-reqwest = { workspace = true }
-hickory-resolver = { workspace = true }
-itertools = { workspace = true }
 metrics = { workspace = true }
 tokio-retry = { workspace = true }
 derive-new = "0.6.0"
