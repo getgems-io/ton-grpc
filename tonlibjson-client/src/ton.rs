@@ -1,14 +1,12 @@
 use std::cmp::min;
 use std::collections::{Bound, HashMap};
-use std::future::IntoFuture;
 use std::ops::{RangeBounds};
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::time::Duration;
-use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, TryFutureExt, FutureExt};
+use futures::{Stream, stream, TryStreamExt, StreamExt, try_join, TryStream, TryFutureExt};
 use anyhow::anyhow;
 use async_stream::try_stream;
-use futures::future::BoxFuture;
 use itertools::Itertools;
 use serde_json::Value;
 use tokio_stream::StreamMap;
@@ -163,7 +161,7 @@ impl TonClientBuilder {
         self
     }
 
-    pub async fn build(self) -> anyhow::Result<TonClient> {
+    pub fn build(self) -> anyhow::Result<TonClient> {
         let stream = match self.config_source {
             ConfigSource::FromFile { path } => {
                 let mut interval = tokio::time::interval(Duration::from_secs(1));
@@ -217,15 +215,6 @@ impl TonClientBuilder {
         let client = ErrorService::new(client);
 
         Ok(TonClient { client } )
-    }
-}
-
-impl IntoFuture for TonClientBuilder {
-    type Output = anyhow::Result<TonClient>;
-    type IntoFuture = BoxFuture<'static, Self::Output>;
-
-    fn into_future(self) -> Self::IntoFuture {
-        self.build().boxed()
     }
 }
 
