@@ -181,7 +181,7 @@ mod tests {
     #[ignore]
     async fn account_get_from_to() {
         tracing::info!("prep client");
-        let mut client = TonClientBuilder::default().await.unwrap();
+        let mut client = TonClientBuilder::default().build().unwrap();
         client.ready().await.unwrap();
         tracing::info!("ready");
         let svc = AccountService::new(client);
@@ -210,7 +210,7 @@ mod tests {
     #[ignore]
     async fn get_account_state_without_criteria() {
         tracing::info!("prep client");
-        let mut client = TonClientBuilder::default().await.unwrap();
+        let mut client = TonClientBuilder::default().build().unwrap();
         client.ready().await.unwrap();
         tracing::info!("ready");
         let svc = AccountService::new(client);
@@ -230,7 +230,7 @@ mod tests {
     #[ignore]
     async fn get_shard_account_cell_without_criteria() {
         tracing::info!("prep client");
-        let mut client = TonClientBuilder::default().await.unwrap();
+        let mut client = TonClientBuilder::default().build().unwrap();
         client.ready().await.unwrap();
         tracing::info!("ready");
         let svc = AccountService::new(client);
