@@ -5,7 +5,7 @@ use tracing::debug;
 use tracing_test::traced_test;
 
 async fn client() -> TonClient {
-    let mut client = TonClientBuilder::default().await.unwrap();
+    let mut client = TonClientBuilder::default().build().unwrap();
     client.ready().await.unwrap();
 
     client

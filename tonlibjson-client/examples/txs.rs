@@ -9,7 +9,7 @@ async fn client() -> TonClient {
         Url::parse("https://github.com/ton-blockchain/ton-blockchain.github.io/raw/7f6526fb2635eb514065beb04ee902ded5dd8a7b/global.config.json").unwrap(), Duration::from_secs(60)
     )
         .disable_retry()
-        .await
+        .build()
         .unwrap();
 
     client.ready().await.unwrap();

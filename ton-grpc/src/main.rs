@@ -94,7 +94,7 @@ async fn main() -> anyhow::Result<()> {
         .set_retry_max_delay(args.retry_max_delay)
         .set_ewma_default_rtt(args.ewma_default_rtt)
         .set_ewma_decay(args.ewma_decay)
-        .await?;
+        .build()?;
 
     client.ready().await?;
     tracing::info!("Ton Client is ready");

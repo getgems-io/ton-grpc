@@ -3,7 +3,7 @@ use tonlibjson_client::ton::{TonClient, TonClientBuilder};
 async fn client() -> TonClient {
     let mut client = TonClientBuilder::default()
         .disable_retry()
-        .await
+        .build()
         .unwrap();
 
     client.ready().await.unwrap();

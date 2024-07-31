@@ -6,7 +6,7 @@ use tonlibjson_client::ton::TonClientBuilder;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let mut ton = TonClientBuilder::default().await?;
+    let mut ton = TonClientBuilder::default().build()?;
     ton.ready().await?;
 
     let master = ton.get_masterchain_info().await?;
