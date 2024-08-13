@@ -42,6 +42,8 @@
 
 
 
+
+
 ## [0.10.6](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.10.5...ton-grpc-v0.10.6) (2024-07-23)
 
 
