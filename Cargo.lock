@@ -2307,9 +2307,9 @@ dependencies = [
 
 [[package]]
 name = "tlb"
-version = "0.2.22"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ea5376ffa60c20c92a9bbf8e1ab4ddeea80a8e89dcab80da81b96a6efe5b95f"
+checksum = "3ee576f53d5c9405aa62aea7db07c0af5e8bdcea1ceaa36cc740e83c7fcadd0e"
 dependencies = [
  "bitvec",
  "hex",
@@ -2320,9 +2320,9 @@ dependencies = [
 
 [[package]]
 name = "tlb-ton"
-version = "0.2.22"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58ff6699b88fc3246b8232fea4504e695ae9e64219c928f3a262dd4404916b46"
+checksum = "660cdd757c2f9c3ee19a28bae34d1876295e4d10402362faa4ddd21a552f89d3"
 dependencies = [
  "base64 0.21.7",
  "chrono",
@@ -2338,9 +2338,9 @@ dependencies = [
 
 [[package]]
 name = "tlbits"
-version = "0.2.22"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a631f5e8bb007e1da78403a1d802ef24bed70f1ed3c01a4e3709c3689df92a11"
+checksum = "3ea0665fa09fd31daa0b0b5992396403fef978cbc19e65738a58b1d905e8daba"
 dependencies = [
  "bitvec",
  "either",
@@ -2473,9 +2473,9 @@ dependencies = [
 
 [[package]]
 name = "ton-contracts"
-version = "0.2.22"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f68bbdfebf88d740fc0e8c4732cd18f30b718e76f00d8c5646931c79fedc981"
+checksum = "e14ad6ea8bd22bda7dc35afa24720f6f2268d3ad74e8950d050e922928c64126"
 dependencies = [
  "anyhow",
  "bitvec",
@@ -2551,9 +2551,9 @@ dependencies = [
 
 [[package]]
 name = "toner"
-version = "0.2.22"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2fea8be29a43c0a23965d279171b9477c444e592ef89802d8d4835db7e8b3aac"
+checksum = "411a81d621f7fbb55a34c7cf6b9325e4074cbca45ea5436c62ff65bb8f71b02f"
 dependencies = [
  "tlb",
  "tlb-ton",
