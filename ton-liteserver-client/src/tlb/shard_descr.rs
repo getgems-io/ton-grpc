@@ -1,10 +1,11 @@
+use crate::tlb::future_split_merge::FutureSplitMerge;
+use adnl_tcp::types::Int256;
 use toner::tlb::bits::de::{BitReader, BitReaderExt};
 use toner::tlb::bits::r#as::NBits;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::r#as::{ParseFully, Ref};
+use toner::tlb::Error;
 use toner::ton::currency::CurrencyCollection;
-use adnl_tcp::types::Int256;
-use crate::tlb::future_split_merge::FutureSplitMerge;
 
 /// ```tlb
 /// shard_descr_new#a
@@ -64,11 +65,11 @@ impl<'de> CellDeserialize<'de> for ShardDescr {
         let end_lt = parser.unpack()?;
         let root_hash = parser.unpack()?;
         let file_hash = parser.unpack()?;
-        let before_split = parser.read_bit()?;
-        let before_merge = parser.read_bit()?;
-        let want_split = parser.read_bit()?;
-        let want_merge = parser.read_bit()?;
-        let nx_cc_updated = parser.read_bit()?;
+        let before_split = parser.read_bit()?.ok_or_else(|| Error::custom("EOF"))?;
+        let before_merge = parser.read_bit()?.ok_or_else(|| Error::custom("EOF"))?;
+        let want_split = parser.read_bit()?.ok_or_else(|| Error::custom("EOF"))?;
+        let want_merge = parser.read_bit()?.ok_or_else(|| Error::custom("EOF"))?;
+        let nx_cc_updated = parser.read_bit()?.ok_or_else(|| Error::custom("EOF"))?;
         let flags = parser.unpack_as::<_, NBits<3>>()?;
         let next_catchain_seqno = parser.unpack()?;
         let next_validator_shard = parser.unpack()?;
@@ -78,7 +79,7 @@ impl<'de> CellDeserialize<'de> for ShardDescr {
         let (fees_collected, funds_created) = match tag {
             0xa => parser.parse_as::<_, Ref<ParseFully>>()?,
             0xb => parser.parse()?,
-            _ => unreachable!()
+            _ => unreachable!(),
         };
 
         Ok(Self {
