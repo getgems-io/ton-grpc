@@ -1,5 +1,4 @@
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
-use toner::tlb::Error;
 
 /// ```tlb
 /// fsm_none$0 = FutureSplitMerge;
@@ -18,11 +17,11 @@ impl BitUnpack for FutureSplitMerge {
     where
         R: BitReader,
     {
-        if !reader.read_bit()?.ok_or_else(|| Error::custom("EOF"))? {
+        if !reader.unpack::<bool>()? {
             return Ok(FutureSplitMerge::None);
         }
 
-        if !reader.read_bit()?.ok_or_else(|| Error::custom("EOF"))? {
+        if !reader.unpack::<bool>()? {
             let split_utime = reader.unpack()?;
             let interval = reader.unpack()?;
 
