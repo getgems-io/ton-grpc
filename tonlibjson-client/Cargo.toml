@@ -33,7 +33,7 @@ hickory-resolver = { workspace = true }
 itertools = { workspace = true }
 metrics = { workspace = true }
 tokio-retry = { workspace = true }
-derive-new = "0.6.0"
+derive-new = "0.7.0"
 crc = "3.2.1"
 
 [dev-dependencies]

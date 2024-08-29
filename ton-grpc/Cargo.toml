@@ -28,7 +28,7 @@ url = { workspace = true }
 clap = { workspace = true }
 humantime = { workspace = true }
 either = "1.13"
-derive-new = "0.6.0"
+derive-new = "0.7.0"
 metrics-exporter-prometheus = { version = "0.15.3", features = ["http-listener"], default-features = false }
 
 [dev-dependencies]
