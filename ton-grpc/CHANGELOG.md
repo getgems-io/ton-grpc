@@ -44,6 +44,13 @@
 
 
 
+## [0.10.8](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.10.7...ton-grpc-v0.10.8) (2024-09-23)
+
+
+### Bug Fixes
+
+* **deps:** bump derive-new from 0.6.0 to 0.7.0 ([782f69f](https://github.com/getgems-io/ton-grpc/commit/782f69f538a4dd75766e5473cb9b65644eb1ff62))
+
 ## [0.10.6](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.10.5...ton-grpc-v0.10.6) (2024-07-23)
 
 
