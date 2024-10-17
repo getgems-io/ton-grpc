@@ -1227,9 +1227,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.158"
+version = "0.2.160"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8adc4bb1803a324070e64a98ae98f38934d91957a99cfb3a43dcbc01bc56439"
+checksum = "f0b21006cd1874ae9e650973c565615676dc4a274c965bb0a73796dac838ce4f"
 
 [[package]]
 name = "linked-hash-map"
