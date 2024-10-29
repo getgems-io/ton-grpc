@@ -6,9 +6,9 @@ use futures::{StreamExt, TryStreamExt};
 use tonic::{async_trait, Request, Response, Status};
 use derive_new::new;
 use tonlibjson_client::ton::TonClient;
-use crate::helpers::extend_block_id;
+use crate::helpers::{extend_block_id, extend_get_block_header};
 use crate::ton::block_service_server::BlockService as BaseBlockService;
-use crate::ton::{AccountAddress, BlockId, BlockIdExt, GetTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, TransactionId, GetTransactionsRequest, Transaction};
+use crate::ton::{AccountAddress, BlockId, BlockIdExt, BlocksHeader, GetTransactionIdsRequest, GetLastBlockRequest, GetShardsResponse, TransactionId, GetTransactionsRequest, Transaction};
 use crate::ton::get_transaction_ids_request::Order;
 
 #[derive(new)]
@@ -32,6 +32,14 @@ impl BaseBlockService for BlockService {
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
         Ok(Response::new(block_id.into()))
+    }
+
+    #[tracing::instrument(skip_all, err)]
+    async fn get_block_header(&self, request: Request<BlockId>) -> Result<Response<BlocksHeader>, Status> {
+        let block_header = extend_get_block_header(&self.client, &request.into_inner()).await
+            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
+
+        Ok(Response::new(block_header.into()))
     }
 
     #[tracing::instrument(skip_all, err)]

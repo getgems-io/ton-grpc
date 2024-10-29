@@ -24,6 +24,11 @@ pub async fn extend_block_id(client: &TonClient, block_id: &ton::BlockId) -> Res
 }
 
 #[tracing::instrument(skip_all, err)]
+pub async fn extend_get_block_header(client: &TonClient, block_id: &ton::BlockId) -> Result<block::BlocksHeader> {
+    client.get_block_header(block_id.workchain, block_id.shard, block_id.seqno, block_id.root_hash.clone().zip(block_id.file_hash.clone())).await
+}
+
+#[tracing::instrument(skip_all, err)]
 pub async fn prev_block_id(client: &TonClient, block_id: &ton::BlockId) -> Result<block::TonBlockIdExt> {
     client.look_up_block_by_seqno(block_id.workchain, block_id.shard, block_id.seqno - 1).await
 }
