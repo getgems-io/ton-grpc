@@ -1,10 +1,10 @@
-use std::task::{Context, Poll};
 use derive_new::new;
 use futures::future::MapErr;
 use futures::TryFutureExt;
-use tower::{Layer, Service};
-use tower::load::Load;
+use std::task::{Context, Poll};
 use ton_client_util::router::route::Error as RouteError;
+use tower::load::Load;
+use tower::{Layer, Service};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -13,7 +13,7 @@ pub enum Error {
     #[error(transparent)]
     Custom(#[from] anyhow::Error),
     #[error(transparent)]
-    Tower(#[from] tower::BoxError)
+    Tower(#[from] tower::BoxError),
 }
 
 #[derive(Default)]
@@ -28,10 +28,13 @@ impl<S> Layer<S> for ErrorLayer {
 }
 
 #[derive(new, Clone)]
-pub struct ErrorService<S> { inner: S }
+pub struct ErrorService<S> {
+    inner: S,
+}
 
-impl<S, Req, E: Into<Error>> Service<Req> for ErrorService<S> where
-    S : Service<Req, Error=E>
+impl<S, Req, E: Into<Error>> Service<Req> for ErrorService<S>
+where
+    S: Service<Req, Error = E>,
 {
     type Response = S::Response;
     type Error = anyhow::Error;
@@ -46,8 +49,10 @@ impl<S, Req, E: Into<Error>> Service<Req> for ErrorService<S> where
     }
 }
 
-
-impl<T> Load for ErrorService<T> where T: Load {
+impl<T> Load for ErrorService<T>
+where
+    T: Load,
+{
     type Metric = T::Metric;
 
     fn load(&self) -> Self::Metric {

@@ -1,6 +1,6 @@
-use std::fmt::{Debug, Formatter};
 use rand::random;
-use sha2::{Digest, Sha256, digest::Update};
+use sha2::{digest::Update, Digest, Sha256};
+use std::fmt::{Debug, Formatter};
 
 #[derive(PartialEq, Eq)]
 pub struct Packet {
@@ -23,7 +23,11 @@ impl Packet {
             .finalize()
             .into();
 
-        Self { nonce, data, checksum }
+        Self {
+            nonce,
+            data,
+            checksum,
+        }
     }
 
     pub fn is_empty(&self) -> bool {

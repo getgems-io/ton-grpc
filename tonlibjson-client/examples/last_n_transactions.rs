@@ -25,25 +25,29 @@ async fn main() -> anyhow::Result<()> {
                                     let Ok(tx) = tx else {
                                         tracing::error!("{:?}", tx.unwrap_err());
 
-                                        return
+                                        return;
                                     };
 
                                     tracing::info!(tx = ?tx);
 
                                     let address = tx.into_internal_string(block.workchain);
                                     match ton.get_account_state(&address).await {
-                                        Ok(account) => tracing::info!("{}: {}", &address, account.balance),
-                                        Err(e) => tracing::error!("{:?}", e)
+                                        Ok(account) => {
+                                            tracing::info!("{}: {}", &address, account.balance)
+                                        }
+                                        Err(e) => tracing::error!("{:?}", e),
                                     }
-                                }).await;
+                                })
+                                .await;
                         } else {
                             tracing::error!("no block")
                         }
-                    },
-                    Err(e) => tracing::error!("{:?}", e)
+                    }
+                    Err(e) => tracing::error!("{:?}", e),
                 }
             }
-        }).await;
+        })
+        .await;
 
     let timing = (Instant::now() - now).as_secs();
 

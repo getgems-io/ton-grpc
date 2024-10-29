@@ -1,10 +1,7 @@
 use tonlibjson_client::ton::{TonClient, TonClientBuilder};
 
 async fn client() -> TonClient {
-    let mut client = TonClientBuilder::default()
-        .disable_retry()
-        .build()
-        .unwrap();
+    let mut client = TonClientBuilder::default().disable_retry().build().unwrap();
 
     client.ready().await.unwrap();
 
@@ -21,7 +18,13 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(current_seqno = current_block.seqno);
 
     for _ in 0..100 {
-        current_block = client.look_up_block_by_seqno(current_block.workchain, current_block.shard, current_block.seqno + 1).await?;
+        current_block = client
+            .look_up_block_by_seqno(
+                current_block.workchain,
+                current_block.shard,
+                current_block.seqno + 1,
+            )
+            .await?;
 
         tracing::info!(current_block = ?current_block);
     }

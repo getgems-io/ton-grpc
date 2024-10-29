@@ -1,7 +1,7 @@
-#[cfg(feature = "tonlibjson")]
-mod tonlibjson;
 #[cfg(feature = "tonemulator")]
 mod tonemulator;
+#[cfg(feature = "tonlibjson")]
+mod tonlibjson;
 
 #[cfg(feature = "tonlibjson")]
 pub use self::tonlibjson::Client;

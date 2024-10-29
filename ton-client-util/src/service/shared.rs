@@ -129,7 +129,7 @@ where
 
                                     guard.call(req)
                                 }
-                                Err(e) => return Poll::Ready(Err(e))
+                                Err(e) => return Poll::Ready(Err(e)),
                             }
                         } else {
                             cx.waker().wake_by_ref();

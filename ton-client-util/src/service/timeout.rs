@@ -85,7 +85,10 @@ where
     }
 }
 
-impl<T> Load for Timeout<T> where T: Load {
+impl<T> Load for Timeout<T>
+where
+    T: Load,
+{
     type Metric = T::Metric;
 
     fn load(&self) -> Self::Metric {

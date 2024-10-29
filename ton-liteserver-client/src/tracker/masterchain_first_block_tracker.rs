@@ -1,7 +1,9 @@
+use crate::client::Error;
 use crate::tl::{
     LiteServerBlockData, LiteServerBlockHeader, LiteServerGetBlock, LiteServerLookupBlock,
 };
 use crate::tlb::block_header::BlockHeader;
+use crate::tlb::merkle_proof::MerkleProof;
 use crate::tracker::find_first_block::find_first_block_header;
 use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
 use futures::TryFutureExt;
@@ -15,8 +17,6 @@ use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes;
 use toner::ton::boc::BoC;
 use tower::Service;
-use crate::client::Error;
-use crate::tlb::merkle_proof::MerkleProof;
 
 pub struct MasterchainFirstBlockTrackerActor<S> {
     client: S,
@@ -47,12 +47,7 @@ where
         Error = Error,
         Future: Send,
     >,
-    S: Service<
-        LiteServerGetBlock,
-        Response = LiteServerBlockData,
-        Error = Error,
-        Future: Send,
-    >,
+    S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = Error, Future: Send>,
 {
     type Output = ();
 
@@ -97,7 +92,10 @@ pub struct MasterchainFirstBlockTracker {
 }
 
 impl MasterchainFirstBlockTracker {
-    pub fn new<S>(client: S, last_block_tracker: MasterchainLastBlockTracker) -> Self where MasterchainFirstBlockTrackerActor<S>: Actor {
+    pub fn new<S>(client: S, last_block_tracker: MasterchainLastBlockTracker) -> Self
+    where
+        MasterchainFirstBlockTrackerActor<S>: Actor,
+    {
         let cancellation_token = CancellationToken::new();
         let (sender, receiver) = watch::channel(None);
 

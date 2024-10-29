@@ -1,11 +1,11 @@
+use pin_project::{pin_project, pinned_drop};
 use std::borrow::Cow;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tower::Service;
-use pin_project::{pin_project, pinned_drop};
 use tower::load::Load;
+use tower::Service;
 
 type Counter = Arc<std::sync::atomic::AtomicI32>;
 
@@ -13,27 +13,28 @@ type Counter = Arc<std::sync::atomic::AtomicI32>;
 pub struct ResponseFuture<T> {
     #[pin]
     inner: T,
-    inflight: Counter
+    inflight: Counter,
 }
 
 impl<T> ResponseFuture<T> {
     pub fn new(inner: T, inflight: Counter) -> ResponseFuture<T> {
         inflight.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
 
-        Self { inner, inflight  }
+        Self { inner, inflight }
     }
 }
 
 #[pinned_drop]
 impl<T> PinnedDrop for ResponseFuture<T> {
     fn drop(self: Pin<&mut Self>) {
-        self.inflight.fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
+        self.inflight
+            .fetch_sub(1, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
 impl<F, T, E> Future for ResponseFuture<F>
-    where
-        F: Future<Output = Result<T, E>>,
+where
+    F: Future<Output = Result<T, E>>,
 {
     type Output = Result<T, E>;
 
@@ -41,7 +42,6 @@ impl<F, T, E> Future for ResponseFuture<F>
         self.project().inner.poll(cx)
     }
 }
-
 
 #[derive(Clone, Debug)]
 pub struct ConcurrencyMetric<S> {
@@ -52,7 +52,11 @@ pub struct ConcurrencyMetric<S> {
 
 impl<S> ConcurrencyMetric<S> {
     pub(crate) fn new(inner: S, liteserver_id: Cow<'static, str>) -> Self {
-        Self { inner, liteserver_id, inflight: Counter::default() }
+        Self {
+            inner,
+            liteserver_id,
+            inflight: Counter::default(),
+        }
     }
 
     pub(crate) fn get_ref(&self) -> &S {
@@ -61,8 +65,9 @@ impl<S> ConcurrencyMetric<S> {
 }
 
 impl<S, Request> Service<Request> for ConcurrencyMetric<S>
-    where
-        S: Service<Request> {
+where
+    S: Service<Request>,
+{
     type Response = S::Response;
     type Error = S::Error;
     type Future = ResponseFuture<S::Future>;

@@ -140,7 +140,12 @@ pub struct ResponseFuture<R> {
 #[pinned_drop]
 impl<R> PinnedDrop for ResponseFuture<R> {
     fn drop(self: Pin<&mut Self>) {
-        if let ResponseState::Rx { request_id, request_storage, ..} = &self.state {
+        if let ResponseState::Rx {
+            request_id,
+            request_storage,
+            ..
+        } = &self.state
+        {
             request_storage.remove(request_id);
         }
     }

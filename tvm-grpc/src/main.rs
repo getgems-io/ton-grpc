@@ -1,21 +1,21 @@
-#[allow(clippy::enum_variant_names)] mod tvm;
-mod transaction_emulator;
-mod tvm_emulator;
 mod threaded;
+mod transaction_emulator;
+#[allow(clippy::enum_variant_names)]
+mod tvm;
+mod tvm_emulator;
 
-use std::net::SocketAddr;
-use std::time::Duration;
-use clap::Parser;
-use tonic::transport::Server;
-use tonic::codec::CompressionEncoding::Gzip;
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::fmt::format::FmtSpan;
-use tonlibjson_sys::TvmEmulator;
+use crate::transaction_emulator::TransactionEmulatorService;
 use crate::tvm::transaction_emulator_service_server::TransactionEmulatorServiceServer;
 use crate::tvm::tvm_emulator_service_server::TvmEmulatorServiceServer;
-use crate::transaction_emulator::TransactionEmulatorService;
 use crate::tvm_emulator::TvmEmulatorService;
-
+use clap::Parser;
+use std::net::SocketAddr;
+use std::time::Duration;
+use tonic::codec::CompressionEncoding::Gzip;
+use tonic::transport::Server;
+use tonlibjson_sys::TvmEmulator;
+use tracing_subscriber::fmt::format::FmtSpan;
+use tracing_subscriber::EnvFilter;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -54,15 +54,20 @@ async fn main() -> anyhow::Result<()> {
         .unwrap();
 
     let (mut health_reporter, health_server) = tonic_health::server::health_reporter();
-    health_reporter.set_serving::<TvmEmulatorServiceServer<TvmEmulatorService>>().await;
-    health_reporter.set_serving::<TransactionEmulatorServiceServer<TransactionEmulatorService>>().await;
+    health_reporter
+        .set_serving::<TvmEmulatorServiceServer<TvmEmulatorService>>()
+        .await;
+    health_reporter
+        .set_serving::<TransactionEmulatorServiceServer<TransactionEmulatorService>>()
+        .await;
 
     let tvm_emulator_service = TvmEmulatorServiceServer::new(TvmEmulatorService::default())
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
-    let transaction_emulator_service = TransactionEmulatorServiceServer::new(TransactionEmulatorService::default())
-        .accept_compressed(Gzip)
-        .send_compressed(Gzip);
+    let transaction_emulator_service =
+        TransactionEmulatorServiceServer::new(TransactionEmulatorService::default())
+            .accept_compressed(Gzip)
+            .send_compressed(Gzip);
 
     tracing::info!("Listening on {:?}", &args.listen);
 
@@ -73,13 +78,13 @@ async fn main() -> anyhow::Result<()> {
         .http2_keepalive_timeout(args.http2_keepalive_timeout.into())
         .initial_connection_window_size(args.initial_connection_window_size)
         .initial_stream_window_size(args.initial_stream_window_size)
-
         .add_service(reflection)
         .add_service(health_server)
         .add_service(tvm_emulator_service)
         .add_service(transaction_emulator_service)
-
-        .serve_with_shutdown(args.listen, async move { tokio::signal::ctrl_c().await.unwrap(); })
+        .serve_with_shutdown(args.listen, async move {
+            tokio::signal::ctrl_c().await.unwrap();
+        })
         .await?;
 
     Ok(())
