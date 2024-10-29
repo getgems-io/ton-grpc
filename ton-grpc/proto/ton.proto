@@ -159,9 +159,32 @@ message TvmCell {
   string bytes = 1;
 }
 
+message BlocksHeader {
+    BlockIdExt id = 1;
+    int32 global_id = 2;
+    int32 version = 3;
+    int32 flags = 4;
+    bool after_merge = 5;
+    bool after_split = 6;
+    bool before_split = 7;
+    bool want_merge = 8;
+    bool want_split = 9;
+    int32 validator_list_hash_short = 10;
+    int32 catchain_seqno = 11;
+    int32 min_ref_mc_seqno = 12;
+    bool is_key_block = 13;
+    int32 prev_key_block_seqno = 14;
+    int64 start_lt = 16;
+    int64 end_lt = 17;
+    int64 gen_utime = 18;
+    int32 vert_seqno = 19;
+    repeated BlockIdExt prev_blocks = 20;
+}
+
 service BlockService {
   rpc GetLastBlock (GetLastBlockRequest) returns (BlockIdExt);
   rpc GetBlock (BlockId) returns (BlockIdExt);
+  rpc GetBlockHeader (BlockId) returns (BlocksHeader);
   rpc GetShards (BlockId) returns (GetShardsResponse);
   rpc GetTransactionIds (GetTransactionIdsRequest) returns (stream TransactionId);
   rpc GetTransactions (GetTransactionsRequest) returns (stream Transaction);

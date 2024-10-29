@@ -99,3 +99,42 @@ async fn get_block_tx_stream_unordered_correct() -> anyhow::Result<()> {
     assert_eq!(len, 512);
     Ok(())
 }
+
+#[tokio::test]
+#[traced_test]
+#[ignore]
+async fn get_block_header_no_hashes() -> anyhow::Result<()> {
+    let client = client().await;
+    let mc_block = client.get_masterchain_info().await?;
+
+    let mc_header = client.get_block_header(
+        mc_block.last.workchain,
+        mc_block.last.shard,
+        mc_block.last.seqno,
+        None,
+    ).await?;
+
+    assert_eq!(mc_header.id.seqno, mc_block.last.seqno);
+    assert_eq!(mc_header.want_split, false);
+    Ok(())
+}
+
+#[tokio::test]
+#[traced_test]
+#[ignore]
+async fn get_block_header_with_hashes() -> anyhow::Result<()> {
+    let client = client().await;
+    let mc_block = client.get_masterchain_info().await?;
+
+    let mc_header = client.get_block_header(
+        mc_block.last.workchain,
+        mc_block.last.shard,
+        mc_block.last.seqno,
+        Some((mc_block.last.root_hash,
+        mc_block.last.file_hash))
+    ).await?;
+
+    assert_eq!(mc_header.id.seqno, mc_block.last.seqno);
+    assert_eq!(mc_header.want_split, false);
+    Ok(())
+}

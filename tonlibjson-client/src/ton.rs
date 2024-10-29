@@ -291,15 +291,28 @@ impl TonClient {
 
     pub async fn get_block_header(
         &self,
-        chain: i32,
+        workchain: i32,
         shard: i64,
         seqno: i32,
+        hashes: Option<(String, String)>,
     ) -> anyhow::Result<BlocksHeader> {
-        let id = self.look_up_block_by_seqno(chain, shard, seqno).await?;
+        let (root_hash, file_hash) = match hashes {
+            Some((root_hash,file_hash)) => (root_hash, file_hash),
+            _ => {
+                let block = self.look_up_block_by_seqno(workchain, shard, seqno).await?;
+                (block.root_hash, block.file_hash)
+            }
+        };
 
         self.client
             .clone()
-            .oneshot(BlocksGetBlockHeader::new(id))
+            .oneshot(BlocksGetBlockHeader::new(TonBlockIdExt {
+                workchain,
+                shard,
+                seqno,
+                root_hash,
+                file_hash,
+            }))
             .await
     }
 

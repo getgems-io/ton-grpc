@@ -46,6 +46,32 @@ impl From<(i32, block::BlocksShortTxId)> for TransactionId {
     }
 }
 
+impl From<block::BlocksHeader> for BlocksHeader {
+    fn from(value: block::BlocksHeader) -> Self {
+        Self {
+            id: Some(value.id.into()),
+            global_id: value.global_id,
+            version: value.version,
+            flags: value.flags,
+            after_merge: value.after_merge,
+            after_split: value.after_split,
+            before_split: value.before_split,
+            want_merge: value.want_merge,
+            want_split: value.want_split,
+            validator_list_hash_short: value.validator_list_hash_short,
+            catchain_seqno: value.catchain_seqno,
+            min_ref_mc_seqno: value.min_ref_mc_seqno,
+            is_key_block: value.is_key_block,
+            prev_key_block_seqno: value.prev_key_block_seqno,
+            start_lt: value.start_lt,
+            end_lt: value.end_lt,
+            gen_utime: value.gen_utime,
+            vert_seqno: value.vert_seqno,
+            prev_blocks: value.prev_blocks.iter().cloned().map(Into::into).collect(),
+        }
+    }
+}
+
 impl From<(&AccountAddressData, block::InternalTransactionId)> for TransactionId {
     fn from((account_address, tx_id): (&AccountAddressData, block::InternalTransactionId)) -> Self {
         Self {
