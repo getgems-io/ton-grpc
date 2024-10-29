@@ -471,10 +471,7 @@ impl FirstBlockDiscover {
                 continue;
             };
 
-            match self.next(start).await {
-                Ok(Some(mfb)) => { self.current.replace(mfb); }
-                Err(_) | Ok(None) => {}
-            }
+            if let Ok(Some(mfb)) = self.next(start).await { self.current.replace(mfb); }
         }
     }
 
