@@ -44,7 +44,7 @@ uuid = { version = "1.11", features = ["v4", "fast-rng", "serde"] }
 dashmap = "5.5"
 pin-project = "1.1"
 rand = "0.8"
-bytes = "1.7"
+bytes = "1.8"
 thiserror = "1.0.64"
 itertools = "0.13"
 bitvec = "1.0.1"
