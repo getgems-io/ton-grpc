@@ -1,18 +1,18 @@
+use crate::block::BlocksGetMasterchainInfo;
+use crate::client::Client;
+use crate::cursor_client::CursorClient;
+use crate::error::ErrorLayer;
+use serde_json::{json, Value};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use serde_json::{json, Value};
-use tower::limit::ConcurrencyLimitLayer;
-use tower::{Service, ServiceBuilder, ServiceExt};
-use tower::load::PeakEwma;
 use ton_client_util::discover::config::{LiteServerId, TonConfig};
-use crate::block::BlocksGetMasterchainInfo;
-use crate::client::Client;
-use crate::cursor_client::CursorClient;
 use ton_client_util::service::shared::SharedLayer;
 use ton_client_util::service::timeout::TimeoutLayer;
-use crate::error::ErrorLayer;
+use tower::limit::ConcurrencyLimitLayer;
+use tower::load::PeakEwma;
+use tower::{Service, ServiceBuilder, ServiceExt};
 
 #[derive(Default, Debug)]
 pub(crate) struct ClientFactory;
@@ -33,7 +33,9 @@ impl Service<TonConfig> for ClientFactory {
                 .build()
                 .await?;
 
-            let _ = (&mut client).oneshot(BlocksGetMasterchainInfo::default()).await?;
+            let _ = (&mut client)
+                .oneshot(BlocksGetMasterchainInfo::default())
+                .await?;
 
             Ok(client)
         })

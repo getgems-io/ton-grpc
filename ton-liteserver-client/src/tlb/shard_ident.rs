@@ -15,7 +15,10 @@ pub struct ShardIdent {
 }
 
 impl BitUnpack for ShardIdent {
-    fn unpack<R>(mut reader: R) -> Result<Self, R::Error> where R: BitReader {
+    fn unpack<R>(mut reader: R) -> Result<Self, R::Error>
+    where
+        R: BitReader,
+    {
         let tag: u8 = reader.unpack_as::<_, NBits<2>>()?;
         if tag != 0x00 {
             unreachable!()
@@ -25,6 +28,10 @@ impl BitUnpack for ShardIdent {
         let workchain_id = reader.unpack()?;
         let shard_prefix = reader.unpack()?;
 
-        Ok(Self { shard_pfx_bits, workchain_id, shard_prefix })
+        Ok(Self {
+            shard_pfx_bits,
+            workchain_id,
+            shard_prefix,
+        })
     }
 }

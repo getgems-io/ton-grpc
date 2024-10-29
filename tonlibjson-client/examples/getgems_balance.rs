@@ -15,7 +15,9 @@ async fn main() -> anyhow::Result<()> {
 
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS";
 
-    let total_value: i64 = ton.get_account_tx_range_unordered(address, ..).await?
+    let total_value: i64 = ton
+        .get_account_tx_range_unordered(address, ..)
+        .await?
         .filter_map(|tx| async {
             let tx: RawTransaction = tx.unwrap();
             if let Some(msg) = tx.out_msgs.first() {

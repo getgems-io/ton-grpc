@@ -1,17 +1,15 @@
 use std::env;
-use std::fs::{create_dir_all, copy};
+use std::fs::{copy, create_dir_all};
 use std::path::{Path, PathBuf};
 
 use cmake::Config;
 use walkdir::WalkDir;
 
 fn main() {
-    let use_native_arch = env::var("TONLIBJSON_SYS_TARGET_CPU_NATIVE")
-        .is_ok_and(|v| v == "1" || v == "true");
-    let use_lld = env::var("TONLIBJSON_SYS_LLD")
-        .is_ok_and(|v| v == "1" || v == "true");
-    let use_lto = env::var("TONLIBJSON_SYS_LTO")
-        .is_ok_and(|v| v == "1" || v == "true");
+    let use_native_arch =
+        env::var("TONLIBJSON_SYS_TARGET_CPU_NATIVE").is_ok_and(|v| v == "1" || v == "true");
+    let use_lld = env::var("TONLIBJSON_SYS_LLD").is_ok_and(|v| v == "1" || v == "true");
+    let use_lto = env::var("TONLIBJSON_SYS_LTO").is_ok_and(|v| v == "1" || v == "true");
 
     println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_TARGET_CPU_NATIVE");
     println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_LLD");
@@ -20,11 +18,9 @@ fn main() {
     let out_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let target_arch = if use_native_arch {
-         "native".to_owned()
+        "native".to_owned()
     } else {
-        env::var("CARGO_CFG_TARGET_ARCH")
-            .unwrap()
-            .replace('_', "-")
+        env::var("CARGO_CFG_TARGET_ARCH").unwrap().replace('_', "-")
     };
 
     let ton_dir = if cfg!(feature = "testnet") {
@@ -125,7 +121,11 @@ fn main() {
             .define("CMAKE_SHARED_LINKER_FLAGS_INIT", "-fuse-ld=lld");
     }
 
-    copy_dir_recursively(env::current_dir().unwrap().join(ton_dir), out_dir.join(ton_dir)).unwrap();
+    copy_dir_recursively(
+        env::current_dir().unwrap().join(ton_dir),
+        out_dir.join(ton_dir),
+    )
+    .unwrap();
 
     if cfg!(feature = "tonlibjson") {
         let dst = cfg.build_target("tonlibjson").build();
@@ -232,7 +232,6 @@ fn main() {
         println!("cargo:rustc-link-lib=static=emulator");
     }
 }
-
 
 fn copy_dir_recursively(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
     let src = src.as_ref();

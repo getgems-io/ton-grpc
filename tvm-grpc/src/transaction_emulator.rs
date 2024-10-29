@@ -1,29 +1,41 @@
+use crate::threaded::{Command, Stop, StreamId};
+use crate::tvm::transaction_emulator_request::Request::*;
+use crate::tvm::transaction_emulator_response::Response::*;
+use crate::tvm::transaction_emulator_service_server::TransactionEmulatorService as BaseTransactionEmulatorService;
+use crate::tvm::{
+    transaction_emulator_request, transaction_emulator_response, TransactionEmulatorEmulateRequest,
+    TransactionEmulatorEmulateResponse, TransactionEmulatorPrepareRequest,
+    TransactionEmulatorPrepareResponse, TransactionEmulatorRequest, TransactionEmulatorResponse,
+    TransactionEmulatorSetConfigRequest, TransactionEmulatorSetConfigResponse,
+    TransactionEmulatorSetIgnoreChksigRequest, TransactionEmulatorSetIgnoreChksigResponse,
+    TransactionEmulatorSetLibsRequest, TransactionEmulatorSetLibsResponse,
+    TransactionEmulatorSetLtRequest, TransactionEmulatorSetLtResponse,
+    TransactionEmulatorSetRandSeedRequest, TransactionEmulatorSetRandSeedResponse,
+    TransactionEmulatorSetUnixtimeRequest, TransactionEmulatorSetUnixtimeResponse, TvmResult,
+};
+use anyhow::anyhow;
+use async_stream::stream;
+use futures::Stream;
+use quick_cache::sync::Cache;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use futures::Stream;
+use tokio::sync::mpsc::UnboundedSender;
+use tokio_stream::StreamExt;
 use tonic::{async_trait, Request, Response, Status, Streaming};
 use tracing::instrument;
-use anyhow::anyhow;
-use async_stream::stream;
-use tokio_stream::StreamExt;
-use quick_cache::sync::Cache;
-use tokio::sync::mpsc::UnboundedSender;
-use crate::threaded::{Command, Stop, StreamId};
-use crate::tvm::transaction_emulator_service_server::TransactionEmulatorService as BaseTransactionEmulatorService;
-use crate::tvm::{transaction_emulator_request, transaction_emulator_response, TransactionEmulatorEmulateRequest, TransactionEmulatorEmulateResponse, TransactionEmulatorPrepareRequest, TransactionEmulatorPrepareResponse, TransactionEmulatorRequest, TransactionEmulatorResponse, TransactionEmulatorSetConfigRequest, TransactionEmulatorSetConfigResponse, TransactionEmulatorSetIgnoreChksigRequest, TransactionEmulatorSetIgnoreChksigResponse, TransactionEmulatorSetLibsRequest, TransactionEmulatorSetLibsResponse, TransactionEmulatorSetLtRequest, TransactionEmulatorSetLtResponse, TransactionEmulatorSetRandSeedRequest, TransactionEmulatorSetRandSeedResponse, TransactionEmulatorSetUnixtimeRequest, TransactionEmulatorSetUnixtimeResponse, TvmResult};
-use crate::tvm::transaction_emulator_request::Request::*;
-use crate::tvm::transaction_emulator_response::Response::*;
 
 #[derive(Debug)]
 pub struct TransactionEmulatorService {
-    tx: UnboundedSender<Command<transaction_emulator_request::Request, transaction_emulator_response::Response>>
+    tx: UnboundedSender<
+        Command<transaction_emulator_request::Request, transaction_emulator_response::Response>,
+    >,
 }
 
 #[derive(Default)]
 struct State {
-    emulator: Option<tonlibjson_sys::TransactionEmulator>
+    emulator: Option<tonlibjson_sys::TransactionEmulator>,
 }
 
 fn lru_cache() -> &'static Cache<String, Arc<String>> {
@@ -34,14 +46,20 @@ fn lru_cache() -> &'static Cache<String, Arc<String>> {
 
 impl Default for TransactionEmulatorService {
     fn default() -> Self {
-        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<Command<transaction_emulator_request::Request, transaction_emulator_response::Response>>();
+        let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<
+            Command<transaction_emulator_request::Request, transaction_emulator_response::Response>,
+        >();
 
         tokio::task::spawn_blocking(move || {
             let mut states: HashMap<StreamId, State> = HashMap::default();
 
             while let Some(command) = rx.blocking_recv() {
                 match command {
-                    Command::Request { stream_id, request, response: oneshot } => {
+                    Command::Request {
+                        stream_id,
+                        request,
+                        response: oneshot,
+                    } => {
                         let state = states.entry(stream_id).or_default();
 
                         let response = match request {
@@ -50,7 +68,9 @@ impl Default for TransactionEmulatorService {
                             SetUnixtime(req) => set_unixtime(state, req).map(SetUnixtimeResponse),
                             SetLt(req) => set_lt(state, req).map(SetLtResponse),
                             SetRandSeed(req) => set_rand_seed(state, req).map(SetRandSeedResponse),
-                            SetIgnoreChksig(req) => set_ignore_chksig(state, req).map(SetIgnoreChksigResponse),
+                            SetIgnoreChksig(req) => {
+                                set_ignore_chksig(state, req).map(SetIgnoreChksigResponse)
+                            }
                             SetConfig(req) => set_config(state, req).map(SetConfigResponse),
                             SetLibs(req) => set_libs(state, req).map(SetLibsResponse),
                         };
@@ -73,9 +93,13 @@ impl Default for TransactionEmulatorService {
 
 #[async_trait]
 impl BaseTransactionEmulatorService for TransactionEmulatorService {
-    type ProcessStream = Pin<Box<dyn Stream<Item=Result<TransactionEmulatorResponse, Status>> + Send>>;
+    type ProcessStream =
+        Pin<Box<dyn Stream<Item = Result<TransactionEmulatorResponse, Status>> + Send>>;
 
-    async fn process(&self, request: Request<Streaming<TransactionEmulatorRequest>>) -> Result<Response<Self::ProcessStream>, Status> {
+    async fn process(
+        &self,
+        request: Request<Streaming<TransactionEmulatorRequest>>,
+    ) -> Result<Response<Self::ProcessStream>, Status> {
         let stream_id = StreamId::new_v4();
         let stream = request.into_inner();
         let stream = stream.timeout(Duration::from_secs(3));
@@ -121,10 +145,14 @@ impl BaseTransactionEmulatorService for TransactionEmulatorService {
 }
 
 #[instrument(skip_all, err)]
-fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> Result<TransactionEmulatorPrepareResponse, Status> {
+fn prepare(
+    state: &mut State,
+    req: TransactionEmulatorPrepareRequest,
+) -> Result<TransactionEmulatorPrepareResponse, Status> {
     let config = if let Some(cache_key) = &req.config_cache_key {
         if req.config_boc.is_empty() {
-            lru_cache().get(cache_key)
+            lru_cache()
+                .get(cache_key)
                 .ok_or(Status::failed_precondition("config cache miss"))?
         } else {
             let config = Arc::new(req.config_boc.clone());
@@ -144,15 +172,19 @@ fn prepare(state: &mut State, req: TransactionEmulatorPrepareRequest) -> Result<
     Ok(TransactionEmulatorPrepareResponse { success: true })
 }
 
-fn emulate(state: &mut State, req: TransactionEmulatorEmulateRequest) -> Result<TransactionEmulatorEmulateResponse, Status> {
+fn emulate(
+    state: &mut State,
+    req: TransactionEmulatorEmulateRequest,
+) -> Result<TransactionEmulatorEmulateResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
         return Err(Status::internal("emulator not initialized"));
     };
 
-    let response = emu.emulate(&req.shard_account_boc, &req.message_boc)
+    let response = emu
+        .emulate(&req.shard_account_boc, &req.message_boc)
         .map_err(|e| Status::internal(e.to_string()))?;
 
-    tracing::trace!(method="emulate", "{}", response);
+    tracing::trace!(method = "emulate", "{}", response);
 
     let response = serde_json::from_str::<TvmResult<TransactionEmulatorEmulateResponse>>(&response)
         .map_err(|e| Status::internal(e.to_string()))?;
@@ -160,71 +192,92 @@ fn emulate(state: &mut State, req: TransactionEmulatorEmulateRequest) -> Result<
     response.into()
 }
 
-fn set_unixtime(state: &mut State, req: TransactionEmulatorSetUnixtimeRequest) -> Result<TransactionEmulatorSetUnixtimeResponse, Status> {
+fn set_unixtime(
+    state: &mut State,
+    req: TransactionEmulatorSetUnixtimeRequest,
+) -> Result<TransactionEmulatorSetUnixtimeResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
         return Err(Status::internal("emulator not initialized"));
     };
 
     let response = emu.set_unixtime(req.unixtime);
-    tracing::trace!(method="set_unixtime", "{}", response);
+    tracing::trace!(method = "set_unixtime", "{}", response);
 
     Ok(TransactionEmulatorSetUnixtimeResponse { success: true })
 }
 
-fn set_lt(state: &mut State, req: TransactionEmulatorSetLtRequest) -> Result<TransactionEmulatorSetLtResponse, Status> {
+fn set_lt(
+    state: &mut State,
+    req: TransactionEmulatorSetLtRequest,
+) -> Result<TransactionEmulatorSetLtResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
         return Err(Status::internal("emulator not initialized"));
     };
 
     let response = emu.set_lt(req.lt);
-    tracing::trace!(method="set_lt", "{}", response);
+    tracing::trace!(method = "set_lt", "{}", response);
 
     Ok(TransactionEmulatorSetLtResponse { success: true })
 }
 
-fn set_rand_seed(state: &mut State, req: TransactionEmulatorSetRandSeedRequest) -> Result<TransactionEmulatorSetRandSeedResponse, Status> {
+fn set_rand_seed(
+    state: &mut State,
+    req: TransactionEmulatorSetRandSeedRequest,
+) -> Result<TransactionEmulatorSetRandSeedResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
         return Err(Status::internal("emulator not initialized"));
     };
 
-    let response = emu.set_rand_seed(&req.rand_seed)
+    let response = emu
+        .set_rand_seed(&req.rand_seed)
         .map_err(|e| Status::internal(e.to_string()))?;
-    tracing::trace!(method="set_rand_seed", "{}", response);
+    tracing::trace!(method = "set_rand_seed", "{}", response);
 
     Ok(TransactionEmulatorSetRandSeedResponse { success: true })
 }
 
-fn set_ignore_chksig(state: &mut State, req: TransactionEmulatorSetIgnoreChksigRequest) -> Result<TransactionEmulatorSetIgnoreChksigResponse, Status> {
+fn set_ignore_chksig(
+    state: &mut State,
+    req: TransactionEmulatorSetIgnoreChksigRequest,
+) -> Result<TransactionEmulatorSetIgnoreChksigResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
         return Err(Status::internal("emulator not initialized"));
     };
 
     let response = emu.set_ignore_chksig(req.ignore_chksig);
-    tracing::trace!(method="set_ignore_chksig", "{}", response);
+    tracing::trace!(method = "set_ignore_chksig", "{}", response);
 
     Ok(TransactionEmulatorSetIgnoreChksigResponse { success: true })
 }
 
-fn set_config(state: &mut State, req: TransactionEmulatorSetConfigRequest) -> Result<TransactionEmulatorSetConfigResponse, Status> {
+fn set_config(
+    state: &mut State,
+    req: TransactionEmulatorSetConfigRequest,
+) -> Result<TransactionEmulatorSetConfigResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
         return Err(Status::internal("emulator not initialized"));
     };
 
-    let response = emu.set_config(&req.config)
+    let response = emu
+        .set_config(&req.config)
         .map_err(|e| Status::internal(e.to_string()))?;
-    tracing::trace!(method="set_config", "{}", response);
+    tracing::trace!(method = "set_config", "{}", response);
 
     Ok(TransactionEmulatorSetConfigResponse { success: true })
 }
 
-fn set_libs(state: &mut State, req: TransactionEmulatorSetLibsRequest) -> Result<TransactionEmulatorSetLibsResponse, Status> {
+fn set_libs(
+    state: &mut State,
+    req: TransactionEmulatorSetLibsRequest,
+) -> Result<TransactionEmulatorSetLibsResponse, Status> {
     let Some(emu) = state.emulator.as_ref() else {
         return Err(Status::internal("emulator not initialized"));
     };
 
-    let response = emu.set_libs(&req.libs)
+    let response = emu
+        .set_libs(&req.libs)
         .map_err(|e| Status::internal(e.to_string()))?;
-    tracing::trace!(method="set_libs", "{}", response);
+    tracing::trace!(method = "set_libs", "{}", response);
 
     Ok(TransactionEmulatorSetLibsResponse { success: true })
 }

@@ -9,8 +9,8 @@ use futures::FutureExt;
 use futures::TryFutureExt;
 use std::task::{Context, Poll};
 use ton_client_util::router::route::{Route, ToRoute};
-use tower::{Service, ServiceExt};
 use ton_client_util::service::timeout::ToTimeout;
+use tower::{Service, ServiceExt};
 
 #[derive(new, Clone)]
 pub struct RunGetMethod {

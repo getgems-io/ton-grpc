@@ -17,33 +17,47 @@ async fn main() -> anyhow::Result<()> {
     // let block = ton.get_shards_by_block_id(block.clone()).await?
     //     .first().unwrap().to_owned();
 
-    let block = ton.look_up_block_by_seqno(0, -9223372036854775808, 34716987).await?;
+    let block = ton
+        .look_up_block_by_seqno(0, -9223372036854775808, 34716987)
+        .await?;
 
     tracing::info!("run");
 
     let now = Instant::now();
-    let _txs = ton.get_block_tx_id_stream(&block, false).try_collect::<Vec<_>>().await;
+    let _txs = ton
+        .get_block_tx_id_stream(&block, false)
+        .try_collect::<Vec<_>>()
+        .await;
     let elapsed = now.elapsed();
     // tracing::info!(txs = ?txs);
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let _txs = ton.get_block_tx_id_stream(&block, true).try_collect::<Vec<_>>().await;
+    let _txs = ton
+        .get_block_tx_id_stream(&block, true)
+        .try_collect::<Vec<_>>()
+        .await;
     let elapsed = now.elapsed();
     // tracing::info!(txs = ?txs);
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let _txs = ton.get_block_tx_stream_unordered(&block).try_collect::<Vec<_>>().await;
+    let _txs = ton
+        .get_block_tx_stream_unordered(&block)
+        .try_collect::<Vec<_>>()
+        .await;
     let elapsed = now.elapsed();
     // tracing::info!(txs = ?txs);
 
     tracing::info!("Elapsed: {:.2?}", elapsed);
 
     let now = Instant::now();
-    let accounts = ton.get_accounts_in_block_stream(&block).try_collect::<Vec<_>>().await?;
+    let accounts = ton
+        .get_accounts_in_block_stream(&block)
+        .try_collect::<Vec<_>>()
+        .await?;
     let elapsed = now.elapsed();
 
     tracing::info!(accounts = ?accounts, elapsed = ?elapsed);

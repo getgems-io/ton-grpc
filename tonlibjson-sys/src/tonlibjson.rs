@@ -1,11 +1,15 @@
-use std::{ffi::{c_void, CStr, CString}, time::Duration, ptr::NonNull};
-use libc::{c_char, c_double, c_int};
 use anyhow::{anyhow, Result};
+use libc::{c_char, c_double, c_int};
+use std::{
+    ffi::{c_void, CStr, CString},
+    ptr::NonNull,
+    time::Duration,
+};
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
     use crate::tonlibjson::Client;
+    use std::time::Duration;
 
     #[test]
     fn receive_timeout() {
@@ -39,7 +43,7 @@ mod tests {
 }
 
 #[link(name = "tonlib")]
-extern {
+extern "C" {
     fn tonlib_client_json_create() -> *mut c_void;
 
     fn tonlib_client_json_destroy(p: *mut c_void);
@@ -55,7 +59,7 @@ extern {
 
 #[derive(Debug)]
 pub struct Client {
-    pointer: NonNull<c_void>
+    pointer: NonNull<c_void>,
 }
 
 impl Client {
@@ -74,7 +78,9 @@ impl Client {
 
         let req = CString::new(request)?;
 
-        unsafe { tonlib_client_json_send(self.pointer.as_ptr(), req.as_ptr()); }
+        unsafe {
+            tonlib_client_json_send(self.pointer.as_ptr(), req.as_ptr());
+        }
 
         Ok(())
     }

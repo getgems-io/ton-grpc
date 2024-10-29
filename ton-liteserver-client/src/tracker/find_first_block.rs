@@ -1,10 +1,10 @@
+use crate::client::Error;
 use crate::tl::{
     LiteServerBlockData, LiteServerBlockHeader, LiteServerError, LiteServerGetBlock,
     LiteServerLookupBlock, TonNodeBlockId, TonNodeBlockIdExt,
 };
 use std::borrow::Borrow;
 use tower::{Service, ServiceExt};
-use crate::client::Error;
 
 pub async fn find_first_block_header<S>(
     client: &mut S,
@@ -32,9 +32,7 @@ where
     while lhs < rhs {
         match block {
             Ok(_) => rhs = cur,
-            Err(Error::LiteServerError(LiteServerError { code: 651, .. })) => {
-                lhs = cur + 1
-            },
+            Err(Error::LiteServerError(LiteServerError { code: 651, .. })) => lhs = cur + 1,
             Err(e) => return Err(e),
         }
 

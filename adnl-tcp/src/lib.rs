@@ -1,13 +1,13 @@
-pub mod packet;
+mod aes_ctr;
 #[cfg(feature = "client")]
 pub mod client;
-pub mod ping;
-pub mod types;
-pub mod serializer;
+mod codec;
+pub mod connection;
 pub mod deserializer;
+mod key;
+pub mod packet;
+pub mod ping;
+pub mod serializer;
 #[cfg(feature = "server")]
 pub mod server;
-pub mod connection;
-mod codec;
-mod key;
-mod aes_ctr;
+pub mod types;

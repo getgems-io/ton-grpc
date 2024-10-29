@@ -1,16 +1,16 @@
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use futures::{Sink, Stream};
-use pin_project::pin_project;
-use tokio::net::TcpStream;
-use tokio_util::codec::Framed;
 use crate::codec::PacketCodec;
 use crate::packet::Packet;
+use futures::{Sink, Stream};
+use pin_project::pin_project;
+use std::pin::Pin;
+use std::task::{Context, Poll};
+use tokio::net::TcpStream;
+use tokio_util::codec::Framed;
 
 #[pin_project]
 pub struct Connection {
     #[pin]
-    inner: Framed<TcpStream, PacketCodec>
+    inner: Framed<TcpStream, PacketCodec>,
 }
 
 impl Connection {

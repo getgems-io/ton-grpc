@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use std::{env, fs};
-use std::path::{Path, PathBuf};
-use syn::{GenericArgument, Ident, MetaList};
-use quote::{format_ident, quote, ToTokens};
-use convert_case::{Case, Casing};
 use convert_case::Case::UpperCamel;
+use convert_case::{Case, Casing};
+use quote::{format_ident, quote, ToTokens};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::{env, fs};
+use syn::{GenericArgument, Ident, MetaList};
 use tl_parser::Combinator;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,68 +20,129 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Generator::from(scheme_path, "generated.rs")
         .configure("ok", vec!["Deserialize"])
         .configure("sync", vec!["Default", "Serialize"])
-        .configure_full("accountAddress", configure_type()
-            .derives(vec!["Clone", "Deserialize", "Serialize"])
-            .field("account_address", configure_field()
-                .optional()
-                .serialize_with("serialize_none_as_empty")
-                .deserialize_with("deserialize_empty_as_none")
-                .build())
-            .build()
+        .configure_full(
+            "accountAddress",
+            configure_type()
+                .derives(vec!["Clone", "Deserialize", "Serialize"])
+                .field(
+                    "account_address",
+                    configure_field()
+                        .optional()
+                        .serialize_with("serialize_none_as_empty")
+                        .deserialize_with("deserialize_empty_as_none")
+                        .build(),
+                )
+                .build(),
         )
-        .configure("ton.blockId", vec!["Clone", "Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
-        .configure("ton.blockIdExt", vec!["Clone", "Serialize", "Deserialize", "Eq", "PartialEq", "Hash", "new"])
-        .configure("blocks.masterchainInfo", vec!["Clone", "Deserialize", "Eq", "PartialEq"])
-        .configure("internal.transactionId", vec!["Clone", "Serialize", "Deserialize", "Eq", "PartialEq"])
-        .configure_full("raw.transactions", configure_type()
-            .derives(vec!["Deserialize"])
-            .field("previous_transaction_id", configure_field()
-                .optional()
-                .deserialize_with("deserialize_default_as_none")
-                .build())
-            .build())
-        .configure_full("raw.transaction", configure_type()
-            .derives(vec!["Clone", "Serialize", "Deserialize"])
-            .field("in_msg", configure_field()
-                .optional()
-                .build())
-            .build())
-        .configure_full("raw.fullAccountState", configure_type()
-            .derives(vec!["Deserialize"])
-            .field("balance", configure_field()
-                .optional()
-                .deserialize_with("deserialize_ton_account_balance")
-                .build())
-            .field("last_transaction_id", configure_field()
-                .optional()
-                .deserialize_with("deserialize_default_as_none")
-                .build()
-            )
-            .build()
+        .configure(
+            "ton.blockId",
+            vec![
+                "Clone",
+                "Serialize",
+                "Deserialize",
+                "Eq",
+                "PartialEq",
+                "Hash",
+                "new",
+            ],
         )
-
-        .configure("blocks.getBlockHeader", vec!["Clone", "Serialize", "Hash", "PartialEq", "Eq", "new"])
+        .configure(
+            "ton.blockIdExt",
+            vec![
+                "Clone",
+                "Serialize",
+                "Deserialize",
+                "Eq",
+                "PartialEq",
+                "Hash",
+                "new",
+            ],
+        )
+        .configure(
+            "blocks.masterchainInfo",
+            vec!["Clone", "Deserialize", "Eq", "PartialEq"],
+        )
+        .configure(
+            "internal.transactionId",
+            vec!["Clone", "Serialize", "Deserialize", "Eq", "PartialEq"],
+        )
+        .configure_full(
+            "raw.transactions",
+            configure_type()
+                .derives(vec!["Deserialize"])
+                .field(
+                    "previous_transaction_id",
+                    configure_field()
+                        .optional()
+                        .deserialize_with("deserialize_default_as_none")
+                        .build(),
+                )
+                .build(),
+        )
+        .configure_full(
+            "raw.transaction",
+            configure_type()
+                .derives(vec!["Clone", "Serialize", "Deserialize"])
+                .field("in_msg", configure_field().optional().build())
+                .build(),
+        )
+        .configure_full(
+            "raw.fullAccountState",
+            configure_type()
+                .derives(vec!["Deserialize"])
+                .field(
+                    "balance",
+                    configure_field()
+                        .optional()
+                        .deserialize_with("deserialize_ton_account_balance")
+                        .build(),
+                )
+                .field(
+                    "last_transaction_id",
+                    configure_field()
+                        .optional()
+                        .deserialize_with("deserialize_default_as_none")
+                        .build(),
+                )
+                .build(),
+        )
+        .configure(
+            "blocks.getBlockHeader",
+            vec!["Clone", "Serialize", "Hash", "PartialEq", "Eq", "new"],
+        )
         .configure("getShardAccountCell", vec!["Clone", "Serialize", "new"])
-        .configure("getShardAccountCellByTransaction", vec!["Clone", "Serialize", "new"])
+        .configure(
+            "getShardAccountCellByTransaction",
+            vec!["Clone", "Serialize", "new"],
+        )
         .configure("raw.getAccountState", vec!["Clone", "Serialize", "new"])
-        .configure("raw.getAccountStateByTransaction", vec!["Clone", "Serialize", "new"])
+        .configure(
+            "raw.getAccountStateByTransaction",
+            vec!["Clone", "Serialize", "new"],
+        )
         .configure("getAccountState", vec!["Clone", "Serialize", "new"])
-        .configure("blocks.getMasterchainInfo", vec!["Clone", "Default", "Serialize", "new"])
-        .configure("blocks.lookupBlock", vec!["Clone", "Serialize", "new", "Hash", "Eq", "PartialEq"])
+        .configure(
+            "blocks.getMasterchainInfo",
+            vec!["Clone", "Default", "Serialize", "new"],
+        )
+        .configure(
+            "blocks.lookupBlock",
+            vec!["Clone", "Serialize", "new", "Hash", "Eq", "PartialEq"],
+        )
         .configure("blocks.getShards", vec!["Clone", "Serialize", "new"])
         .configure("blocks.getTransactions", vec!["Clone", "Serialize", "new"])
         .configure("raw.sendMessage", vec!["Serialize", "new"])
         .configure("raw.sendMessageReturnHash", vec!["Serialize", "new"])
-
         .configure("smc.load", vec!["Clone", "Serialize", "new"])
         .configure("smc.runGetMethod", vec!["Clone", "Serialize", "new"])
-
-        .configure_full("raw.getTransactionsV2", configure_type().derives(vec!["Clone", "Serialize", "new"])
-            .field("private_key", configure_field().skip().build())
-            .build()
+        .configure_full(
+            "raw.getTransactionsV2",
+            configure_type()
+                .derives(vec!["Clone", "Serialize", "new"])
+                .field("private_key", configure_field().skip().build())
+                .build(),
         )
         // .add_type("withBlock", vec!["Clone", "Serialize", "new"])
-
         .generate()?;
 
     Ok(())
@@ -93,23 +154,35 @@ struct Generator {
     types: HashMap<String, TypeConfiguration>,
 }
 
-fn configure_type() -> TypeConfigurationBuilder { Default::default() }
-fn configure_field() -> FieldConfigurationBuilder { Default::default() }
+fn configure_type() -> TypeConfigurationBuilder {
+    Default::default()
+}
+fn configure_field() -> FieldConfigurationBuilder {
+    Default::default()
+}
 
 #[derive(Default)]
 struct TypeConfigurationBuilder {
     derives: Vec<String>,
-    fields: HashMap<String, FieldConfiguration>
+    fields: HashMap<String, FieldConfiguration>,
 }
 
 struct TypeConfiguration {
     pub derives: Vec<String>,
-    pub fields: HashMap<String, FieldConfiguration>
+    pub fields: HashMap<String, FieldConfiguration>,
 }
 
 impl Default for TypeConfiguration {
     fn default() -> Self {
-        Self { derives: vec!["Debug".to_owned(), "Clone".to_owned(), "Serialize".to_owned(), "Deserialize".to_owned()], fields: HashMap::new() }
+        Self {
+            derives: vec![
+                "Debug".to_owned(),
+                "Clone".to_owned(),
+                "Serialize".to_owned(),
+                "Deserialize".to_owned(),
+            ],
+            fields: HashMap::new(),
+        }
     }
 }
 
@@ -118,7 +191,7 @@ struct FieldConfigurationBuilder {
     skip: bool,
     optional: bool,
     deserialize_with: Option<String>,
-    serialize_with: Option<String>
+    serialize_with: Option<String>,
 }
 
 #[derive(Default)]
@@ -126,7 +199,7 @@ struct FieldConfiguration {
     pub skip: bool,
     pub optional: bool,
     pub deserialize_with: Option<String>,
-    pub serialize_with: Option<String>
+    pub serialize_with: Option<String>,
 }
 
 impl FieldConfigurationBuilder {
@@ -154,7 +227,12 @@ impl FieldConfigurationBuilder {
     }
 
     fn build(self) -> FieldConfiguration {
-        FieldConfiguration { skip: self.skip, optional: self.optional, deserialize_with: self.deserialize_with, serialize_with: self.serialize_with }
+        FieldConfiguration {
+            skip: self.skip,
+            optional: self.optional,
+            deserialize_with: self.deserialize_with,
+            serialize_with: self.serialize_with,
+        }
     }
 }
 
@@ -173,21 +251,28 @@ impl TypeConfigurationBuilder {
     }
 
     fn build(self) -> TypeConfiguration {
-        TypeConfiguration { derives: self.derives, fields: self.fields }
+        TypeConfiguration {
+            derives: self.derives,
+            fields: self.fields,
+        }
     }
 }
-
 
 impl Generator {
     fn from<I: AsRef<Path>, O: AsRef<Path>>(input: I, output: O) -> Self {
         let input: PathBuf = input.as_ref().to_path_buf();
         let output: PathBuf = output.as_ref().to_path_buf();
 
-        Self { input, output, types: Default::default() }
+        Self {
+            input,
+            output,
+            types: Default::default(),
+        }
     }
 
     fn configure(mut self, name: &str, derives: Vec<&str>) -> Self {
-        self.types.insert(name.to_owned(), configure_type().derives(derives).build());
+        self.types
+            .insert(name.to_owned(), configure_type().derives(derives).build());
 
         self
     }
@@ -212,8 +297,22 @@ impl Generator {
 
         let mut formatted = String::new();
 
-        let skip_list: Vec<String> = vec!["Vector t", "Bool", "Int32", "Int53", "Int64", "Int256", "Bytes", "SecureString", "SecureBytes", "Object", "Function"]
-            .into_iter().map(|s| s.to_owned()).collect();
+        let skip_list: Vec<String> = vec![
+            "Vector t",
+            "Bool",
+            "Int32",
+            "Int53",
+            "Int64",
+            "Int256",
+            "Bytes",
+            "SecureString",
+            "SecureBytes",
+            "Object",
+            "Function",
+        ]
+        .into_iter()
+        .map(|s| s.to_owned())
+        .collect();
 
         for (type_ident, types) in map {
             eprintln!("type_ident = {:}", type_ident);
@@ -224,7 +323,12 @@ impl Generator {
             let output_name = generate_type_name(&type_ident);
             let struct_name = format_ident!("{}", output_name);
 
-            let output = if types.iter().filter(|combinator| !combinator.is_functional()).count() == 1 {
+            let output = if types
+                .iter()
+                .filter(|combinator| !combinator.is_functional())
+                .count()
+                == 1
+            {
                 let bare_type = types.first().unwrap().id();
                 let name = format_ident!("{}", generate_type_name(bare_type));
 
@@ -240,8 +344,8 @@ impl Generator {
                         let field_name = format_ident!("{}", generate_type_name(rename));
 
                         quote! {
-                        #field_name(#field_name)
-                    }
+                            #field_name(#field_name)
+                        }
                     })
                     .collect();
 
@@ -262,7 +366,10 @@ impl Generator {
             eprintln!("tokens = {}", output);
 
             for definition in types.into_iter() {
-                if definition.is_builtin() || definition.id() == "vector" || definition.id() == "int256" {
+                if definition.is_builtin()
+                    || definition.id() == "vector"
+                    || definition.id() == "int256"
+                {
                     continue;
                 }
 
@@ -277,27 +384,39 @@ impl Generator {
                 let derives = format!("derive({})", configuration.derives.join(","));
                 let t = syn::parse_str::<MetaList>(&derives)?;
 
-                let fields: Vec<_> = definition.fields()
+                let fields: Vec<_> = definition
+                    .fields()
                     .iter()
                     .filter(|field| {
                         let default_configuration = FieldConfiguration::default();
                         let field_name = field.id().unwrap();
-                        let field_configuration = configuration.fields.get(field_name).unwrap_or(&default_configuration);
+                        let field_configuration = configuration
+                            .fields
+                            .get(field_name)
+                            .unwrap_or(&default_configuration);
 
                         !field_configuration.skip
                     })
                     .map(|field| {
                         let default_configuration = FieldConfiguration::default();
                         let field_name = field.id().unwrap().to_case(Case::Snake);
-                        let field_configuration = configuration.fields.get(&field_name).unwrap_or(&default_configuration);
+                        let field_configuration = configuration
+                            .fields
+                            .get(&field_name)
+                            .unwrap_or(&default_configuration);
 
                         eprintln!("field = {:?}", field);
                         let field_name = format_ident!("{}", &field_name);
                         let mut deserialize_number_from_string = false; // TODO[akostylev0]
-                        let field_type: Box<dyn ToTokens> = if field.field_type().is_some_and(|typ| typ == "#") {
+                        let field_type: Box<dyn ToTokens> = if field
+                            .field_type()
+                            .is_some_and(|typ| typ == "#")
+                        {
                             deserialize_number_from_string = true;
                             if field_configuration.optional {
-                                Box::new(syn::parse_str::<GenericArgument>("Option<Int31>").unwrap())
+                                Box::new(
+                                    syn::parse_str::<GenericArgument>("Option<Int31>").unwrap(),
+                                )
                             } else {
                                 Box::new(format_ident!("{}", "Int31"))
                             }
@@ -316,65 +435,77 @@ impl Generator {
                             Box::new(syn::parse_str::<GenericArgument>(&gen).unwrap())
                         } else {
                             let field_type = field.field_type();
-                            if field_type.is_some_and(|s| s == "int32" || s == "int64" || s == "int53" || s == "int256")  {
+                            if field_type.is_some_and(|s| {
+                                s == "int32" || s == "int64" || s == "int53" || s == "int256"
+                            }) {
                                 deserialize_number_from_string = true;
                             }
 
                             if field_configuration.optional {
-                                let id = format!("Option<{}>", structure_ident(field_type.unwrap()));
+                                let id =
+                                    format!("Option<{}>", structure_ident(field_type.unwrap()));
                                 Box::new(syn::parse_str::<GenericArgument>(&id).unwrap())
                             } else {
                                 Box::new(format_ident!("{}", structure_ident(field_type.unwrap())))
                             }
                         };
 
-                        let serialize_with = if let Some(serialize_with) = &field_configuration.serialize_with {
-                            quote! {
-                                #[serde(serialize_with = #serialize_with)]
-                            }
-                        } else { quote! {} };
-                        let deserialize_with = if let Some(deserialize_with) = &field_configuration.deserialize_with {
-                            quote! {
-                                #[serde(deserialize_with = #deserialize_with)]
-                            }
-                        } else { quote! {} };
+                        let serialize_with =
+                            if let Some(serialize_with) = &field_configuration.serialize_with {
+                                quote! {
+                                    #[serde(serialize_with = #serialize_with)]
+                                }
+                            } else {
+                                quote! {}
+                            };
+                        let deserialize_with =
+                            if let Some(deserialize_with) = &field_configuration.deserialize_with {
+                                quote! {
+                                    #[serde(deserialize_with = #deserialize_with)]
+                                }
+                            } else {
+                                quote! {}
+                            };
 
                         // // TODO[akostylev0]: just write custom wrappers for primitive types
-                    if deserialize_number_from_string && deserialize_with.is_empty() {
-                        quote! {
-                            #serialize_with
-                            #[serde(default)]
-                            #[serde(deserialize_with = "deserialize_number_from_string")]
-                            pub #field_name: #field_type
+                        if deserialize_number_from_string && deserialize_with.is_empty() {
+                            quote! {
+                                #serialize_with
+                                #[serde(default)]
+                                #[serde(deserialize_with = "deserialize_number_from_string")]
+                                pub #field_name: #field_type
+                            }
+                        } else {
+                            quote! {
+                                #serialize_with
+                                #deserialize_with
+                                pub #field_name: #field_type
+                            }
                         }
-                    } else  {
-                        quote! {
-                            #serialize_with
-                            #deserialize_with
-                            pub #field_name: #field_type
-                        }
-                    }}).collect();
+                    })
+                    .collect();
 
                 let traits = if definition.is_functional() {
-                    let result_name = format_ident!("{}", generate_type_name(definition.result_type()));
+                    let result_name =
+                        format_ident!("{}", generate_type_name(definition.result_type()));
                     quote! {
-                    impl Functional for #struct_name {
-                        type Result = #result_name;
+                        impl Functional for #struct_name {
+                            type Result = #result_name;
+                        }
                     }
-                }
                 } else {
                     quote! {}
                 };
 
                 let output = quote! {
-                #[#t]
-                #[serde(tag = "@type", rename = #id)]
-                pub struct #struct_name {
-                    #(#fields),*
-                }
+                    #[#t]
+                    #[serde(tag = "@type", rename = #id)]
+                    pub struct #struct_name {
+                        #(#fields),*
+                    }
 
-                #traits
-            };
+                    #traits
+                };
 
                 let syntax_tree = syn::parse2(output.clone()).unwrap();
                 formatted += &prettyplease::unparse(&syntax_tree);
@@ -382,8 +513,7 @@ impl Generator {
         }
 
         let out_dir = env::var_os("OUT_DIR").unwrap();
-        let dest_path = Path::new(&out_dir)
-            .join(self.output);
+        let dest_path = Path::new(&out_dir).join(self.output);
 
         eprintln!("dest_path = {:?}", dest_path);
 
@@ -398,9 +528,12 @@ fn generate_type_name(s: &str) -> String {
 
     let boxed_prefix = if name.starts_with(|c: char| c.is_uppercase()) {
         "Boxed"
-    } else { "" };
+    } else {
+        ""
+    };
 
-    let ns_prefix = ns.split('.')
+    let ns_prefix = ns
+        .split('.')
         .map(|f| f.to_case(UpperCamel))
         .collect::<Vec<_>>()
         .join("");

@@ -1,5 +1,5 @@
-use rand::random;
 use crate::packet::Packet;
+use rand::random;
 
 pub fn ping_packet() -> Packet {
     let nonce = random::<u64>();

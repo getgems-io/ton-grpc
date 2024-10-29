@@ -9,11 +9,13 @@ impl Ed25519KeyId {
     const KEY_TYPE: [u8; 4] = [0xC6, 0xB4, 0x13, 0x48];
 
     pub fn from_public_key_bytes(public_key: &[u8; 32]) -> Self {
-        Self(Sha256::default()
-            .chain_update(Self::KEY_TYPE.as_slice())
-            .chain_update(public_key.as_slice())
-            .finalize()
-            .into())
+        Self(
+            Sha256::default()
+                .chain_update(Self::KEY_TYPE.as_slice())
+                .chain_update(public_key.as_slice())
+                .finalize()
+                .into(),
+        )
     }
 
     pub fn from_slice(slice: &[u8]) -> Self {
@@ -31,7 +33,7 @@ impl Ed25519KeyId {
 pub struct Ed25519Key {
     id: Ed25519KeyId,
     pub_key: VerifyingKey,
-    exp_key: ExpandedSecretKey
+    exp_key: ExpandedSecretKey,
 }
 
 impl Ed25519Key {
@@ -41,7 +43,11 @@ impl Ed25519Key {
         let id = Ed25519KeyId::from_public_key_bytes(pub_key.as_bytes());
         let exp_key: ExpandedSecretKey = private_key.as_bytes().into();
 
-        Self { id, pub_key, exp_key }
+        Self {
+            id,
+            pub_key,
+            exp_key,
+        }
     }
 
     pub fn id(&self) -> &Ed25519KeyId {

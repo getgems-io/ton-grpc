@@ -1,10 +1,10 @@
-use std::collections::HashMap;
-use std::{env, fs};
-use std::path::{Path, PathBuf};
-use syn::{GenericArgument, Ident, MetaList};
-use quote::{format_ident, quote, ToTokens};
-use convert_case::{Case, Casing};
 use convert_case::Case::UpperCamel;
+use convert_case::{Case, Casing};
+use quote::{format_ident, quote, ToTokens};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::{env, fs};
+use syn::{GenericArgument, Ident, MetaList};
 use tl_parser::{Combinator, Condition};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,8 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed={}", scheme_path.to_string_lossy());
 
-    Generator::from(scheme_path, "generated.rs")
-        .generate()?;
+    Generator::from(scheme_path, "generated.rs").generate()?;
 
     Ok(())
 }
@@ -30,12 +29,19 @@ struct Generator {
 }
 
 struct TypeConfiguration {
-    pub derives: Vec<String>
+    pub derives: Vec<String>,
 }
 
 impl Default for TypeConfiguration {
     fn default() -> Self {
-        Self { derives: vec!["Debug".to_owned(), "Clone".to_owned(), "PartialEq".to_owned(), "Eq".to_owned()] }
+        Self {
+            derives: vec![
+                "Debug".to_owned(),
+                "Clone".to_owned(),
+                "PartialEq".to_owned(),
+                "Eq".to_owned(),
+            ],
+        }
     }
 }
 
@@ -44,7 +50,11 @@ impl Generator {
         let input: PathBuf = input.as_ref().to_path_buf();
         let output: PathBuf = output.as_ref().to_path_buf();
 
-        Self { input, output, types: Default::default() }
+        Self {
+            input,
+            output,
+            types: Default::default(),
+        }
     }
 
     fn generate(self) -> anyhow::Result<()> {
@@ -61,8 +71,21 @@ impl Generator {
 
         let mut formatted = String::new();
 
-        let skip_list: Vec<String> = vec!["Vector t", "Int32", "Int53", "Int64", "Int128", "Int256", "Bytes", "SecureString", "SecureBytes", "Function"]
-            .into_iter().map(|s| s.to_owned()).collect();
+        let skip_list: Vec<String> = vec![
+            "Vector t",
+            "Int32",
+            "Int53",
+            "Int64",
+            "Int128",
+            "Int256",
+            "Bytes",
+            "SecureString",
+            "SecureBytes",
+            "Function",
+        ]
+        .into_iter()
+        .map(|s| s.to_owned())
+        .collect();
 
         // Boxed Types
         for (type_ident, types) in map {
@@ -74,7 +97,12 @@ impl Generator {
             let output_name = generate_type_name(&type_ident);
             let struct_name = format_ident!("{}", output_name);
 
-            let output = if types.iter().filter(|combinator| !combinator.is_functional()).count() == 1 {
+            let output = if types
+                .iter()
+                .filter(|combinator| !combinator.is_functional())
+                .count()
+                == 1
+            {
                 let bare_type = types.first().unwrap().id();
                 let name = format_ident!("{}", generate_type_name(bare_type));
 
@@ -90,8 +118,8 @@ impl Generator {
                         let field_name = format_ident!("{}", generate_type_name(rename));
 
                         quote! {
-                        #field_name(#field_name)
-                    }
+                            #field_name(#field_name)
+                        }
                     })
                     .collect();
 
@@ -185,7 +213,10 @@ impl Generator {
 
             // Bare Types
             for definition in types.into_iter() {
-                if definition.is_builtin() || definition.id() == "vector" || definition.id() == "int256" {
+                if definition.is_builtin()
+                    || definition.id() == "vector"
+                    || definition.id() == "int256"
+                {
                     continue;
                 }
 
@@ -204,14 +235,18 @@ impl Generator {
                 let derives = format!("derive({})", to_derive.join(","));
                 let t = syn::parse_str::<MetaList>(&derives)?;
 
-                let fields: Vec<_> = definition.fields()
+                let fields: Vec<_> = definition
+                    .fields()
                     .iter()
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
 
                         eprintln!("field = {:?}", field);
                         let field_name = format_ident!("{}", &field_name);
-                        let field_type: Box<dyn ToTokens> = if field.field_type().is_some_and(|typ| typ == "#") {
+                        let field_type: Box<dyn ToTokens> = if field
+                            .field_type()
+                            .is_some_and(|typ| typ == "#")
+                        {
                             Box::new(format_ident!("{}", "Int31"))
                         } else if field.type_is_polymorphic() {
                             let type_name = generate_type_name(field.field_type().unwrap());
@@ -229,7 +264,8 @@ impl Generator {
                         } else {
                             let field_type = field.field_type();
                             if field.type_is_optional() {
-                                let id = format!("Option<{}>", structure_ident(field_type.unwrap()));
+                                let id =
+                                    format!("Option<{}>", structure_ident(field_type.unwrap()));
                                 Box::new(syn::parse_str::<GenericArgument>(&id).unwrap())
                             } else {
                                 Box::new(format_ident!("{}", structure_ident(field_type.unwrap())))
@@ -239,9 +275,11 @@ impl Generator {
                         quote! {
                             pub #field_name: #field_type
                         }
-                    }).collect();
+                    })
+                    .collect();
 
-                let serialize_defs: Vec<_> = definition.fields()
+                let serialize_defs: Vec<_> = definition
+                    .fields()
                     .iter()
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
@@ -251,17 +289,32 @@ impl Generator {
 
                         match field.type_condition() {
                             None => match field.field_type() {
-                                Some("#") => quote! { let mut #field_name_ident = self.#field_name_ident; },
+                                Some("#") => {
+                                    quote! { let mut #field_name_ident = self.#field_name_ident; }
+                                }
                                 // TODO[akostylev0] bool optimization
                                 // Some("Bool") => quote! { let #field_name_ident = self.#field_name_ident; },
-                                Some("int") => quote! { let #field_name_ident = self.#field_name_ident; },
-                                Some("long") => quote! { let #field_name_ident = self.#field_name_ident; },
-                                Some("int256") => quote! { let #field_name_ident = &self.#field_name_ident; },
-                                Some("bytes") => quote! { let #field_name_ident = &self.#field_name_ident; },
-                                Some("string") => quote! { let #field_name_ident = &self.#field_name_ident; },
-                                _ => quote! { let #field_name_ident = &self.#field_name_ident; }
+                                Some("int") => {
+                                    quote! { let #field_name_ident = self.#field_name_ident; }
+                                }
+                                Some("long") => {
+                                    quote! { let #field_name_ident = self.#field_name_ident; }
+                                }
+                                Some("int256") => {
+                                    quote! { let #field_name_ident = &self.#field_name_ident; }
+                                }
+                                Some("bytes") => {
+                                    quote! { let #field_name_ident = &self.#field_name_ident; }
+                                }
+                                Some("string") => {
+                                    quote! { let #field_name_ident = &self.#field_name_ident; }
+                                }
+                                _ => quote! { let #field_name_ident = &self.#field_name_ident; },
                             },
-                            Some(Condition { field_ref, bit_selector: Some(bit_selector) }) =>  {
+                            Some(Condition {
+                                field_ref,
+                                bit_selector: Some(bit_selector),
+                            }) => {
                                 let field_ref = format_ident!("{}", &field_ref);
                                 quote! {
                                     let #field_name_ident = self.#field_name_ident.as_ref();
@@ -269,14 +322,19 @@ impl Generator {
                                         #field_ref |= 1 << #bit_selector;
                                     }
                                 }
-                            },
-                            Some(Condition { field_ref: _, bit_selector: None }) => {
+                            }
+                            Some(Condition {
+                                field_ref: _,
+                                bit_selector: None,
+                            }) => {
                                 unimplemented!()
                             }
                         }
-                    }).collect();
+                    })
+                    .collect();
 
-                let serialize_fields: Vec<_> = definition.fields()
+                let serialize_fields: Vec<_> = definition
+                    .fields()
                     .iter()
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
@@ -294,9 +352,12 @@ impl Generator {
                                 Some("int256") => quote! { se.write_i256(#field_name_ident); },
                                 Some("bytes") => quote! { se.write_bytes(#field_name_ident); },
                                 Some("string") => quote! { se.write_string(#field_name_ident); },
-                                _ => quote! { #field_name_ident.serialize(se); }
+                                _ => quote! { #field_name_ident.serialize(se); },
                             },
-                            Some(Condition { field_ref: _, bit_selector: Some(_) }) =>  {
+                            Some(Condition {
+                                field_ref: _,
+                                bit_selector: Some(_),
+                            }) => {
                                 let inner = match field.field_type() {
                                     Some("#") => quote! { se.write_i31(*value) },
                                     // TODO[akostylev0] bool optimization
@@ -306,7 +367,7 @@ impl Generator {
                                     Some("int256") => quote! { se.write_i256(value) },
                                     Some("bytes") => quote! { se.write_bytes(value) },
                                     Some("string") => quote! { se.write_string(value) },
-                                    _ => quote! { value.serialize(se) }
+                                    _ => quote! { value.serialize(se) },
                                 };
                                 quote! {
                                     match #field_name_ident {
@@ -314,12 +375,16 @@ impl Generator {
                                         Some(value) => #inner,
                                     };
                                 }
-                            },
-                            Some(Condition { field_ref: _, bit_selector: None }) => {
+                            }
+                            Some(Condition {
+                                field_ref: _,
+                                bit_selector: None,
+                            }) => {
                                 unimplemented!()
                             }
                         }
-                    }).collect();
+                    })
+                    .collect();
 
                 let deserialize_fields: Vec<_> = definition.fields()
                     .iter()
@@ -363,7 +428,8 @@ impl Generator {
                         }
                     }).collect();
 
-                let deserialize_pass: Vec<_> = definition.fields()
+                let deserialize_pass: Vec<_> = definition
+                    .fields()
                     .iter()
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
@@ -374,10 +440,12 @@ impl Generator {
                         quote! {
                             #field_name_ident,
                         }
-                    }).collect();
+                    })
+                    .collect();
 
                 let traits = if definition.is_functional() {
-                    let result_name = format_ident!("{}", generate_type_name(definition.result_type()));
+                    let result_name =
+                        format_ident!("{}", generate_type_name(definition.result_type()));
                     quote! {
                         impl Functional for #struct_name {
                             type Result = #result_name;
@@ -448,8 +516,7 @@ impl Generator {
         }
 
         let out_dir = env::var_os("OUT_DIR").unwrap();
-        let dest_path = Path::new(&out_dir)
-            .join(self.output);
+        let dest_path = Path::new(&out_dir).join(self.output);
 
         eprintln!("dest_path = {:?}", dest_path);
 
@@ -464,9 +531,12 @@ fn generate_type_name(s: &str) -> String {
 
     let boxed_prefix = if name.starts_with(|c: char| c.is_uppercase()) {
         "Boxed"
-    } else { "" };
+    } else {
+        ""
+    };
 
-    let ns_prefix = ns.split('.')
+    let ns_prefix = ns
+        .split('.')
         .map(|f| f.to_case(UpperCamel))
         .collect::<Vec<_>>()
         .join("");

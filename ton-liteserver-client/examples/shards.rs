@@ -1,15 +1,18 @@
 use adnl_tcp::client::ServerKey;
+use anyhow::anyhow;
 use base64::Engine;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use std::time::Duration;
-use anyhow::anyhow;
 use ton_liteserver_client::client::LiteServerClient;
-use ton_liteserver_client::tl::{LiteServerGetAllShardsInfo, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo, TonNodeBoxedBlockIdExt};
-use ton_liteserver_client::tlb::shard_hashes::ShardHashes;
-use toner::{tlb::bits::de::unpack_bytes, ton::boc::BoC};
-use toner::tlb::bits::de::unpack_bytes_fully;
-use tower::{ServiceBuilder, ServiceExt};
+use ton_liteserver_client::tl::{
+    LiteServerGetAllShardsInfo, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo,
+    TonNodeBoxedBlockIdExt,
+};
 use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
+use ton_liteserver_client::tlb::shard_hashes::ShardHashes;
+use toner::tlb::bits::de::unpack_bytes_fully;
+use toner::{tlb::bits::de::unpack_bytes, ton::boc::BoC};
+use tower::{ServiceBuilder, ServiceExt};
 
 #[tokio::main]
 async fn main() -> Result<(), tower::BoxError> {
@@ -30,7 +33,9 @@ async fn main() -> Result<(), tower::BoxError> {
         .await?;
 
     let boc: BoC = unpack_bytes(&shards.data)?;
-    let root = boc.single_root().ok_or_else(|| anyhow!("single root expected"))?;
+    let root = boc
+        .single_root()
+        .ok_or_else(|| anyhow!("single root expected"))?;
     let shards: ShardHashes = root.parse_fully()?;
 
     for (workchain_id, shards) in shards.iter() {

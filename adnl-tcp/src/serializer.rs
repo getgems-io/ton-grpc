@@ -1,6 +1,6 @@
-use std::fmt::Debug;
+use crate::types::Int256;
 use bytes::BufMut;
-use crate::types::{Int256};
+use std::fmt::Debug;
 
 pub trait Serialize {
     fn serialize(&self, se: &mut Serializer);
@@ -62,13 +62,15 @@ impl Serializer {
             if padding > 0 {
                 self.output.reserve(val.len() + 4 + 4 - padding);
                 self.output.put_u8(254);
-                self.output.put_slice(&(val.len() as u32).to_le_bytes()[..3]);
+                self.output
+                    .put_slice(&(val.len() as u32).to_le_bytes()[..3]);
                 self.output.put_slice(val);
                 self.output.put_bytes(0, 4 - padding);
             } else {
                 self.output.reserve(val.len() + 4);
                 self.output.put_u8(254);
-                self.output.put_slice(&(val.len() as u32).to_le_bytes()[..3]);
+                self.output
+                    .put_slice(&(val.len() as u32).to_le_bytes()[..3]);
                 self.output.put_u8(val.len() as u8);
                 self.output.put_slice(val);
             }
@@ -77,8 +79,8 @@ impl Serializer {
 }
 
 pub fn to_bytes_boxed<T>(value: &T) -> Vec<u8>
-    where
-        T: SerializeBoxed,
+where
+    T: SerializeBoxed,
 {
     let mut serializer = Serializer { output: Vec::new() };
     value.serialize_boxed(&mut serializer);

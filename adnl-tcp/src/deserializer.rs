@@ -1,26 +1,32 @@
+use crate::types::Int256;
 use anyhow::bail;
 use bytes::Buf;
 use thiserror::Error;
-use crate::types::Int256;
 
 #[derive(Error, Debug)]
 pub enum DeserializerBoxedError {
     #[error("Unexpected constructor number: {0}")]
     UnexpectedConstructorNumber(u32),
     #[error(transparent)]
-    DeserializeError(#[from] anyhow::Error)
+    DeserializeError(#[from] anyhow::Error),
 }
 
-pub trait Deserialize where Self: Sized {
+pub trait Deserialize
+where
+    Self: Sized,
+{
     fn deserialize(de: &mut Deserializer) -> Result<Self, DeserializerBoxedError>;
 }
 
 pub trait DeserializeBoxed: Deserialize {
-    fn deserialize_boxed(constructor_number: u32, de: &mut Deserializer) -> Result<Self, DeserializerBoxedError>;
+    fn deserialize_boxed(
+        constructor_number: u32,
+        de: &mut Deserializer,
+    ) -> Result<Self, DeserializerBoxedError>;
 }
 
 pub struct Deserializer<'de> {
-    input: &'de [u8]
+    input: &'de [u8],
 }
 
 impl<'de> Deserializer<'de> {
@@ -88,7 +94,8 @@ impl<'de> Deserializer<'de> {
 }
 
 pub fn from_bytes_boxed<T>(bytes: &[u8]) -> anyhow::Result<T>
-    where T: DeserializeBoxed,
+where
+    T: DeserializeBoxed,
 {
     let mut deserializer = Deserializer::from_bytes(bytes);
     let constructor_number = deserializer.parse_constructor_numer()?;
@@ -99,7 +106,6 @@ pub fn from_bytes_boxed<T>(bytes: &[u8]) -> anyhow::Result<T>
         bail!("input is not empty")
     }
 }
-
 
 #[cfg(test)]
 mod tests {
