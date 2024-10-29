@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.2](https://github.com/getgems-io/ton-grpc/compare/ton-liteserver-client-v0.2.1...ton-liteserver-client-v0.2.2) (2024-10-29)
+
+
+### Bug Fixes
+
+* **deps:** bump prettyplease from 0.2.20 to 0.2.22 ([1b924c9](https://github.com/getgems-io/ton-grpc/commit/1b924c9a9f5b943dedbf93534943e824b8112d6f))
+* **deps:** bump prettyplease from 0.2.22 to 0.2.25 ([9755806](https://github.com/getgems-io/ton-grpc/commit/97558066be05fc3f20580c877ee7be474c9a1943))
+* **deps:** bump syn from 2.0.74 to 2.0.76 ([f5230cb](https://github.com/getgems-io/ton-grpc/commit/f5230cb68c10f624a9a4d0f5c949d35097b82474))
+* **deps:** bump syn from 2.0.76 to 2.0.77 ([13e1504](https://github.com/getgems-io/ton-grpc/commit/13e1504fb7d112a672f41244f27c2447637c1e9a))
+
 ## [0.2.1](https://github.com/getgems-io/ton-grpc/compare/ton-liteserver-client-v0.2.0...ton-liteserver-client-v0.2.1) (2024-08-13)
 
 

@@ -44,6 +44,19 @@
 
 
 
+## [0.11.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.10.7...ton-grpc-v0.11.0) (2024-10-29)
+
+
+### Features
+
+* **ton-grpc:** new method GetBlockHeader ([24615dd](https://github.com/getgems-io/ton-grpc/commit/24615dd81c9c252ba4f19bc4ad72dae6794a7a64))
+
+
+### Bug Fixes
+
+* **deps:** bump derive-new from 0.6.0 to 0.7.0 ([782f69f](https://github.com/getgems-io/ton-grpc/commit/782f69f538a4dd75766e5473cb9b65644eb1ff62))
+* **deps:** bump metrics-exporter-prometheus from 0.15.3 to 0.16.0 ([59201a3](https://github.com/getgems-io/ton-grpc/commit/59201a30beef1629a4cba0c9f59481fe22e64336))
+
 ## [0.10.6](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.10.5...ton-grpc-v0.10.6) (2024-07-23)
 
 
