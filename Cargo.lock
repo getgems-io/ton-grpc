@@ -1309,16 +1309,6 @@ checksum = "6c8640c5d730cb13ebd907d8d04b52f55ac9a2eec55b440c8892f40d56c76c1d"
 
 [[package]]
 name = "metrics"
-version = "0.23.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "884adb57038347dfbaf2d5065887b6cf4312330dc8e94bc30a1a839bd79d3261"
-dependencies = [
- "ahash",
- "portable-atomic",
-]
-
-[[package]]
-name = "metrics"
 version = "0.24.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ae428771d17306715c5091d446327d1cfdedc82185c65ba8423ab404e45bf10"
@@ -1339,7 +1329,7 @@ dependencies = [
  "hyper-util",
  "indexmap 2.6.0",
  "ipnet",
- "metrics 0.24.0",
+ "metrics",
  "metrics-util",
  "quanta",
  "thiserror",
@@ -1356,7 +1346,7 @@ dependencies = [
  "crossbeam-epoch",
  "crossbeam-utils",
  "hashbrown 0.15.0",
- "metrics 0.24.0",
+ "metrics",
  "quanta",
  "sketches-ddsketch",
 ]
@@ -2462,7 +2452,7 @@ dependencies = [
  "futures",
  "hickory-resolver",
  "itertools 0.13.0",
- "metrics 0.23.0",
+ "metrics",
  "pin-project",
  "reqwest",
  "serde",
@@ -2660,7 +2650,7 @@ dependencies = [
  "hex",
  "hickory-resolver",
  "itertools 0.13.0",
- "metrics 0.23.0",
+ "metrics",
  "pin-project",
  "prettyplease",
  "quick_cache",
