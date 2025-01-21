@@ -40,6 +40,13 @@
 
 
 
+## [0.7.8](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.7.7...tvm-grpc-v0.7.8) (2025-01-21)
+
+
+### Bug Fixes
+
+* **cd:** use ubuntu as base image ([40ea4d7](https://github.com/getgems-io/ton-grpc/commit/40ea4d7de40c8759d35b60641f8b477fecd4ae9c))
+
 ## [0.7.1](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.7.0...tvm-grpc-v0.7.1) (2024-04-14)
 
 
