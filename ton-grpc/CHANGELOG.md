@@ -46,6 +46,13 @@
 
 
 
+## [0.11.2](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.11.1...ton-grpc-v0.11.2) (2025-01-21)
+
+
+### Bug Fixes
+
+* **cd:** use ubuntu as base image ([40ea4d7](https://github.com/getgems-io/ton-grpc/commit/40ea4d7de40c8759d35b60641f8b477fecd4ae9c))
+
 ## [0.11.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.10.7...ton-grpc-v0.11.0) (2024-10-29)
 
 
