@@ -76,7 +76,7 @@ fn main() {
         .define("PORTABLE", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("TON_ARCH", target_arch)
-        .cxxflag("-std=c++17")
+        .cxxflag("-std=c++")
         .cxxflag("-stdlib=libc++")
         .always_configure(true)
         .very_verbose(false);

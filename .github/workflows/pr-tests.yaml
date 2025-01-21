@@ -34,10 +34,6 @@ jobs:
         if: runner.os == 'Linux'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-#      - uses: awalsh128/cache-apt-pkgs-action@latest
-#        if: runner.os == 'Linux'
-#        with:
-#          packages: libsecp256k1-dev libsodium-dev liblz4-dev
       - uses: arduino/setup-protoc@v3
         if: runner.os == 'Linux'
       - run: brew install secp256k1 libsodium lz4 protobuf
