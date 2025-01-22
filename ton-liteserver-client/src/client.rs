@@ -234,12 +234,12 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
 
-        return match this.state.as_mut().project() {
+        match this.state.as_mut().project() {
             ResponseStateProj::Failed { error } => {
                 Poll::Ready(Err(error.take().expect("polled after error")))
             }
             ResponseStateProj::Rx { rx, .. } => {
-                return match ready!(rx.poll(cx)) {
+                match ready!(rx.poll(cx)) {
                     Ok(response) => {
                         let response =
                             from_bytes_boxed::<Result<Response, LiteServerError>>(&response)
@@ -251,7 +251,7 @@ where
                     Err(_) => Poll::Ready(Err(Error::OneshotClosed)),
                 }
             }
-        };
+        }
     }
 }
 

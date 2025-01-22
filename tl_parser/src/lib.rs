@@ -68,16 +68,16 @@ impl Combinator {
     }
 
     pub fn constructor_number_be(&self) -> u32 {
-        return self
+        self
             .constructor_number
             .unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes()))
-            .to_be();
+            .to_be()
     }
 
     pub fn constructor_number_le(&self) -> u32 {
-        return self
+        self
             .constructor_number
-            .unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes()));
+            .unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes()))
     }
 }
 
