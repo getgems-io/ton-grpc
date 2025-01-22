@@ -37,7 +37,7 @@ tonic-health = "0.11"
 tonic-build = "0.11"
 prost = "0.12"
 quick_cache = "0.5"
-url = { version = "2.5.2", features = ["serde"] }
+url = { version = "2.5.4", features = ["serde"] }
 clap = { version = "4.5.20", features = ["derive"] }
 humantime = "2.1.0"
 uuid = { version = "1.11", features = ["v4", "fast-rng", "serde"] }
