@@ -24,15 +24,15 @@ runs:
       shell: bash
       run: |
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-        sudo add-apt-repository "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main"
+        sudo add-apt-repository "deb http://apt.llvm.org/${{ steps.llvm_setup.outputs.UBUNTU_VERSION }}/ llvm-toolchain-${{ steps.llvm_setup.outputs.UBUNTU_VERSION }}-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} main"
         sudo apt-get update
-        sudo apt-get install --yes autoconf libtool libsecp256k1-dev libsodium-dev liblz4-dev clang-19 lldb-19 lld-19 libc++-19-dev libc++abi-19-dev libunwind-19-dev
+        sudo apt-get install --yes autoconf libtool libsecp256k1-dev libsodium-dev liblz4-dev clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libunwind-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev
     - uses: arduino/setup-protoc@v2
       with:
         repo-token: ${{ inputs.token }}
     - shell: bash
       run: |
-        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-19 101
-        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-19 101
+        sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
     - name: Run sccache-cache
       uses: mozilla-actions/sccache-action@v0.0.3
