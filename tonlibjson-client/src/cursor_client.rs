@@ -383,7 +383,7 @@ impl Service<Specialized<BlocksGetMasterchainInfo>> for CursorClient {
     fn call(&mut self, _: Specialized<BlocksGetMasterchainInfo>) -> Self::Future {
         let response = self.masterchain_info_rx.borrow().as_ref().unwrap().clone();
 
-        return ready(Ok(response)).boxed();
+        ready(Ok(response)).boxed()
     }
 }
 

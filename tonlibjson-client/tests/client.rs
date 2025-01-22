@@ -116,7 +116,7 @@ async fn get_block_header_no_hashes() -> anyhow::Result<()> {
         .await?;
 
     assert_eq!(mc_header.id.seqno, mc_block.last.seqno);
-    assert_eq!(mc_header.want_split, false);
+    assert!(!mc_header.want_split);
     Ok(())
 }
 
@@ -137,6 +137,6 @@ async fn get_block_header_with_hashes() -> anyhow::Result<()> {
         .await?;
 
     assert_eq!(mc_header.id.seqno, mc_block.last.seqno);
-    assert_eq!(mc_header.want_split, false);
+    assert!(!mc_header.want_split);
     Ok(())
 }

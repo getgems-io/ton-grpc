@@ -65,7 +65,7 @@ mod tests {
             0b1000000000000000000000000000000000000000000000000000000000000000_u64,
         );
 
-        assert_eq!(prefix.matches(&[0u8; 32]), true);
-        assert_eq!(prefix.matches(&[1u8; 32]), true);
+        assert!(prefix.matches(&[0u8; 32]));
+        assert!(prefix.matches(&[1u8; 32]));
     }
 }

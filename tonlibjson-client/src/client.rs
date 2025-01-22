@@ -186,12 +186,12 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let mut this = self.project();
 
-        return match this.state.as_mut().project() {
+        match this.state.as_mut().project() {
             ResponseStateProj::Failed { error } => {
                 Poll::Ready(Err(error.take().expect("polled after error")))
             }
             ResponseStateProj::Rx { rx, .. } => {
-                return match ready!(rx.poll(cx)) {
+                match ready!(rx.poll(cx)) {
                     Ok(response) => {
                         // TODO[akostylev0] refac!!
                         if response.data["@type"] == "error" {
@@ -210,9 +210,9 @@ where
                         }
                     }
                     Err(_) => Poll::Ready(Err(anyhow!("oneshot closed"))),
-                };
+                }
             }
-        };
+        }
     }
 }
 

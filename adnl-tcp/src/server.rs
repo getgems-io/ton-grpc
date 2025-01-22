@@ -72,6 +72,6 @@ mod tests {
     static SERVER_KEY: OnceLock<Ed25519Key> = OnceLock::new();
 
     fn provided_server_key() -> &'static Ed25519Key {
-        SERVER_KEY.get_or_init(|| Ed25519Key::generate())
+        SERVER_KEY.get_or_init(Ed25519Key::generate)
     }
 }
