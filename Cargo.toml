@@ -20,7 +20,7 @@ tokio = { version = "1.43", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
 futures = "0.3"
-tracing = "0.1.40"
+tracing = "0.1.41"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-futures = { version = "0.2.5", features = ["std", "std-future", "futures-03"] }
 serde_json = "1.0"
