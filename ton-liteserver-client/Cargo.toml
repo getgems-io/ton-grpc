@@ -34,7 +34,7 @@ url = "2.5.1"
 hex = { workspace = true }
 base64 = { workspace = true }
 tracing-test = "0.2.5"
-tracing-subscriber = "0.3.18"
+tracing-subscriber = "0.3.19"
 
 [features]
 testnet = []
