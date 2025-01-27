@@ -28,7 +28,7 @@ futures = { workspace = true }
 tokio-stream = { workspace = true }
 dashmap = { workspace = true }
 tokio-retry = { workspace = true }
-url = "2.5.1"
+url = "2.5.4"
 
 [dev-dependencies]
 hex = { workspace = true }
