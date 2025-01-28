@@ -2664,9 +2664,9 @@ dependencies = [
 
 [[package]]
 name = "ton-contracts"
-version = "0.3.2"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f69a5dec650154397423a05805f78a7ff52ae15f5d5b4b2062fcfd1eb81c03b"
+checksum = "1de3787a36a06e90de770d08754df154654a3a355df635a365c5abcd7c4c34a2"
 dependencies = [
  "anyhow",
  "bitvec",
@@ -2742,9 +2742,9 @@ dependencies = [
 
 [[package]]
 name = "toner"
-version = "0.3.2"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ecf9dbe7b7df561bcfaf0cdfc1d4f8eeac7905152517244a5fe69dd32a6fd3ea"
+checksum = "c2584dee4de6464ad7ec670195a384c308b9354a7e3ee8c7fe8945c5496e8cb1"
 dependencies = [
  "tlb",
  "tlb-ton",
