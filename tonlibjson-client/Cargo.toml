@@ -43,7 +43,7 @@ tracing-test = { workspace = true }
 tl_parser = { path = "../tl_parser" }
 anyhow = { workspace = true }
 quote = "1.0"
-syn = "2.0.96"
+syn = "2.0.98"
 prettyplease = "0.2.29"
 convert_case = "0.7.1"
 
