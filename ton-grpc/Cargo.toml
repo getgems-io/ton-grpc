@@ -29,7 +29,7 @@ clap = { workspace = true }
 humantime = { workspace = true }
 either = "1.13"
 derive-new = "0.7.0"
-metrics-exporter-prometheus = { version = "0.16.1", features = ["http-listener"], default-features = false }
+metrics-exporter-prometheus = { version = "0.16.2", features = ["http-listener"], default-features = false }
 
 [dev-dependencies]
 tracing-test = { workspace = true }
