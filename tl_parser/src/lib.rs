@@ -68,15 +68,13 @@ impl Combinator {
     }
 
     pub fn constructor_number_be(&self) -> u32 {
-        self
-            .constructor_number
+        self.constructor_number
             .unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes()))
             .to_be()
     }
 
     pub fn constructor_number_le(&self) -> u32 {
-        self
-            .constructor_number
+        self.constructor_number
             .unwrap_or_else(|| crc32fast::hash(self.constructor_number_form().as_bytes()))
     }
 }
@@ -271,7 +269,8 @@ pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
                 alt((combinator_decl, builtin_combinator_decl)),
                 opt(space_or_comment),
             )),
-        )).parse(input)
+        ))
+        .parse(input)
         .map_err(|e| anyhow!("parse error: {}", e))?;
 
         if let Some(types) = types {
@@ -289,7 +288,8 @@ pub fn parse(input: &str) -> anyhow::Result<Vec<Combinator>> {
                 alt((functional_combinator_decl, builtin_combinator_decl)),
                 opt(space_or_comment),
             )),
-        )).parse(input)
+        ))
+        .parse(input)
         .map_err(|e: nom::Err<Error<&str>>| anyhow!("parse error: {}", e))?;
 
         if let Some(funcs) = funcs {
@@ -348,7 +348,8 @@ fn space_or_comment(input: &str) -> nom::IResult<&str, ()> {
         single_line_comment,
         multi_line_comment,
         line_ending,
-    ))).parse(input)?;
+    )))
+    .parse(input)?;
 
     Ok((input, ()))
 }
@@ -379,7 +380,8 @@ fn uc_ident_ns(input: &str) -> nom::IResult<&str, String> {
     let (input, ns) = opt(terminated(
         separated_list1(tag("."), namespace_ident),
         tag("."),
-    )).parse(input)?;
+    ))
+    .parse(input)?;
     let (input, head) = uc_ident(input)?;
 
     match ns {
@@ -442,7 +444,8 @@ fn opt_args(input: &str) -> nom::IResult<&str, Vec<OptionalField>> {
     let (input, names) = preceded(
         tag("{"),
         many1(delimited(space0, var_ident, space_or_comment)),
-    ).parse(input)?;
+    )
+    .parse(input)?;
     let (input, _) = delimited(space0, tag(":"), space_or_comment).parse(input)?;
     let (input, type_name) = terminated(type_expr, tag("}")).parse(input)?;
 
@@ -484,8 +487,10 @@ fn combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
 fn functional_combinator_decl(input: &str) -> nom::IResult<&str, Combinator> {
     let (input, (combinator_id, constructor_number)) =
         preceded(multispace0, full_combinator_id).parse(input)?;
-    let (input, opts) = opt(delimited(space_or_comment, opt_args, space_or_comment)).parse(input)?;
-    let (input, fields) = many0(delimited(space_or_comment, args, space_or_comment)).parse(input)?;
+    let (input, opts) =
+        opt(delimited(space_or_comment, opt_args, space_or_comment)).parse(input)?;
+    let (input, fields) =
+        many0(delimited(space_or_comment, args, space_or_comment)).parse(input)?;
     let (input, _) = delimited(multispace0, tag("="), multispace0).parse(input)?;
     let (input, (_, combinator_type)) = result_type(input)?;
     let (input, _) = preceded(multispace0, tag(";")).parse(input)?;
@@ -570,7 +575,8 @@ fn subexpr(input: &str) -> nom::IResult<&str, String> {
             )),
             |vs: Vec<String>| vs.join("+"),
         ),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 fn type_ident(input: &str) -> nom::IResult<&str, String> {
@@ -578,7 +584,8 @@ fn type_ident(input: &str) -> nom::IResult<&str, String> {
         boxed_type_ident,
         lc_ident_ns,
         map(tag("#"), |s: &str| s.to_owned()),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 fn term(input: &str) -> nom::IResult<&str, String> {
@@ -595,7 +602,8 @@ fn term(input: &str) -> nom::IResult<&str, String> {
         var_ident,
         map(nat_const, |s| s.to_owned()),
         preceded(tag("%"), term),
-    )).parse(input)
+    ))
+    .parse(input)
 }
 
 fn type_term(input: &str) -> nom::IResult<&str, (bool, String)> {
