@@ -39,7 +39,7 @@ use ton_client_util::router::route::{BlockCriteria, Route};
 use ton_client_util::service::shared::SharedService;
 use tower::discover::Change;
 use tower::load::PeakEwmaDiscover;
-use tower::retry::budget::Budget;
+use tower::retry::budget::TpsBudget;
 use tower::retry::Retry;
 use tower::timeout::Timeout;
 use tower::util::Either;
@@ -224,7 +224,7 @@ impl TonClientBuilder {
         let client = SharedService::new(client);
         let client = tower::util::option_layer(if self.retry_enabled {
             Some(tower::retry::RetryLayer::new(RetryPolicy::new(
-                Budget::new(
+                TpsBudget::new(
                     self.retry_budget_ttl,
                     self.retry_min_per_sec,
                     self.retry_percent,

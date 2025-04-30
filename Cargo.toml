@@ -14,8 +14,8 @@ members = [
 
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
-async-trait = "0.1"
-tower = { version = "0.4", features = ["full"] }
+async-trait = "0.1.88"
+tower = { version = "0.5.2", features = ["full"] }
 tokio = { version = "1.43", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 tokio-stream = { version = "0.1", features = ["sync"] }
@@ -23,8 +23,8 @@ futures = "0.3"
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-futures = { version = "0.2.5", features = ["std", "std-future", "futures-03"] }
-serde_json = "1.0"
-serde = { version = "1.0", features = ["serde_derive"] }
+serde_json = "1.0.140"
+serde = { version = "1.0.219", features = ["serde_derive"] }
 base64 = "0.22"
 hex = "0.4"
 tracing-test = "0.2.5"
@@ -39,10 +39,10 @@ prost = "0.13.5"
 quick_cache = "0.6.10"
 url = { version = "2.5.4", features = ["serde"] }
 clap = { version = "4.5.30", features = ["derive"] }
-humantime = "2.1.0"
-uuid = { version = "1.14", features = ["v4", "fast-rng", "serde"] }
+humantime = "2.2.0"
+uuid = { version = "1.16", features = ["v4", "fast-rng", "serde"] }
 dashmap = "6.1.0"
-pin-project = "1.1"
+pin-project = "1.1.10"
 rand = "0.8"
 bytes = "1.10.1"
 thiserror = "2.0.11"
@@ -54,17 +54,17 @@ hickory-resolver = { version = "0.25.1" }
 tokio-retry = "0.3"
 nom = "8.0.0"
 crc32fast = "1.4.2"
-either = "1.13"
+either = "1.15.0"
 derive-new = "0.7.0"
 metrics-exporter-prometheus = { version = "0.17.0", features = ["http-listener"], default-features = false }
-quote = "1.0"
+quote = "1.0.40"
 syn = "2.0.101"
 prettyplease = "0.2.29"
 convert_case = "0.8.0"
 crc = "3.2.1"
 libc = "0.2"
 cmake = "0.1"
-pkg-config = "0.3"
+pkg-config = "0.3.32"
 walkdir = "2.5"
 sha2 = "0.10.8"
 aes = "0.8.4"
