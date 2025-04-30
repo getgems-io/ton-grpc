@@ -4,9 +4,8 @@ use crate::discover::config::{
     load_ton_config, read_ton_config, LiteServer, LiteServerId, TonConfig,
 };
 use futures::{Stream, StreamExt, TryStreamExt};
-use hickory_resolver::error::ResolveError;
-use hickory_resolver::system_conf::read_system_conf;
-use hickory_resolver::TokioAsyncResolver;
+use hickory_resolver::name_server::TokioConnectionProvider;
+use hickory_resolver::{ResolveError, TokioResolver};
 use reqwest::Url;
 use std::collections::HashSet;
 use std::convert::Infallible;
@@ -14,7 +13,6 @@ use std::net::IpAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{ready, Context, Poll};
-use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::time::Interval;
 use tokio_stream::wrappers::IntervalStream;
@@ -146,16 +144,14 @@ impl Stream for LiteServerDiscover {
     }
 }
 
-fn dns_resolver() -> TokioAsyncResolver {
-    let (resolver_config, mut resolver_opts) = read_system_conf().unwrap();
-    resolver_opts.positive_max_ttl = Some(Duration::from_secs(1));
-    resolver_opts.negative_max_ttl = Some(Duration::from_secs(1));
-
-    TokioAsyncResolver::tokio(resolver_config, resolver_opts)
+fn dns_resolver() -> TokioResolver {
+    TokioResolver::builder(TokioConnectionProvider::default())
+        .map(|builder| builder.build())
+        .expect("cannot build DNS resolver")
 }
 
 async fn apply_dns(
-    dns_resolver: TokioAsyncResolver,
+    dns_resolver: TokioResolver,
     ls: LiteServer,
 ) -> Result<LiteServer, ResolveError> {
     if let Some(host) = ls.host.as_ref() {

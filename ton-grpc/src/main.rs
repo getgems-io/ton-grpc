@@ -116,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
 
-    let (mut health_reporter, health_server) = tonic_health::server::health_reporter();
+    let (health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter
         .set_serving::<AccountServiceServer<AccountService>>()
         .await;

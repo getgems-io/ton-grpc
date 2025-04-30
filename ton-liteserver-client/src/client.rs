@@ -238,19 +238,16 @@ where
             ResponseStateProj::Failed { error } => {
                 Poll::Ready(Err(error.take().expect("polled after error")))
             }
-            ResponseStateProj::Rx { rx, .. } => {
-                match ready!(rx.poll(cx)) {
-                    Ok(response) => {
-                        let response =
-                            from_bytes_boxed::<Result<Response, LiteServerError>>(&response)
-                                .map_err(|_| Error::Deserialize)?
-                                .map_err(Error::LiteServerError)?;
+            ResponseStateProj::Rx { rx, .. } => match ready!(rx.poll(cx)) {
+                Ok(response) => {
+                    let response = from_bytes_boxed::<Result<Response, LiteServerError>>(&response)
+                        .map_err(|_| Error::Deserialize)?
+                        .map_err(Error::LiteServerError)?;
 
-                        Poll::Ready(Ok(response))
-                    }
-                    Err(_) => Poll::Ready(Err(Error::OneshotClosed)),
+                    Poll::Ready(Ok(response))
                 }
-            }
+                Err(_) => Poll::Ready(Err(Error::OneshotClosed)),
+            },
         }
     }
 }
