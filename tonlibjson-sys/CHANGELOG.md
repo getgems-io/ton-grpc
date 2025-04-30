@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.6](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.5...tonlibjson-sys-v0.4.6) (2025-04-30)
+
+
+### Bug Fixes
+
+* **build:** define TONLIBJSON_STATIC and EMULATOR_STATIC as ON ([f41d4cc](https://github.com/getgems-io/ton-grpc/commit/f41d4cca26ee83c4bb777d5f679b1342fd4cb076))
+* **deps:** bump tonlibjson-sys/ton from `1b7c46f` to `cee4c67` ([b14442d](https://github.com/getgems-io/ton-grpc/commit/b14442dba64fa700f113b375569de8f0ffd992c8))
+* **deps:** bump tonlibjson-sys/ton-testnet from `e060515` to `fe46f0e` ([781dabe](https://github.com/getgems-io/ton-grpc/commit/781dabea2d305074c5f11233592c4e55428f9da9))
+* **deps:** bump tonlibjson-sys/ton-testnet from `fe46f0e` to `413b898` ([b62f5fe](https://github.com/getgems-io/ton-grpc/commit/b62f5fec026f732ebb8704dd79b79e3632ce41a3))
+
 ## [0.4.5](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.4...tonlibjson-sys-v0.4.5) (2025-01-21)
 
 
