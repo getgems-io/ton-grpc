@@ -74,6 +74,8 @@ fn main() {
         .define("CMAKE_C_COMPILER", "clang")
         .define("CMAKE_CXX_COMPILER", "clang++")
         .define("PORTABLE", "ON")
+        .define("TONLIBJSON_STATIC", "ON")
+        .define("EMULATOR_STATIC", "ON")
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("TON_ARCH", target_arch)
         .cxxflag("-std=c++14")
