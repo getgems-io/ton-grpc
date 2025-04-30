@@ -38,7 +38,7 @@ tonic-build = "0.12.3"
 prost = "0.13.5"
 quick_cache = "0.6.10"
 url = { version = "2.5.4", features = ["serde"] }
-clap = { version = "4.5.30", features = ["derive"] }
+clap = { version = "4.5.37", features = ["derive"] }
 humantime = "2.1.0"
 uuid = { version = "1.14", features = ["v4", "fast-rng", "serde"] }
 dashmap = "6.1.0"
