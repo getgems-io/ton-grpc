@@ -50,7 +50,7 @@ itertools = "0.14.0"
 bitvec = "1.0.1"
 metrics = "0.24.2"
 reqwest = { version = "0.12.9", features = ["rustls-tls", "hickory-dns"], default-features = false }
-hickory-resolver = { version = "0.25.1" }
+hickory-resolver = { version = "0.25.2" }
 tokio-retry = "0.3"
 nom = "8.0.0"
 crc32fast = "1.4.2"
