@@ -71,7 +71,6 @@ impl Serializer {
                 self.output.put_u8(254);
                 self.output
                     .put_slice(&(val.len() as u32).to_le_bytes()[..3]);
-                self.output.put_u8(val.len() as u8);
                 self.output.put_slice(val);
             }
         }
