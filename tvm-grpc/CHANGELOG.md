@@ -40,6 +40,8 @@
 
 
 
+## [0.7.10](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.7.9...tvm-grpc-v0.7.10) (2025-05-15)
+
 ## [0.7.9](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.7.8...tvm-grpc-v0.7.9) (2025-04-30)
 
 ## [0.7.8](https://github.com/getgems-io/ton-grpc/compare/tvm-grpc-v0.7.7...tvm-grpc-v0.7.8) (2025-01-21)
