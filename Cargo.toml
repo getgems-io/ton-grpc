@@ -34,7 +34,7 @@ num-bigint = "0.4"
 tonic = { version = "0.13.1", features = ["gzip"] }
 tonic-reflection = "0.13.0"
 tonic-health = "0.13.1"
-tonic-build = "0.13.0"
+tonic-build = "0.13.1"
 prost = "0.13.5"
 quick_cache = "0.6.14"
 url = { version = "2.5.4", features = ["serde"] }
