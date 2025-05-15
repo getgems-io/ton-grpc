@@ -6,6 +6,8 @@
 
 
 
+## [0.20.3](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.20.2...tonlibjson-client-v0.20.3) (2025-05-15)
+
 ## [0.20.2](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.20.1...tonlibjson-client-v0.20.2) (2025-04-30)
 
 
