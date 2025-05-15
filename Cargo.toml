@@ -43,7 +43,7 @@ humantime = "2.2.0"
 uuid = { version = "1.16", features = ["v4", "fast-rng", "serde"] }
 dashmap = "6.1.0"
 pin-project = "1.1.10"
-rand = "0.8"
+rand = "0.9"
 bytes = "1.10.1"
 thiserror = "2.0.11"
 itertools = "0.14.0"
