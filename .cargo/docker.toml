@@ -2,7 +2,7 @@
 
 [target.x86_64-unknown-linux-gnu]
 linker = "clang"
-rustflags = "-Clink-arg=-fuse-ld=lld -Clinker-plugin-lto"
+rustflags = ["-C", "link-arg=-fuse-ld=lld", "-C", "linker-plugin-lto"]
 
 [profile.release]
 debug = true
