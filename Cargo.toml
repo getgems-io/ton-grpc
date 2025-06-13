@@ -58,7 +58,7 @@ either = "1.15.0"
 derive-new = "0.7.0"
 metrics-exporter-prometheus = { version = "0.17.0", features = ["http-listener"], default-features = false }
 quote = "1.0.40"
-syn = "2.0.101"
+syn = "2.0.103"
 prettyplease = "0.2.29"
 convert_case = "0.8.0"
 crc = "3.3.0"
