@@ -2,8 +2,8 @@ use crate::block::{
     BlocksGetBlockHeader, BlocksGetShards, BlocksHeader, BlocksLookupBlock, BlocksMasterchainInfo,
     TonBlockId, TonBlockIdExt,
 };
-use crate::cursor::registry::Registry;
 use crate::cursor::client::InnerClient;
+use crate::cursor::registry::Registry;
 use futures::never::Never;
 use futures::try_join;
 use std::borrow::Cow;

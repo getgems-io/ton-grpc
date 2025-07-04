@@ -1,7 +1,7 @@
-use dashmap::{DashMap, DashSet};
 use crate::block::{BlocksHeader, TonBlockIdExt};
 use crate::cursor::shard_bounds::ShardBounds;
 use crate::cursor::{ChainId, Seqno, ShardId};
+use dashmap::{DashMap, DashSet};
 use ton_client_util::router::route::BlockCriteria;
 use ton_client_util::router::shard_prefix::ShardPrefix;
 
@@ -99,12 +99,7 @@ impl Registry {
         entry.insert(*shard_id);
     }
 
-    pub fn contains(
-        &self,
-        chain: &ChainId,
-        criteria: &BlockCriteria,
-        not_available: bool,
-    ) -> bool {
+    pub fn contains(&self, chain: &ChainId, criteria: &BlockCriteria, not_available: bool) -> bool {
         match criteria {
             BlockCriteria::LogicalTime { address, lt } => self
                 .shard_registry

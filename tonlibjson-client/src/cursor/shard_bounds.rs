@@ -8,7 +8,6 @@ pub struct ShardBounds {
 }
 
 impl ShardBounds {
-
     pub fn left(left: BlocksHeader) -> Self {
         Self {
             left: Some(left),
