@@ -1,4 +1,4 @@
-use crate::router::Routed;
+use crate::router::{BlockAvailability, Routed};
 use itertools::Itertools;
 
 pub trait ToRoute {
@@ -36,16 +36,13 @@ impl Route {
                 let mut known = false;
                 let clients: Vec<_> = from
                     .into_iter()
-                    .filter(|s| {
-                        if s.contains(chain, criteria) {
-                            true
-                        } else {
-                            if s.contains_not_available(chain, criteria) {
-                                known = true;
-                            }
-
+                    .filter(|s| match s.available(chain, criteria) {
+                        BlockAvailability::Available => true,
+                        BlockAvailability::NotAvailable => {
+                            known = true;
                             false
                         }
+                        BlockAvailability::NotPresent | BlockAvailability::Unknown => false,
                     })
                     .cloned()
                     .collect();
@@ -81,6 +78,7 @@ impl Route {
 mod tests {
     use super::*;
     use crate::router::route::Route;
+    use crate::router::BlockAvailability;
 
     #[derive(Debug, Clone, PartialEq, Eq)]
     struct MyRouted {
@@ -90,12 +88,16 @@ mod tests {
     }
 
     impl Routed for MyRouted {
-        fn contains(&self, _: &i32, _: &BlockCriteria) -> bool {
-            self.contains
+        fn available(&self, _: &i32, _: &BlockCriteria) -> BlockAvailability {
+            if self.contains {
+                BlockAvailability::Available
+            } else if self.contains_not_available {
+                BlockAvailability::NotAvailable
+            } else {
+                BlockAvailability::NotPresent
+            }
         }
-        fn contains_not_available(&self, _: &i32, _: &BlockCriteria) -> bool {
-            self.contains_not_available
-        }
+
         fn last_seqno(&self) -> Option<i32> {
             self.last_seqno
         }

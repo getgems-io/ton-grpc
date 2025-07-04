@@ -17,7 +17,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use ton_client_util::actor::Actor;
 use ton_client_util::router::route::BlockCriteria;
-use ton_client_util::router::Routed;
+use ton_client_util::router::{BlockAvailability, Routed};
 use ton_client_util::service::shared::SharedService;
 use tower::load::peak_ewma::Cost;
 use tower::load::{CompleteOnResponse, Load, PeakEwma};
@@ -84,8 +84,8 @@ where
 }
 
 impl<S> Routed for TrackedClient<S> {
-    fn contains(&self, chain: &i32, criteria: &BlockCriteria) -> bool {
-        match chain {
+    fn available(&self, chain: &i32, criteria: &BlockCriteria) -> BlockAvailability {
+        let available = match chain {
             // masterchain
             -1 => self
                 .masterchain_first_block_tracker
@@ -120,11 +120,13 @@ impl<S> Routed for TrackedClient<S> {
                     )
                     .is_some_and(|(lhs, rhs)| lhs <= *lt as u64 && *lt as u64 <= rhs),
             },
-        }
-    }
+        };
 
-    fn contains_not_available(&self, chain: &i32, criteria: &BlockCriteria) -> bool {
-        self.contains(chain, criteria)
+        if available {
+            BlockAvailability::Available
+        } else {
+            BlockAvailability::NotPresent
+        }
     }
 
     fn last_seqno(&self) -> Option<i32> {

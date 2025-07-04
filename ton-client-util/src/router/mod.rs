@@ -14,9 +14,16 @@ use tower::balance::p2c::Balance;
 use tower::discover::{Change, Discover, ServiceList};
 use tower::{BoxError, Service};
 
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+pub enum BlockAvailability {
+    Available,
+    NotAvailable,
+    NotPresent,
+    Unknown,
+}
+
 pub trait Routed {
-    fn contains(&self, chain: &i32, criteria: &BlockCriteria) -> bool;
-    fn contains_not_available(&self, chain: &i32, criteria: &BlockCriteria) -> bool;
+    fn available(&self, chain: &i32, criteria: &BlockCriteria) -> BlockAvailability;
     fn last_seqno(&self) -> Option<i32>;
 }
 
