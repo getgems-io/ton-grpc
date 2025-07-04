@@ -1,5 +1,6 @@
 use crate::block::TonBlockIdExt;
 
+pub mod discover;
 pub mod registry;
 pub mod shard_bounds;
 
