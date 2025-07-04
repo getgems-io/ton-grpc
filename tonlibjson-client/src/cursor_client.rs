@@ -4,11 +4,12 @@ use crate::block::{
     TonBlockId, TonBlockIdExt,
 };
 use crate::client::Client;
+use crate::cursor::registry::Registry;
+use crate::cursor::{ChainId, Seqno, ShardId};
 use crate::error::ErrorService;
 use crate::metric::ConcurrencyMetric;
 use crate::request::Specialized;
 use anyhow::Result;
-use dashmap::{DashMap, DashSet};
 use futures::future::ready;
 use futures::never::Never;
 use futures::{try_join, FutureExt};
@@ -26,7 +27,6 @@ use tokio::time::{interval, MissedTickBehavior};
 use tokio_retry::strategy::{jitter, FibonacciBackoff};
 use tokio_retry::Retry;
 use ton_client_util::router::route::BlockCriteria;
-use ton_client_util::router::shard_prefix::ShardPrefix;
 use ton_client_util::router::Routed;
 use ton_client_util::service::shared::SharedService;
 use ton_client_util::service::timeout::Timeout;
@@ -39,220 +39,6 @@ use tracing::instrument;
 
 pub(crate) type InnerClient =
     ConcurrencyMetric<ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<Client>>>>>>;
-
-type ChainId = i32;
-type ShardId = (i32, i64);
-
-impl From<&TonBlockIdExt> for ShardId {
-    fn from(value: &TonBlockIdExt) -> Self {
-        (value.workchain, value.shard)
-    }
-}
-
-type Seqno = i32;
-#[derive(Debug, Clone, Default)]
-struct ShardBounds {
-    left: Option<BlocksHeader>,
-    right: Option<BlocksHeader>,
-    right_end: Option<Seqno>,
-}
-
-impl ShardBounds {
-    fn left(left: BlocksHeader) -> Self {
-        Self {
-            left: Some(left),
-            right: None,
-            right_end: None,
-        }
-    }
-
-    fn right(right: BlocksHeader) -> Self {
-        Self {
-            left: None,
-            right_end: Some(right.id.seqno),
-            right: Some(right),
-        }
-    }
-
-    fn right_end(right_end: Seqno) -> Self {
-        Self {
-            left: None,
-            right_end: Some(right_end),
-            right: None,
-        }
-    }
-
-    fn right_next(&self) -> Option<Seqno> {
-        let seqno = self.right_end?;
-
-        match self.right {
-            None => Some(seqno),
-            Some(ref right) if right.id.seqno < seqno => Some(right.id.seqno + 1),
-            _ => None,
-        }
-    }
-
-    fn contains_seqno(&self, seqno: Seqno, not_available: bool) -> bool {
-        let Some(ref left) = self.left else {
-            return false;
-        };
-        let Some(ref right) = self.right else {
-            return false;
-        };
-
-        if not_available {
-            left.id.seqno <= seqno && seqno <= self.right_end.unwrap_or(right.id.seqno)
-        } else {
-            left.id.seqno <= seqno && seqno <= right.id.seqno
-        }
-    }
-
-    fn contains_lt(&self, lt: i64, not_available: bool) -> bool {
-        let Some(ref left) = self.left else {
-            return false;
-        };
-        let Some(ref right) = self.right else {
-            return false;
-        };
-
-        if not_available {
-            left.start_lt <= lt && lt <= right.end_lt + (right.end_lt - right.start_lt)
-        } else {
-            left.start_lt <= lt && lt <= right.end_lt
-        }
-    }
-}
-
-type ShardRegistry = DashMap<ChainId, DashSet<ShardId>>;
-type ShardBoundsRegistry = DashMap<ShardId, ShardBounds>;
-
-#[derive(Default)]
-struct Registry {
-    shard_registry: ShardRegistry,
-    shard_bounds_registry: ShardBoundsRegistry,
-}
-
-impl Registry {
-    fn right_next(&self, shard_id: ShardId) -> Option<Seqno> {
-        self.shard_bounds_registry
-            .get(&shard_id)
-            .and_then(|s| s.right_next())
-    }
-
-    fn get_last_seqno(&self, shard_id: &ShardId) -> Option<Seqno> {
-        self.shard_bounds_registry
-            .get(shard_id)
-            .and_then(|s| s.right.as_ref().map(|h| h.id.seqno))
-    }
-
-    fn upsert_left(&self, header: &BlocksHeader) {
-        let shard_id = (header.id.workchain, header.id.shard);
-
-        self.update_shard_registry(&shard_id);
-
-        tracing::trace!(
-            chaid_id = header.id.workchain,
-            shard_id = header.id.shard,
-            seqno = header.id.seqno,
-            "left block"
-        );
-
-        self.shard_bounds_registry
-            .entry(shard_id)
-            .and_modify(|b| {
-                b.left.replace(header.clone());
-            })
-            .or_insert_with(|| ShardBounds::left(header.clone()));
-    }
-
-    fn upsert_right(&self, header: &BlocksHeader) {
-        let shard_id = (header.id.workchain, header.id.shard);
-
-        self.update_shard_registry(&shard_id);
-
-        tracing::trace!(
-            chaid_id = header.id.workchain,
-            shard_id = header.id.shard,
-            seqno = header.id.seqno,
-            "right block"
-        );
-
-        self.shard_bounds_registry
-            .entry(shard_id)
-            .and_modify(|b| {
-                b.right.replace(header.clone());
-            })
-            .or_insert_with(|| ShardBounds::right(header.clone()));
-    }
-
-    fn upsert_right_end(&self, block_id: &TonBlockIdExt) {
-        let shard_id = (block_id.workchain, block_id.shard);
-
-        self.update_shard_registry(&shard_id);
-
-        tracing::trace!(
-            chaid_id = block_id.workchain,
-            shard_id = block_id.shard,
-            seqno = block_id.seqno,
-            "right end block"
-        );
-
-        self.shard_bounds_registry
-            .entry(shard_id)
-            .and_modify(|b| {
-                b.right_end.replace(block_id.seqno);
-            })
-            .or_insert_with(|| ShardBounds::right_end(block_id.seqno));
-    }
-
-    fn update_shard_registry(&self, shard_id: &ShardId) {
-        let entry = self.shard_registry.entry(shard_id.0).or_default();
-
-        if entry.contains(shard_id) {
-            return;
-        }
-
-        tracing::trace!(chaid_id = shard_id.0, shard_id = shard_id.1, "new shard");
-
-        entry.insert(*shard_id);
-    }
-
-    fn contains(&self, chain: &ChainId, criteria: &BlockCriteria, not_available: bool) -> bool {
-        match criteria {
-            BlockCriteria::LogicalTime { address, lt } => self
-                .shard_registry
-                .get(chain)
-                .map(|shard_ids| {
-                    shard_ids
-                        .iter()
-                        .filter_map(|shard_id| {
-                            ShardPrefix::from_shard_id(shard_id.1 as u64)
-                                .matches(address)
-                                .then(|| self.shard_bounds_registry.get(&shard_id))
-                                .flatten()
-                        })
-                        .any(|bounds| bounds.contains_lt(*lt, not_available))
-                })
-                .unwrap_or(false),
-            BlockCriteria::Seqno { shard, seqno } => {
-                let shard_id = (*chain, *shard);
-                let Some(bounds) = self.shard_bounds_registry.get(&shard_id) else {
-                    return false;
-                };
-
-                bounds.contains_seqno(*seqno, not_available)
-            }
-        }
-    }
-
-    pub fn edges_defined(&self, shard_id: &ShardId) -> bool {
-        let Some(shard_bounds) = self.shard_bounds_registry.get(shard_id) else {
-            return false;
-        };
-
-        shard_bounds.left.is_some()
-    }
-}
 
 #[derive(Clone)]
 pub(crate) struct CursorClient {
