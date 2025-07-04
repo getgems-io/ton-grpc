@@ -14,6 +14,13 @@ use tower::balance::p2c::Balance;
 use tower::discover::{Change, Discover, ServiceList};
 use tower::{BoxError, Service};
 
+///
+/// Represents the availability of a block in the context of a router.
+/// It can be `Available` if the block is present and meets the criteria,
+/// `NotAvailable` if the block is not present but could be available in the future,
+/// `NotPresent` if the block is not present and will not be available,
+/// and `Unknown` if the availability is uncertain.
+///
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 pub enum BlockAvailability {
     Available,
