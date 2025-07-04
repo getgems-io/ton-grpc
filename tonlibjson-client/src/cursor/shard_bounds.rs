@@ -25,10 +25,10 @@ impl ShardBounds {
         }
     }
 
-    pub fn from_right_seqno(right_end: Seqno) -> Self {
+    pub fn from_right_seqno(right_seqno: Seqno) -> Self {
         Self {
             left: None,
-            right_seqno: Some(right_end),
+            right_seqno: Some(right_seqno),
             right: None,
         }
     }
@@ -51,8 +51,8 @@ impl ShardBounds {
         self.right.replace(right)
     }
 
-    pub fn right_seqno_replace(&mut self, right_end: Seqno) -> Option<Seqno> {
-        self.right_seqno.replace(right_end)
+    pub fn right_seqno_replace(&mut self, right_seqno: Seqno) -> Option<Seqno> {
+        self.right_seqno.replace(right_seqno)
     }
 
     pub fn right_next_seqno(&self) -> Option<Seqno> {
