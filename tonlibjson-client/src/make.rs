@@ -1,6 +1,6 @@
 use crate::block::BlocksGetMasterchainInfo;
 use crate::client::Client;
-use crate::cursor_client::CursorClient;
+use crate::cursor::client::CursorClient;
 use crate::error::ErrorLayer;
 use serde_json::{json, Value};
 use std::future::Future;

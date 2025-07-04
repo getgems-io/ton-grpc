@@ -2,7 +2,6 @@ pub mod address;
 pub mod block;
 mod client;
 mod cursor;
-mod cursor_client;
 mod deserialize;
 mod error;
 mod make;

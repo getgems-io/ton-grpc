@@ -3,6 +3,7 @@ use crate::block::TonBlockIdExt;
 pub mod discover;
 pub mod registry;
 pub mod shard_bounds;
+pub mod client;
 
 pub type Seqno = i32;
 pub type ChainId = i32;

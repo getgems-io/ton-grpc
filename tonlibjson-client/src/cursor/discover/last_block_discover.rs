@@ -4,7 +4,7 @@ use crate::block::{
 };
 use crate::cursor::registry::Registry;
 use crate::cursor::ShardId;
-use crate::cursor_client::InnerClient;
+use crate::cursor::client::InnerClient;
 use anyhow::Result;
 use futures::never::Never;
 use std::borrow::Cow;
