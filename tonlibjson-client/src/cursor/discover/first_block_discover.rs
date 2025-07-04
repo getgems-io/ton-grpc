@@ -3,7 +3,7 @@ use crate::block::{
     TonBlockId, TonBlockIdExt,
 };
 use crate::cursor::registry::Registry;
-use crate::cursor_client::InnerClient;
+use crate::cursor::client::InnerClient;
 use futures::never::Never;
 use futures::try_join;
 use std::borrow::Cow;

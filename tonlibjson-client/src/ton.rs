@@ -9,7 +9,7 @@ use crate::block::{
     RawSendMessageReturnHash, RawTransaction, RawTransactions, SmcBoxedMethodId, SmcRunResult,
     TonBlockId, TonBlockIdExt, TvmBoxedStackEntry, TvmCell, WithBlock,
 };
-use crate::cursor_client::CursorClient;
+use crate::cursor::client::CursorClient;
 use crate::error::ErrorService;
 use crate::make::{ClientFactory, CursorClientFactory};
 use crate::request::{Forward, Specialized};
