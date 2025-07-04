@@ -4,6 +4,7 @@ use crate::block::{
     TonBlockId, TonBlockIdExt,
 };
 use crate::client::Client;
+use crate::cursor::discover::first_block_discover::FirstBlockDiscover;
 use crate::cursor::registry::Registry;
 use crate::cursor::{ChainId, Seqno, ShardId};
 use crate::error::ErrorService;
@@ -12,7 +13,7 @@ use crate::request::Specialized;
 use anyhow::Result;
 use futures::future::ready;
 use futures::never::Never;
-use futures::{try_join, FutureExt};
+use futures::FutureExt;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::convert::Infallible;
@@ -35,8 +36,6 @@ use tower::load::peak_ewma::Cost;
 use tower::load::Load;
 use tower::load::PeakEwma;
 use tower::{Service, ServiceExt};
-use tracing::instrument;
-
 pub(crate) type InnerClient =
     ConcurrencyMetric<ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<Client>>>>>>;
 
@@ -204,83 +203,6 @@ impl Load for CursorClient {
     }
 }
 
-async fn check_block_available(
-    client: &mut InnerClient,
-    block_id: TonBlockId,
-) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
-    let block_id = client.oneshot(BlocksLookupBlock::seqno(block_id)).await?;
-    let shards = client
-        .oneshot(BlocksGetShards::new(block_id.clone()))
-        .await?;
-
-    let clone = client.clone();
-    let requests = shards
-        .shards
-        .into_iter()
-        .map(BlocksGetBlockHeader::new)
-        .map(|r| clone.clone().oneshot(r));
-
-    try_join!(
-        client.oneshot(BlocksGetBlockHeader::new(block_id)),
-        futures::future::try_join_all(requests)
-    )
-}
-
-#[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks(
-    client: &mut InnerClient,
-    start: &TonBlockIdExt,
-    lhs: Option<i32>,
-    cur: Option<i32>,
-) -> Result<(BlocksHeader, Vec<BlocksHeader>)> {
-    let length = start.seqno;
-    let mut rhs = length;
-    let mut lhs = lhs.unwrap_or(1);
-    let mut cur = cur.unwrap_or(start.seqno - 200000);
-
-    let workchain = start.workchain;
-    let shard = start.shard;
-
-    let mut block = check_block_available(client, TonBlockId::new(workchain, shard, cur)).await;
-    let mut success = None;
-
-    let mut hops = 0;
-
-    while lhs < rhs {
-        // TODO[akostylev0] specify error
-        if block.is_err() {
-            lhs = cur + 1;
-        } else {
-            rhs = cur;
-        }
-
-        cur = (lhs + rhs) / 2;
-        if cur == 0 {
-            break;
-        }
-
-        block = check_block_available(client, TonBlockId::new(workchain, shard, cur)).await;
-        if block.is_ok() {
-            success = Some(block.as_ref().unwrap().clone());
-        }
-
-        hops += 1;
-    }
-
-    let delta = 4;
-    let (master, work) = match block {
-        Ok(b) => b,
-        Err(e) => match success {
-            Some(b) if b.0.id.seqno - cur <= delta => b,
-            _ => return Err(e),
-        },
-    };
-
-    tracing::trace!(hops = hops, seqno = master.id.seqno, "first seqno");
-
-    Ok((master, work))
-}
-
 async fn wait_for_block_header(
     block_id: TonBlockIdExt,
     client: InnerClient,
@@ -297,77 +219,6 @@ async fn wait_for_block_header(
         client.oneshot(BlocksGetBlockHeader::new(block_id))
     })
     .await
-}
-
-struct FirstBlockDiscover {
-    id: Cow<'static, str>,
-    client: InnerClient,
-    registry: Arc<Registry>,
-    rx: Receiver<Option<BlocksMasterchainInfo>>,
-    current: Option<BlocksHeader>,
-}
-
-impl FirstBlockDiscover {
-    fn new(
-        id: Cow<'static, str>,
-        client: InnerClient,
-        registry: Arc<Registry>,
-        rx: Receiver<Option<BlocksMasterchainInfo>>,
-    ) -> Self {
-        Self {
-            id,
-            client,
-            registry,
-            rx,
-            current: None,
-        }
-    }
-
-    async fn discover(mut self) -> Never {
-        let mut timer = interval(Duration::from_secs(30));
-        timer.set_missed_tick_behavior(MissedTickBehavior::Skip);
-
-        loop {
-            timer.tick().await;
-
-            let Some(start) = self.rx.borrow().as_ref().map(|m| m.last.clone()) else {
-                continue;
-            };
-
-            if let Ok(Some(mfb)) = self.next(start).await {
-                self.current.replace(mfb);
-            }
-        }
-    }
-
-    async fn next(&mut self, start: TonBlockIdExt) -> Result<Option<BlocksHeader>> {
-        if let Some(ref mfb) = self.current {
-            if let Err(e) = (&mut self.client)
-                .oneshot(BlocksGetShards::new(mfb.id.clone()))
-                .await
-            {
-                tracing::trace!(seqno = mfb.id.seqno, e = ?e, "first block not available anymore");
-            } else {
-                tracing::trace!("first block still available");
-
-                return Ok(None);
-            }
-        }
-
-        let lhs = self.current.as_ref().map(|n| n.id.seqno + 1);
-        let cur = self.current.as_ref().map(|n| n.id.seqno + 32);
-        let (mfb, wfb) = find_first_blocks(&mut self.client, &start, lhs, cur).await?;
-
-        metrics::counter!("ton_liteserver_first_seqno", "liteserver_id" => self.id.clone())
-            .absolute(mfb.id.seqno as u64);
-
-        self.registry.upsert_left(&mfb);
-        for header in &wfb {
-            self.registry.upsert_left(header);
-        }
-
-        Ok(Some(mfb))
-    }
 }
 
 struct LastBlockDiscover {
