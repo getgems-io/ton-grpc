@@ -5,7 +5,7 @@ use crate::cursor::Seqno;
 pub struct ShardBounds {
     left: Option<BlocksHeader>,
     right: Option<BlocksHeader>,
-    right_end: Option<Seqno>,
+    right_seqno: Option<Seqno>,
 }
 
 impl ShardBounds {
@@ -13,14 +13,14 @@ impl ShardBounds {
         Self {
             left: Some(left),
             right: None,
-            right_end: None,
+            right_seqno: None,
         }
     }
 
     pub fn from_right(right: BlocksHeader) -> Self {
         Self {
             left: None,
-            right_end: Some(right.id.seqno),
+            right_seqno: Some(right.id.seqno),
             right: Some(right),
         }
     }
@@ -28,7 +28,7 @@ impl ShardBounds {
     pub fn from_right_seqno(right_end: Seqno) -> Self {
         Self {
             left: None,
-            right_end: Some(right_end),
+            right_seqno: Some(right_end),
             right: None,
         }
     }
@@ -51,12 +51,12 @@ impl ShardBounds {
         self.right.replace(right)
     }
 
-    pub fn right_end_replace(&mut self, right_end: Seqno) -> Option<Seqno> {
-        self.right_end.replace(right_end)
+    pub fn right_seqno_replace(&mut self, right_end: Seqno) -> Option<Seqno> {
+        self.right_seqno.replace(right_end)
     }
 
-    pub fn right_next(&self) -> Option<Seqno> {
-        let seqno = self.right_end?;
+    pub fn right_next_seqno(&self) -> Option<Seqno> {
+        let seqno = self.right_seqno?;
 
         match self.right {
             None => Some(seqno),
@@ -74,7 +74,7 @@ impl ShardBounds {
         };
 
         if not_available {
-            left.id.seqno <= seqno && seqno <= self.right_end.unwrap_or(right.id.seqno)
+            left.id.seqno <= seqno && seqno <= self.right_seqno.unwrap_or(right.id.seqno)
         } else {
             left.id.seqno <= seqno && seqno <= right.id.seqno
         }

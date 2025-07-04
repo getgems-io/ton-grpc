@@ -18,7 +18,7 @@ impl Registry {
     pub fn right_next(&self, shard_id: ShardId) -> Option<Seqno> {
         self.shard_bounds_registry
             .get(&shard_id)
-            .and_then(|s| s.right_next())
+            .and_then(|s| s.right_next_seqno())
     }
 
     pub fn get_last_seqno(&self, shard_id: &ShardId) -> Option<Seqno> {
@@ -82,7 +82,7 @@ impl Registry {
         self.shard_bounds_registry
             .entry(shard_id)
             .and_modify(|b| {
-                b.right_end_replace(block_id.seqno);
+                b.right_seqno_replace(block_id.seqno);
             })
             .or_insert_with(|| ShardBounds::from_right_seqno(block_id.seqno));
     }
