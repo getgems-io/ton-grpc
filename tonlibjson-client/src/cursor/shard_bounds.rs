@@ -66,7 +66,7 @@ impl ShardBounds {
     }
 
     pub fn contains_seqno(&self, seqno: Seqno, not_available: bool) -> bool {
-        let Some(left) = self.left() else {
+        let Some(ref left) = self.left else {
             return false;
         };
         let Some(ref right) = self.right else {
