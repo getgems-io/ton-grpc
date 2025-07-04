@@ -89,7 +89,7 @@ impl Generator {
 
         // Boxed Types
         for (type_ident, types) in map {
-            eprintln!("type_ident = {:}", type_ident);
+            eprintln!("type_ident = {type_ident:}");
             if skip_list.contains(&type_ident) {
                 continue;
             }
@@ -204,12 +204,12 @@ impl Generator {
                 }
             };
 
-            eprintln!("tokens = {}", output);
+            eprintln!("tokens = {output}");
 
             let syntax_tree = syn::parse2(output.clone()).unwrap();
             formatted += &prettyplease::unparse(&syntax_tree);
 
-            eprintln!("tokens = {}", output);
+            eprintln!("tokens = {output}");
 
             // Bare Types
             for definition in types.into_iter() {
@@ -223,7 +223,7 @@ impl Generator {
                 let default = TypeConfiguration::default();
                 let configuration = self.types.get(definition.id()).unwrap_or(&default);
 
-                eprintln!("definition = {:?}", definition);
+                eprintln!("definition = {definition:?}");
 
                 let struct_name = structure_ident(definition.id());
 
@@ -241,7 +241,7 @@ impl Generator {
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
 
-                        eprintln!("field = {:?}", field);
+                        eprintln!("field = {field:?}");
                         let field_name = format_ident!("{}", &field_name);
                         let field_type: Box<dyn ToTokens> = if field
                             .field_type()
@@ -258,7 +258,7 @@ impl Generator {
 
                             let mut gen = format!("{}<{}>", type_name, args.join(","));
                             if field.type_is_optional() {
-                                gen = format!("Option<{}>", gen);
+                                gen = format!("Option<{gen}>");
                             }
                             Box::new(syn::parse_str::<GenericArgument>(&gen).unwrap())
                         } else {
@@ -284,7 +284,7 @@ impl Generator {
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
 
-                        eprintln!("field = {:?}", field);
+                        eprintln!("field = {field:?}");
                         let field_name_ident = format_ident!("{}", &field_name);
 
                         match field.type_condition() {
@@ -339,7 +339,7 @@ impl Generator {
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
 
-                        eprintln!("field = {:?}", field);
+                        eprintln!("field = {field:?}");
                         let field_name_ident = format_ident!("{}", &field_name);
 
                         match field.type_condition() {
@@ -391,7 +391,7 @@ impl Generator {
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
 
-                        eprintln!("field = {:?}", field);
+                        eprintln!("field = {field:?}");
                         let field_name_ident = format_ident!("{}", &field_name);
 
                         let parse_fn = match field.field_type() {
@@ -434,7 +434,7 @@ impl Generator {
                     .map(|field| {
                         let field_name = field.id().unwrap().to_case(Case::Snake);
 
-                        eprintln!("field = {:?}", field);
+                        eprintln!("field = {field:?}");
                         let field_name_ident = format_ident!("{}", &field_name);
 
                         quote! {
@@ -508,7 +508,7 @@ impl Generator {
                     }
                 };
 
-                eprintln!("{}", output);
+                eprintln!("{output}");
 
                 let syntax_tree = syn::parse2(output.clone()).unwrap();
                 formatted += &prettyplease::unparse(&syntax_tree);
@@ -518,7 +518,7 @@ impl Generator {
         let out_dir = env::var_os("OUT_DIR").unwrap();
         let dest_path = Path::new(&out_dir).join(self.output);
 
-        eprintln!("dest_path = {:?}", dest_path);
+        eprintln!("dest_path = {dest_path:?}");
 
         fs::write(dest_path, formatted).unwrap();
 

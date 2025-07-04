@@ -60,7 +60,7 @@ async fn main() -> Result<(), tower::BoxError> {
             let boc: BoC = unpack_bytes_fully(header.header_proof)?;
             let header: MerkleProof = boc.single_root().unwrap().parse_fully()?;
 
-            println!("header = {:?}", header);
+            println!("header = {header:?}");
         }
     }
 

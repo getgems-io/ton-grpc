@@ -131,7 +131,7 @@ impl FieldType {
                     .collect::<Vec<_>>()
                     .join(" ");
 
-                format!("[ {} ]", fields)
+                format!("[ {fields} ]")
             }
             Repetition {
                 multiplicity: Some(multiplicity),
@@ -143,7 +143,7 @@ impl FieldType {
                     .collect::<Vec<_>>()
                     .join(" ");
 
-                format!("{}*[ {} ]", multiplicity, fields)
+                format!("{multiplicity}*[ {fields} ]")
             }
         }
     }
@@ -358,14 +358,14 @@ fn lc_ident(input: &str) -> nom::IResult<&str, String> {
     let (input, head) = satisfy(is_lc_letter)(input)?;
     let (input, tail) = take_while(is_ident_char)(input)?;
 
-    Ok((input, format!("{}{}", head, tail)))
+    Ok((input, format!("{head}{tail}")))
 }
 
 fn uc_ident(input: &str) -> nom::IResult<&str, String> {
     let (input, head) = satisfy(is_uc_letter)(input)?;
     let (input, tail) = take_while(is_ident_char)(input)?;
 
-    Ok((input, format!("{}{}", head, tail)))
+    Ok((input, format!("{head}{tail}")))
 }
 
 fn namespace_ident(input: &str) -> nom::IResult<&str, String> {
@@ -571,7 +571,7 @@ fn subexpr(input: &str) -> nom::IResult<&str, String> {
                     map(tag("+"), |s: &str| s.to_owned()),
                     alt((term, map(nat_const, |s: &str| s.to_owned()))),
                 ),
-                |(s1, s2)| format!("{} + {}", s1, s2),
+                |(s1, s2)| format!("{s1} + {s2}"),
             )),
             |vs: Vec<String>| vs.join("+"),
         ),

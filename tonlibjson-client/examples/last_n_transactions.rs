@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
 
     let timing = (Instant::now() - now).as_secs();
 
-    println!("Time: {:?}", timing);
+    println!("Time: {timing:?}");
 
     Ok(())
 }

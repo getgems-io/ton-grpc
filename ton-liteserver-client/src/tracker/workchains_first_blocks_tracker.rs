@@ -195,7 +195,7 @@ mod test {
         println!("wait");
 
         while let Ok(block) = receiver.recv().await {
-            println!("{:?}", block)
+            println!("{block:?}")
         }
     }
 }

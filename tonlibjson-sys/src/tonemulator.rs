@@ -338,7 +338,7 @@ pub mod tests {
 
         let result = emulator.run_get_method(105222, "te6cckEBAQEABQAABgAAANAJX0U=");
 
-        println!("{:?}", result);
+        println!("{result:?}");
         assert!(result.is_ok());
     }
 
@@ -353,7 +353,7 @@ pub mod tests {
         let body = "te6cckEBAwEAiwABmU9Ixy590w1KbQEhtnM/bc6Z4R37unJhdZ5qL+c4gcOgXgUIRouixUgkDX5KjSTMO1N5Lyyry8pPJ9mrYFqJyQIAAAABZAnLkpmlwn3AAQEE0AICAGhiAGihZ5e1vhbvvT4MiEuZcPvPZy8sh4bGgqvHe4vMyoD5odzWUAAAAAAAAAAAAAAAAAAAyNE/vw==";
         let result = emulator.send_external_message(body);
 
-        println!("{:?}", result);
+        println!("{result:?}");
         assert!(result.is_ok());
     }
 
@@ -367,7 +367,7 @@ pub mod tests {
         let body = "te6cckEBBQEAwQACDwAAAgQAKUAgAQMCAgMEAgGrSAGaXRa0fkdk8vmV+YKuW8YIhjRwRbDP2TkSVQf9O5iSyQA2ZB341/PoYCGTbNnfvHve1QV6VUI1Iun+2hcd2gdeFRDuaygAAAAAAAAAAAAAAAAAAMADAKVfzD0UAAAAAAAAAACAHfk4ZNa3zjW+wrWrdO9uCikkZxLoPnzxQpl9oWBxQgMwAsUnbNxd2SUfe96ittpj+Int7jiWHRrtJCAU45LvVJ3McxLQCAAAH0OrCQ==";
         let result = emulator.send_internal_message(body, 1000);
 
-        println!("{:?}", result);
+        println!("{result:?}");
         assert!(result.is_ok());
     }
 
@@ -378,7 +378,7 @@ pub mod tests {
 
         let result = emulate_run_method(params, gas_limit);
 
-        println!("{:?}", result);
+        println!("{result:?}");
         assert!(result.is_err());
     }
 }

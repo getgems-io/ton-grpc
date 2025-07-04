@@ -315,7 +315,7 @@ impl Generator {
         .collect();
 
         for (type_ident, types) in map {
-            eprintln!("type_ident = {:}", type_ident);
+            eprintln!("type_ident = {type_ident:}");
             if skip_list.contains(&type_ident) {
                 continue;
             }
@@ -358,12 +358,12 @@ impl Generator {
                 }
             };
 
-            eprintln!("tokens = {}", output);
+            eprintln!("tokens = {output}");
 
             let syntax_tree = syn::parse2(output.clone()).unwrap();
             formatted += &prettyplease::unparse(&syntax_tree);
 
-            eprintln!("tokens = {}", output);
+            eprintln!("tokens = {output}");
 
             for definition in types.into_iter() {
                 if definition.is_builtin()
@@ -376,7 +376,7 @@ impl Generator {
                 let default = TypeConfiguration::default();
                 let configuration = self.types.get(definition.id()).unwrap_or(&default);
 
-                eprintln!("definition = {:?}", definition);
+                eprintln!("definition = {definition:?}");
 
                 let id = definition.id();
                 let struct_name = structure_ident(definition.id());
@@ -405,7 +405,7 @@ impl Generator {
                             .get(&field_name)
                             .unwrap_or(&default_configuration);
 
-                        eprintln!("field = {:?}", field);
+                        eprintln!("field = {field:?}");
                         let field_name = format_ident!("{}", &field_name);
                         let mut deserialize_number_from_string = false; // TODO[akostylev0]
                         let field_type: Box<dyn ToTokens> = if field
@@ -430,7 +430,7 @@ impl Generator {
 
                             let mut gen = format!("{}<{}>", type_name, args.join(","));
                             if field.type_is_optional() || field_configuration.optional {
-                                gen = format!("Option<{}>", gen);
+                                gen = format!("Option<{gen}>");
                             }
                             Box::new(syn::parse_str::<GenericArgument>(&gen).unwrap())
                         } else {
@@ -515,7 +515,7 @@ impl Generator {
         let out_dir = env::var_os("OUT_DIR").unwrap();
         let dest_path = Path::new(&out_dir).join(self.output);
 
-        eprintln!("dest_path = {:?}", dest_path);
+        eprintln!("dest_path = {dest_path:?}");
 
         fs::write(dest_path, formatted).unwrap();
 

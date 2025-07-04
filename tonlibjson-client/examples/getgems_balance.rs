@@ -36,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
     let timing = (Instant::now() - now).as_secs();
 
     println!("Total value: {:?}", total_value / 1000000000);
-    println!("Time: {:?}", timing);
+    println!("Time: {timing:?}");
 
     Ok(())
 }

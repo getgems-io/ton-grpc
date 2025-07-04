@@ -24,11 +24,11 @@ async fn main() -> anyhow::Result<()> {
     let boc: BoC = unpack_bytes(&header.header_proof)?;
     let root = boc.single_root().unwrap();
 
-    println!("root = {:?}", root);
+    println!("root = {root:?}");
 
     let header: MerkleProof = root.parse_fully()?;
 
-    println!("header = {:?}", header);
+    println!("header = {header:?}");
 
     Ok(())
 }

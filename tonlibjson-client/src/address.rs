@@ -160,7 +160,7 @@ impl FromStr for ShardContextAccountAddress {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(s)
-            .with_context(|| format!("input string is {}", s))?;
+            .with_context(|| format!("input string is {s}"))?;
 
         if bytes.len() != 32 {
             return Err(anyhow!(

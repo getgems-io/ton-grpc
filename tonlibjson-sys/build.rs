@@ -28,7 +28,7 @@ fn main() {
     } else {
         "ton"
     };
-    eprintln!("ton dir is {}", ton_dir);
+    eprintln!("ton dir is {ton_dir}");
     println!("cargo:rerun-if-changed={ton_dir}/CMakeLists.txt");
     println!("cargo:rerun-if-changed=build.rs");
 
@@ -47,7 +47,7 @@ fn main() {
             .display()
             .to_string()
     });
-    println!("cargo:rustc-link-search=native={}/lib", openssl_dir);
+    println!("cargo:rustc-link-search=native={openssl_dir}/lib");
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
 
@@ -144,7 +144,7 @@ fn main() {
                 dst.display(),
                 item
             );
-            println!("cargo:rustc-link-lib=static={}", item)
+            println!("cargo:rustc-link-lib=static={item}")
         }
         println!("cargo:rustc-link-lib=static=tl-lite-utils");
 
