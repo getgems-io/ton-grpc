@@ -24,7 +24,7 @@ impl Registry {
     pub fn get_last_seqno(&self, shard_id: &ShardId) -> Option<Seqno> {
         self.shard_bounds_registry
             .get(shard_id)
-            .and_then(|s| s.right.as_ref().map(|h| h.id.seqno))
+            .and_then(|s| s.right().map(|h| h.id.seqno))
     }
 
     pub fn upsert_left(&self, header: &BlocksHeader) {
@@ -42,9 +42,9 @@ impl Registry {
         self.shard_bounds_registry
             .entry(shard_id)
             .and_modify(|b| {
-                b.left.replace(header.clone());
+                b.left_replace(header.clone());
             })
-            .or_insert_with(|| ShardBounds::left(header.clone()));
+            .or_insert_with(|| ShardBounds::from_left(header.clone()));
     }
 
     pub fn upsert_right(&self, header: &BlocksHeader) {
@@ -62,9 +62,9 @@ impl Registry {
         self.shard_bounds_registry
             .entry(shard_id)
             .and_modify(|b| {
-                b.right.replace(header.clone());
+                b.right_replace(header.clone());
             })
-            .or_insert_with(|| ShardBounds::right(header.clone()));
+            .or_insert_with(|| ShardBounds::from_right(header.clone()));
     }
 
     pub fn upsert_right_end(&self, block_id: &TonBlockIdExt) {
@@ -82,9 +82,9 @@ impl Registry {
         self.shard_bounds_registry
             .entry(shard_id)
             .and_modify(|b| {
-                b.right_end.replace(block_id.seqno);
+                b.right_end_replace(block_id.seqno);
             })
-            .or_insert_with(|| ShardBounds::right_end(block_id.seqno));
+            .or_insert_with(|| ShardBounds::from_right_seqno(block_id.seqno));
     }
 
     pub fn update_shard_registry(&self, shard_id: &ShardId) {
@@ -132,6 +132,6 @@ impl Registry {
             return false;
         };
 
-        shard_bounds.left.is_some()
+        shard_bounds.left().is_some()
     }
 }
