@@ -1,5 +1,6 @@
 use crate::block::BlocksHeader;
 use crate::cursor::Seqno;
+use ton_client_util::router::BlockAvailability;
 
 #[derive(Debug, Clone, Default)]
 pub struct ShardBounds {
@@ -65,33 +66,49 @@ impl ShardBounds {
         }
     }
 
-    pub fn contains_seqno(&self, seqno: Seqno, not_available: bool) -> bool {
+    pub fn contains_seqno(&self, seqno: Seqno) -> BlockAvailability {
         let Some(ref left) = self.left else {
-            return false;
+            return BlockAvailability::Unknown;
         };
         let Some(ref right) = self.right else {
-            return false;
+            return BlockAvailability::Unknown;
         };
 
-        if not_available {
-            left.id.seqno <= seqno && seqno <= self.right_seqno.unwrap_or(right.id.seqno)
-        } else {
-            left.id.seqno <= seqno && seqno <= right.id.seqno
+        if seqno < left.id.seqno {
+            return BlockAvailability::NotPresent;
         }
+
+        if seqno <= right.id.seqno {
+            return BlockAvailability::Available;
+        }
+
+        if seqno <= self.right_seqno.unwrap_or(right.id.seqno) {
+            return BlockAvailability::NotAvailable;
+        }
+
+        BlockAvailability::NotPresent
     }
 
-    pub fn contains_lt(&self, lt: i64, not_available: bool) -> bool {
+    pub fn contains_lt(&self, lt: i64) -> BlockAvailability {
         let Some(ref left) = self.left else {
-            return false;
+            return BlockAvailability::Unknown;
         };
         let Some(ref right) = self.right else {
-            return false;
+            return BlockAvailability::Unknown;
         };
 
-        if not_available {
-            left.start_lt <= lt && lt <= right.end_lt + (right.end_lt - right.start_lt)
-        } else {
-            left.start_lt <= lt && lt <= right.end_lt
+        if lt < left.start_lt {
+            return BlockAvailability::NotPresent;
         }
+
+        if lt <= right.end_lt {
+            return BlockAvailability::Available;
+        }
+
+        if lt <= right.end_lt + (right.end_lt - right.start_lt) {
+            return BlockAvailability::NotAvailable;
+        }
+
+        BlockAvailability::NotPresent
     }
 }
