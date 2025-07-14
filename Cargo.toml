@@ -53,7 +53,7 @@ reqwest = { version = "0.12.9", features = ["rustls-tls", "hickory-dns"], defaul
 hickory-resolver = { version = "0.25.2" }
 tokio-retry = "0.3"
 nom = "8.0.0"
-crc32fast = "1.4.2"
+crc32fast = "1.5.0"
 either = "1.15.0"
 derive-new = "0.7.0"
 metrics-exporter-prometheus = { version = "0.17.2", features = ["http-listener"], default-features = false }
