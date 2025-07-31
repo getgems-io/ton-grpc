@@ -2753,7 +2753,7 @@ dependencies = [
 
 [[package]]
 name = "ton-contract"
-version = "0.1.8"
+version = "0.1.9"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2785,7 +2785,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.11.4"
+version = "0.11.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -2924,7 +2924,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.20.3"
+version = "0.20.4"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -2966,7 +2966,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-sys"
-version = "0.4.7"
+version = "0.4.8"
 dependencies = [
  "anyhow",
  "cmake",
@@ -3110,7 +3110,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tvm-grpc"
-version = "0.7.10"
+version = "0.7.11"
 dependencies = [
  "anyhow",
  "async-stream",

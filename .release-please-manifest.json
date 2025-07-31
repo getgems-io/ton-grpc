@@ -1,1 +1,1 @@
-{"charts/ton-grpc":"0.7.0","charts/tvm-grpc":"0.6.0","ton-grpc":"0.11.4","tvm-grpc":"0.7.10","tonlibjson-client":"0.20.3","tonlibjson-sys":"0.4.7","adnl-tcp":"0.3.0","ton-liteserver-client":"0.2.3","ton-contract":"0.1.8"}
+{"charts/ton-grpc":"0.7.0","charts/tvm-grpc":"0.6.0","ton-grpc":"0.11.5","tvm-grpc":"0.7.11","tonlibjson-client":"0.20.4","tonlibjson-sys":"0.4.8","adnl-tcp":"0.3.0","ton-liteserver-client":"0.2.3","ton-contract":"0.1.9"}
