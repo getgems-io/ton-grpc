@@ -14,7 +14,7 @@ members = [
 
 [workspace.dependencies]
 anyhow = { version = "1.0", features = ["backtrace"] }
-async-trait = "0.1.88"
+async-trait = "0.1.89"
 tower = { version = "0.5.2", features = ["full"] }
 tokio = { version = "1.47", features = ["full"] }
 tokio-util = { version = "0.7", features = ["codec"] }
