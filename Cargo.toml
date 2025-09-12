@@ -39,7 +39,7 @@ prost = "0.13.5"
 quick_cache = "0.6.15"
 url = { version = "2.5.4", features = ["serde"] }
 clap = { version = "4.5.40", features = ["derive"] }
-humantime = "2.2.0"
+humantime = "2.3.0"
 uuid = { version = "1.17", features = ["v4", "fast-rng", "serde"] }
 dashmap = "6.1.0"
 pin-project = "1.1.10"
