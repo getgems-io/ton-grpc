@@ -49,7 +49,7 @@ thiserror = "2.0.17"
 itertools = "0.14.0"
 bitvec = "1.0.1"
 metrics = "0.24.2"
-reqwest = { version = "0.12.23", features = ["rustls-tls", "hickory-dns"], default-features = false }
+reqwest = { version = "0.12.24", features = ["rustls-tls", "hickory-dns"], default-features = false }
 hickory-resolver = { version = "0.25.2" }
 tokio-retry = "0.3"
 nom = "8.0.0"
