@@ -35,7 +35,7 @@ tonic = { version = "0.13.1", features = ["gzip"] }
 tonic-reflection = "0.13.1"
 tonic-health = "0.13.1"
 tonic-build = "0.13.1"
-prost = "0.13.5"
+prost = "0.14.1"
 quick_cache = "0.6.17"
 url = { version = "2.5.7", features = ["serde"] }
 clap = { version = "4.5.48", features = ["derive"] }
