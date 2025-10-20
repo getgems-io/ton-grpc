@@ -36,7 +36,7 @@ tonic-reflection = "0.13.1"
 tonic-health = "0.13.1"
 tonic-build = "0.13.1"
 prost = "0.13.5"
-quick_cache = "0.6.17"
+quick_cache = "0.6.18"
 url = { version = "2.5.7", features = ["serde"] }
 clap = { version = "4.5.48", features = ["derive"] }
 humantime = "2.3.0"
