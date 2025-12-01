@@ -56,7 +56,7 @@ nom = "8.0.0"
 crc32fast = "1.5.0"
 either = "1.15.0"
 derive-new = "0.7.0"
-metrics-exporter-prometheus = { version = "0.17.2", features = ["http-listener"], default-features = false }
+metrics-exporter-prometheus = { version = "0.18.0", features = ["http-listener"], default-features = false }
 quote = "1.0.41"
 syn = "2.0.106"
 prettyplease = "0.2.37"
