@@ -48,7 +48,7 @@ bytes = "1.10.1"
 thiserror = "2.0.17"
 itertools = "0.14.0"
 bitvec = "1.0.1"
-metrics = "0.24.2"
+metrics = "0.24.3"
 reqwest = { version = "0.12.23", features = ["rustls-tls", "hickory-dns"], default-features = false }
 hickory-resolver = { version = "0.25.2" }
 tokio-retry = "0.3"
