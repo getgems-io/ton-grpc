@@ -205,7 +205,9 @@ fn main() {
             dst.display()
         );
         println!("cargo:rustc-link-lib=static=tonlib");
-        println!("cargo:rustc-link-lib=static=tonlibjson_private");
+        // tonlibjson_private was removed from this commit
+        // https://github.com/ton-blockchain/ton/commit/ddb173b16f4ff8fb314175b9751720dbfc79e77e
+        // println!("cargo:rustc-link-lib=static=tonlibjson_private");
         println!("cargo:rustc-link-lib=static=tonlibjson");
     }
 
