@@ -29,19 +29,21 @@ runs:
         sudo apt-get install --yes autoconf libtool libsecp256k1-dev libsodium-dev liblz4-dev clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libunwind-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev
         echo "openssl version"
         openssl version
-    - name: Install OpenSSL 3.5 from source
-      shell: bash
-      run: |
-        wget https://www.openssl.org/source/openssl-3.5.0.tar.gz
-        tar xzf openssl-3.5.0.tar.gz
-        cd openssl-3.5.0
-        ./config --prefix=$HOME/openssl-3.5.0 --openssldir=$HOME/openssl-3.5.0
-        make -j$(nproc)
-        make install
-        echo "OPENSSL_ROOT_DIR=$HOME/openssl-3.5.0" >> $GITHUB_ENV
-        echo "$HOME/openssl-3.5.0/bin" >> $GITHUB_PATH
-        echo "openssl version"
-        openssl version
+    # Этот шаг посоветовал copilot
+    # OpenSSL нужной версии нету в apt-get install, там 3.0 а нужна 3.5
+#    - name: Install OpenSSL 3.5 from source
+#      shell: bash
+#      run: |
+#        wget https://www.openssl.org/source/openssl-3.5.0.tar.gz
+#        tar xzf openssl-3.5.0.tar.gz
+#        cd openssl-3.5.0
+#        ./config --prefix=$HOME/openssl-3.5.0 --openssldir=$HOME/openssl-3.5.0
+#        make -j$(nproc)
+#        make install
+#        echo "OPENSSL_ROOT_DIR=$HOME/openssl-3.5.0" >> $GITHUB_ENV
+#        echo "$HOME/openssl-3.5.0/bin" >> $GITHUB_PATH
+#        echo "openssl version"
+#        openssl version
     - uses: arduino/setup-protoc@v2
       with:
         repo-token: ${{ inputs.token }}
