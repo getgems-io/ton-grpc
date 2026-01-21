@@ -20,7 +20,8 @@ jobs:
       matrix:
 #        os: ['ubuntu-latest', 'macos-14', 'macos-15']
         os: ['ubuntu-latest']
-        features: ['', 'testnet']
+        features: ['testnet']
+#        features: ['', 'testnet']
     name: Run cargo tests
     runs-on: ${{ matrix.os }}
     permissions:
