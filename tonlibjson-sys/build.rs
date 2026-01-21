@@ -72,6 +72,11 @@ fn main() {
     let mut cfg = Config::new(out_dir.join(ton_dir));
     cfg.define("TON_ONLY_TONLIB", "ON")
         .define("CMAKE_C_COMPILER", "clang")
+        // without CMAKE_BUILD_TYPE=Release got error
+        // clang++: error: no such file or directory: '&&'
+        // clang++: error: no such file or directory: 'dsymutil'
+        // clang++: error: no such file or directory: 'generate_common'
+        .define("CMAKE_BUILD_TYPE", "Release")
         .define("CMAKE_CXX_COMPILER", "clang++")
         .define("PORTABLE", "ON")
         .define("TONLIBJSON_STATIC", "ON")
