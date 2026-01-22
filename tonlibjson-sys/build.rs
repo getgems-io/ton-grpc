@@ -79,9 +79,9 @@ fn main() {
         // clang++: error: no such file or directory: 'generate_common'
         .define("CMAKE_BUILD_TYPE", "Release")
         .define("OPENSSL_ROOT_DIR", openssl_dir.clone())
-        .define("OPENSSL_INCLUDE_DIR", openssl_dir.clone()+"/include")
-        .define("OPENSSL_CRYPTO_LIBRARY", openssl_dir.clone()+"/lib/libcrypto.so")
-        .define("OPENSSL_SSL_LIBRARY", openssl_dir.clone()+"/lib/libssl.so")
+//         .define("OPENSSL_INCLUDE_DIR", openssl_dir.clone()+"/include")
+//         .define("OPENSSL_CRYPTO_LIBRARY", openssl_dir.clone()+"/lib/libcrypto.so")
+//         .define("OPENSSL_SSL_LIBRARY", openssl_dir.clone()+"/lib/libssl.so")
         .define("CMAKE_CXX_COMPILER", "clang++")
         .define("PORTABLE", "ON")
         .define("TONLIBJSON_STATIC", "ON")

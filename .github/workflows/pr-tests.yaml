@@ -46,5 +46,6 @@ jobs:
           CARGO_INCREMENTAL: "0"
           SCCACHE_GHA_ENABLED: "true"
           RUSTC_WRAPPER: "sccache"
+          TONLIBJSON_SYS_LLD: "1"
           CMAKE_C_COMPILER_LAUNCHER: "sccache"
           CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
