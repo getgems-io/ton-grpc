@@ -18,10 +18,8 @@ jobs:
   pr-tests:
     strategy:
       matrix:
-#        os: ['ubuntu-latest', 'macos-14', 'macos-15']
-        os: ['ubuntu-latest']
-        features: ['testnet']
-#        features: ['', 'testnet']
+        os: ['ubuntu-latest', 'macos-14', 'macos-15']
+        features: ['', 'testnet']
     name: Run cargo tests
     runs-on: ${{ matrix.os }}
     permissions:

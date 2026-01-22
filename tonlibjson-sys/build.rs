@@ -47,7 +47,7 @@ fn main() {
             .display()
             .to_string()
     });
-    eprintln!("openssl_dir is {openssl_dir}");
+
     println!("cargo:rustc-link-search=native={openssl_dir}/lib");
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
@@ -78,11 +78,10 @@ fn main() {
         // clang++: error: no such file or directory: 'dsymutil'
         // clang++: error: no such file or directory: 'generate_common'
         .define("CMAKE_BUILD_TYPE", "Release")
+        // QUIC will require openssl 3.5+
+        // but its not easy to install
+        // https://github.com/getgems-io/ton-grpc/actions/runs/21245238777/job/61132760447?pr=1483
         .define("USE_QUIC", "OFF")
-//         .define("OPENSSL_ROOT_DIR", openssl_dir.clone())
-//         .define("OPENSSL_INCLUDE_DIR", openssl_dir.clone()+"/include")
-//         .define("OPENSSL_CRYPTO_LIBRARY", openssl_dir.clone()+"/lib/libcrypto.so")
-//         .define("OPENSSL_SSL_LIBRARY", openssl_dir.clone()+"/lib/libssl.so")
         .define("CMAKE_CXX_COMPILER", "clang++")
         .define("PORTABLE", "ON")
         .define("TONLIBJSON_STATIC", "ON")
