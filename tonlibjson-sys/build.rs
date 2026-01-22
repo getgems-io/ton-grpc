@@ -72,6 +72,15 @@ fn main() {
     let mut cfg = Config::new(out_dir.join(ton_dir));
     cfg.define("TON_ONLY_TONLIB", "ON")
         .define("CMAKE_C_COMPILER", "clang")
+        // without CMAKE_BUILD_TYPE=Release got error
+        // clang++: error: no such file or directory: '&&'
+        // clang++: error: no such file or directory: 'dsymutil'
+        // clang++: error: no such file or directory: 'generate_common'
+        .define("CMAKE_BUILD_TYPE", "Release")
+        // QUIC will require openssl 3.5+
+        // but its not easy to install
+        // https://github.com/getgems-io/ton-grpc/actions/runs/21245238777/job/61132760447?pr=1483
+        .define("USE_QUIC", "OFF")
         .define("CMAKE_CXX_COMPILER", "clang++")
         .define("PORTABLE", "ON")
         .define("TONLIBJSON_STATIC", "ON")
@@ -128,6 +137,12 @@ fn main() {
         out_dir.join(ton_dir),
     )
     .unwrap();
+
+    let use_old_private_lib = if cfg!(feature = "testnet") {
+      false
+    } else {
+      true
+    };
 
     if cfg!(feature = "tonlibjson") {
         let dst = cfg.build_target("tonlibjson").build();
@@ -205,7 +220,11 @@ fn main() {
             dst.display()
         );
         println!("cargo:rustc-link-lib=static=tonlib");
-        println!("cargo:rustc-link-lib=static=tonlibjson_private");
+        if use_old_private_lib {
+          // tonlibjson_private was removed from this commit
+          // https://github.com/ton-blockchain/ton/commit/ddb173b16f4ff8fb314175b9751720dbfc79e77e
+          println!("cargo:rustc-link-lib=static=tonlibjson_private");
+        }
         println!("cargo:rustc-link-lib=static=tonlibjson");
     }
 
