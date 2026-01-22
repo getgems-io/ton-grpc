@@ -47,6 +47,7 @@ fn main() {
             .display()
             .to_string()
     });
+    eprintln!("openssl_dir is {openssl_dir}");
     println!("cargo:rustc-link-search=native={openssl_dir}/lib");
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
@@ -77,6 +78,10 @@ fn main() {
         // clang++: error: no such file or directory: 'dsymutil'
         // clang++: error: no such file or directory: 'generate_common'
         .define("CMAKE_BUILD_TYPE", "Release")
+        .define("OPENSSL_ROOT_DIR", openssl_dir)
+//         .define("OPENSSL_INCLUDE_DIR", "/root/openssl-3.5.0/include")
+//         .define("OPENSSL_CRYPTO_LIBRARY", "/root/openssl-3.5.0/lib/libcrypto.so")
+//         .define("OPENSSL_SSL_LIBRARY", "/root/openssl-3.5.0/lib/libssl.so")
         .define("CMAKE_CXX_COMPILER", "clang++")
         .define("PORTABLE", "ON")
         .define("TONLIBJSON_STATIC", "ON")
