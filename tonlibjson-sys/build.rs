@@ -47,7 +47,6 @@ fn main() {
             .display()
             .to_string()
     });
-
     println!("cargo:rustc-link-search=native={openssl_dir}/lib");
     println!("cargo:rustc-link-lib=static=crypto");
     println!("cargo:rustc-link-lib=static=ssl");
