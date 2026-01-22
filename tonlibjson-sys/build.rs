@@ -223,6 +223,7 @@ fn main() {
         if use_old_private_lib {
           // tonlibjson_private was removed from this commit
           // https://github.com/ton-blockchain/ton/commit/ddb173b16f4ff8fb314175b9751720dbfc79e77e
+          // but still used on master branch
           println!("cargo:rustc-link-lib=static=tonlibjson_private");
         }
         println!("cargo:rustc-link-lib=static=tonlibjson");
