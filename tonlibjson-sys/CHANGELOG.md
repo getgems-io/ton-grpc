@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.9](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.8...tonlibjson-sys-v0.4.9) (2026-01-22)
+
+
+### Bug Fixes
+
+* **build:** split build for mainnet and testnet ([313b59d](https://github.com/getgems-io/ton-grpc/commit/313b59dd1412b193bb4138db93539e4988ae4bdd))
+
 ## [0.4.8](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.7...tonlibjson-sys-v0.4.8) (2025-10-08)
 
 
