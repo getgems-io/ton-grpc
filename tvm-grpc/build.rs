@@ -1,12 +1,10 @@
-// build trigger 1
-
 use std::env;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    tonic_build::configure()
+    tonic_prost_build::configure()
         .type_attribute(
             "TvmEmulatorRunGetMethodResponse",
             "#[derive(serde::Deserialize, serde::Serialize)]",
