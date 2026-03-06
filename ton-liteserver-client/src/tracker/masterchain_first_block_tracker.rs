@@ -111,7 +111,7 @@ impl MasterchainFirstBlockTracker {
         }
     }
 
-    pub fn borrow(&self) -> Ref<Option<BlockHeader>> {
+    pub fn borrow(&self) -> Ref<'_, Option<BlockHeader>> {
         self.receiver.borrow()
     }
 
