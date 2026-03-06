@@ -21,6 +21,7 @@ tracing-futures = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tonic = { workspace = true }
+tonic-prost = { workspace = true }
 tonic-reflection = { workspace = true }
 tonic-health = { workspace = true }
 prost = { workspace = true }
@@ -35,4 +36,4 @@ metrics-exporter-prometheus = { workspace = true, features = ["http-listener"], 
 tracing-test = { workspace = true }
 
 [build-dependencies]
-tonic-build = { workspace = true }
+tonic-prost-build = { workspace = true }
