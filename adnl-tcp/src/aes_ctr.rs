@@ -4,7 +4,7 @@ use aes::cipher::StreamCipher;
 use anyhow::{anyhow, bail};
 use ed25519_dalek::hazmat::ExpandedSecretKey;
 use ed25519_dalek::VerifyingKey;
-use rand::Rng;
+use rand::fill;
 use sha2::{Digest, Sha256};
 use std::ops::Mul;
 
@@ -17,7 +17,7 @@ pub struct AesCtr {
 impl AesCtr {
     pub fn generate() -> Self {
         let mut basis = [0u8; 160];
-        rand::thread_rng().fill(basis.as_mut_slice());
+        fill(&mut basis);
 
         Self { basis }
     }

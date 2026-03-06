@@ -21,7 +21,7 @@ dependencies = [
  "futures",
  "hex",
  "pin-project",
- "rand 0.8.5",
+ "rand 0.10.0",
  "sha2",
  "thiserror 2.0.18",
  "tokio",
@@ -1167,7 +1167,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.2",
+ "socket2 0.6.3",
  "tokio",
  "tower-service",
  "tracing",
@@ -1947,7 +1947,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2 0.6.2",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -1985,7 +1985,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2 0.6.2",
+ "socket2 0.6.3",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -2492,12 +2492,12 @@ dependencies = [
 
 [[package]]
 name = "socket2"
-version = "0.6.2"
+version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86f4aa3ad99f2088c990dfa82d367e19cb29268ed67c574d10d0a4bfe71f07e0"
+checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2754,7 +2754,7 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2 0.6.2",
+ "socket2 0.6.3",
  "tokio-macros",
  "windows-sys 0.61.2",
 ]
@@ -2912,7 +2912,7 @@ dependencies = [
  "pin-project",
  "prettyplease",
  "quote",
- "rand 0.8.5",
+ "rand 0.10.0",
  "syn",
  "thiserror 2.0.18",
  "tl_parser",
@@ -2960,7 +2960,7 @@ dependencies = [
  "hyper-util",
  "percent-encoding",
  "pin-project",
- "socket2 0.6.2",
+ "socket2 0.6.3",
  "sync_wrapper",
  "tokio",
  "tokio-stream",
@@ -3057,7 +3057,7 @@ dependencies = [
  "prettyplease",
  "quick_cache",
  "quote",
- "rand 0.8.5",
+ "rand 0.10.0",
  "reqwest",
  "serde",
  "serde_json",
