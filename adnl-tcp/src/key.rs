@@ -38,7 +38,9 @@ pub struct Ed25519Key {
 
 impl Ed25519Key {
     pub fn generate() -> Self {
-        let private_key = SigningKey::generate(&mut rand::thread_rng());
+        let mut bytes = [0u8; 32];
+        rand::fill(&mut bytes);
+        let private_key = SigningKey::from_bytes(&bytes);
         let pub_key = private_key.verifying_key();
         let id = Ed25519KeyId::from_public_key_bytes(pub_key.as_bytes());
         let exp_key: ExpandedSecretKey = private_key.as_bytes().into();
