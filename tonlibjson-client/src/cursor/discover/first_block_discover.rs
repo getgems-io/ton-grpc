@@ -119,8 +119,8 @@ async fn find_first_blocks(
         }
 
         block = check_block_available(client, TonBlockId::new(workchain, shard, cur)).await;
-        if block.is_ok() {
-            success = Some(block.as_ref().unwrap().clone());
+        if let Ok(inner) = &block {
+            success = Some(inner.clone());
         }
 
         hops += 1;

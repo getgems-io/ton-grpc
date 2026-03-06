@@ -42,8 +42,8 @@ where
         }
 
         block = check_block_available(client, TonNodeBlockId::new(workchain, shard, cur)).await;
-        if block.is_ok() {
-            success = Some(block.as_ref().unwrap().clone());
+        if let Ok(inner) = &block {
+            success = Some(inner.clone());
         }
 
         hops += 1;
