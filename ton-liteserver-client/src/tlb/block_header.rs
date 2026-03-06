@@ -21,7 +21,10 @@ pub struct BlockHeader {
 impl<'de> CellDeserialize<'de> for BlockHeader {
     type Args = ();
 
-    fn parse(parser: &mut CellParser<'de>, _args: Self::Args) -> Result<Self, CellParserError<'de>> {
+    fn parse(
+        parser: &mut CellParser<'de>,
+        _args: Self::Args,
+    ) -> Result<Self, CellParserError<'de>> {
         let tag: u32 = parser.unpack_as::<_, NBits<32>>(())?;
         if tag != 0x11ef55aa {
             unimplemented!("actual tag is {:x}", tag)

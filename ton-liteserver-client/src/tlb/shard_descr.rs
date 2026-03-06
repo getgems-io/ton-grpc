@@ -2,7 +2,7 @@ use crate::tlb::future_split_merge::FutureSplitMerge;
 use adnl_tcp::types::Int256;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::{ParseFully, Ref, bits::NBits};
+use toner::tlb::{bits::NBits, ParseFully, Ref};
 use toner::ton::currency::CurrencyCollection;
 
 /// ```tlb
@@ -56,7 +56,10 @@ pub struct ShardDescr {
 impl<'de> CellDeserialize<'de> for ShardDescr {
     type Args = ();
 
-    fn parse(parser: &mut CellParser<'de>, _args: Self::Args) -> Result<Self, CellParserError<'de>> {
+    fn parse(
+        parser: &mut CellParser<'de>,
+        _args: Self::Args,
+    ) -> Result<Self, CellParserError<'de>> {
         let tag: u8 = parser.unpack_as::<_, NBits<4>>(())?;
 
         let seq_no = parser.unpack(())?;
