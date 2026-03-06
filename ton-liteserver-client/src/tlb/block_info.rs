@@ -53,7 +53,10 @@ pub struct BlockInfo {
 impl<'de> CellDeserialize<'de> for BlockInfo {
     type Args = ();
 
-    fn parse(parser: &mut CellParser<'de>, _args: Self::Args) -> Result<Self, CellParserError<'de>> {
+    fn parse(
+        parser: &mut CellParser<'de>,
+        _args: Self::Args,
+    ) -> Result<Self, CellParserError<'de>> {
         let tag: u32 = parser.unpack(())?;
         if tag != 0x9bc7a987 {
             unreachable!()

@@ -1,7 +1,7 @@
 use crate::tlb::ext_blk_ref::ExtBlkRef;
 use toner::tlb::bits::de::BitReaderExt;
-use toner::tlb::de::{CellParser, CellParserError};
 use toner::tlb::de::CellDeserialize;
+use toner::tlb::de::{CellParser, CellParserError};
 use toner::tlb::{Data, Ref, Same};
 
 /// ```tlb
@@ -17,10 +17,7 @@ pub enum BlkPrevInfo {
 impl<'de> CellDeserialize<'de> for BlkPrevInfo {
     type Args = bool;
 
-    fn parse(
-        parser: &mut CellParser<'de>,
-        args: Self::Args,
-    ) -> Result<Self, CellParserError<'de>> {
+    fn parse(parser: &mut CellParser<'de>, args: Self::Args) -> Result<Self, CellParserError<'de>> {
         match args {
             false => Ok(BlkPrevInfo::Ref(parser.unpack(())?)),
             true => Ok(BlkPrevInfo::RefPair(

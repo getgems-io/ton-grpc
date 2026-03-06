@@ -16,7 +16,10 @@ pub struct MerkleProof {
 impl<'de> CellDeserialize<'de> for MerkleProof {
     type Args = ();
 
-    fn parse(parser: &mut CellParser<'de>, _args: Self::Args) -> Result<Self, CellParserError<'de>> {
+    fn parse(
+        parser: &mut CellParser<'de>,
+        _args: Self::Args,
+    ) -> Result<Self, CellParserError<'de>> {
         let tag: u8 = parser.unpack_as::<_, NBits<8>>(())?;
         if tag != 0x03 {
             unreachable!()
