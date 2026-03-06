@@ -12,7 +12,7 @@ use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
 use ton_client_util::router::shard_prefix::ShardPrefix;
 use toner::tlb::bits::de::unpack_bytes_fully;
-use toner::ton::boc::BoC;
+use toner::tlb::BoC;
 use tower::{Service, ServiceExt};
 
 pub struct WorkchainsLastBlocksTrackerActor<S> {
@@ -66,14 +66,14 @@ where
                 .await
             {
                 Ok(shards_description) => {
-                    let boc: BoC = unpack_bytes_fully(&shards_description.data).unwrap();
+                    let boc: BoC = unpack_bytes_fully(&shards_description.data, ()).unwrap();
                     let root = boc.single_root().unwrap();
-                    let shard_hashes: ShardHashes = root.parse_fully().unwrap();
+                    let shard_hashes: ShardHashes = root.parse_fully(()).unwrap();
 
                     // TODO[akostylev0]: verify proofs
                     shard_hashes
                         .iter()
-                        .flat_map(|(chain_id, shards)| {
+                        .flat_map(|(chain_id, shards): (&u32, &Vec<ShardDescr>)| {
                             shards.iter().map(move |shard| (chain_id, shard))
                         })
                         .for_each(|(chain_id, shard)| {

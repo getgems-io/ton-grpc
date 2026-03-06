@@ -16,15 +16,17 @@ pub struct ExtBlkRef {
     pub file_hash: [u8; 32],
 }
 
-impl BitUnpack for ExtBlkRef {
-    fn unpack<R>(mut reader: R) -> Result<Self, R::Error>
+impl<'de> BitUnpack<'de> for ExtBlkRef {
+    type Args = ();
+
+    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
     where
-        R: BitReader,
+        R: BitReader<'de> + ?Sized,
     {
-        let end_lt = reader.unpack()?;
-        let seq_no = reader.unpack()?;
-        let root_hash = reader.unpack()?;
-        let file_hash = reader.unpack()?;
+        let end_lt = reader.unpack(())?;
+        let seq_no = reader.unpack(())?;
+        let root_hash = reader.unpack(())?;
+        let file_hash = reader.unpack(())?;
 
         Ok(Self {
             end_lt,

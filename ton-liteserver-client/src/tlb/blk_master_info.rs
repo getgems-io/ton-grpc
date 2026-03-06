@@ -9,12 +9,14 @@ pub struct BlkMasterInfo {
     pub master: ExtBlkRef,
 }
 
-impl BitUnpack for BlkMasterInfo {
-    fn unpack<R>(mut reader: R) -> Result<Self, R::Error>
+impl<'de> BitUnpack<'de> for BlkMasterInfo {
+    type Args = ();
+
+    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
     where
-        R: BitReader,
+        R: BitReader<'de> + ?Sized,
     {
-        let master = reader.unpack()?;
+        let master = reader.unpack(())?;
 
         Ok(Self { master })
     }

@@ -1,5 +1,5 @@
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
-use toner::tlb::bits::r#as::NBits;
+use toner::tlb::bits::NBits;
 
 /// ```tlb
 /// capabilities#c4 version:uint32 capabilities:uint64 = GlobalVersion;
@@ -10,18 +10,20 @@ pub struct GlobalVersion {
     pub capabilities: u64,
 }
 
-impl BitUnpack for GlobalVersion {
-    fn unpack<R>(mut reader: R) -> Result<Self, R::Error>
+impl<'de> BitUnpack<'de> for GlobalVersion {
+    type Args = ();
+
+    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
     where
-        R: BitReader,
+        R: BitReader<'de> + ?Sized,
     {
-        let tag: u8 = reader.unpack_as::<_, NBits<8>>()?;
+        let tag: u8 = reader.unpack_as::<_, NBits<8>>(())?;
         if tag != 0xC4 {
             unreachable!()
         }
 
-        let version = reader.unpack()?;
-        let capabilities = reader.unpack()?;
+        let version = reader.unpack(())?;
+        let capabilities = reader.unpack(())?;
 
         Ok(Self {
             version,

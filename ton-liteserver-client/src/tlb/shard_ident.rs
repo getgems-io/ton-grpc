@@ -1,5 +1,5 @@
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
-use toner::tlb::bits::r#as::NBits;
+use toner::tlb::bits::NBits;
 
 /// `tlb
 /// shard_ident$00
@@ -14,19 +14,21 @@ pub struct ShardIdent {
     pub shard_prefix: u64,
 }
 
-impl BitUnpack for ShardIdent {
-    fn unpack<R>(mut reader: R) -> Result<Self, R::Error>
+impl<'de> BitUnpack<'de> for ShardIdent {
+    type Args = ();
+
+    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
     where
-        R: BitReader,
+        R: BitReader<'de> + ?Sized,
     {
-        let tag: u8 = reader.unpack_as::<_, NBits<2>>()?;
+        let tag: u8 = reader.unpack_as::<_, NBits<2>>(())?;
         if tag != 0x00 {
             unreachable!()
         }
 
-        let shard_pfx_bits = reader.unpack_as::<_, NBits<6>>()?;
-        let workchain_id = reader.unpack()?;
-        let shard_prefix = reader.unpack()?;
+        let shard_pfx_bits = reader.unpack_as::<_, NBits<6>>(())?;
+        let workchain_id = reader.unpack(())?;
+        let shard_prefix = reader.unpack(())?;
 
         Ok(Self {
             shard_pfx_bits,
