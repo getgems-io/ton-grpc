@@ -10,7 +10,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes_fully;
-use toner::ton::boc::BoC;
+use toner::tlb::BoC;
 use tower::{Service, ServiceExt};
 
 pub struct MasterchainLastBlockHeaderTrackerActor<S> {
@@ -63,10 +63,10 @@ where
                 Ok(response) => {
                     let header_bytes = response.header_proof;
 
-                    let boc: BoC = unpack_bytes_fully(&header_bytes).unwrap();
+                    let boc: BoC = unpack_bytes_fully(&header_bytes, ()).unwrap();
                     let root = boc.single_root().unwrap();
 
-                    let header: MerkleProof = root.parse_fully().unwrap();
+                    let header: MerkleProof = root.parse_fully(()).unwrap();
 
                     self.sender.send(Some(header.virtual_root)).unwrap();
                 }

@@ -10,8 +10,8 @@ use ton_liteserver_client::tl::{
 };
 use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
 use ton_liteserver_client::tlb::shard_hashes::ShardHashes;
-use toner::tlb::bits::de::unpack_bytes_fully;
-use toner::{tlb::bits::de::unpack_bytes, ton::boc::BoC};
+use toner::tlb::bits::de::{unpack_bytes, unpack_bytes_fully};
+use toner::tlb::BoC;
 use tower::{ServiceBuilder, ServiceExt};
 
 #[tokio::main]
@@ -32,11 +32,11 @@ async fn main() -> Result<(), tower::BoxError> {
         .oneshot(LiteServerGetAllShardsInfo { id })
         .await?;
 
-    let boc: BoC = unpack_bytes(&shards.data)?;
+    let boc: BoC = unpack_bytes(&shards.data, ())?;
     let root = boc
         .single_root()
         .ok_or_else(|| anyhow!("single root expected"))?;
-    let shards: ShardHashes = root.parse_fully()?;
+    let shards: ShardHashes = root.parse_fully(())?;
 
     for (workchain_id, shards) in shards.iter() {
         for shard in shards {
@@ -57,8 +57,8 @@ async fn main() -> Result<(), tower::BoxError> {
                 .oneshot(LiteServerGetBlockHeader::new(block_id))
                 .await?;
 
-            let boc: BoC = unpack_bytes_fully(header.header_proof)?;
-            let header: MerkleProof = boc.single_root().unwrap().parse_fully()?;
+            let boc: BoC = unpack_bytes_fully(&header.header_proof, ())?;
+            let header: MerkleProof = boc.single_root().unwrap().parse_fully(())?;
 
             println!("header = {header:?}");
         }

@@ -22,7 +22,7 @@ use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
 use ton_client_util::router::shard_prefix::ShardPrefix;
 use toner::tlb::bits::de::unpack_bytes_fully;
-use toner::ton::boc::BoC;
+use toner::tlb::BoC;
 use tower::Service;
 
 pub struct WorkchainsFirstBlocksTrackerActor<S> {
@@ -91,9 +91,9 @@ where
                         Ok(resolved) => {
                             let shard_id = (resolved.id.workchain, resolved.id.shard);
 
-                            let boc: BoC = unpack_bytes_fully(&resolved.header_proof).unwrap();
+                            let boc: BoC = unpack_bytes_fully(&resolved.header_proof, ()).unwrap();
                             let root = boc.single_root().unwrap();
-                            let block_header: MerkleProof = root.parse_fully().unwrap();
+                            let block_header: MerkleProof = root.parse_fully(()).unwrap();
 
                             self.state.insert(shard_id, block_header.virtual_root.clone());
 

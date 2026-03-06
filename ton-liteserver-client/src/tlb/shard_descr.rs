@@ -1,9 +1,8 @@
 use crate::tlb::future_split_merge::FutureSplitMerge;
 use adnl_tcp::types::Int256;
 use toner::tlb::bits::de::BitReaderExt;
-use toner::tlb::bits::r#as::NBits;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::r#as::{ParseFully, Ref};
+use toner::tlb::{ParseFully, Ref, bits::NBits};
 use toner::ton::currency::CurrencyCollection;
 
 /// ```tlb
@@ -55,29 +54,31 @@ pub struct ShardDescr {
 }
 
 impl<'de> CellDeserialize<'de> for ShardDescr {
-    fn parse(parser: &mut CellParser<'de>) -> Result<Self, CellParserError<'de>> {
-        let tag: u8 = parser.unpack_as::<_, NBits<4>>()?;
+    type Args = ();
 
-        let seq_no = parser.unpack()?;
-        let reg_mc_seqno = parser.unpack()?;
-        let start_lt = parser.unpack()?;
-        let end_lt = parser.unpack()?;
-        let root_hash = parser.unpack()?;
-        let file_hash = parser.unpack()?;
-        let before_split = parser.unpack()?;
-        let before_merge = parser.unpack()?;
-        let want_split = parser.unpack()?;
-        let want_merge = parser.unpack()?;
-        let nx_cc_updated = parser.unpack()?;
-        let flags = parser.unpack_as::<_, NBits<3>>()?;
-        let next_catchain_seqno = parser.unpack()?;
-        let next_validator_shard = parser.unpack()?;
-        let min_ref_mc_seqno = parser.unpack()?;
-        let gen_utime = parser.unpack()?;
-        let split_merge_at = parser.unpack()?;
+    fn parse(parser: &mut CellParser<'de>, _args: Self::Args) -> Result<Self, CellParserError<'de>> {
+        let tag: u8 = parser.unpack_as::<_, NBits<4>>(())?;
+
+        let seq_no = parser.unpack(())?;
+        let reg_mc_seqno = parser.unpack(())?;
+        let start_lt = parser.unpack(())?;
+        let end_lt = parser.unpack(())?;
+        let root_hash = parser.unpack(())?;
+        let file_hash = parser.unpack(())?;
+        let before_split = parser.unpack(())?;
+        let before_merge = parser.unpack(())?;
+        let want_split = parser.unpack(())?;
+        let want_merge = parser.unpack(())?;
+        let nx_cc_updated = parser.unpack(())?;
+        let flags = parser.unpack_as::<_, NBits<3>>(())?;
+        let next_catchain_seqno = parser.unpack(())?;
+        let next_validator_shard = parser.unpack(())?;
+        let min_ref_mc_seqno = parser.unpack(())?;
+        let gen_utime = parser.unpack(())?;
+        let split_merge_at = parser.unpack(())?;
         let (fees_collected, funds_created) = match tag {
-            0xa => parser.parse_as::<_, Ref<ParseFully>>()?,
-            0xb => parser.parse()?,
+            0xa => parser.parse_as::<_, Ref<ParseFully>>(((), ()))?,
+            0xb => parser.parse(((), ()))?,
             _ => unreachable!(),
         };
 

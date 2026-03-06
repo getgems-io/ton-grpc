@@ -15,7 +15,7 @@ use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
 use toner::tlb::bits::de::unpack_bytes;
-use toner::ton::boc::BoC;
+use toner::tlb::BoC;
 use tower::Service;
 
 pub struct MasterchainFirstBlockTrackerActor<S> {
@@ -70,10 +70,10 @@ where
             .map_ok(|block| {
                 current_seqno.replace(block.id.seqno);
 
-                let boc: BoC = unpack_bytes(&block.header_proof).unwrap();
+                let boc: BoC = unpack_bytes(&block.header_proof, ()).unwrap();
                 let root = boc.single_root().unwrap();
 
-                let header: MerkleProof = root.parse_fully().unwrap();
+                let header: MerkleProof = root.parse_fully(()).unwrap();
 
                 let _ = self.sender.send(Some(header.virtual_root));
             })

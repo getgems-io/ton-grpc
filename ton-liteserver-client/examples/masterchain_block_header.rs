@@ -5,7 +5,7 @@ use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetBlockHeader, LiteServerGetMasterchainInfo};
 use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
 use toner::tlb::bits::de::unpack_bytes;
-use toner::ton::boc::BoC;
+use toner::tlb::BoC;
 use tower::ServiceExt;
 
 #[tokio::main]
@@ -21,12 +21,12 @@ async fn main() -> anyhow::Result<()> {
         .oneshot(LiteServerGetBlockHeader::new(info.last))
         .await?;
 
-    let boc: BoC = unpack_bytes(&header.header_proof)?;
+    let boc: BoC = unpack_bytes(&header.header_proof, ())?;
     let root = boc.single_root().unwrap();
 
     println!("root = {root:?}");
 
-    let header: MerkleProof = root.parse_fully()?;
+    let header: MerkleProof = root.parse_fully(())?;
 
     println!("header = {header:?}");
 

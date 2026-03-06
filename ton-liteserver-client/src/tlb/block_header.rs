@@ -1,9 +1,7 @@
 use crate::tlb::block_info::BlockInfo;
-use toner::tlb::bits::de::BitReaderExt;
-use toner::tlb::bits::r#as::NBits;
+use toner::tlb::bits::{de::BitReaderExt, NBits};
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::r#as::{ParseFully, Ref};
-use toner::tlb::Cell;
+use toner::tlb::{Cell, ParseFully, Ref};
 
 /// ```tlb
 /// block#11ef55aa
@@ -21,17 +19,19 @@ pub struct BlockHeader {
 }
 
 impl<'de> CellDeserialize<'de> for BlockHeader {
-    fn parse(parser: &mut CellParser<'de>) -> Result<Self, CellParserError<'de>> {
-        let tag: u32 = parser.unpack_as::<_, NBits<32>>()?;
+    type Args = ();
+
+    fn parse(parser: &mut CellParser<'de>, _args: Self::Args) -> Result<Self, CellParserError<'de>> {
+        let tag: u32 = parser.unpack_as::<_, NBits<32>>(())?;
         if tag != 0x11ef55aa {
             unimplemented!("actual tag is {:x}", tag)
         };
 
-        let global_id = parser.unpack()?;
-        let info = parser.parse_as::<BlockInfo, Ref<ParseFully>>()?;
+        let global_id = parser.unpack(())?;
+        let info = parser.parse_as::<BlockInfo, Ref<ParseFully>>(())?;
 
         // Pruned Branches
-        let _: [Cell; 3] = parser.parse()?;
+        let _: [Cell; 3] = parser.parse(())?;
 
         Ok(Self { global_id, info })
     }

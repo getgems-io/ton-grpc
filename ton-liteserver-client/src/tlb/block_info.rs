@@ -4,7 +4,7 @@ use crate::tlb::global_version::GlobalVersion;
 use crate::tlb::shard_ident::ShardIdent;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::r#as::{Data, Ref, Same};
+use toner::tlb::{Data, Ref, Same};
 
 /// ```tlb
 ///  block_info#9bc7a987
@@ -51,38 +51,40 @@ pub struct BlockInfo {
 }
 
 impl<'de> CellDeserialize<'de> for BlockInfo {
-    fn parse(parser: &mut CellParser<'de>) -> Result<Self, CellParserError<'de>> {
-        let tag: u32 = parser.unpack()?;
+    type Args = ();
+
+    fn parse(parser: &mut CellParser<'de>, _args: Self::Args) -> Result<Self, CellParserError<'de>> {
+        let tag: u32 = parser.unpack(())?;
         if tag != 0x9bc7a987 {
             unreachable!()
         };
 
-        let version = parser.unpack()?;
-        let flags = parser.unpack()?;
-        let seq_no = parser.unpack()?;
-        let vert_seq_no = parser.unpack()?;
-        let shard = parser.unpack()?;
-        let gen_utime = parser.unpack()?;
-        let start_lt = parser.unpack()?;
-        let end_lt = parser.unpack()?;
-        let gen_validator_list_hash_short = parser.unpack()?;
-        let gen_catchain_seqno = parser.unpack()?;
-        let min_ref_mc_seqno = parser.unpack()?;
-        let prev_key_block_seqno = parser.unpack()?;
+        let version = parser.unpack(())?;
+        let flags = parser.unpack(())?;
+        let seq_no = parser.unpack(())?;
+        let vert_seq_no = parser.unpack(())?;
+        let shard = parser.unpack(())?;
+        let gen_utime = parser.unpack(())?;
+        let start_lt = parser.unpack(())?;
+        let end_lt = parser.unpack(())?;
+        let gen_validator_list_hash_short = parser.unpack(())?;
+        let gen_catchain_seqno = parser.unpack(())?;
+        let min_ref_mc_seqno = parser.unpack(())?;
+        let prev_key_block_seqno = parser.unpack(())?;
 
         let gen_software = if flags & (1 << 0) != 0 {
-            Some(parser.unpack()?)
+            Some(parser.unpack(())?)
         } else {
             None
         };
         let master_ref = if flags & (1 << 15) != 0 {
-            Some(parser.parse_as::<_, Ref<Data<Same>>>()?)
+            Some(parser.parse_as::<_, Ref<Data<Same>>>(())?)
         } else {
             None
         };
-        let prev_ref = parser.parse_as_with::<_, Ref<Same>>(flags & (1 << 14) != 0)?;
+        let prev_ref = parser.parse_as::<_, Ref<Same>>(flags & (1 << 14) != 0)?;
         let prev_vert_ref = if flags & (1 << 8) != 0 {
-            Some(parser.parse_as_with::<_, Ref<Same>>(false)?)
+            Some(parser.parse_as::<_, Ref<Same>>(false)?)
         } else {
             None
         };

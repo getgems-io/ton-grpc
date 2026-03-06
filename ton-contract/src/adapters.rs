@@ -3,13 +3,11 @@ use core::{fmt::Display, str::FromStr};
 use std::{error::Error as StdError, sync::Arc};
 use toner::{
     tlb::bits::de::unpack_bytes,
-    tlb::bits::ser::pack_with,
-    tlb::de::r#as::CellDeserializeAsOwned,
+    tlb::bits::ser::pack,
+    tlb::de::CellDeserializeAsOwned,
     tlb::de::CellDeserializeOwned,
-    tlb::ser::r#as::{CellSerializeAs, CellSerializeWrapAsExt},
-    tlb::ser::{CellSerialize, CellSerializeExt},
-    tlb::{Cell, Error as TlbError},
-    ton::boc::{BagOfCellsArgs, BoC},
+    tlb::ser::{CellSerialize, CellSerializeAs, CellSerializeExt, CellSerializeWrapAsExt},
+    tlb::{BagOfCellsArgs, BoC, Cell, Error as TlbError},
 };
 
 use tonlibjson_client::block::{
@@ -31,17 +29,17 @@ pub trait TvmBoxedStackEntryExt: Sized {
     #[inline]
     fn parse_cell_fully<T>(&self) -> Result<T, TonContractError>
     where
-        T: CellDeserializeOwned,
+        T: CellDeserializeOwned<Args = ()>,
     {
-        self.to_cell()?.parse_fully().map_err(Into::into)
+        self.to_cell()?.parse_fully(()).map_err(Into::into)
     }
     #[inline]
     fn parse_cell_fully_as<T, As>(&self) -> Result<T, TonContractError>
     where
-        As: CellDeserializeAsOwned<T>,
+        As: CellDeserializeAsOwned<T, Args = ()>,
     {
         self.to_cell()?
-            .parse_fully_as::<T, As>()
+            .parse_fully_as::<T, As>(())
             .map_err(Into::into)
     }
 
@@ -53,15 +51,15 @@ pub trait TvmBoxedStackEntryExt: Sized {
     #[inline]
     fn store_cell<T>(value: T) -> Result<Self, TonContractError>
     where
-        T: CellSerialize,
+        T: CellSerialize<Args = ()>,
     {
-        Self::from_cell(value.to_cell()?)
+        Self::from_cell(value.to_cell(())?)
     }
     fn store_cell_as<T, As>(value: T) -> Result<Self, TonContractError>
     where
-        As: CellSerializeAs<T>,
+        As: CellSerializeAs<T, Args = ()>,
     {
-        Self::from_cell(value.wrap_as::<As>().to_cell()?)
+        Self::from_cell(value.wrap_as::<As>().to_cell(())?)
     }
 
     fn to_number<T>(&self) -> Result<T, TonContractError>
@@ -87,14 +85,14 @@ impl TvmBoxedStackEntryExt for TvmBoxedStackEntry {
 
         let bytes = STANDARD.decode(bytes)?;
 
-        unpack_bytes(bytes).map_err(Into::into)
+        unpack_bytes(&bytes, ()).map_err(Into::into)
     }
 
     fn from_boc(boc: BoC) -> Result<Self, TonContractError> {
         Ok(Self::TvmStackEntrySlice(TvmStackEntrySlice {
             slice: TvmSlice {
                 bytes: STANDARD.encode(
-                    pack_with(
+                    pack(
                         boc,
                         BagOfCellsArgs {
                             has_idx: false,
