@@ -3,7 +3,7 @@ use crate::client::Client;
 use crate::cursor::discover::first_block_discover::FirstBlockDiscover;
 use crate::cursor::discover::last_block_discover::LastBlockDiscover;
 use crate::cursor::registry::Registry;
-use crate::cursor::{ChainId, Seqno};
+use crate::cursor::Seqno;
 use crate::error::ErrorService;
 use crate::metric::ConcurrencyMetric;
 use crate::request::Specialized;
@@ -18,7 +18,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::watch::{Receiver, Sender};
 use ton_client_util::router::route::BlockCriteria;
-use ton_client_util::router::Routed;
+use ton_client_util::router::{BlockAvailability, Routed};
 use ton_client_util::service::shared::SharedService;
 use ton_client_util::service::timeout::Timeout;
 use tower::limit::ConcurrencyLimit;
@@ -40,12 +40,8 @@ pub(crate) struct CursorClient {
 }
 
 impl Routed for CursorClient {
-    fn contains(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
-        self.registry.contains(chain, criteria, false)
-    }
-
-    fn contains_not_available(&self, chain: &ChainId, criteria: &BlockCriteria) -> bool {
-        self.registry.contains(chain, criteria, true)
+    fn available(&self, chain: &i32, criteria: &BlockCriteria) -> BlockAvailability {
+        self.registry.available(chain, criteria)
     }
 
     fn last_seqno(&self) -> Option<Seqno> {
