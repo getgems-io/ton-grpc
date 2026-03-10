@@ -38,36 +38,49 @@ fn main() {
         println!("cargo:rustc-link-lib=static=c++");
     }
 
-    let openssl_dir = env::var("OPENSSL_ROOT_DIR").unwrap_or_else(|_| {
-        pkg_config::probe_library("openssl")
-            .unwrap()
-            .link_paths
-            .first()
-            .unwrap()
-            .display()
-            .to_string()
-    });
-    println!("cargo:rustc-link-search=native={openssl_dir}/lib");
-    println!("cargo:rustc-link-lib=static=crypto");
-    println!("cargo:rustc-link-lib=static=ssl");
+    let openssl_paths = if !cfg!(feature = "bundled") {
+        let (lib_dir, include_dir) = if let Ok(root) = env::var("OPENSSL_ROOT_DIR") {
+            (
+                PathBuf::from(format!("{root}/lib")),
+                PathBuf::from(format!("{root}/include")),
+            )
+        } else {
+            let openssl = pkg_config::probe_library("openssl").unwrap();
+            (
+                openssl.link_paths.first().unwrap().to_path_buf(),
+                openssl.include_paths.first().unwrap().to_path_buf(),
+            )
+        };
+        println!("cargo:rustc-link-search=native={}", lib_dir.display());
+        println!("cargo:rustc-link-lib=static=crypto");
+        println!("cargo:rustc-link-lib=static=ssl");
+        Some((lib_dir, include_dir))
+    } else {
+        None
+    };
 
-    let sodium_dir = pkg_config::probe_library("libsodium")
-        .unwrap()
-        .link_paths
-        .first()
-        .unwrap()
-        .to_path_buf();
-    println!("cargo:rustc-link-search=native={}", sodium_dir.display());
-    println!("cargo:rustc-link-lib=static=sodium");
+    // sodium is always built from third-party/sodium by CMake (BuildSodium.cmake has no skip mechanism)
+    // linking is done after cmake build in tonlibjson/tonemulator sections
 
-    let secp256k1_dir = pkg_config::probe_library("libsecp256k1")
-        .unwrap()
-        .link_paths
-        .first()
-        .unwrap()
-        .to_path_buf();
-    println!("cargo:rustc-link-search=native={}", secp256k1_dir.display());
-    println!("cargo:rustc-link-lib=static=secp256k1");
+    let secp256k1_paths = if !cfg!(feature = "bundled") {
+        let secp256k1 = pkg_config::probe_library("libsecp256k1").unwrap();
+        let secp256k1_dir = secp256k1.link_paths.first().unwrap().to_path_buf();
+        println!("cargo:rustc-link-search=native={}", secp256k1_dir.display());
+        println!("cargo:rustc-link-lib=static=secp256k1");
+        Some((secp256k1_dir, secp256k1.include_paths.first().unwrap().to_path_buf()))
+    } else {
+        None
+    };
+
+    let zlib_paths = if !cfg!(feature = "bundled") {
+        let zlib = pkg_config::probe_library("zlib").unwrap();
+        let zlib_dir = zlib.link_paths.first().unwrap().to_path_buf();
+        println!("cargo:rustc-link-search=native={}", zlib_dir.display());
+        println!("cargo:rustc-link-lib=static=z");
+        Some((zlib_dir, zlib.include_paths.first().unwrap().to_path_buf()))
+    } else {
+        None
+    };
 
     let mut cfg = Config::new(out_dir.join(ton_dir));
     cfg.define("TON_ONLY_TONLIB", "ON")
@@ -91,6 +104,35 @@ fn main() {
         .cxxflag("-stdlib=libc++")
         .always_configure(true)
         .very_verbose(false);
+
+    // Pass system OpenSSL to CMake so BuildOpenSSL.cmake skips bundled build
+    if let Some((ref lib_dir, ref include_dir)) = openssl_paths {
+        cfg.define(
+            "OPENSSL_CRYPTO_LIBRARY",
+            lib_dir.join("libcrypto.a").to_str().unwrap(),
+        );
+        cfg.define(
+            "OPENSSL_SSL_LIBRARY",
+            lib_dir.join("libssl.a").to_str().unwrap(),
+        );
+        cfg.define("OPENSSL_INCLUDE_DIR", include_dir.to_str().unwrap());
+    }
+
+    // Pass system secp256k1 to CMake so BuildSECP256K1.cmake skips bundled build
+    if let Some((ref secp256k1_dir, ref secp256k1_include_dir)) = secp256k1_paths {
+        let secp256k1_lib = secp256k1_dir.join("libsecp256k1.a");
+        cfg.define("SECP256K1_LIBRARY", secp256k1_lib.to_str().unwrap());
+        cfg.define("SECP256K1_INCLUDE_DIR", secp256k1_include_dir.to_str().unwrap());
+    }
+
+    // Pass system zlib to CMake so BuildZlib.cmake skips bundled build
+    if let Some((ref zlib_dir, ref zlib_include_dir)) = zlib_paths {
+        let zlib_lib = zlib_dir.join("libz.a");
+        cfg.define("ZLIB_FOUND", "1");
+        cfg.define("ZLIB_LIBRARY", zlib_lib.to_str().unwrap());
+        cfg.define("ZLIB_LIBRARIES", zlib_lib.to_str().unwrap());
+        cfg.define("ZLIB_INCLUDE_DIR", zlib_include_dir.to_str().unwrap());
+    }
 
     // lz4
     {
@@ -142,6 +184,34 @@ fn main() {
 
     if cfg!(feature = "tonlibjson") {
         let dst = cfg.build_target("tonlibjson").build();
+
+        if cfg!(feature = "bundled") {
+            println!(
+                "cargo:rustc-link-search=native={}/build/third-party/openssl/lib",
+                dst.display()
+            );
+            println!("cargo:rustc-link-lib=static=crypto");
+            println!("cargo:rustc-link-lib=static=ssl");
+
+            println!(
+                "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
+                dst.display()
+            );
+            println!("cargo:rustc-link-lib=static=z");
+
+            println!(
+                "cargo:rustc-link-search=native={}/build/third-party/secp256k1/lib",
+                dst.display()
+            );
+            println!("cargo:rustc-link-lib=static=secp256k1");
+        }
+
+        // sodium is always bundled (BuildSodium.cmake has no skip mechanism)
+        println!(
+            "cargo:rustc-link-search=native={}/build/third-party/sodium/lib",
+            dst.display()
+        );
+        println!("cargo:rustc-link-lib=static=sodium");
 
         println!(
             "cargo:rustc-link-search=native={}/build/third-party/blst",
@@ -227,6 +297,34 @@ fn main() {
 
     if cfg!(feature = "tonemulator") {
         let dst = cfg.build_target("emulator").build();
+
+        if cfg!(feature = "bundled") {
+            println!(
+                "cargo:rustc-link-search=native={}/build/third-party/openssl/lib",
+                dst.display()
+            );
+            println!("cargo:rustc-link-lib=static=crypto");
+            println!("cargo:rustc-link-lib=static=ssl");
+
+            println!(
+                "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
+                dst.display()
+            );
+            println!("cargo:rustc-link-lib=static=z");
+
+            println!(
+                "cargo:rustc-link-search=native={}/build/third-party/secp256k1/lib",
+                dst.display()
+            );
+            println!("cargo:rustc-link-lib=static=secp256k1");
+        }
+
+        // sodium is always bundled (BuildSodium.cmake has no skip mechanism)
+        println!(
+            "cargo:rustc-link-search=native={}/build/third-party/sodium/lib",
+            dst.display()
+        );
+        println!("cargo:rustc-link-lib=static=sodium");
 
         println!(
             "cargo:rustc-link-search=native={}/build/third-party/blst",
