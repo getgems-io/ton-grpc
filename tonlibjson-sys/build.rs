@@ -72,12 +72,15 @@ fn main() {
         None
     };
 
-    let zlib_paths = if !cfg!(feature = "bundled") {
+    // On macOS, always use bundled zlib (pkg_config returns incomplete paths)
+    let use_bundled_zlib = cfg!(feature = "bundled") || target_os == "macos";
+    let zlib_paths = if !use_bundled_zlib {
         let zlib = pkg_config::probe_library("zlib").unwrap();
         let zlib_dir = zlib.link_paths.first().unwrap().to_path_buf();
         println!("cargo:rustc-link-search=native={}", zlib_dir.display());
         println!("cargo:rustc-link-lib=static=z");
-        Some((zlib_dir, zlib.include_paths.first().unwrap().to_path_buf()))
+        let zlib_include_dir = zlib.include_paths.first().map(|p| p.to_path_buf());
+        Some((zlib_dir, zlib_include_dir))
     } else {
         None
     };
@@ -131,7 +134,9 @@ fn main() {
         cfg.define("ZLIB_FOUND", "1");
         cfg.define("ZLIB_LIBRARY", zlib_lib.to_str().unwrap());
         cfg.define("ZLIB_LIBRARIES", zlib_lib.to_str().unwrap());
-        cfg.define("ZLIB_INCLUDE_DIR", zlib_include_dir.to_str().unwrap());
+        if let Some(ref include_dir) = zlib_include_dir {
+            cfg.define("ZLIB_INCLUDE_DIR", include_dir.to_str().unwrap());
+        }
     }
 
     // lz4
@@ -194,16 +199,19 @@ fn main() {
             println!("cargo:rustc-link-lib=static=ssl");
 
             println!(
-                "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
-                dst.display()
-            );
-            println!("cargo:rustc-link-lib=static=z");
-
-            println!(
                 "cargo:rustc-link-search=native={}/build/third-party/secp256k1/lib",
                 dst.display()
             );
             println!("cargo:rustc-link-lib=static=secp256k1");
+        }
+
+        // zlib is bundled when feature "bundled" is active or on macOS
+        if use_bundled_zlib {
+            println!(
+                "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
+                dst.display()
+            );
+            println!("cargo:rustc-link-lib=static=z");
         }
 
         // sodium is always bundled (BuildSodium.cmake has no skip mechanism)
@@ -307,16 +315,19 @@ fn main() {
             println!("cargo:rustc-link-lib=static=ssl");
 
             println!(
-                "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
-                dst.display()
-            );
-            println!("cargo:rustc-link-lib=static=z");
-
-            println!(
                 "cargo:rustc-link-search=native={}/build/third-party/secp256k1/lib",
                 dst.display()
             );
             println!("cargo:rustc-link-lib=static=secp256k1");
+        }
+
+        // zlib is bundled when feature "bundled" is active or on macOS
+        if use_bundled_zlib {
+            println!(
+                "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
+                dst.display()
+            );
+            println!("cargo:rustc-link-lib=static=z");
         }
 
         // sodium is always bundled (BuildSodium.cmake has no skip mechanism)
