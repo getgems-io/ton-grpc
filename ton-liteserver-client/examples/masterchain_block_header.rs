@@ -18,18 +18,20 @@ async fn main() -> anyhow::Result<()> {
     let info = (&mut client)
         .oneshot(LiteServerGetMasterchainInfo::default())
         .await?;
-    let header = (&mut client)
+    let response = (&mut client)
         .oneshot(LiteServerGetBlockHeader::new(info.last))
         .await?;
 
-    println!("header_proof = {:?}", header.header_proof);
+    println!("header_proof = {:?}", response.header_proof);
 
-    let boc: BoC = unpack_bytes(&header.header_proof, ())?;
+    let boc: BoC = unpack_bytes(&response.header_proof, ())?;
     let root = boc.single_root().unwrap();
 
     println!("root = {root:?}");
 
     let header: MerkleProof<BlockHeader> = root.parse_fully(())?;
+    assert_eq!(response.id.seqno, header.virtual_root.info.seq_no as i32);
+    assert_eq!(response.id.root_hash, header.virtual_hash);
 
     println!("header = {header:?}");
 

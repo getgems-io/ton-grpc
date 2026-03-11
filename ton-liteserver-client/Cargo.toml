@@ -29,6 +29,8 @@ tokio-stream = { workspace = true }
 dashmap = { workspace = true }
 tokio-retry = { workspace = true }
 url = { workspace = true }
+hex = { workspace = true }
+sha2 = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }

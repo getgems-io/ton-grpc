@@ -2913,6 +2913,7 @@ dependencies = [
  "prettyplease",
  "quote",
  "rand 0.10.0",
+ "sha2",
  "syn",
  "thiserror 2.0.18",
  "tl-parser",
