@@ -72,18 +72,9 @@ fn main() {
         None
     };
 
-    let zlib_paths = if !cfg!(feature = "bundled") {
-        let zlib = pkg_config::probe_library("zlib").unwrap();
-        let zlib_dir = zlib.link_paths.first().unwrap().to_path_buf();
-        println!("cargo:rustc-link-search=native={}", zlib_dir.display());
-        println!("cargo:rustc-link-lib=static=z");
-        Some((zlib_dir, zlib.include_paths.first().unwrap().to_path_buf()))
-    } else {
-        None
-    };
-
     let mut cfg = Config::new(out_dir.join(ton_dir));
     cfg.define("TON_ONLY_TONLIB", "ON")
+        .define("TDUTILS_USE_LIBBACKTRACE", "OFF")
         .define("CMAKE_C_COMPILER", "clang")
         // without CMAKE_BUILD_TYPE=Release got error
         // clang++: error: no such file or directory: '&&'
@@ -123,15 +114,6 @@ fn main() {
         let secp256k1_lib = secp256k1_dir.join("libsecp256k1.a");
         cfg.define("SECP256K1_LIBRARY", secp256k1_lib.to_str().unwrap());
         cfg.define("SECP256K1_INCLUDE_DIR", secp256k1_include_dir.to_str().unwrap());
-    }
-
-    // Pass system zlib to CMake so BuildZlib.cmake skips bundled build
-    if let Some((ref zlib_dir, ref zlib_include_dir)) = zlib_paths {
-        let zlib_lib = zlib_dir.join("libz.a");
-        cfg.define("ZLIB_FOUND", "1");
-        cfg.define("ZLIB_LIBRARY", zlib_lib.to_str().unwrap());
-        cfg.define("ZLIB_LIBRARIES", zlib_lib.to_str().unwrap());
-        cfg.define("ZLIB_INCLUDE_DIR", zlib_include_dir.to_str().unwrap());
     }
 
     // lz4
