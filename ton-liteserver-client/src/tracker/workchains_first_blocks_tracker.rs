@@ -93,7 +93,7 @@ where
 
                             let boc: BoC = unpack_bytes_fully(&resolved.header_proof, ()).unwrap();
                             let root = boc.single_root().unwrap();
-                            let block_header: MerkleProof = root.parse_fully(()).unwrap();
+                            let block_header: MerkleProof<BlockHeader> = root.parse_fully(()).unwrap();
 
                             self.state.insert(shard_id, block_header.virtual_root.clone());
 

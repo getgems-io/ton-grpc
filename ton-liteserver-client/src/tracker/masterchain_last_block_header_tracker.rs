@@ -66,7 +66,7 @@ where
                     let boc: BoC = unpack_bytes_fully(&header_bytes, ()).unwrap();
                     let root = boc.single_root().unwrap();
 
-                    let header: MerkleProof = root.parse_fully(()).unwrap();
+                    let header: MerkleProof<BlockHeader> = root.parse_fully(()).unwrap();
 
                     self.sender.send(Some(header.virtual_root)).unwrap();
                 }

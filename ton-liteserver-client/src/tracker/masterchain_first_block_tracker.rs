@@ -73,7 +73,7 @@ where
                 let boc: BoC = unpack_bytes(&block.header_proof, ()).unwrap();
                 let root = boc.single_root().unwrap();
 
-                let header: MerkleProof = root.parse_fully(()).unwrap();
+                let header: MerkleProof<BlockHeader> = root.parse_fully(()).unwrap();
 
                 let _ = self.sender.send(Some(header.virtual_root));
             })
