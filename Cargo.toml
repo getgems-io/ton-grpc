@@ -2,7 +2,7 @@
 resolver = "2"
 members = [
     "tonlibjson-sys",
-    "tl_parser",
+    "tl-parser",
     "adnl-tcp",
     "ton-client-util",
     "tonlibjson-client",

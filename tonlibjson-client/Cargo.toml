@@ -40,7 +40,7 @@ crc = { workspace = true }
 tracing-test = { workspace = true }
 
 [build-dependencies]
-tl_parser = { path = "../tl_parser" }
+tl-parser = { path = "../tl-parser" }
 anyhow = { workspace = true }
 quote = { workspace = true }
 syn = { workspace = true }
