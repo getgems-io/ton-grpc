@@ -7,13 +7,13 @@ use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 /// !pruned_branch#01 {level:#[1..3]} {hashes:level * bits256} {depths:level * uint16} = PrunedBranch;
 /// ```
 #[derive(Debug, Clone)]
-pub struct PrunedCell {
+pub struct PrunedBranch {
     pub level: u8,
     pub hashes: Vec<Int256>,
     pub depths: Vec<u16>,
 }
 
-impl<'de> BitUnpack<'de> for PrunedCell {
+impl<'de> BitUnpack<'de> for PrunedBranch {
     type Args = ();
 
     fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
@@ -43,7 +43,7 @@ impl<'de> BitUnpack<'de> for PrunedCell {
     }
 }
 
-impl<'de> CellDeserialize<'de> for PrunedCell {
+impl<'de> CellDeserialize<'de> for PrunedBranch {
     type Args = ();
 
     fn parse(parser: &mut CellParser<'de>, args: Self::Args) -> Result<Self, CellParserError<'de>> {
@@ -69,7 +69,7 @@ mod tests {
 
         let bit_packed: BitVec<u8, toner::tlb::bits::bitvec::order::Msb0> = BitVec::from_vec(data);
         let mut reader = bit_packed.as_bitslice();
-        let pruned: PrunedCell = reader.unpack(()).unwrap();
+        let pruned: PrunedBranch = reader.unpack(()).unwrap();
 
         assert_eq!(pruned.level, 1);
         assert_eq!(pruned.hashes.len(), 1);
@@ -92,7 +92,7 @@ mod tests {
 
         let bit_packed: BitVec<u8, toner::tlb::bits::bitvec::order::Msb0> = BitVec::from_vec(data);
         let mut reader = bit_packed.as_bitslice();
-        let pruned: PrunedCell = reader.unpack(()).unwrap();
+        let pruned: PrunedBranch = reader.unpack(()).unwrap();
 
         assert_eq!(pruned.level, 2);
         assert_eq!(pruned.hashes.len(), 2);

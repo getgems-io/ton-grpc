@@ -1,5 +1,5 @@
 use crate::tlb::block_info::BlockInfo;
-use crate::tlb::pruned_cell::PrunedCell;
+use crate::tlb::pruned_cell::PrunedBranch;
 use toner::tlb::bits::{de::BitReaderExt, NBits};
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::{ParseFully, Ref};
@@ -17,9 +17,9 @@ use toner::tlb::{ParseFully, Ref};
 pub struct BlockHeader {
     pub global_id: i32,
     pub info: BlockInfo,
-    pub value_flow: PrunedCell,
-    pub state_update: PrunedCell,
-    pub extra: PrunedCell,
+    pub value_flow: PrunedBranch,
+    pub state_update: PrunedBranch,
+    pub extra: PrunedBranch,
 }
 
 impl<'de> CellDeserialize<'de> for BlockHeader {
@@ -36,9 +36,9 @@ impl<'de> CellDeserialize<'de> for BlockHeader {
 
         let global_id = parser.unpack(())?;
         let info = parser.parse_as::<BlockInfo, Ref<ParseFully>>(())?;
-        let value_flow = parser.parse_as::<PrunedCell, Ref<ParseFully>>(())?;
-        let state_update = parser.parse_as::<PrunedCell, Ref<ParseFully>>(())?;
-        let extra = parser.parse_as::<PrunedCell, Ref<ParseFully>>(())?;
+        let value_flow = parser.parse_as::<PrunedBranch, Ref<ParseFully>>(())?;
+        let state_update = parser.parse_as::<PrunedBranch, Ref<ParseFully>>(())?;
+        let extra = parser.parse_as::<PrunedBranch, Ref<ParseFully>>(())?;
         parser.ensure_empty()?;
 
         Ok(Self {
