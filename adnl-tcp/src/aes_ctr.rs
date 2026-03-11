@@ -72,15 +72,13 @@ impl AesCtr {
     }
 
     fn cipher(x: &[u8; 32], y: &[u8; 32]) -> Aes256Ctr128 {
-        let key = [
-            x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], x[13],
-            x[14], x[15], y[16], y[17], y[18], y[19], y[20], y[21], y[22], y[23], y[24], y[25],
-            y[26], y[27], y[28], y[29], y[30], y[31],
-        ];
-        let ctr = [
-            y[0], y[1], y[2], y[3], x[20], x[21], x[22], x[23], x[24], x[25], x[26], x[27], x[28],
-            x[29], x[30], x[31],
-        ];
+        let mut key = [0u8; 32];
+        key[..16].copy_from_slice(&x[..16]);
+        key[16..].copy_from_slice(&y[16..]);
+
+        let mut ctr = [0u8; 16];
+        ctr[..4].copy_from_slice(&y[..4]);
+        ctr[4..].copy_from_slice(&x[20..]);
 
         Aes256Ctr128::new(
             GenericArray::from_slice(&key),
