@@ -21,6 +21,8 @@ async fn main() -> anyhow::Result<()> {
         .oneshot(LiteServerGetBlockHeader::new(info.last))
         .await?;
 
+    println!("header_proof = {:?}", header.header_proof);
+
     let boc: BoC = unpack_bytes(&header.header_proof, ())?;
     let root = boc.single_root().unwrap();
 
@@ -34,11 +36,11 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn provided_client() -> anyhow::Result<LiteServerClient> {
-    let ip: i32 = -2018135749;
+    let ip: i32 = -2018145068;
     let ip = Ipv4Addr::from(ip as u32);
-    let port = 53312;
+    let port = 13206;
     let key: ServerKey = base64::engine::general_purpose::STANDARD
-        .decode("aF91CuUHuuOv9rm2W5+O/4h38M3sRm40DtSdRxQhmtQ=")?
+        .decode("K0t3+IWLOXHYMvMcrGZDPs+pn58a17LFbnXoQkKc2xw=")?
         .as_slice()
         .try_into()?;
 
