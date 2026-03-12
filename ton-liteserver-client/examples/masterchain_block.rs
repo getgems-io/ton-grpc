@@ -2,9 +2,8 @@ use adnl_tcp::client::ServerKey;
 use base64::Engine;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use ton_liteserver_client::client::LiteServerClient;
-use ton_liteserver_client::tl::{LiteServerGetBlockHeader, LiteServerGetMasterchainInfo};
-use ton_liteserver_client::tlb::block_header::BlockHeader;
-use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
+use ton_liteserver_client::tl::{LiteServerGetBlock, LiteServerGetMasterchainInfo};
+use ton_liteserver_client::tlb::block::Block;
 use toner::tlb::bits::de::unpack_bytes;
 use toner::tlb::BoC;
 use tower::ServiceExt;
@@ -19,22 +18,16 @@ async fn main() -> anyhow::Result<()> {
         .oneshot(LiteServerGetMasterchainInfo::default())
         .await?;
     let response = (&mut client)
-        .oneshot(LiteServerGetBlockHeader::new(info.last))
+        .oneshot(LiteServerGetBlock::new(info.last))
         .await?;
 
-    println!("header_proof = {:?}", response.header_proof);
+    let boc: BoC = unpack_bytes(&response.data, ())?;
+    let root = boc.single_root().unwrap();
 
-    println!("data = {:x?}", hex::encode(&response.header_proof));
-    let boc: BoC = unpack_bytes(&response.header_proof, ())?;
-    // let root = boc.single_root().unwrap();
-    //
-    // println!("root = {root:?}");
-    //
-    // let header: MerkleProof<BlockHeader> = root.parse_fully(())?;
-    // assert_eq!(response.id.seqno, header.virtual_root.info.seq_no as i32);
-    // assert_eq!(response.id.root_hash, header.virtual_hash);
-    //
-    // println!("header = {header:?}");
+    let block: Block = root.parse_fully(())?;
+    assert_eq!(response.id.seqno, block.info.seq_no as i32);
+
+    println!("block = {block:?}");
 
     Ok(())
 }

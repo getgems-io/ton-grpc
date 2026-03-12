@@ -2692,8 +2692,6 @@ dependencies = [
 [[package]]
 name = "tlb"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4989698593b2328a870f012a1207339fddc1ef21b25bdce0bd13e5016e83b93a"
 dependencies = [
  "array-util",
  "base64 0.21.7",
@@ -2729,8 +2727,6 @@ dependencies = [
 [[package]]
 name = "tlbits"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5a79a9558f4cb3614e0ce93b0a1b4d9b8384cc249cb7f6a487d61bd27bfd74e"
 dependencies = [
  "array-util",
  "bitvec",

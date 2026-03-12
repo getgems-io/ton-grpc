@@ -71,3 +71,6 @@ sha2 = "0.10.8"
 aes = "0.8.4"
 ctr = "0.9.2"
 ed25519-dalek = { version = "2.2.0", features = ["hazmat"] }
+
+[patch.crates-io]
+tlb = { path = "../toner/crates/tlb" }
