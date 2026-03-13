@@ -2707,8 +2707,6 @@ dependencies = [
 [[package]]
 name = "tlb-ton"
 version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f17c58fe899909d37a3832a4a078c03d744d10973abf71f2cdd1927a2d1efc83"
 dependencies = [
  "base64 0.21.7",
  "chrono",
@@ -2905,6 +2903,7 @@ dependencies = [
  "dashmap",
  "futures",
  "hex",
+ "num-bigint",
  "pin-project",
  "prettyplease",
  "quote",

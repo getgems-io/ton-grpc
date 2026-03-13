@@ -74,3 +74,4 @@ ed25519-dalek = { version = "2.2.0", features = ["hazmat"] }
 
 [patch.crates-io]
 tlb = { path = "../toner/crates/tlb" }
+tlb-ton = { path = "../toner/crates/tlb-ton" }

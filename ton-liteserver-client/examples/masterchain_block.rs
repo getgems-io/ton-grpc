@@ -21,6 +21,8 @@ async fn main() -> anyhow::Result<()> {
         .oneshot(LiteServerGetBlock::new(info.last))
         .await?;
 
+    tracing::info!("{}", hex::encode(&response.data));
+
     let boc: BoC = unpack_bytes(&response.data, ())?;
     let root = boc.single_root().unwrap();
 

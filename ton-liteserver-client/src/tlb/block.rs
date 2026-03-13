@@ -1,7 +1,11 @@
+use crate::tlb::block_extra::BlockExtra;
 use crate::tlb::block_info::BlockInfo;
+use crate::tlb::merkle_update::MerkleUpdate;
+use crate::tlb::shard_state::ShardState;
+use crate::tlb::value_flow::ValueFlow;
 use toner::tlb::bits::{de::BitReaderExt, NBits};
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::{Cell, Error, ParseFully, Ref};
+use toner::tlb::{Error, ParseFully, Ref};
 
 /// ```tlb
 /// block#11ef55aa global_id:int32
@@ -9,13 +13,13 @@ use toner::tlb::{Cell, Error, ParseFully, Ref};
 ///   state_update:^(MERKLE_UPDATE ShardState)
 ///   extra:^BlockExtra = Block;
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Block {
     pub global_id: i32,
     pub info: BlockInfo,
-    pub value_flow: Cell,
-    pub state_update: Cell,
-    pub extra: Cell,
+    pub value_flow: ValueFlow,
+    pub state_update: MerkleUpdate<ShardState>,
+    pub extra: BlockExtra,
 }
 
 impl<'de> CellDeserialize<'de> for Block {
@@ -31,10 +35,10 @@ impl<'de> CellDeserialize<'de> for Block {
         };
 
         let global_id: i32 = parser.unpack(())?;
-        let info = parser.parse_as::<BlockInfo, Ref<ParseFully>>(())?;
-        let value_flow = parser.parse_as::<Cell, Ref>(())?;
-        let state_update = parser.parse_as::<Cell, Ref>(())?;
-        let extra = parser.parse_as::<Cell, Ref>(())?;
+        let info = parser.parse_as::<_, Ref<ParseFully>>(())?;
+        let value_flow = parser.parse_as::<_, Ref<ParseFully>>(())?;
+        let state_update = parser.parse_as::<_, Ref<ParseFully>>(())?;
+        let extra = parser.parse_as::<_, Ref<ParseFully>>(())?;
         parser.ensure_empty()?;
 
         Ok(Self {
