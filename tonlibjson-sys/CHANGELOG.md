@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.5.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.9...tonlibjson-sys-v0.5.0) (2026-03-13)
+
+
+### Features
+
+* **tonlibjson-sys:** bundled feature ([facb271](https://github.com/getgems-io/ton-grpc/commit/facb2714fffb153aa17dab5ecc1b492762b0a40d))
+
+
+### Bug Fixes
+
+* **deps:** bump tonlibjson-sys/ton from `05bea13` to `a31025f` ([ad69fea](https://github.com/getgems-io/ton-grpc/commit/ad69feab00cf4e0211144bb5ae44046761ebbdd0))
+* **deps:** bump tonlibjson-sys/ton-testnet from `2542386` to `46c302c` ([4623e43](https://github.com/getgems-io/ton-grpc/commit/4623e43ca741e0403fad5d849a5a6ffb290034bf))
+* **deps:** bump tonlibjson-sys/ton-testnet from `459f67c` to `d9bc8b9` ([f575935](https://github.com/getgems-io/ton-grpc/commit/f5759352a825ece592b57e3c625b344ea2ad3b04))
+* **deps:** bump tonlibjson-sys/ton-testnet from `d9bc8b9` to `2542386` ([8996ef8](https://github.com/getgems-io/ton-grpc/commit/8996ef8730765edda24cd658581ef39560373024))
+* **tonlibjson-sys:** fix build ([bf273d8](https://github.com/getgems-io/ton-grpc/commit/bf273d82b2f348c0750fb24a0bbb6d16058bcc5a))
+* **tonlibjson-sys:** rm use_old_private_lib ([533afe4](https://github.com/getgems-io/ton-grpc/commit/533afe4e2b37111711a0c42b93665c16a81bf444))
+* **tonlibjson-sys:** use bundled zlib on macos ([8c5ac81](https://github.com/getgems-io/ton-grpc/commit/8c5ac817d2041c8b5559a89db056bbe3f9a6bd97))
+
 ## [0.4.9](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.8...tonlibjson-sys-v0.4.9) (2026-01-22)
 
 
