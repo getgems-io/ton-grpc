@@ -12,6 +12,6 @@ pub mod shard_descr;
 pub mod shard_hashes;
 pub mod shard_ident;
 
+mod merkle_update;
 #[cfg(test)]
 pub(crate) mod tests;
-mod merkle_update;

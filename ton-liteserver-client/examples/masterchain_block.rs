@@ -3,10 +3,10 @@ use base64::Engine;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetBlock, LiteServerGetMasterchainInfo};
+use ton_liteserver_client::tlb::block::Block;
 use toner::tlb::bits::de::unpack_bytes;
 use toner::tlb::BoC;
 use tower::ServiceExt;
-use ton_liteserver_client::tlb::block::Block;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
