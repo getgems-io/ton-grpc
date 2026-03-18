@@ -51,3 +51,30 @@ impl<'de> CellDeserialize<'de> for Block {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::tlb::tests::BLOCK_HEX;
+    use std::sync::Arc;
+    use toner::tlb::bits::de::unpack_bytes;
+    use toner::tlb::{BoC, Cell};
+    use crate::tlb::block::Block;
+
+    #[test]
+    fn test_block_parse_ok() {
+        let root = given_block_root_cell();
+
+        let block: Block = root.parse_fully(()).unwrap();
+
+        assert_eq!(block.global_id, -239);
+    }
+
+    fn given_block_root_cell() -> Arc<Cell> {
+        let data = hex::decode(BLOCK_HEX).unwrap();
+
+        unpack_bytes::<BoC>(&data, ())
+            .unwrap()
+            .into_single_root()
+            .unwrap()
+    }
+}
