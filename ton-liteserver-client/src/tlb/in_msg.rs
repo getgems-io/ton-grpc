@@ -4,6 +4,7 @@ use toner::tlb::bits::NBits;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::{Cell, Error, Ref};
 use toner::ton::currency::Grams;
+use toner::ton::message::Message;
 
 /// ```tlb
 /// msg_import_ext$000 msg:^(Message Any) transaction:^Transaction
@@ -27,11 +28,11 @@ use toner::ton::currency::Grams;
 #[derive(Debug, Clone)]
 pub enum InMsg {
     ImportExt {
-        msg: Cell,
+        msg: Message,
         transaction: Cell,
     },
     ImportIhr {
-        msg: Cell,
+        msg: Message,
         transaction: Cell,
         ihr_fee: BigUint,
         proof_created: Cell,
@@ -85,7 +86,7 @@ impl<'de> CellDeserialize<'de> for InMsg {
         match tag {
             // msg_import_ext$000
             0b000 => {
-                let msg = parser.parse_as::<Cell, Ref>(())?;
+                let msg = parser.parse_as::<Message, Ref>(())?;
                 let transaction = parser.parse_as::<Cell, Ref>(())?;
 
                 Ok(Self::ImportExt { msg, transaction })
@@ -122,7 +123,7 @@ impl<'de> CellDeserialize<'de> for InMsg {
             }
             // msg_import_ihr$010
             0b010 => {
-                let msg = parser.parse_as::<Cell, Ref>(())?;
+                let msg = parser.parse_as::<Message, Ref>(())?;
                 let transaction = parser.parse_as::<Cell, Ref>(())?;
                 let ihr_fee = parser.unpack_as::<_, Grams>(())?;
                 let proof_created = parser.parse_as::<Cell, Ref>(())?;
