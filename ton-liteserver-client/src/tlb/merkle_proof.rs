@@ -78,3 +78,44 @@ where
         Ok(inner.virtual_root)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::tlb::block_header::BlockHeader;
+    use crate::tlb::merkle_proof::MerkleProof;
+    use crate::tlb::tests::BLOCK_HEADER_MERKLE_PROOF_HEX;
+    use std::sync::Arc;
+    use toner::tlb::bits::de::unpack_bytes;
+    use toner::tlb::{BoC, Cell};
+
+    #[test]
+    fn test_merkle_proof_parse_ok() {
+        let root = given_block_header_root_cell();
+
+        let header: MerkleProof<BlockHeader> = root.parse_fully(()).unwrap();
+
+        assert_eq!(header.depth, 22);
+        assert_eq!(
+            hex::encode(header.virtual_hash),
+            "9b3184087274bb28db6a90ce88e0d3918bdebf723f89fc121a1e77d02e34cf5f"
+        );
+    }
+
+    #[test]
+    fn test_merkle_proof_parse_as_ok() {
+        let root = given_block_header_root_cell();
+
+        let header: BlockHeader = root.parse_fully_as::<_, MerkleProof<_>>(()).unwrap();
+
+        assert_eq!(header.global_id, -239);
+    }
+
+    fn given_block_header_root_cell() -> Arc<Cell> {
+        let data = hex::decode(BLOCK_HEADER_MERKLE_PROOF_HEX).unwrap();
+
+        unpack_bytes::<BoC>(&data, ())
+            .unwrap()
+            .into_single_root()
+            .unwrap()
+    }
+}
