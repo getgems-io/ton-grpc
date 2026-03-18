@@ -1,0 +1,9 @@
+[package]
+name = "testcontainers-mylocalton"
+version = "0.1.0"
+edition = "2024"
+authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
+
+[dependencies]
+tokio = { workspace = true}
+testcontainers = { workspace = true }
