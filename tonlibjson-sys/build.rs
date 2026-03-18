@@ -67,7 +67,10 @@ fn main() {
         let secp256k1_dir = secp256k1.link_paths.first().unwrap().to_path_buf();
         println!("cargo:rustc-link-search=native={}", secp256k1_dir.display());
         println!("cargo:rustc-link-lib=static=secp256k1");
-        Some((secp256k1_dir, secp256k1.include_paths.first().unwrap().to_path_buf()))
+        Some((
+            secp256k1_dir,
+            secp256k1.include_paths.first().unwrap().to_path_buf(),
+        ))
     } else {
         None
     };
@@ -113,7 +116,10 @@ fn main() {
     if let Some((ref secp256k1_dir, ref secp256k1_include_dir)) = secp256k1_paths {
         let secp256k1_lib = secp256k1_dir.join("libsecp256k1.a");
         cfg.define("SECP256K1_LIBRARY", secp256k1_lib.to_str().unwrap());
-        cfg.define("SECP256K1_INCLUDE_DIR", secp256k1_include_dir.to_str().unwrap());
+        cfg.define(
+            "SECP256K1_INCLUDE_DIR",
+            secp256k1_include_dir.to_str().unwrap(),
+        );
     }
 
     // lz4
