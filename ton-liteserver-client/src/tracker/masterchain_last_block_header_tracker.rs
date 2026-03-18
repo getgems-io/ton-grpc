@@ -66,9 +66,9 @@ where
                     let boc: BoC = unpack_bytes_fully(&header_bytes, ()).unwrap();
                     let root = boc.single_root().unwrap();
 
-                    let header: MerkleProof = root.parse_fully(()).unwrap();
+                    let header = root.parse_fully_as::<_, MerkleProof<_>>(()).unwrap();
 
-                    self.sender.send(Some(header.virtual_root)).unwrap();
+                    self.sender.send(Some(header)).unwrap();
                 }
                 Err(error) => {
                     tracing::warn!(?error)

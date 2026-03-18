@@ -73,9 +73,9 @@ where
                 let boc: BoC = unpack_bytes(&block.header_proof, ()).unwrap();
                 let root = boc.single_root().unwrap();
 
-                let header: MerkleProof = root.parse_fully(()).unwrap();
+                let header = root.parse_fully_as::<_, MerkleProof<_>>(()).unwrap();
 
-                let _ = self.sender.send(Some(header.virtual_root));
+                let _ = self.sender.send(Some(header));
             })
             .inspect_err(|error| tracing::warn!(?error))
             .await;

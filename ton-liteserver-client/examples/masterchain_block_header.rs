@@ -3,6 +3,7 @@ use base64::Engine;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetBlockHeader, LiteServerGetMasterchainInfo};
+use ton_liteserver_client::tlb::block_header::BlockHeader;
 use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
 use toner::tlb::bits::de::unpack_bytes;
 use toner::tlb::BoC;
@@ -26,7 +27,7 @@ async fn main() -> anyhow::Result<()> {
 
     println!("root = {root:?}");
 
-    let header: MerkleProof = root.parse_fully(())?;
+    let header: BlockHeader = root.parse_fully_as::<_, MerkleProof<_>>(())?;
 
     println!("header = {header:?}");
 
@@ -34,11 +35,11 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn provided_client() -> anyhow::Result<LiteServerClient> {
-    let ip: i32 = -2018135749;
+    let ip: i32 = 1091956407;
     let ip = Ipv4Addr::from(ip as u32);
-    let port = 53312;
+    let port = 16351;
     let key: ServerKey = base64::engine::general_purpose::STANDARD
-        .decode("aF91CuUHuuOv9rm2W5+O/4h38M3sRm40DtSdRxQhmtQ=")?
+        .decode("Mf/JGvcWAvcrN3oheze8RF/ps6p7oL6ifrIzFmGQFQ8=")?
         .as_slice()
         .try_into()?;
 

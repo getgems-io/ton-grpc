@@ -14,7 +14,7 @@ convert_case = { workspace = true }
 [dependencies]
 adnl-tcp = { path = "../adnl-tcp", features = ["client"] }
 ton-client-util = { path = "../ton-client-util" }
-toner.workspace = true
+toner = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
@@ -29,6 +29,7 @@ tokio-stream = { workspace = true }
 dashmap = { workspace = true }
 tokio-retry = { workspace = true }
 url = { workspace = true }
+hex = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }
