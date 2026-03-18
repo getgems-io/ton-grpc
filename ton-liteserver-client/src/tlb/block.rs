@@ -54,11 +54,11 @@ impl<'de> CellDeserialize<'de> for Block {
 
 #[cfg(test)]
 mod tests {
+    use crate::tlb::block::Block;
     use crate::tlb::tests::BLOCK_HEX;
     use std::sync::Arc;
     use toner::tlb::bits::de::unpack_bytes;
     use toner::tlb::{BoC, Cell};
-    use crate::tlb::block::Block;
 
     #[test]
     fn test_block_parse_ok() {
