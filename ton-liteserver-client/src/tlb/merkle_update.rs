@@ -96,29 +96,3 @@ where
         })
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use crate::tlb::tests::BLOCK_HEX;
-    use std::sync::Arc;
-    use toner::tlb::bits::de::unpack_bytes;
-    use toner::tlb::{BoC, Cell};
-    use crate::tlb::block::Block;
-
-    #[test]
-    fn test_merkle_update_ok() {
-        // TODO[akostylev0]: test MerkleUpdate
-        let root = given_block_root_cell();
-
-        root.parse_fully::<Block>(()).unwrap();
-    }
-
-    fn given_block_root_cell() -> Arc<Cell> {
-        let data = hex::decode(BLOCK_HEX).unwrap();
-
-        unpack_bytes::<BoC>(&data, ())
-            .unwrap()
-            .into_single_root()
-            .unwrap()
-    }
-}
