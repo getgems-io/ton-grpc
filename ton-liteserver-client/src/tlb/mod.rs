@@ -10,3 +10,6 @@ pub mod merkle_proof;
 pub mod shard_descr;
 pub mod shard_hashes;
 pub mod shard_ident;
+
+#[cfg(test)]
+pub(crate) mod tests;
