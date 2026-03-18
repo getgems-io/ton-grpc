@@ -8,10 +8,10 @@ pub mod ext_blk_ref;
 pub mod future_split_merge;
 pub mod global_version;
 pub mod merkle_proof;
+pub mod merkle_update;
 pub mod shard_descr;
 pub mod shard_hashes;
 pub mod shard_ident;
 
-mod merkle_update;
 #[cfg(test)]
 pub(crate) mod tests;
