@@ -8,6 +8,7 @@ use ton_liteserver_client::tl::{
     LiteServerGetAllShardsInfo, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo,
     TonNodeBoxedBlockIdExt,
 };
+use ton_liteserver_client::tlb::block_header::BlockHeader;
 use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
 use ton_liteserver_client::tlb::shard_hashes::ShardHashes;
 use toner::tlb::bits::de::{unpack_bytes, unpack_bytes_fully};
@@ -58,7 +59,10 @@ async fn main() -> Result<(), tower::BoxError> {
                 .await?;
 
             let boc: BoC = unpack_bytes_fully(&header.header_proof, ())?;
-            let header: MerkleProof = boc.single_root().unwrap().parse_fully(())?;
+            let header: BlockHeader = boc
+                .single_root()
+                .unwrap()
+                .parse_fully_as::<_, MerkleProof<_>>(())?;
 
             println!("header = {header:?}");
         }
