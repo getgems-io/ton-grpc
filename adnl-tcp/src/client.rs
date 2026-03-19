@@ -58,16 +58,17 @@ impl Client {
 mod tests {
     use super::*;
     use crate::ping::{is_pong_packet, ping_packet};
-    use base64::Engine;
     use futures::SinkExt;
-    use std::net::{Ipv4Addr, SocketAddrV4};
+    use testcontainers_ton::LocalLiteServer;
     use tracing_test::traced_test;
 
     #[traced_test]
     #[tokio::test]
     #[ignore]
     async fn client_connect() -> anyhow::Result<()> {
-        let _ = provided_client().await?;
+        let server = LocalLiteServer::new().await?;
+
+        let _ = Client::connect(server.get_addr(), server.get_server_key()).await?;
 
         Ok(())
     }
@@ -76,14 +77,11 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn client_connect_wrong_key() -> anyhow::Result<()> {
-        let ip: i32 = -2018147075;
-        let ip = Ipv4Addr::from(ip as u32);
-        let port = 46529;
-        let key: ServerKey = (0..32).collect::<Vec<_>>().try_into().unwrap();
+        let server = LocalLiteServer::new().await?;
+        let mut invalid_key: ServerKey = server.get_server_key();
+        invalid_key[0] = invalid_key[0] ^ 1;
 
-        tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
-
-        let client = Client::connect(SocketAddrV4::new(ip, port), key).await;
+        let client = Client::connect(server.get_addr(), invalid_key).await;
 
         assert!(client.is_err());
         assert_eq!(
@@ -98,7 +96,8 @@ mod tests {
     #[tokio::test]
     #[ignore]
     async fn client_ping() -> anyhow::Result<()> {
-        let mut client = provided_client().await?;
+        let server = LocalLiteServer::new().await?;
+        let mut client = Client::connect(server.get_addr(), server.get_server_key()).await?;
 
         let sent = client.send(ping_packet()).await;
         let received = client.next().await.unwrap()?;
@@ -107,21 +106,5 @@ mod tests {
         assert!(is_pong_packet(&received));
 
         Ok(())
-    }
-
-    async fn provided_client() -> anyhow::Result<Connection> {
-        let ip: i32 = -2018147075;
-        let ip = Ipv4Addr::from(ip as u32);
-        let port = 46529;
-        let key: ServerKey = base64::engine::general_purpose::STANDARD
-            .decode("jLO6yoooqUQqg4/1QXflpv2qGCoXmzZCR+bOsYJ2hxw=")?
-            .as_slice()
-            .try_into()?;
-
-        tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
-
-        let connection = Client::connect(SocketAddrV4::new(ip, port), key).await?;
-
-        Ok(connection)
     }
 }
