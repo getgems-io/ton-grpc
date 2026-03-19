@@ -15,7 +15,7 @@ impl Image for Genesis {
         "v4.2.0"
     }
 
-    // TODO[akostykev0]: add HEALTHCHECK in Dockerfile
+    // TODO[akostylev0]: add HEALTHCHECK in Dockerfile
     fn ready_conditions(&self) -> Vec<WaitFor> {
         vec![WaitFor::message_on_either_std(
             "Done importing neighbor msg queues for shard",

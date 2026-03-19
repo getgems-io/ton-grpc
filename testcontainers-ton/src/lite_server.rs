@@ -28,7 +28,7 @@ impl Image for LiteServer {
         "v4.2.0"
     }
 
-    // TODO[akostykev0]: add HEALTHCHECK in Dockerfile
+    // TODO[akostylev0]: add HEALTHCHECK in Dockerfile
     fn ready_conditions(&self) -> Vec<WaitFor> {
         vec![
             WaitFor::message_on_either_std("finished downloading state"),
