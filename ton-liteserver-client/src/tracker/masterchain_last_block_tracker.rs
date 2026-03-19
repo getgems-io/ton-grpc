@@ -126,6 +126,7 @@ mod test {
 
     #[tokio::test]
     #[traced_test]
+    #[ignore = "requires docker"]
     async fn masterchain_last_block_delay_test() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
         let client = LiteServerClient::connect(

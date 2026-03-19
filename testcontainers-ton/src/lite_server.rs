@@ -74,10 +74,6 @@ mod test {
             .copy_file_from("/usr/share/data/global.config.json", &mut config)
             .await
             .unwrap();
-
-        println!("{:?}", str::from_utf8(&config).unwrap());
-        assert!(false);
-
         let container = LiteServer::new(config).start().await.unwrap();
 
         let result = container
