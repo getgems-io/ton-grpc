@@ -175,27 +175,29 @@ impl WorkchainsFirstBlocksTracker {
 #[cfg(test)]
 mod test {
     use super::WorkchainsFirstBlocksTracker;
-    use crate::client::tests::provided_client;
+    use crate::client::LiteServerClient;
     use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
     use crate::tracker::workchains_last_blocks_tracker::WorkchainsLastBlocksTracker;
+    use testcontainers_ton::LocalLiteServer;
     use tracing_test::traced_test;
 
-    #[ignore]
     #[tokio::test]
     #[traced_test]
-    async fn workchains_first_block_tracker() {
-        let client = provided_client().await.unwrap();
+    async fn workchains_first_block_tracker() -> anyhow::Result<()> {
+        let local_lite_server = LocalLiteServer::new().await?;
+        let client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
         let masterchain_tracker = MasterchainLastBlockTracker::new(client.clone());
         let workchain_tracker =
             WorkchainsLastBlocksTracker::new(client.clone(), masterchain_tracker);
         let first_tracker = WorkchainsFirstBlocksTracker::new(client.clone(), workchain_tracker);
 
         let mut receiver = first_tracker.receiver();
+        let _result = receiver.recv().await?;
 
-        println!("wait");
-
-        while let Ok(block) = receiver.recv().await {
-            println!("{block:?}")
-        }
+        Ok(())
     }
 }

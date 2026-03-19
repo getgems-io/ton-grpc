@@ -260,18 +260,21 @@ pub(crate) mod tests {
         LiteServerGetMasterchainInfoExt, LiteServerGetVersion,
     };
     use crate::wait_seqno::WaitSeqno;
-    use base64::Engine;
-    use std::net::Ipv4Addr;
     use std::time::SystemTime;
     use std::time::UNIX_EPOCH;
+    use testcontainers_ton::LocalLiteServer;
     use tower::ServiceExt;
     use tracing_test::traced_test;
 
     #[tokio::test]
     #[traced_test]
-    #[ignore]
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
-        let client = provided_client().await?;
+        let local_lite_server = LocalLiteServer::new().await?;
+        let client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
 
         let response = client
             .oneshot(LiteServerGetMasterchainInfo::default())
@@ -285,9 +288,13 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore]
     async fn client_wait_seqno_info() -> anyhow::Result<()> {
-        let mut client = provided_client().await?;
+        let local_lite_server = LocalLiteServer::new().await?;
+        let mut client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
         let current = (&mut client)
             .oneshot(LiteServerGetMasterchainInfo::default())
             .await?;
@@ -307,9 +314,14 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
-        let mut client = provided_client().await?;
+        let local_lite_server = LocalLiteServer::new().await?;
+        let mut client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
+
         let response = (&mut client)
             .oneshot(LiteServerGetMasterchainInfo::default())
             .await?;
@@ -326,9 +338,13 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore]
     async fn client_get_version() -> anyhow::Result<()> {
-        let client = provided_client().await?;
+        let local_lite_server = LocalLiteServer::new().await?;
+        let client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
 
         let response = client.oneshot(LiteServerGetVersion::default()).await?;
 
@@ -345,9 +361,13 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore]
     async fn client_error_test() -> anyhow::Result<()> {
-        let client = provided_client().await?;
+        let local_lite_server = LocalLiteServer::new().await?;
+        let client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
 
         let response = client
             .oneshot(LiteServerGetMasterchainInfoExt { mode: 1 })
@@ -356,7 +376,7 @@ pub(crate) mod tests {
         assert!(response.is_err());
         assert_eq!(
             response.unwrap_err().to_string(),
-            "LiteServer error: Error code: -400, message: \"unsupported getMasterchainInfo mode\""
+            "lite server error: Error code: -400, message: \"unsupported getMasterchainInfo mode\""
                 .to_owned()
         );
 
@@ -365,9 +385,13 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
-        let mut client = provided_client().await?;
+        let local_lite_server = LocalLiteServer::new().await?;
+        let mut client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
         let known_block = (&mut client)
             .oneshot(LiteServerGetMasterchainInfo::default())
             .await?
@@ -387,10 +411,15 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore]
     async fn client_drop_test() -> anyhow::Result<()> {
+        let local_lite_server = LocalLiteServer::new().await?;
+
         let future = {
-            let client = provided_client().await?;
+            let client = LiteServerClient::connect(
+                local_lite_server.get_addr(),
+                local_lite_server.get_server_key(),
+            )
+            .await?;
 
             client.oneshot(LiteServerGetMasterchainInfo::default())
         };
@@ -400,38 +429,5 @@ pub(crate) mod tests {
         assert!(response.is_ok());
 
         Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub(crate) async fn provided_archive_client() -> anyhow::Result<LiteServerClient> {
-        let ip: i32 = -2018135749;
-        let ip = Ipv4Addr::from(ip as u32);
-        let port = 53312;
-        let key: ServerKey = base64::engine::general_purpose::STANDARD
-            .decode("aF91CuUHuuOv9rm2W5+O/4h38M3sRm40DtSdRxQhmtQ=")?
-            .as_slice()
-            .try_into()?;
-
-        tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
-
-        let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), key).await?;
-
-        Ok(client)
-    }
-
-    pub(crate) async fn provided_client() -> anyhow::Result<LiteServerClient> {
-        let ip: i32 = 1091931623;
-        let ip = Ipv4Addr::from(ip as u32);
-        let port = 17728;
-        let key: ServerKey = base64::engine::general_purpose::STANDARD
-            .decode("BYSVpL7aPk0kU5CtlsIae/8mf2B/NrBi7DKmepcjX6Q=")?
-            .as_slice()
-            .try_into()?;
-
-        tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
-
-        let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), key).await?;
-
-        Ok(client)
     }
 }

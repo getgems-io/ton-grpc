@@ -166,22 +166,26 @@ impl WorkchainsLastBlocksTracker {
 #[cfg(test)]
 mod test {
     use super::WorkchainsLastBlocksTracker;
-    use crate::client::tests::provided_client;
+    use crate::client::LiteServerClient;
     use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
+    use testcontainers_ton::LocalLiteServer;
     use tracing_test::traced_test;
 
-    #[ignore]
     #[tokio::test]
     #[traced_test]
-    async fn workchain_last_block_tracker() {
-        let client = provided_client().await.unwrap();
+    async fn workchain_last_block_tracker() -> anyhow::Result<()> {
+        let local_lite_server = LocalLiteServer::new().await?;
+        let client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
         let last_tracker = MasterchainLastBlockTracker::new(client.clone());
         let workchain_tracker = WorkchainsLastBlocksTracker::new(client, last_tracker);
 
         let mut receiver = workchain_tracker.receiver();
+        let _result = receiver.recv().await?;
 
-        while let Ok(v) = receiver.recv().await {
-            println!("{:x}", v.shard as u64);
-        }
+        Ok(())
     }
 }
