@@ -122,13 +122,13 @@ impl MasterchainFirstBlockTracker {
 
 #[cfg(test)]
 mod test {
-    use super::MasterchainFirstBlockTracker;
-    use crate::client::LiteServerClient;
-    use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
-    use testcontainers_ton::LocalLiteServer;
-    use tracing_test::traced_test;
-
     // TODO[akostylev0]: fix test
+    // use super::MasterchainFirstBlockTracker;
+    // use crate::client::LiteServerClient;
+    // use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
+    // use testcontainers_ton::LocalLiteServer;
+    // use tracing_test::traced_test;
+    //
     // #[tokio::test]
     // #[traced_test]
     // #[ignore = "requires docker"]
