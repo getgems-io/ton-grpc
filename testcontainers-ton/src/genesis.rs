@@ -51,6 +51,7 @@ mod test {
     use testcontainers::runners::AsyncRunner;
 
     #[tokio::test]
+    #[ignore = "requires docker"]
     pub async fn test_genesis_run() {
         let genesis = Genesis::default().start().await.unwrap();
 

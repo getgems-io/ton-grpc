@@ -67,6 +67,7 @@ mod test {
     use testcontainers::runners::AsyncRunner;
 
     #[tokio::test]
+    #[ignore = "requires docker"]
     pub async fn test_liteserver_run() {
         let genesis = Genesis::default().start().await.unwrap();
         let mut config = vec![];
