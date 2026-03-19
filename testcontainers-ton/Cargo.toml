@@ -1,9 +1,11 @@
 [package]
-name = "testcontainers-mylocalton"
+name = "testcontainers-ton"
 version = "0.1.0"
 edition = "2024"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
-tokio = { workspace = true}
+anyhow = { workspace = true }
+tokio = { workspace = true }
 testcontainers = { workspace = true }
+base64 = { workspace = true }

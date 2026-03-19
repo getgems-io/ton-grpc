@@ -3157,9 +3157,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "testcontainers-mylocalton"
+name = "testcontainers-ton"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "base64 0.22.1",
  "testcontainers",
  "tokio",
 ]
@@ -3503,6 +3505,8 @@ dependencies = [
  "quote",
  "rand 0.10.0",
  "syn",
+ "testcontainers",
+ "testcontainers-ton",
  "thiserror 2.0.18",
  "tl_parser",
  "tokio",

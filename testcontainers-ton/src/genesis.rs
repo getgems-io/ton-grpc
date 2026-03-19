@@ -1,23 +1,10 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 use testcontainers::Image;
-use testcontainers::core::{ContainerPort, Mount, WaitFor};
+use testcontainers::core::{ContainerPort, WaitFor};
 
-#[derive(Debug, Clone)]
-pub struct Genesis {
-    mounts: Vec<Mount>,
-}
-
-impl Genesis {
-    pub fn new() -> Self {
-        Self {
-            mounts: vec![Mount::volume_mount(
-                "mylocalton-shared-volume",
-                "/usr/share/data",
-            )],
-        }
-    }
-}
+#[derive(Debug, Clone, Default)]
+pub struct Genesis {}
 
 impl Image for Genesis {
     fn name(&self) -> &str {
@@ -28,10 +15,11 @@ impl Image for Genesis {
         "v4.2.0"
     }
 
+    // TODO[akostykev0]: add HEALTHCHECK in Dockerfile
     fn ready_conditions(&self) -> Vec<WaitFor> {
-        vec![
-            WaitFor::message_on_either_std("Done importing neighbor msg queues for shard"),
-        ]
+        vec![WaitFor::message_on_either_std(
+            "Done importing neighbor msg queues for shard",
+        )]
     }
 
     fn env_vars(
@@ -54,10 +42,6 @@ impl Image for Genesis {
             ContainerPort::Tcp(8888),
         ]
     }
-
-    fn mounts(&self) -> impl IntoIterator<Item = &Mount> {
-        self.mounts.iter()
-    }
 }
 
 #[cfg(test)]
@@ -68,7 +52,7 @@ mod test {
 
     #[tokio::test]
     pub async fn test_genesis_run() {
-        let genesis = Genesis::new().start().await.unwrap();
+        let genesis = Genesis::default().start().await.unwrap();
 
         let result = genesis
             .exec(

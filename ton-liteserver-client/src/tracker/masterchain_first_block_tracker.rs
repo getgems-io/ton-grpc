@@ -123,15 +123,22 @@ impl MasterchainFirstBlockTracker {
 #[cfg(test)]
 mod test {
     use super::MasterchainFirstBlockTracker;
-    use crate::client::tests::provided_client;
+    use crate::client::LiteServerClient;
     use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
+    use testcontainers_ton::LocalLiteServer;
     use tracing_test::traced_test;
 
-    #[ignore]
+    // TODO[akostylev0]: fix test
     #[tokio::test]
     #[traced_test]
-    async fn masterchain_first_block_tracker_delay() {
-        let client = provided_client().await.unwrap();
+    #[ignore]
+    async fn masterchain_first_block_tracker_delay() -> anyhow::Result<()> {
+        let local_lite_server = LocalLiteServer::new().await?;
+        let client = LiteServerClient::connect(
+            local_lite_server.get_addr(),
+            local_lite_server.get_server_key(),
+        )
+        .await?;
         let last_tracker = MasterchainLastBlockTracker::new(client.clone());
         let first_tracker = MasterchainFirstBlockTracker::new(client, last_tracker);
         let mut prev_seqno = None;
@@ -148,5 +155,7 @@ mod test {
             }
             prev_seqno.replace(current_seqno);
         }
+
+        Ok(())
     }
 }
