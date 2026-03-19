@@ -1,6 +1,4 @@
-use adnl_tcp::client::ServerKey;
-use base64::Engine;
-use std::net::{Ipv4Addr, SocketAddrV4};
+use testcontainers_ton::LocalLiteServer;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetBlock, LiteServerGetMasterchainInfo};
 use ton_liteserver_client::tlb::block::Block;
@@ -12,7 +10,9 @@ use tower::ServiceExt;
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
-    let mut client = provided_client().await?;
+    let lite_server = LocalLiteServer::new().await?;
+    let mut client =
+        LiteServerClient::connect(lite_server.get_addr(), lite_server.get_server_key()).await?;
 
     let info = (&mut client)
         .oneshot(LiteServerGetMasterchainInfo::default())
@@ -30,20 +30,4 @@ async fn main() -> anyhow::Result<()> {
     println!("block = {block:?}");
 
     Ok(())
-}
-
-async fn provided_client() -> anyhow::Result<LiteServerClient> {
-    let ip: i32 = 1091956407;
-    let ip = Ipv4Addr::from(ip as u32);
-    let port = 16351;
-    let key: ServerKey = base64::engine::general_purpose::STANDARD
-        .decode("Mf/JGvcWAvcrN3oheze8RF/ps6p7oL6ifrIzFmGQFQ8=")?
-        .as_slice()
-        .try_into()?;
-
-    tracing::info!("Connecting to {}:{} with key {:?}", ip, port, key);
-
-    let client = LiteServerClient::connect(SocketAddrV4::new(ip, port), key).await?;
-
-    Ok(client)
 }

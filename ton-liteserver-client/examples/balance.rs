@@ -18,7 +18,7 @@ use tower::reconnect::Reconnect;
 use tower::{BoxError, ServiceBuilder, ServiceExt};
 
 #[tokio::main]
-async fn main() -> Result<(), tower::BoxError> {
+async fn main() -> Result<(), BoxError> {
     tracing_subscriber::fmt::init();
 
     let discovery = LiteServerDiscover::new(read_ton_config_from_url_stream(
