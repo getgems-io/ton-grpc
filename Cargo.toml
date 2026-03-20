@@ -1,17 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "tonlibjson-sys",
-    "tl_parser",
-    "adnl-tcp",
-    "testcontainers-ton",
-    "ton-client-util",
-    "tonlibjson-client",
-    "ton-liteserver-client",
-    "ton-contract",
-    "ton-grpc",
-    "tvm-grpc",
-]
+members = ["crates/*"]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.102", features = ["backtrace"] }
