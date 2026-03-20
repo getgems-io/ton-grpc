@@ -13,22 +13,32 @@ tasks:
     command: 'cargo build'
     inputs:
       - '@globs(sources)'
+    env:
+      RUSTC_WRAPPER: sccache
   check:
     command: 'cargo check'
     inputs:
       - '@globs(sources)'
+    env:
+      RUSTC_WRAPPER: sccache
   format:
     command: 'cargo fmt --check'
     inputs:
       - '@globs(sources)'
       - '@globs(tests)'
+    env:
+      RUSTC_WRAPPER: sccache
   lint:
     command: 'cargo clippy'
     inputs:
       - '@globs(sources)'
       - '@globs(tests)'
+    env:
+      RUSTC_WRAPPER: sccache
   test:
     command: 'cargo test'
     inputs:
       - '@globs(sources)'
       - '@globs(tests)'
+    env:
+      RUSTC_WRAPPER: sccache
