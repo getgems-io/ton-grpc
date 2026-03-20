@@ -1,3 +1,7 @@
 /target
 .idea
 liteserver_config.json
+
+# moon
+.moon/cache
+.moon/docker

@@ -11,6 +11,7 @@ use testcontainers::runners::AsyncRunner;
 
 pub type ServerKey = [u8; 32];
 
+struct A;
 pub struct LocalLiteServer {
     #[allow(unused)]
     genesis: ContainerAsync<Genesis>,

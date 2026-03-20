@@ -1,0 +1,32 @@
+fileGroups:
+  sources:
+    - 'src/**/*'
+    - 'Cargo.toml'
+  tests:
+    - 'benches/**/*'
+    - 'tests/**/*'
+
+tasks:
+  build:
+    command: 'cargo build'
+    inputs:
+      - '@globs(sources)'
+  check:
+    command: 'cargo check'
+    inputs:
+      - '@globs(sources)'
+  format:
+    command: 'cargo fmt --check'
+    inputs:
+      - '@globs(sources)'
+      - '@globs(tests)'
+  lint:
+    command: 'cargo clippy'
+    inputs:
+      - '@globs(sources)'
+      - '@globs(tests)'
+  test:
+    command: 'cargo test'
+    inputs:
+      - '@globs(sources)'
+      - '@globs(tests)'
