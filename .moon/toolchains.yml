@@ -1,1 +1,3 @@
+$schema: './cache/schemas/toolchains.json'
+
 rust: {}

@@ -1,1 +1,3 @@
+$schema: '../../.moon/cache/schemas/project.json'
+
 layer: 'library'
