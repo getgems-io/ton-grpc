@@ -2,6 +2,7 @@ $schema: '../cache/schemas/tasks.json'
 
 fileGroups:
   sources:
+    - 'build.rs'
     - 'src/**/*'
     - 'Cargo.toml'
   tests:
@@ -11,34 +12,54 @@ fileGroups:
 tasks:
   build:
     command: 'cargo build'
+    deps:
+      - '^:build'
     inputs:
       - '@globs(sources)'
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: 'sccache'
+      CMAKE_C_COMPILER_LAUNCHER: 'sccache'
+      CMAKE_CXX_COMPILER_LAUNCHER: 'sccache'
   check:
     command: 'cargo check'
     inputs:
       - '@globs(sources)'
+    deps:
+      - '~:build'
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: 'sccache'
+      CMAKE_C_COMPILER_LAUNCHER: 'sccache'
+      CMAKE_CXX_COMPILER_LAUNCHER: 'sccache'
   format:
     command: 'cargo fmt --check'
     inputs:
       - '@globs(sources)'
       - '@globs(tests)'
+    deps:
+      - '~:build'
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: 'sccache'
+      CMAKE_C_COMPILER_LAUNCHER: 'sccache'
+      CMAKE_CXX_COMPILER_LAUNCHER: 'sccache'
   lint:
     command: 'cargo clippy'
     inputs:
       - '@globs(sources)'
       - '@globs(tests)'
+    deps:
+      - '~:build'
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: 'sccache'
+      CMAKE_C_COMPILER_LAUNCHER: 'sccache'
+      CMAKE_CXX_COMPILER_LAUNCHER: 'sccache'
   test:
     command: 'cargo test'
     inputs:
       - '@globs(sources)'
       - '@globs(tests)'
+    deps:
+      - '~:build'
     env:
-      RUSTC_WRAPPER: sccache
+      RUSTC_WRAPPER: 'sccache'
+      CMAKE_C_COMPILER_LAUNCHER: 'sccache'
+      CMAKE_CXX_COMPILER_LAUNCHER: 'sccache'
