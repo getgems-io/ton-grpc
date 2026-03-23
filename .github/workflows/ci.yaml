@@ -25,9 +25,12 @@ permissions:
     pull-requests: write
 jobs:
     ci:
+        strategy:
+            fail-fast: false
+            matrix:
+                os: [ 'ubuntu-latest', 'macos-15' ]
         name: moon ci
-        runs-on:
-            group: "CPUBound"
+        runs-on: ${{ matrix.os }}
         steps:
             -   uses: actions/checkout@v4
                 with:
@@ -60,4 +63,5 @@ jobs:
                 if: success() || failure()
                 with:
                     access-token: ${{ secrets.GITHUB_TOKEN }}
+                    matrix: ${{ toJSON(matrix) }}
             -   run: sccache --show-stats
