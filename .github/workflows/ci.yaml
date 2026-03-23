@@ -60,3 +60,4 @@ jobs:
                 if: success() || failure()
                 with:
                     access-token: ${{ secrets.GITHUB_TOKEN }}
+            -   run: sccache --show-stats
