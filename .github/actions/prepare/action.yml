@@ -7,10 +7,8 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        targets: x86_64-unknown-linux-gnu
     - name: Install LLVM and Clang
+      if: runner.os == 'Linux'
       id: llvm_setup
       shell: bash
       run: |
@@ -21,6 +19,7 @@ runs:
         echo "LLVM_MAJOR_VERSION=$LLVM_MAJOR_VERSION" >> $GITHUB_OUTPUT
         echo "UBUNTU_VERSION=$UBUNTU_VERSION" >> $GITHUB_OUTPUT
     - name: Install LLVM and Clang
+      if: runner.os == 'Linux'
       shell: bash
       run: |
         wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
@@ -28,8 +27,12 @@ runs:
         sudo apt-get update
         sudo apt-get install --yes autoconf libtool libsecp256k1-dev libsodium-dev liblz4-dev clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lldb-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} libc++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libc++abi-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev libunwind-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }}-dev
     - shell: bash
+      if: runner.os == 'Linux'
       run: |
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+    - run: brew install secp256k1 libsodium lz4 autoconf automake libtool zlib
+      shell: bash
+      if: runner.os == 'macOS'
     - name: Run sccache-cache
       uses: mozilla-actions/sccache-action@v0.0.8
