@@ -8,10 +8,10 @@ authors = [
 ]
 
 [dependencies]
-anyhow.workspace = true
-async-trait.workspace = true
-base64.workspace = true
-num-bigint.workspace = true
-thiserror.workspace = true
-tonlibjson-client.path = "../tonlibjson-client"
-toner.workspace = true
+anyhow = { version = "1.0.102", features = ["backtrace"] }
+async-trait = "0.1.89"
+base64 = "0.22.1"
+num-bigint = "0.4.6"
+thiserror = "2.0.17"
+tonlibjson-client = { path = "../tonlibjson-client" }
+toner = "0.7.3"

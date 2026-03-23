@@ -9,14 +9,14 @@ description = "Rust binding for tonlibjson from https://github.com/ton-blockchai
 repository = "https://github.com/getgems-io/ton-grpc"
 
 [dependencies]
-libc = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
+libc = "0.2.183"
+anyhow = { version = "1.0.102", features = ["backtrace"] }
+tracing = "0.1.44"
 
 [build-dependencies]
-cmake = { workspace = true }
-pkg-config = { workspace = true }
-walkdir = { workspace = true }
+cmake = "0.1.57"
+pkg-config = "0.3.32"
+walkdir = "2.5"
 
 [features]
 default = ["tonlibjson", "tonemulator"]
