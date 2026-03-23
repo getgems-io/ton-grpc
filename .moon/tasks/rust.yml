@@ -24,19 +24,16 @@ tasks:
     command: 'cargo check'
     inputs:
       - '@globs(sources)'
-    deps:
-      - '~:build'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
       CMAKE_CXX_COMPILER_LAUNCHER: 'sccache'
+      TON_SKIP_BUILD: 'true'
   format:
     command: 'cargo fmt --check'
     inputs:
       - '@globs(sources)'
       - '@globs(tests)'
-    deps:
-      - '~:build'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
@@ -46,12 +43,11 @@ tasks:
     inputs:
       - '@globs(sources)'
       - '@globs(tests)'
-    deps:
-      - '~:build'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
       CMAKE_CXX_COMPILER_LAUNCHER: 'sccache'
+      TON_SKIP_BUILD: 'true'
   test:
     command: 'cargo test'
     inputs:

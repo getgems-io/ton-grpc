@@ -6,6 +6,17 @@ use cmake::Config;
 use walkdir::WalkDir;
 
 fn main() {
+    let skip_build = env::var("TON_SKIP_BUILD")
+        .map(|v| v == "1" || v.to_lowercase() == "true")
+        .unwrap_or(false); // Run by default if not set
+
+    if skip_build {
+        println!(
+            "cargo:warning=Skipping build.rs execution due to TON_SKIP_BUILD environment variable."
+        );
+        return;
+    }
+
     let use_native_arch =
         env::var("TONLIBJSON_SYS_TARGET_CPU_NATIVE").is_ok_and(|v| v == "1" || v == "true");
     let use_lld = env::var("TONLIBJSON_SYS_LLD").is_ok_and(|v| v == "1" || v == "true");
