@@ -11,6 +11,7 @@ fn main() {
         .unwrap_or(false); // Run by default if not set
 
     if skip_build {
+        println!("cargo::rerun-if-env-changed=TON_SKIP_BUILD");
         println!(
             "cargo:warning=Skipping build.rs execution due to TON_SKIP_BUILD environment variable."
         );
