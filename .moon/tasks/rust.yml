@@ -49,7 +49,7 @@ tasks:
       CMAKE_CXX_COMPILER_LAUNCHER: 'sccache'
       TON_SKIP_BUILD: 'true'
   test:
-    command: 'cargo test'
+    command: 'cargo test -j 4'
     inputs:
       - '@group(sources)'
       - '@group(tests)'
