@@ -15,7 +15,7 @@ tasks:
     deps:
       - '^:build'
     inputs:
-      - '@globs(sources)'
+      - '@group(sources)'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
@@ -23,7 +23,7 @@ tasks:
   check:
     command: 'cargo check'
     inputs:
-      - '@globs(sources)'
+      - '@group(sources)'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
@@ -32,8 +32,8 @@ tasks:
   format:
     command: 'cargo fmt --check'
     inputs:
-      - '@globs(sources)'
-      - '@globs(tests)'
+      - '@group(sources)'
+      - '@group(tests)'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
@@ -41,8 +41,8 @@ tasks:
   lint:
     command: 'cargo clippy'
     inputs:
-      - '@globs(sources)'
-      - '@globs(tests)'
+      - '@group(sources)'
+      - '@group(tests)'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
@@ -51,8 +51,8 @@ tasks:
   test:
     command: 'cargo test'
     inputs:
-      - '@globs(sources)'
-      - '@globs(tests)'
+      - '@group(sources)'
+      - '@group(tests)'
     deps:
       - '~:build'
     env:
