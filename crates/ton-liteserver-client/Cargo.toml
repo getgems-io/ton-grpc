@@ -5,37 +5,37 @@ edition = "2021"
 
 [build-dependencies]
 tl-parser = { path = "../tl-parser" }
-anyhow = { workspace = true }
-quote = { workspace = true }
-syn = { workspace = true }
-prettyplease = { workspace = true }
-convert_case = { workspace = true }
+anyhow = { version = "1.0.102", features = ["backtrace"] }
+quote = "1.0.45"
+syn = "2.0.117"
+prettyplease = "0.2.37"
+convert_case = "0.11.0"
 
 [dependencies]
 adnl-tcp = { path = "../adnl-tcp", features = ["client"] }
 ton-client-util = { path = "../ton-client-util" }
-toner = { workspace = true }
-anyhow = { workspace = true }
-tokio = { workspace = true }
-tokio-util = { workspace = true }
-tower = { workspace = true }
-tracing = { workspace = true }
-bytes = { workspace = true }
-pin-project = { workspace = true }
-rand = { workspace = true }
-thiserror = { workspace = true }
-futures = { workspace = true }
-tokio-stream = { workspace = true }
-dashmap = { workspace = true }
-tokio-retry = { workspace = true }
-url = { workspace = true }
-hex = { workspace = true }
+toner = "0.7.3"
+anyhow = { version = "1.0.102", features = ["backtrace"] }
+tokio = { version = "1.50.0", features = ["full"] }
+tokio-util = { version = "0.7.18", features = ["codec"] }
+tower = { version = "0.5.3", features = ["full"] }
+tracing = "0.1.44"
+bytes = "1.11.1"
+pin-project = "1.1.10"
+rand = "0.10.0"
+thiserror = "2.0.17"
+futures = "0.3.32"
+tokio-stream = { version = "0.1.18", features = ["sync"] }
+dashmap = "6.1.0"
+tokio-retry = "0.3.0"
+url = { version = "2.5.7", features = ["serde"] }
+hex = "0.4.3"
 
 [dev-dependencies]
-base64 = { workspace = true }
-tracing-test = { workspace = true }
-tracing-subscriber = { workspace = true }
-testcontainers = { workspace = true }
+base64 = "0.22.1"
+tracing-test = "0.2.6"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+testcontainers = "0.27.1"
 testcontainers-ton = { path = "../testcontainers-ton" }
 
 [features]
