@@ -22,14 +22,15 @@ permissions:
     checks: write
     security-events: write
 jobs:
-    pr-check:
-        name: Run rust-clippy analyzing
+    ci:
+        name: moon ci
         runs-on:
             group: "CPUBound"
         steps:
             -   uses: actions/checkout@v4
                 with:
                     submodules: recursive
+                    fetch-depth: 0
             -   uses: moonrepo/setup-rust@v1
                 with:
                     cache-base: master
