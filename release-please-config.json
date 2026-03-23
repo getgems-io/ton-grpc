@@ -11,22 +11,22 @@
       "release-type": "helm",
       "package-name": "charts/tvm-grpc"
     },
-    "tvm-grpc": {
+    "crates/tvm-grpc": {
       "release-type": "rust"
     },
-    "ton-grpc": {
+    "crates/ton-grpc": {
       "release-type": "rust"
     },
-    "tonlibjson-sys": {
+    "crates/tonlibjson-sys": {
       "release-type": "rust"
     },
-    "tonlibjson-client": {
+    "crates/tonlibjson-client": {
       "release-type": "rust"
     },
-    "adnl-tcp": {
+    "crates/adnl-tcp": {
       "release-type": "rust"
     },
-    "ton-liteserver-client": {
+    "crates/ton-liteserver-client": {
       "release-type": "rust"
     }
   }
