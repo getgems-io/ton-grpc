@@ -1,1 +1,5 @@
 moon = "2.1.1"
+protoc = "34.1.0"
+
+[plugins.tools]
+protoc = "https://raw.githubusercontent.com/b4nst/proto-plugins/refs/heads/main/toml/protoc.toml"
