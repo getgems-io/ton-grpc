@@ -3,6 +3,11 @@ on:
     push:
         branches:
             - "master"
+        paths-ignore:
+            - .github/workflows/charts-*
+            - charts/**
+            - .release-please-manifest.json
+            - release-please-config.json
     pull_request:
         branches:
             - "master"
