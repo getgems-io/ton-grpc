@@ -14,6 +14,7 @@ on:
 env:
     REGISTRY: ghcr.io
     IMAGE_NAME: ${{ github.repository }}
+    SCCACHE_GHA_ENABLED: true
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: false
@@ -45,6 +46,15 @@ jobs:
             -   uses: ./.github/actions/prepare
                 with:
                     token: ${{ secrets.GITHUB_TOKEN }}
+            -   uses: actions/cache@v5
+                with:
+                    path: |
+                        .moon/cache/hashes
+                        .moon/cache/outputs
+                    key: moon-${{ runner.os }}-${{ github.run_id }}
+                    restore-keys: |
+                        moon-${{ runner.os }}-${{ github.run_id }}
+                        moon-${{ runner.os }}
             -   run: moon ci
             -   uses: moonrepo/run-report-action@v1
                 if: success() || failure()
