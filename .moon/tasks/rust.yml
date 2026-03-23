@@ -11,7 +11,7 @@ fileGroups:
 
 tasks:
   build:
-    command: 'cargo build'
+    command: 'cargo build -j 4'
     deps:
       - '^:build'
     inputs:
