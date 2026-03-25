@@ -253,7 +253,7 @@ where
 }
 
 #[cfg(test)]
-pub(crate) mod tests {
+mod integration {
     use super::*;
     use crate::tl::{
         LiteServerGetAllShardsInfo, LiteServerGetBlockProof, LiteServerGetMasterchainInfo,
@@ -268,7 +268,6 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "requires docker"]
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
         let client = LiteServerClient::connect(
@@ -289,7 +288,6 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "requires docker"]
     async fn client_wait_seqno_info() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
         let mut client = LiteServerClient::connect(
@@ -316,7 +314,6 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "requires docker"]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
         let mut client = LiteServerClient::connect(
@@ -341,7 +338,6 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "requires docker"]
     async fn client_get_version() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
         let client = LiteServerClient::connect(
@@ -365,7 +361,6 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "requires docker"]
     async fn client_error_test() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
         let client = LiteServerClient::connect(
@@ -390,7 +385,6 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "requires docker"]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
         let mut client = LiteServerClient::connect(
@@ -417,7 +411,6 @@ pub(crate) mod tests {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "requires docker"]
     async fn client_drop_test() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
 
