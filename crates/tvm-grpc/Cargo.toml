@@ -6,7 +6,7 @@ edition = "2021"
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
-tonlibjson-sys = { path = "../tonlibjson-sys", features = ["tonemulator"] }
+tonlibjson-sys = { path = "../tonlibjson-sys" }
 tokio = { version = "1.50.0", features = ["full"] }
 futures = "0.3.32"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
