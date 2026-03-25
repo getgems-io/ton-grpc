@@ -3,3 +3,4 @@ $schema: './cache/schemas/toolchains.json'
 rust:
   bins:
     - sccache
+    - cargo-nextest

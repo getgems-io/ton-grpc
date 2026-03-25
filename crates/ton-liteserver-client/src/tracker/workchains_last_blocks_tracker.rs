@@ -164,7 +164,7 @@ impl WorkchainsLastBlocksTracker {
 }
 
 #[cfg(test)]
-mod test {
+mod integration {
     use super::WorkchainsLastBlocksTracker;
     use crate::client::LiteServerClient;
     use crate::tracker::masterchain_last_block_tracker::MasterchainLastBlockTracker;
@@ -173,7 +173,6 @@ mod test {
 
     #[tokio::test]
     #[traced_test]
-    #[ignore = "requires docker"]
     async fn workchain_last_block_tracker() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
         let client = LiteServerClient::connect(

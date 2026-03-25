@@ -20,6 +20,7 @@ env:
     REGISTRY: ghcr.io
     IMAGE_NAME: ${{ github.repository }}
     SCCACHE_GHA_ENABLED: true
+    NEXTEST_PROFILE: ci
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: false

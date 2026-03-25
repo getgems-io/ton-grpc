@@ -1,0 +1,10 @@
+[test-groups]
+integration = { max-threads = 2 }
+
+[[profile.default.overrides]]
+filter = 'test(::integration::)'
+test-group = 'integration'
+
+[[profile.default.overrides]]
+platform = 'cfg(target_os = "macos")'
+default-filter = 'test(::integration::)'

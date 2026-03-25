@@ -55,7 +55,7 @@ impl Client {
 }
 
 #[cfg(test)]
-mod tests {
+mod integration {
     use super::*;
     use crate::ping::{is_pong_packet, ping_packet};
     use futures::SinkExt;
@@ -64,7 +64,6 @@ mod tests {
 
     #[traced_test]
     #[tokio::test]
-    #[ignore = "requires docker"]
     async fn client_connect() -> anyhow::Result<()> {
         let server = LocalLiteServer::new().await?;
 
@@ -75,7 +74,6 @@ mod tests {
 
     #[traced_test]
     #[tokio::test]
-    #[ignore = "requires docker"]
     async fn client_connect_wrong_key() -> anyhow::Result<()> {
         let server = LocalLiteServer::new().await?;
         let mut invalid_key: ServerKey = server.get_server_key();
@@ -94,7 +92,6 @@ mod tests {
 
     #[traced_test]
     #[tokio::test]
-    #[ignore = "requires docker"]
     async fn client_ping() -> anyhow::Result<()> {
         let server = LocalLiteServer::new().await?;
         let mut client = Client::connect(server.get_addr(), server.get_server_key()).await?;

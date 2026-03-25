@@ -45,13 +45,12 @@ impl Image for Genesis {
 }
 
 #[cfg(test)]
-mod test {
+mod integration {
     use crate::genesis::Genesis;
     use testcontainers::core::{CmdWaitFor, ExecCommand};
     use testcontainers::runners::AsyncRunner;
 
     #[tokio::test]
-    #[ignore = "requires docker"]
     pub async fn test_genesis_run() {
         let genesis = Genesis::default().start().await.unwrap();
 
