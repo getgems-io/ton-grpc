@@ -31,6 +31,8 @@ tasks:
     command: 'cargo check'
     inputs:
       - '@group(sources)'
+    deps:
+      - '^:check'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
@@ -50,6 +52,8 @@ tasks:
     inputs:
       - '@group(sources)'
       - '@group(tests)'
+    deps:
+      - '^:lint'
     env:
       RUSTC_WRAPPER: 'sccache'
       CMAKE_C_COMPILER_LAUNCHER: 'sccache'
