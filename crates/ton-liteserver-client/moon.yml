@@ -6,3 +6,9 @@ tasks:
   build:
     deps:
       - 'root:git/submodule/update'
+  check:
+    deps:
+      - 'root:git/submodule/update'
+  lint:
+    deps:
+      - 'root:git/submodule/update'
