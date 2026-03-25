@@ -1,6 +1,8 @@
 $schema: './cache/schemas/workspace.json'
 
-projects: ["crates/*"]
+projects:
+  - '.'
+  - 'crates/*'
 
 vcs:
   defaultBranch: "master"
