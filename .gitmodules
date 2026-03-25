@@ -1,7 +1,7 @@
-[submodule "tonlibjson-sys/ton"]
-	path = crates/tonlibjson-sys/ton
+[submodule "ton"]
+	path = third-party/ton
 	url = https://github.com/ton-blockchain/ton.git
-[submodule "tonlibjson-sys/ton-testnet"]
-	path = crates/tonlibjson-sys/ton-testnet
+[submodule "ton-testnet"]
+	path = third-party/ton-testnet
 	url = https://github.com/ton-blockchain/ton.git
 	branch = testnet
