@@ -39,8 +39,9 @@ jobs:
         steps:
             -   uses: actions/checkout@v4
                 with:
-                    submodules: recursive
+                    submodules: false
                     fetch-depth: 0
+            -   run: git submodule update --init --recursive --depth 1
             -   uses: moonrepo/setup-rust@v1
                 with:
                     cache-base: master

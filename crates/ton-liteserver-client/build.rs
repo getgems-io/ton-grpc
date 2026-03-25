@@ -9,9 +9,9 @@ use tl_parser::{Combinator, Condition};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let scheme_path = if cfg!(feature = "testnet") {
-        Path::new("../tonlibjson-sys/ton-testnet/tl/generate/scheme/lite_api.tl")
+        Path::new("../../third-party/ton-testnet/tl/generate/scheme/lite_api.tl")
     } else {
-        Path::new("../tonlibjson-sys/ton/tl/generate/scheme/lite_api.tl")
+        Path::new("../../third-party/ton/tl/generate/scheme/lite_api.tl")
     };
 
     println!("cargo:rerun-if-changed=build.rs");

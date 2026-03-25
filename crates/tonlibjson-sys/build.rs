@@ -36,9 +36,9 @@ fn main() {
     };
 
     let ton_dir = if cfg!(feature = "testnet") {
-        "ton-testnet"
+        "../../third-party/ton-testnet"
     } else {
-        "ton"
+        "../../third-party/ton"
     };
     eprintln!("ton dir is {ton_dir}");
     println!("cargo:rerun-if-changed={ton_dir}/CMakeLists.txt");
