@@ -1,5 +1,12 @@
 $schema: '../cache/schemas/tasks.json'
 
+inheritedBy:
+  toolchain: 'rust'
+  layer:
+    - 'application'
+    - 'library'
+    - 'tool'
+
 fileGroups:
   sources:
     - 'build.rs'
