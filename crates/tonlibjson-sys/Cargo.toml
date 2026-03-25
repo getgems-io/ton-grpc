@@ -19,8 +19,6 @@ pkg-config = "0.3.32"
 walkdir = "2.5"
 
 [features]
-default = ["tonlibjson", "tonemulator"]
+default = []
 testnet = []
 bundled = []
-tonlibjson = []
-tonemulator = []

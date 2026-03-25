@@ -180,165 +180,113 @@ fn main() {
     )
     .unwrap();
 
-    if cfg!(feature = "tonlibjson") {
-        let dst = cfg.build_target("tonlibjson").build();
+    let dst = cfg.build_target("tonlibjson").build();
 
-        if cfg!(feature = "bundled") {
-            println!(
-                "cargo:rustc-link-search=native={}/build/third-party/openssl/lib",
-                dst.display()
-            );
-            println!("cargo:rustc-link-lib=static=crypto");
-            println!("cargo:rustc-link-lib=static=ssl");
-
-            println!(
-                "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
-                dst.display()
-            );
-            println!("cargo:rustc-link-lib=static=z");
-
-            println!(
-                "cargo:rustc-link-search=native={}/build/third-party/secp256k1/lib",
-                dst.display()
-            );
-            println!("cargo:rustc-link-lib=static=secp256k1");
-        }
-
-        // sodium is always bundled (BuildSodium.cmake has no skip mechanism)
+    if cfg!(feature = "bundled") {
         println!(
-            "cargo:rustc-link-search=native={}/build/third-party/sodium/lib",
+            "cargo:rustc-link-search=native={}/build/third-party/openssl/lib",
             dst.display()
         );
-        println!("cargo:rustc-link-lib=static=sodium");
+        println!("cargo:rustc-link-lib=static=crypto");
+        println!("cargo:rustc-link-lib=static=ssl");
 
         println!(
-            "cargo:rustc-link-search=native={}/build/third-party/blst",
+            "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
             dst.display()
         );
-        println!("cargo:rustc-link-lib=static=blst");
-
-        for item in ["tdnet", "keys", "tdactor", "tl-utils", "tdutils"] {
-            println!(
-                "cargo:rustc-link-search=native={}/build/{}",
-                dst.display(),
-                item
-            );
-            println!("cargo:rustc-link-lib=static={item}")
-        }
-        println!("cargo:rustc-link-lib=static=tl-lite-utils");
+        println!("cargo:rustc-link-lib=static=z");
 
         println!(
-            "cargo:rustc-link-search=native={}/build/adnl",
+            "cargo:rustc-link-search=native={}/build/third-party/secp256k1/lib",
             dst.display()
         );
-        println!("cargo:rustc-link-lib=static=adnllite");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/lite-client",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=lite-client-common");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/crypto",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=ton_crypto");
-        println!("cargo:rustc-link-lib=static=ton_crypto_core");
-
-        println!("cargo:rustc-link-lib=static=ton_block");
-        println!("cargo:rustc-link-lib=static=smc-envelope");
-
-        println!("cargo:rustc-link-search=native={}/build/tl", dst.display());
-        println!("cargo:rustc-link-lib=static=tl_api");
-        println!("cargo:rustc-link-lib=static=tl_lite_api");
-        println!("cargo:rustc-link-lib=static=tl_tonlib_api");
-        println!("cargo:rustc-link-lib=static=tl_tonlib_api_json");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/tddb",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=tddb_utils");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/third-party/crc32c",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=crc32c");
-
-        println!("cargo:rustc-link-search=native={}/lib", dst.display());
-        println!("cargo:rustc-link-lib=static=tdactor");
-        println!("cargo:rustc-link-lib=static=tddb_utils");
-        println!("cargo:rustc-link-lib=static=tdutils");
-        println!("cargo:rustc-link-lib=static=tl-lite-utils");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/emulator",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=emulator_static");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/tonlib",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=tonlib");
-        println!("cargo:rustc-link-lib=static=tonlibjson");
+        println!("cargo:rustc-link-lib=static=secp256k1");
     }
 
-    if cfg!(feature = "tonemulator") {
-        let dst = cfg.build_target("emulator").build();
+    // sodium is always bundled (BuildSodium.cmake has no skip mechanism)
+    println!(
+        "cargo:rustc-link-search=native={}/build/third-party/sodium/lib",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=sodium");
 
-        if cfg!(feature = "bundled") {
-            println!(
-                "cargo:rustc-link-search=native={}/build/third-party/openssl/lib",
-                dst.display()
-            );
-            println!("cargo:rustc-link-lib=static=crypto");
-            println!("cargo:rustc-link-lib=static=ssl");
+    println!(
+        "cargo:rustc-link-search=native={}/build/third-party/blst",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=blst");
 
-            println!(
-                "cargo:rustc-link-search=native={}/build/third-party/zlib/lib",
-                dst.display()
-            );
-            println!("cargo:rustc-link-lib=static=z");
-
-            println!(
-                "cargo:rustc-link-search=native={}/build/third-party/secp256k1/lib",
-                dst.display()
-            );
-            println!("cargo:rustc-link-lib=static=secp256k1");
-        }
-
-        // sodium is always bundled (BuildSodium.cmake has no skip mechanism)
+    for item in ["tdnet", "keys", "tdactor", "tl-utils", "tdutils"] {
         println!(
-            "cargo:rustc-link-search=native={}/build/third-party/sodium/lib",
-            dst.display()
+            "cargo:rustc-link-search=native={}/build/{}",
+            dst.display(),
+            item
         );
-        println!("cargo:rustc-link-lib=static=sodium");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/third-party/blst",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=blst");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/crypto",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=ton_crypto");
-        println!("cargo:rustc-link-lib=static=ton_block");
-        println!("cargo:rustc-link-lib=static=smc-envelope");
-
-        println!(
-            "cargo:rustc-link-search=native={}/build/emulator",
-            dst.display()
-        );
-        println!("cargo:rustc-link-lib=static=emulator_static");
-        println!("cargo:rustc-link-lib=static=emulator");
+        println!("cargo:rustc-link-lib=static={item}")
     }
+    println!("cargo:rustc-link-lib=static=tl-lite-utils");
+
+    println!(
+        "cargo:rustc-link-search=native={}/build/adnl",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=adnllite");
+
+    println!(
+        "cargo:rustc-link-search=native={}/build/lite-client",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=lite-client-common");
+
+    println!(
+        "cargo:rustc-link-search=native={}/build/crypto",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=ton_crypto");
+    println!("cargo:rustc-link-lib=static=ton_crypto_core");
+
+    println!("cargo:rustc-link-lib=static=ton_block");
+    println!("cargo:rustc-link-lib=static=smc-envelope");
+
+    println!("cargo:rustc-link-search=native={}/build/tl", dst.display());
+    println!("cargo:rustc-link-lib=static=tl_api");
+    println!("cargo:rustc-link-lib=static=tl_lite_api");
+    println!("cargo:rustc-link-lib=static=tl_tonlib_api");
+    println!("cargo:rustc-link-lib=static=tl_tonlib_api_json");
+
+    println!(
+        "cargo:rustc-link-search=native={}/build/tddb",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=tddb_utils");
+
+    println!(
+        "cargo:rustc-link-search=native={}/build/third-party/crc32c",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=crc32c");
+
+    println!("cargo:rustc-link-search=native={}/lib", dst.display());
+    println!("cargo:rustc-link-lib=static=tdactor");
+    println!("cargo:rustc-link-lib=static=tddb_utils");
+    println!("cargo:rustc-link-lib=static=tdutils");
+    println!("cargo:rustc-link-lib=static=tl-lite-utils");
+
+    println!(
+        "cargo:rustc-link-search=native={}/build/emulator",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=emulator_static");
+
+    println!(
+        "cargo:rustc-link-search=native={}/build/tonlib",
+        dst.display()
+    );
+    println!("cargo:rustc-link-lib=static=tonlib");
+    println!("cargo:rustc-link-lib=static=tonlibjson");
+
+    let _ = cfg.build_target("emulator").build();
+    println!("cargo:rustc-link-lib=static=emulator");
 }
 
 fn copy_dir_recursively(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
