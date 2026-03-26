@@ -198,7 +198,7 @@ impl TonClientBuilder {
                     let mut interval = tokio::time::interval(interval);
                     interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-                    Box::pin(read_ton_config_from_url_stream(url.clone(), interval))
+                    Box::pin(read_ton_config_from_url_stream(url, interval))
                 }
                 ConfigSource::Config { config } => {
                     let config: TonConfig = serde_json::from_str(&config)?;
