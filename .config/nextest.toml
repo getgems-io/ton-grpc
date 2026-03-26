@@ -1,9 +1,11 @@
 [profile.default]
 default-filter = 'not test(::integration::)'
+slow-timeout = { period = "30s", terminate-after = 1 }
 
 [profile.ci]
 fail-fast = false
 default-filter = 'all()'
+slow-timeout = { period = "30s", terminate-after = 2 }
 
 [test-groups]
 integration = { max-threads = 4 }

@@ -15,12 +15,15 @@ use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::time::Duration;
+use ton_client::client::TonClient as _;
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
-use tonlibjson_client::ton::TonClientBuilder;
+use tonlibjson_client::ton::{TonClient, TonClientBuilder};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use url::Url;
+
+type ConcreteTonClient = TonClient;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -118,13 +121,13 @@ async fn main() -> anyhow::Result<()> {
 
     let (health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter
-        .set_serving::<AccountServiceServer<AccountService>>()
+        .set_serving::<AccountServiceServer<AccountService<ConcreteTonClient>>>()
         .await;
     health_reporter
-        .set_serving::<BlockServiceServer<BlockService>>()
+        .set_serving::<BlockServiceServer<BlockService<ConcreteTonClient>>>()
         .await;
     health_reporter
-        .set_serving::<MessageServiceServer<MessageService>>()
+        .set_serving::<MessageServiceServer<MessageService<ConcreteTonClient>>>()
         .await;
 
     tracing::info!("Listening on {:?}", &args.listen);

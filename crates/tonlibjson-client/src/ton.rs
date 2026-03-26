@@ -1,11 +1,9 @@
-use crate::address::InternalAccountAddress;
 use crate::block::{
     AccountAddress, BlocksAccountTransactionId, BlocksGetBlockHeader, BlocksGetMasterchainInfo,
     BlocksGetShards, BlocksGetTransactions, BlocksGetTransactionsExt, BlocksHeader,
     BlocksLookupBlock, BlocksMasterchainInfo, BlocksShards, BlocksShortTxId, BlocksTransactions,
-    BlocksTransactionsExt, FullAccountState, GetAccountState, GetShardAccountCell,
-    GetShardAccountCellByTransaction, InternalTransactionId, RawFullAccountState,
-    RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage,
+    BlocksTransactionsExt, GetShardAccountCell, InternalTransactionId, MsgBoxedData,
+    RawFullAccountState, RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2,
     RawSendMessageReturnHash, RawTransaction, RawTransactions, SmcBoxedMethodId, SmcRunResult,
     TonBlockId, TonBlockIdExt, TvmBoxedStackEntry, TvmCell, WithBlock,
 };
@@ -17,20 +15,17 @@ use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use anyhow::anyhow;
 use async_stream::try_stream;
-use futures::{Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt, stream, try_join};
-use itertools::Itertools;
+use futures::stream::BoxStream;
+use futures::{Stream, StreamExt, TryFutureExt, stream};
 use serde_json::Value;
-use std::cmp::min;
-use std::collections::{Bound, HashMap};
-use std::ops::RangeBounds;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 use tokio_stream::StreamMap;
-use tokio_util::either;
-use ton_client_util::discover::config::LiteServerId;
+use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use ton_client_util::discover::{
     LiteServerDiscover, read_ton_config_from_file_stream, read_ton_config_from_url_stream,
 };
@@ -44,7 +39,6 @@ use tower::retry::budget::TpsBudget;
 use tower::timeout::Timeout;
 use tower::util::Either;
 use tower::{Layer, ServiceExt};
-use tracing::{instrument, trace};
 use url::Url;
 
 #[cfg(not(feature = "testnet"))]
@@ -66,12 +60,10 @@ pub struct TonClient {
     client: ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance>, SharedBalance>>>,
 }
 
-const MAIN_CHAIN: i32 = -1;
-const MAIN_SHARD: i64 = -9223372036854775808;
-
 enum ConfigSource {
     FromFile { path: PathBuf },
     FromUrl { url: Url, interval: Duration },
+    Static { config: TonConfig },
 }
 
 pub struct TonClientBuilder {
@@ -118,6 +110,13 @@ impl TonClientBuilder {
     pub fn from_config_url(url: Url, interval: Duration) -> Self {
         Self {
             config_source: ConfigSource::FromUrl { url, interval },
+            ..Default::default()
+        }
+    }
+
+    pub fn from_config(config: TonConfig) -> Self {
+        Self {
+            config_source: ConfigSource::Static { config },
             ..Default::default()
         }
     }
@@ -177,20 +176,24 @@ impl TonClientBuilder {
     }
 
     pub fn build(self) -> anyhow::Result<TonClient> {
-        let stream = match self.config_source {
-            ConfigSource::FromFile { path } => {
-                let mut interval = tokio::time::interval(Duration::from_secs(1));
-                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        let stream: Pin<Box<dyn Stream<Item = Result<TonConfig, anyhow::Error>> + Send>> =
+            match self.config_source {
+                ConfigSource::FromFile { path } => {
+                    let mut interval = tokio::time::interval(Duration::from_secs(1));
+                    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-                either::Either::Left(read_ton_config_from_file_stream(path, interval))
-            }
-            ConfigSource::FromUrl { url, interval } => {
-                let mut interval = tokio::time::interval(interval);
-                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                    Box::pin(read_ton_config_from_file_stream(path, interval))
+                }
+                ConfigSource::FromUrl { url, interval } => {
+                    let mut interval = tokio::time::interval(interval);
+                    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-                either::Either::Right(read_ton_config_from_url_stream(url.clone(), interval))
-            }
-        };
+                    Box::pin(read_ton_config_from_url_stream(url.clone(), interval))
+                }
+                ConfigSource::Static { config } => {
+                    Box::pin(stream::once(async { Ok(config) }).chain(stream::pending()))
+                }
+            };
         let lite_server_discover = LiteServerDiscover::new(stream);
         let client_discover = lite_server_discover.then(|s| async {
             match s {
@@ -245,624 +248,6 @@ impl TonClientBuilder {
 }
 
 impl TonClient {
-    pub async fn ready(&mut self) -> anyhow::Result<()> {
-        self.get_masterchain_info().await?;
-        tracing::info!("ready");
-
-        Ok(())
-    }
-
-    pub async fn get_masterchain_info(&self) -> anyhow::Result<BlocksMasterchainInfo> {
-        self.client
-            .clone()
-            .oneshot(Specialized::new(BlocksGetMasterchainInfo::default()))
-            .await
-    }
-
-    #[instrument(skip_all, err)]
-    pub async fn look_up_block_by_seqno(
-        &self,
-        chain: i32,
-        shard: i64,
-        seqno: i32,
-    ) -> anyhow::Result<TonBlockIdExt> {
-        if seqno <= 0 {
-            return Err(anyhow!("seqno must be greater than 0"));
-        }
-
-        self.client
-            .clone()
-            .oneshot(BlocksLookupBlock::seqno(TonBlockId::new(
-                chain, shard, seqno,
-            )))
-            .await
-    }
-
-    pub async fn look_up_block_by_lt(
-        &self,
-        chain: i32,
-        shard: i64,
-        lt: i64,
-    ) -> anyhow::Result<TonBlockIdExt> {
-        if lt <= 0 {
-            return Err(anyhow!("lt must be greater than 0"));
-        }
-
-        self.client
-            .clone()
-            .oneshot(BlocksLookupBlock::logical_time(
-                TonBlockId::new(chain, shard, 0),
-                lt,
-            ))
-            .await
-    }
-
-    pub async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<BlocksShards> {
-        let block = self
-            .look_up_block_by_seqno(MAIN_CHAIN, MAIN_SHARD, master_seqno)
-            .await?;
-
-        self.client
-            .clone()
-            .oneshot(BlocksGetShards::new(block))
-            .await
-    }
-
-    pub async fn get_shards_by_block_id(
-        &self,
-        block_id: TonBlockIdExt,
-    ) -> anyhow::Result<Vec<TonBlockIdExt>> {
-        if block_id.workchain != -1 {
-            return Err(anyhow!("workchain must be -1"));
-        }
-
-        self.client
-            .clone()
-            .oneshot(BlocksGetShards::new(block_id))
-            .map_ok(|res| res.shards)
-            .await
-    }
-
-    pub async fn get_block_header(
-        &self,
-        workchain: i32,
-        shard: i64,
-        seqno: i32,
-        hashes: Option<(String, String)>,
-    ) -> anyhow::Result<BlocksHeader> {
-        let (root_hash, file_hash) = match hashes {
-            Some((root_hash, file_hash)) => (root_hash, file_hash),
-            _ => {
-                let block = self.look_up_block_by_seqno(workchain, shard, seqno).await?;
-                (block.root_hash, block.file_hash)
-            }
-        };
-
-        self.client
-            .clone()
-            .oneshot(BlocksGetBlockHeader::new(TonBlockIdExt {
-                workchain,
-                shard,
-                seqno,
-                root_hash,
-                file_hash,
-            }))
-            .await
-    }
-
-    #[instrument(skip_all, err)]
-    pub async fn raw_get_account_state(
-        &self,
-        address: &str,
-    ) -> anyhow::Result<RawFullAccountState> {
-        let account_address = AccountAddress::new(address)?;
-
-        self.client
-            .clone()
-            .oneshot(RawGetAccountState::new(account_address))
-            .await
-    }
-
-    #[instrument(skip_all, err)]
-    pub async fn raw_get_account_state_on_block(
-        &self,
-        address: &str,
-        block_id: TonBlockIdExt,
-    ) -> anyhow::Result<RawFullAccountState> {
-        let account_address = AccountAddress::new(address)?;
-
-        self.client
-            .clone()
-            .oneshot(WithBlock::new(
-                block_id,
-                RawGetAccountState::new(account_address),
-            ))
-            .await
-    }
-
-    // TODO[akostylev0]: (optimization) use BlockId instead of BlockIdExt
-    pub async fn raw_get_account_state_at_least_block(
-        &self,
-        address: &str,
-        block_id: &TonBlockIdExt,
-    ) -> anyhow::Result<RawFullAccountState> {
-        let route = Route::Block {
-            chain: block_id.workchain,
-            criteria: BlockCriteria::Seqno {
-                shard: block_id.shard,
-                seqno: block_id.seqno,
-            },
-        };
-        let account_address = AccountAddress::new(address)?;
-
-        self.client
-            .clone()
-            .oneshot(Forward::new(
-                route,
-                RawGetAccountState::new(account_address),
-            ))
-            .await
-    }
-
-    #[instrument(skip_all, err)]
-    pub async fn raw_get_account_state_by_transaction(
-        &self,
-        address: &str,
-        transaction_id: InternalTransactionId,
-    ) -> anyhow::Result<RawFullAccountState> {
-        let account_address = AccountAddress::new(address)?;
-
-        self.client
-            .clone()
-            .oneshot(RawGetAccountStateByTransaction::new(
-                account_address,
-                transaction_id,
-            ))
-            .await
-    }
-
-    pub async fn get_account_state(&self, address: &str) -> anyhow::Result<FullAccountState> {
-        let account_address = AccountAddress::new(address)?;
-
-        self.client
-            .clone()
-            .oneshot(GetAccountState::new(account_address))
-            .await
-    }
-
-    #[instrument(skip_all, err)]
-    pub async fn raw_get_transactions(
-        &self,
-        address: &str,
-        from_tx: &InternalTransactionId,
-    ) -> anyhow::Result<RawTransactions> {
-        let address = AccountAddress::new(address)?;
-
-        self.client
-            .clone()
-            .oneshot(RawGetTransactionsV2::new(
-                address,
-                from_tx.clone(),
-                16,
-                false,
-            ))
-            .await
-    }
-
-    pub async fn blocks_get_transactions_ext(
-        &self,
-        block: &TonBlockIdExt,
-        tx: Option<BlocksAccountTransactionId>,
-        reverse: bool,
-        count: i32,
-    ) -> anyhow::Result<BlocksTransactionsExt> {
-        self.client
-            .clone()
-            .oneshot(BlocksGetTransactionsExt::unverified(
-                block.to_owned(),
-                tx,
-                reverse,
-                count,
-            ))
-            .await
-    }
-
-    pub async fn blocks_get_transactions(
-        &self,
-        block: &TonBlockIdExt,
-        tx: Option<BlocksAccountTransactionId>,
-        reverse: bool,
-        count: i32,
-    ) -> anyhow::Result<BlocksTransactions> {
-        self.client
-            .clone()
-            .oneshot(BlocksGetTransactions::unverified(
-                block.to_owned(),
-                tx,
-                reverse,
-                count,
-            ))
-            .await
-    }
-
-    pub async fn blocks_get_transactions_verified(
-        &self,
-        block: &TonBlockIdExt,
-        tx: Option<BlocksAccountTransactionId>,
-        reverse: bool,
-        count: i32,
-    ) -> anyhow::Result<BlocksTransactions> {
-        self.client
-            .clone()
-            .oneshot(BlocksGetTransactions::verified(
-                block.to_owned(),
-                tx,
-                reverse,
-                count,
-            ))
-            .await
-    }
-
-    pub async fn send_message(&self, message: &str) -> anyhow::Result<()> {
-        self.client
-            .clone()
-            .oneshot(RawSendMessage::new(message.to_string()))
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn send_message_returning_hash(&self, message: &str) -> anyhow::Result<String> {
-        self.client
-            .clone()
-            .oneshot(RawSendMessageReturnHash::new(message.to_string()))
-            .map_ok(|res| res.hash)
-            .await
-    }
-
-    pub fn get_block_tx_stream_unordered(
-        &self,
-        block: &TonBlockIdExt,
-    ) -> impl Stream<Item = anyhow::Result<BlocksShortTxId>> + 'static {
-        let stream_map = StreamMap::from_iter(
-            [false, true].map(|r| (r, self.get_block_tx_id_stream(block, r).boxed())),
-        );
-
-        try_stream! {
-            let mut last = HashMap::with_capacity(2);
-
-            for await (key, tx) in stream_map {
-                let tx = tx?;
-                if let Some(prev_tx) = last.get(&!key)
-                    && prev_tx == &tx
-                {
-                    return;
-                }
-                last.insert(key, tx.clone());
-                yield tx;
-            }
-        }
-    }
-
-    pub fn get_block_tx_stream(
-        &self,
-        block: &TonBlockIdExt,
-        reverse: bool,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
-        struct State {
-            last_tx: Option<BlocksAccountTransactionId>,
-            incomplete: bool,
-            block: TonBlockIdExt,
-            this: TonClient,
-            exp: u32,
-        }
-
-        stream::try_unfold(
-            State {
-                last_tx: None,
-                incomplete: true,
-                block: block.clone(),
-                this: self.clone(),
-                exp: 5,
-            },
-            move |state| async move {
-                if !state.incomplete {
-                    return anyhow::Ok(None);
-                }
-
-                let txs = state
-                    .this
-                    .blocks_get_transactions_ext(
-                        &state.block,
-                        state.last_tx,
-                        reverse,
-                        2_i32.pow(state.exp),
-                    )
-                    .await?;
-
-                tracing::debug!("got {} transactions", txs.transactions.len());
-
-                let last_tx = txs.transactions.last().map(|t| t.try_into()).transpose()?;
-
-                anyhow::Ok(Some((
-                    stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
-                    State {
-                        last_tx,
-                        incomplete: txs.incomplete,
-                        block: state.block,
-                        this: state.this,
-                        exp: min(8, state.exp + 1),
-                    },
-                )))
-            },
-        )
-        .try_flatten()
-    }
-
-    pub fn get_block_tx_id_stream(
-        &self,
-        block: &TonBlockIdExt,
-        reverse: bool,
-    ) -> impl Stream<Item = anyhow::Result<BlocksShortTxId>> + 'static {
-        struct State {
-            last_tx: Option<BlocksAccountTransactionId>,
-            incomplete: bool,
-            block: TonBlockIdExt,
-            this: TonClient,
-            exp: u32,
-        }
-
-        stream::try_unfold(
-            State {
-                last_tx: None,
-                incomplete: true,
-                block: block.clone(),
-                this: self.clone(),
-                exp: 5,
-            },
-            move |state| async move {
-                if !state.incomplete {
-                    return anyhow::Ok(None);
-                }
-
-                let txs = state
-                    .this
-                    .blocks_get_transactions(
-                        &state.block,
-                        state.last_tx,
-                        reverse,
-                        2_i32.pow(state.exp),
-                    )
-                    .await?;
-
-                tracing::debug!("got {} transactions", txs.transactions.len());
-
-                let last_tx = txs.transactions.last().map(Into::into);
-
-                anyhow::Ok(Some((
-                    stream::iter(txs.transactions.into_iter().map(anyhow::Ok)),
-                    State {
-                        last_tx,
-                        incomplete: txs.incomplete,
-                        block: state.block,
-                        this: state.this,
-                        exp: min(8, state.exp + 1),
-                    },
-                )))
-            },
-        )
-        .try_flatten()
-    }
-
-    pub fn get_account_tx_stream(
-        &self,
-        address: &str,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
-        self.get_account_tx_stream_from(address, None)
-    }
-
-    // TODO[akostylev0] run search of first tx in parallel with `range` stream
-    #[instrument(skip_all, err)]
-    pub async fn get_account_tx_range_unordered<R: RangeBounds<InternalTransactionId> + 'static>(
-        &self,
-        address: &str,
-        range: R,
-    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + 'static> {
-        let ((last_block, last_tx), (first_block, first_tx)) = try_join!(
-            async {
-                let last_tx = match range.start_bound().cloned() {
-                    Bound::Included(tx) | Bound::Excluded(tx) => tx.to_owned(),
-                    Bound::Unbounded => {
-                        let state = self.raw_get_account_state(address).await?;
-
-                        state
-                            .last_transaction_id
-                            .ok_or_else(|| anyhow!("invalid last tx"))?
-                    }
-                };
-                let last_block = self
-                    .raw_get_account_state_by_transaction(address, last_tx.clone())
-                    .await?
-                    .block_id;
-
-                anyhow::Ok((last_block, last_tx))
-            },
-            async {
-                let first_tx = match range.end_bound().cloned() {
-                    Bound::Included(tx) | Bound::Excluded(tx) => tx.to_owned(),
-                    Bound::Unbounded => self.find_first_tx(address).await?,
-                };
-                let first_block = self
-                    .raw_get_account_state_by_transaction(address, first_tx.clone())
-                    .await?
-                    .block_id;
-
-                anyhow::Ok((first_block, first_tx))
-            }
-        )?;
-
-        let chunks = min(256, (last_block.seqno - first_block.seqno) / 28800);
-        let step = (last_block.seqno - first_block.seqno) / chunks;
-
-        let workchain = first_block.workchain;
-        let shard = first_block.shard;
-        let seqno = first_block.seqno;
-
-        let mid: Vec<anyhow::Result<InternalTransactionId>> = stream::iter(1..chunks)
-            .map(|i| async move {
-                let block = self
-                    .look_up_block_by_seqno(workchain, shard, seqno + step * i)
-                    .await?;
-                let state = self.raw_get_account_state_on_block(address, block).await?;
-
-                anyhow::Ok(
-                    state
-                        .last_transaction_id
-                        .ok_or(anyhow!("invalid last tx"))?,
-                )
-            })
-            .buffered(32)
-            .collect()
-            .await;
-
-        let mut mid = mid
-            .into_iter()
-            .collect::<anyhow::Result<Vec<InternalTransactionId>>>()?;
-
-        let mut txs = vec![first_tx.clone()];
-        txs.append(&mut mid);
-        txs.push(last_tx.clone());
-        txs.dedup();
-
-        tracing::debug!(txs = ?txs);
-
-        let streams = txs
-            .windows(2)
-            .to_owned()
-            .map(|e| {
-                let [left, right, ..] = e else { unreachable!() };
-                let left_bound = if left == &first_tx {
-                    range.end_bound().cloned()
-                } else {
-                    Bound::Included(left.clone())
-                };
-                let right_bound = if right == &last_tx {
-                    range.start_bound().cloned()
-                } else {
-                    Bound::Excluded(right.clone())
-                };
-
-                self.get_account_tx_range(address, (right_bound, left_bound))
-                    .boxed()
-            })
-            .collect_vec();
-
-        Ok(stream::iter(streams).flatten_unordered(32))
-    }
-
-    #[instrument(skip_all)]
-    pub fn get_account_tx_range<R: RangeBounds<InternalTransactionId> + 'static>(
-        &self,
-        address: &str,
-        range: R,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
-        let last_tx = match range.start_bound() {
-            Bound::Included(tx) | Bound::Excluded(tx) => Some(tx.to_owned()),
-            Bound::Unbounded => None,
-        };
-        let stream = self.get_account_tx_stream_from(address, last_tx);
-
-        let exclude = if let Bound::Excluded(tx) = range.start_bound().cloned() {
-            Some(tx)
-        } else {
-            None
-        };
-        let stream = stream.try_skip_while(move |sx| {
-            std::future::ready(if let Some(tx) = exclude.as_ref() {
-                Ok(tx == &sx.transaction_id)
-            } else {
-                Ok(false)
-            })
-        });
-
-        let end = range.end_bound().cloned();
-        try_stream! {
-            tokio::pin!(stream);
-            while let Some(x) = stream.try_next().await? {
-                match end.as_ref() {
-                    Bound::Unbounded => { yield x; },
-                    Bound::Included(tx) => {
-                        let cond = tx == &x.transaction_id ;
-                        yield x;
-                        if cond { break; }
-                    },
-                    Bound::Excluded(tx) => {
-                        if tx == &x.transaction_id { break; }
-                        yield x;
-                    }
-                }
-            }
-        }
-    }
-
-    #[instrument(skip_all)]
-    pub fn get_account_tx_stream_from(
-        &self,
-        address: &str,
-        last_tx: Option<InternalTransactionId>,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
-        struct State {
-            address: String,
-            next_id: Option<InternalTransactionId>,
-            this: TonClient,
-            next: bool,
-        }
-
-        stream::try_unfold(
-            State {
-                address: address.to_owned(),
-                next_id: last_tx,
-                this: self.clone(),
-                next: true,
-            },
-            move |state| async move {
-                if !state.next {
-                    return anyhow::Ok(None);
-                }
-
-                let next_id = if let Some(id) = state.next_id {
-                    id
-                } else {
-                    let state = state.this.raw_get_account_state(&state.address).await?;
-                    let Some(tx_id) = state.last_transaction_id else {
-                        return anyhow::Ok(None);
-                    };
-
-                    tx_id
-                };
-
-                let txs = state
-                    .this
-                    .raw_get_transactions(&state.address, &next_id)
-                    .await?;
-
-                let items = txs.transactions;
-
-                let next = txs.previous_transaction_id.is_some();
-                anyhow::Ok(Some((
-                    stream::iter(items.into_iter().map(anyhow::Ok)),
-                    State {
-                        address: state.address,
-                        next_id: txs.previous_transaction_id,
-                        this: state.this,
-                        next,
-                    },
-                )))
-            },
-        )
-        .try_flatten()
-    }
-
     pub async fn run_get_method(
         &self,
         address: String,
@@ -877,35 +262,269 @@ impl TonClient {
             .oneshot(RunGetMethod::new(address, method, stack))
             .await
     }
+}
 
-    pub async fn get_shard_account_cell(&self, address: &str) -> anyhow::Result<TvmCell> {
-        let address = AccountAddress::new(address)?;
+impl From<TonBlockIdExt> for ton_client::types::BlockIdExt {
+    fn from(v: TonBlockIdExt) -> Self {
+        Self::new(v.workchain, v.shard, v.seqno, v.root_hash, v.file_hash)
+    }
+}
 
-        self.client
+impl From<ton_client::types::BlockIdExt> for TonBlockIdExt {
+    fn from(v: ton_client::types::BlockIdExt) -> Self {
+        Self {
+            workchain: v.workchain,
+            shard: v.shard,
+            seqno: v.seqno,
+            root_hash: v.root_hash,
+            file_hash: v.file_hash,
+        }
+    }
+}
+
+impl From<InternalTransactionId> for ton_client::types::InternalTransactionId {
+    fn from(v: InternalTransactionId) -> Self {
+        Self {
+            hash: v.hash,
+            lt: v.lt,
+        }
+    }
+}
+
+impl From<ton_client::types::InternalTransactionId> for InternalTransactionId {
+    fn from(v: ton_client::types::InternalTransactionId) -> Self {
+        Self {
+            hash: v.hash,
+            lt: v.lt,
+        }
+    }
+}
+
+impl From<BlocksMasterchainInfo> for ton_client::types::MasterchainInfo {
+    fn from(v: BlocksMasterchainInfo) -> Self {
+        Self {
+            last: v.last.into(),
+        }
+    }
+}
+
+impl From<BlocksShortTxId> for ton_client::types::ShortTxId {
+    fn from(v: BlocksShortTxId) -> Self {
+        Self {
+            account: v.account,
+            lt: v.lt,
+            hash: v.hash,
+        }
+    }
+}
+
+impl From<RawFullAccountState> for ton_client::types::RawFullAccountState {
+    fn from(v: RawFullAccountState) -> Self {
+        Self {
+            balance: v.balance,
+            code: v.code,
+            data: v.data,
+            frozen_hash: v.frozen_hash,
+            last_transaction_id: v.last_transaction_id.map(Into::into),
+            block_id: v.block_id.into(),
+        }
+    }
+}
+
+impl From<BlocksHeader> for ton_client::types::BlocksHeader {
+    fn from(v: BlocksHeader) -> Self {
+        Self {
+            id: v.id.into(),
+            global_id: v.global_id,
+            version: v.version,
+            flags: v.flags,
+            after_merge: v.after_merge,
+            after_split: v.after_split,
+            before_split: v.before_split,
+            want_merge: v.want_merge,
+            want_split: v.want_split,
+            validator_list_hash_short: v.validator_list_hash_short,
+            catchain_seqno: v.catchain_seqno,
+            min_ref_mc_seqno: v.min_ref_mc_seqno,
+            is_key_block: v.is_key_block,
+            prev_key_block_seqno: v.prev_key_block_seqno,
+            start_lt: v.start_lt,
+            end_lt: v.end_lt,
+            gen_utime: v.gen_utime,
+            vert_seqno: v.vert_seqno,
+            prev_blocks: v.prev_blocks.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<TvmCell> for ton_client::types::TvmCell {
+    fn from(v: TvmCell) -> Self {
+        Self { bytes: v.bytes }
+    }
+}
+
+impl From<AccountAddress> for ton_client::types::AccountAddress {
+    fn from(v: AccountAddress) -> Self {
+        Self {
+            account_address: v.account_address,
+        }
+    }
+}
+
+impl From<MsgBoxedData> for ton_client::types::MsgData {
+    fn from(v: MsgBoxedData) -> Self {
+        match v {
+            MsgBoxedData::MsgDataRaw(d) => Self::Raw {
+                body: d.body,
+                init_state: d.init_state,
+            },
+            MsgBoxedData::MsgDataText(d) => Self::Text { text: d.text },
+            MsgBoxedData::MsgDataDecryptedText(d) => Self::DecryptedText { text: d.text },
+            MsgBoxedData::MsgDataEncryptedText(d) => Self::EncryptedText { text: d.text },
+        }
+    }
+}
+
+impl From<crate::block::RawMessage> for ton_client::types::RawMessage {
+    fn from(v: crate::block::RawMessage) -> Self {
+        Self {
+            source: v.source.into(),
+            destination: v.destination.into(),
+            value: v.value,
+            fwd_fee: v.fwd_fee,
+            ihr_fee: v.ihr_fee,
+            created_lt: v.created_lt,
+            body_hash: v.body_hash,
+            msg_data: v.msg_data.into(),
+        }
+    }
+}
+
+impl From<RawTransaction> for ton_client::types::RawTransaction {
+    fn from(v: RawTransaction) -> Self {
+        Self {
+            address: v.address.into(),
+            utime: v.utime,
+            data: v.data,
+            transaction_id: v.transaction_id.into(),
+            fee: v.fee,
+            storage_fee: v.storage_fee,
+            other_fee: v.other_fee,
+            in_msg: v.in_msg.map(Into::into),
+            out_msgs: v.out_msgs.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl ton_client::client::TonClient for TonClient {
+    type Error = anyhow::Error;
+
+    async fn get_masterchain_info(
+        &self,
+    ) -> Result<ton_client::types::MasterchainInfo, Self::Error> {
+        let info = self
+            .client
             .clone()
-            .oneshot(GetShardAccountCell::new(address))
-            .await
+            .oneshot(Specialized::new(BlocksGetMasterchainInfo::default()))
+            .await?;
+
+        Ok(info.into())
     }
 
-    pub async fn get_shard_account_cell_on_block(
+    async fn look_up_block_by_seqno(
         &self,
-        address: &str,
-        block: TonBlockIdExt,
-    ) -> anyhow::Result<TvmCell> {
-        let address = AccountAddress::new(address)?;
+        workchain: i32,
+        shard: i64,
+        seqno: i32,
+    ) -> Result<ton_client::types::BlockIdExt, Self::Error> {
+        if seqno <= 0 {
+            return Err(anyhow!("seqno must be greater than 0"));
+        }
 
-        self.client
+        let block: TonBlockIdExt = self
+            .client
             .clone()
-            .oneshot(WithBlock::new(block, GetShardAccountCell::new(address)))
-            .await
+            .oneshot(BlocksLookupBlock::seqno(TonBlockId::new(
+                workchain, shard, seqno,
+            )))
+            .await?;
+
+        Ok(block.into())
     }
 
-    // TODO[akostylev0]: (optimization) use BlockId instead of BlockIdExt
-    pub async fn get_shard_account_cell_at_least_block(
+    async fn get_block_header(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: i32,
+        hashes: Option<(String, String)>,
+    ) -> Result<ton_client::types::BlocksHeader, Self::Error> {
+        let (root_hash, file_hash) = match hashes {
+            Some((root_hash, file_hash)) => (root_hash, file_hash),
+            _ => {
+                let block = self.look_up_block_by_seqno(workchain, shard, seqno).await?;
+                (block.root_hash, block.file_hash)
+            }
+        };
+
+        let header: BlocksHeader = self
+            .client
+            .clone()
+            .oneshot(BlocksGetBlockHeader::new(TonBlockIdExt {
+                workchain,
+                shard,
+                seqno,
+                root_hash,
+                file_hash,
+            }))
+            .await?;
+
+        Ok(header.into())
+    }
+
+    async fn get_shards_by_block_id(
+        &self,
+        block_id: ton_client::types::BlockIdExt,
+    ) -> Result<Vec<ton_client::types::BlockIdExt>, Self::Error> {
+        let block_id: TonBlockIdExt = block_id.into();
+        if block_id.workchain != -1 {
+            return Err(anyhow!("workchain must be -1"));
+        }
+
+        let shards: BlocksShards = self
+            .client
+            .clone()
+            .oneshot(BlocksGetShards::new(block_id))
+            .await?;
+
+        Ok(shards.shards.into_iter().map(Into::into).collect())
+    }
+
+    async fn raw_get_account_state_on_block(
         &self,
         address: &str,
-        block_id: &TonBlockIdExt,
-    ) -> anyhow::Result<TvmCell> {
+        block_id: ton_client::types::BlockIdExt,
+    ) -> Result<ton_client::types::RawFullAccountState, Self::Error> {
+        let account_address = AccountAddress::new(address)?;
+
+        let state: RawFullAccountState = self
+            .client
+            .clone()
+            .oneshot(WithBlock::new(
+                block_id.into(),
+                RawGetAccountState::new(account_address),
+            ))
+            .await?;
+
+        Ok(state.into())
+    }
+
+    async fn raw_get_account_state_at_least_block(
+        &self,
+        address: &str,
+        block_id: &ton_client::types::BlockIdExt,
+    ) -> Result<ton_client::types::RawFullAccountState, Self::Error> {
+        let block_id: TonBlockIdExt = ton_client::types::BlockIdExt::clone(block_id).into();
         let route = Route::Block {
             chain: block_id.workchain,
             criteria: BlockCriteria::Seqno {
@@ -913,37 +532,149 @@ impl TonClient {
                 seqno: block_id.seqno,
             },
         };
-        let address = AccountAddress::new(address)?;
+        let account_address = AccountAddress::new(address)?;
 
-        self.client
+        let state: RawFullAccountState = self
+            .client
             .clone()
-            .oneshot(Forward::new(route, GetShardAccountCell::new(address)))
-            .await
+            .oneshot(Forward::new(
+                route,
+                RawGetAccountState::new(account_address),
+            ))
+            .await?;
+
+        Ok(state.into())
     }
 
-    pub async fn get_shard_account_cell_by_transaction(
+    async fn raw_get_account_state_by_transaction(
         &self,
         address: &str,
-        transaction: InternalTransactionId,
-    ) -> anyhow::Result<TvmCell> {
-        let address = AccountAddress::new(address)?;
+        transaction_id: ton_client::types::InternalTransactionId,
+    ) -> Result<ton_client::types::RawFullAccountState, Self::Error> {
+        let account_address = AccountAddress::new(address)?;
 
-        self.client
+        let state: RawFullAccountState = self
+            .client
             .clone()
-            .oneshot(GetShardAccountCellByTransaction::new(address, transaction))
-            .await
+            .oneshot(RawGetAccountStateByTransaction::new(
+                account_address,
+                transaction_id.into(),
+            ))
+            .await?;
+
+        Ok(state.into())
     }
 
-    pub fn get_accounts_in_block_stream(
+    async fn raw_get_account_state(
         &self,
-        block: &TonBlockIdExt,
-    ) -> impl TryStream<Ok = InternalAccountAddress, Error = anyhow::Error> + 'static {
+        address: &str,
+    ) -> Result<ton_client::types::RawFullAccountState, Self::Error> {
+        let account_address = AccountAddress::new(address)?;
+
+        let state: RawFullAccountState = self
+            .client
+            .clone()
+            .oneshot(RawGetAccountState::new(account_address))
+            .await?;
+
+        Ok(state.into())
+    }
+
+    async fn get_block_transactions_batch(
+        &self,
+        block: &ton_client::types::BlockIdExt,
+        after: Option<&ton_client::types::ShortTxId>,
+        reverse: bool,
+        limit: i32,
+    ) -> Result<(Vec<ton_client::types::ShortTxId>, bool), Self::Error> {
+        let block: TonBlockIdExt = block.clone().into();
+        let after = after.map(|s| BlocksAccountTransactionId {
+            account: s.account.clone(),
+            lt: s.lt,
+        });
+
+        let txs: BlocksTransactions = self
+            .client
+            .clone()
+            .oneshot(BlocksGetTransactions::unverified(
+                block, after, reverse, limit,
+            ))
+            .await?;
+
+        Ok((
+            txs.transactions.into_iter().map(Into::into).collect(),
+            txs.incomplete,
+        ))
+    }
+
+    async fn get_block_raw_transactions_batch(
+        &self,
+        block: &ton_client::types::BlockIdExt,
+        after: Option<&ton_client::types::ShortTxId>,
+        reverse: bool,
+        limit: i32,
+    ) -> Result<(Vec<ton_client::types::RawTransaction>, bool), Self::Error> {
+        let block: TonBlockIdExt = block.clone().into();
+        let after = after.map(|s| BlocksAccountTransactionId {
+            account: s.account.clone(),
+            lt: s.lt,
+        });
+
+        let txs: BlocksTransactionsExt = self
+            .client
+            .clone()
+            .oneshot(BlocksGetTransactionsExt::unverified(
+                block, after, reverse, limit,
+            ))
+            .await?;
+
+        Ok((
+            txs.transactions.into_iter().map(Into::into).collect(),
+            txs.incomplete,
+        ))
+    }
+
+    async fn get_account_transactions_batch(
+        &self,
+        address: &str,
+        from: &ton_client::types::InternalTransactionId,
+        limit: i32,
+    ) -> Result<
+        (
+            Vec<ton_client::types::RawTransaction>,
+            Option<ton_client::types::InternalTransactionId>,
+        ),
+        Self::Error,
+    > {
+        let address = AccountAddress::new(address)?;
+
+        let txs: RawTransactions = self
+            .client
+            .clone()
+            .oneshot(RawGetTransactionsV2::new(
+                address,
+                from.clone().into(),
+                limit,
+                false,
+            ))
+            .await?;
+
+        Ok((
+            txs.transactions.into_iter().map(Into::into).collect(),
+            txs.previous_transaction_id.map(Into::into),
+        ))
+    }
+
+    fn get_accounts_in_block_stream(
+        &self,
+        block: &ton_client::types::BlockIdExt,
+    ) -> BoxStream<'static, Result<ton_client::types::InternalAccountAddress, Self::Error>> {
         let chain = block.workchain;
         let stream_map = StreamMap::from_iter(
-            [false, true].map(|r| (r, self.get_block_tx_id_stream(block, r).boxed())),
+            [false, true].map(|reverse| (reverse, self.get_block_tx_id_stream(block, reverse))),
         );
 
-        let stream = try_stream! {
+        try_stream! {
             let mut last = HashMap::with_capacity(2);
 
             for await (key, tx) in stream_map {
@@ -963,67 +694,144 @@ impl TonClient {
 
                 last.insert(key, tx.account().to_owned());
 
-                yield tx.into_internal(chain);
+                let address = crate::address::ShardContextAccountAddress::from_str(tx.account())?;
+                let address: ton_client::types::InternalAccountAddress =
+                    address.into_internal(chain).into();
+
+                yield address;
             }
-        };
-
-        stream
-    }
-
-    #[instrument(skip_all, err)]
-    async fn find_first_tx(&self, account: &str) -> anyhow::Result<InternalTransactionId> {
-        let start = self.get_masterchain_info().await?.last;
-
-        let length = start.seqno;
-        let mut rhs = length;
-        let mut lhs = 1;
-        let mut cur = (lhs + rhs) / 2;
-
-        let workchain = start.workchain;
-        let shard = start.shard;
-
-        let mut tx = self
-            .check_account_available(account, &TonBlockId::new(workchain, shard, cur))
-            .await;
-
-        while lhs < rhs {
-            // TODO[akostylev0] specify error
-            if tx.is_err() {
-                lhs = cur + 1;
-            } else {
-                rhs = cur;
-            }
-
-            cur = (lhs + rhs) / 2;
-
-            if cur == 0 {
-                break;
-            }
-
-            trace!("lhs: {}, rhs: {}, cur: {}", lhs, rhs, cur);
-
-            tx = self
-                .check_account_available(account, &TonBlockId::new(workchain, shard, cur))
-                .await;
         }
-
-        let tx = tx?;
-
-        trace!(tx = ?tx, "first tx");
-
-        Ok(tx)
+        .boxed()
     }
 
-    async fn check_account_available(
+    async fn get_shard_account_cell_on_block(
         &self,
-        account: &str,
-        block: &TonBlockId,
-    ) -> anyhow::Result<InternalTransactionId> {
-        let block = self
-            .look_up_block_by_seqno(block.workchain, block.shard, block.seqno)
+        address: &str,
+        block: ton_client::types::BlockIdExt,
+    ) -> Result<ton_client::types::TvmCell, Self::Error> {
+        let address = AccountAddress::new(address)?;
+        let cell: TvmCell = self
+            .client
+            .clone()
+            .oneshot(WithBlock::new(
+                block.into(),
+                GetShardAccountCell::new(address),
+            ))
             .await?;
-        let state = self.raw_get_account_state_on_block(account, block).await?;
 
-        state.last_transaction_id.ok_or(anyhow!("tx not found"))
+        Ok(cell.into())
+    }
+
+    async fn get_shard_account_cell_at_least_block(
+        &self,
+        address: &str,
+        block_id: &ton_client::types::BlockIdExt,
+    ) -> Result<ton_client::types::TvmCell, Self::Error> {
+        let block_id: TonBlockIdExt = ton_client::types::BlockIdExt::clone(block_id).into();
+        let route = Route::Block {
+            chain: block_id.workchain,
+            criteria: BlockCriteria::Seqno {
+                shard: block_id.shard,
+                seqno: block_id.seqno,
+            },
+        };
+        let address = AccountAddress::new(address)?;
+
+        let cell: TvmCell = self
+            .client
+            .clone()
+            .oneshot(Forward::new(route, GetShardAccountCell::new(address)))
+            .await?;
+
+        Ok(cell.into())
+    }
+
+    async fn send_message_returning_hash(&self, body: &str) -> Result<String, Self::Error> {
+        self.client
+            .clone()
+            .oneshot(RawSendMessageReturnHash::new(body.to_string()))
+            .map_ok(|res| res.hash)
+            .await
+    }
+}
+
+#[cfg(test)]
+mod integration {
+    use testcontainers_ton::LocalLiteServer;
+    use ton_client::client::TonClient as TonClientTrait;
+    use ton_client_util::discover::config::TonConfig;
+
+    use super::*;
+
+    async fn setup() -> (TonClient, LocalLiteServer) {
+        let local = LocalLiteServer::new().await.unwrap();
+        let config: TonConfig = serde_json::from_value(local.get_config_json().clone()).unwrap();
+        let mut client = TonClientBuilder::from_config(config).build().unwrap();
+        TonClientTrait::ready(&mut client).await.unwrap();
+
+        (client, local)
+    }
+
+    #[tokio::test]
+    async fn get_masterchain_info() {
+        let (client, _local) = setup().await;
+
+        let info = TonClientTrait::get_masterchain_info(&client).await.unwrap();
+
+        assert_eq!(info.last.workchain, -1);
+        assert!(info.last.seqno > 0);
+    }
+
+    #[tokio::test]
+    async fn look_up_block_and_get_header() {
+        let (client, _local) = setup().await;
+        let info = TonClientTrait::get_masterchain_info(&client).await.unwrap();
+
+        let block = TonClientTrait::look_up_block_by_seqno(
+            &client,
+            info.last.workchain,
+            info.last.shard,
+            info.last.seqno,
+        )
+        .await
+        .unwrap();
+        let header = TonClientTrait::get_block_header(
+            &client,
+            block.workchain,
+            block.shard,
+            block.seqno,
+            Some((block.root_hash.clone(), block.file_hash.clone())),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(block.workchain, -1);
+        assert_eq!(block.seqno, info.last.seqno);
+        assert_eq!(header.id.seqno, block.seqno);
+        assert!(header.end_lt >= header.start_lt);
+    }
+
+    #[tokio::test]
+    async fn get_shards_by_block_id() {
+        let (client, _local) = setup().await;
+        let info = TonClientTrait::get_masterchain_info(&client).await.unwrap();
+
+        let shards = TonClientTrait::get_shards_by_block_id(&client, info.last)
+            .await
+            .unwrap();
+
+        assert!(!shards.is_empty());
+        for shard in &shards {
+            assert_eq!(shard.workchain, 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn send_message_returns_error_for_invalid_body() {
+        let (client, _local) = setup().await;
+
+        let result = TonClientTrait::send_message_returning_hash(&client, "invalid_boc").await;
+
+        assert!(result.is_err());
     }
 }

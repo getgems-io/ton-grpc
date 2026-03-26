@@ -7,20 +7,20 @@ use crate::ton::{
     AccountAddress, BlockId, BlockIdExt, BlocksHeader, GetLastBlockRequest, GetShardsResponse,
     GetTransactionIdsRequest, GetTransactionsRequest, Transaction, TransactionId,
 };
-use anyhow::Context;
+use anyhow::{Context, anyhow};
 use derive_new::new;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};
+use ton_client::client::TonClient;
 use tonic::{Request, Response, Status, async_trait};
-use tonlibjson_client::ton::TonClient;
 
 #[derive(new)]
-pub struct BlockService {
-    client: TonClient,
+pub struct BlockService<T> {
+    client: T,
 }
 
 #[async_trait]
-impl BaseBlockService for BlockService {
+impl<T: TonClient> BaseBlockService for BlockService<T> {
     #[tracing::instrument(skip_all, err)]
     async fn get_last_block(
         &self,
@@ -30,7 +30,7 @@ impl BaseBlockService for BlockService {
             .client
             .get_masterchain_info()
             .await
-            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?
+            .map_err(|e| Status::internal(e.to_string()))?
             .last;
 
         Ok(Response::new(block.into()))
@@ -40,7 +40,7 @@ impl BaseBlockService for BlockService {
     async fn get_block(&self, request: Request<BlockId>) -> Result<Response<BlockIdExt>, Status> {
         let block_id = extend_block_id(&self.client, &request.into_inner())
             .await
-            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(block_id.into()))
     }
@@ -52,7 +52,7 @@ impl BaseBlockService for BlockService {
     ) -> Result<Response<BlocksHeader>, Status> {
         let block_header = extend_get_block_header(&self.client, &request.into_inner())
             .await
-            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(block_header.into()))
     }
@@ -64,13 +64,13 @@ impl BaseBlockService for BlockService {
     ) -> Result<Response<GetShardsResponse>, Status> {
         let block_id = extend_block_id(&self.client, &request.into_inner())
             .await
-            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         let shards = self
             .client
             .get_shards_by_block_id(block_id)
             .await
-            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         Ok(Response::new(GetShardsResponse {
             shards: shards.into_iter().map(|i| i.into()).collect(),
@@ -121,7 +121,7 @@ impl BaseBlockService for BlockService {
         let msg = request.into_inner();
         let block_id = extend_block_id(&self.client, &msg)
             .await
-            .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
+            .map_err(|e| Status::internal(e.to_string()))?;
 
         let stream = self
             .client
@@ -160,7 +160,7 @@ impl BaseBlockService for BlockService {
         let stream = stream
             .map(move |tx| match tx {
                 Ok(tx) => (chain_id, tx).try_into(),
-                Err(e) => Err(e),
+                Err(e) => Err(anyhow!("{e}")),
             })
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();

@@ -3240,6 +3240,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "serde_json",
  "testcontainers",
  "tokio",
 ]
@@ -3486,6 +3487,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-stream",
+ "futures",
+ "hex",
+ "itertools",
+ "serde",
+ "tokio",
+ "tokio-stream",
+ "tracing",
+]
+
+[[package]]
 name = "ton-client-util"
 version = "0.1.0"
 dependencies = [
@@ -3553,6 +3569,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+ "ton-client",
  "tonic",
  "tonic-health",
  "tonic-prost",
@@ -3731,12 +3748,14 @@ dependencies = [
  "serde",
  "serde_json",
  "syn",
+ "testcontainers-ton",
  "thiserror 2.0.18",
  "tl-parser",
  "tokio",
  "tokio-retry",
  "tokio-stream",
  "tokio-util",
+ "ton-client",
  "ton-client-util",
  "tonlibjson-sys",
  "tower",

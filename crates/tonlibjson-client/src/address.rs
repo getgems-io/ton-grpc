@@ -1,4 +1,4 @@
-use anyhow::{Context, anyhow};
+use anyhow::anyhow;
 use base64::Engine;
 use base64::display::Base64Display;
 use bytes::BufMut;
@@ -45,11 +45,10 @@ impl FromStr for AccountAddressData {
 
         if let Some((workchain_id, hex_bytes)) = s.split_once(':') {
             chain_id = workchain_id.parse()?;
-            hex::decode_to_slice(hex_bytes, &mut bytes)?
+            hex::decode_to_slice(hex_bytes, &mut bytes)?;
         } else if hex::decode_to_slice(s, &mut bytes).is_ok() {
             chain_id = -1;
         } else {
-            // convert url safe to standard
             let s = s.replace('-', "+").replace('_', "/");
 
             let Ok(data) = base64::engine::general_purpose::STANDARD.decode(&s) else {
@@ -60,7 +59,6 @@ impl FromStr for AccountAddressData {
                 return Err(anyhow!("invalid base64 address: {}", &s));
             };
 
-            // 32 is length of address and 2 is length of crc16
             if data.len() != 32 + 2 {
                 return Err(anyhow!(
                     "invalid address length, expected 34 got {} bytes",
@@ -149,6 +147,36 @@ impl AccountAddressData {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InternalAccountAddress {
+    pub chain_id: i32,
+    pub bytes: [u8; 32],
+}
+
+impl Display for InternalAccountAddress {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.chain_id, hex::encode(self.bytes))
+    }
+}
+
+impl From<InternalAccountAddress> for ton_client::types::InternalAccountAddress {
+    fn from(value: InternalAccountAddress) -> Self {
+        Self {
+            chain_id: value.chain_id,
+            bytes: value.bytes,
+        }
+    }
+}
+
+impl From<ton_client::types::InternalAccountAddress> for InternalAccountAddress {
+    fn from(value: ton_client::types::InternalAccountAddress) -> Self {
+        Self {
+            chain_id: value.chain_id,
+            bytes: value.bytes,
+        }
+    }
+}
+
 #[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub struct ShardContextAccountAddress {
     pub bytes: [u8; 32],
@@ -160,7 +188,7 @@ impl FromStr for ShardContextAccountAddress {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let bytes = base64::engine::general_purpose::STANDARD
             .decode(s)
-            .with_context(|| format!("input string is {s}"))?;
+            .map_err(|e| anyhow!("input string is {s}: {e}"))?;
 
         if bytes.len() != 32 {
             return Err(anyhow!(
@@ -219,30 +247,9 @@ impl ShardContextAccountAddress {
     }
 }
 
-pub struct InternalAccountAddress {
-    pub chain_id: i32,
-    pub bytes: [u8; 32],
-}
-
-impl Debug for InternalAccountAddress {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("InternalAccountAddress")
-            .field("chain_id", &self.chain_id)
-            .field("bytes", &hex::encode(self.bytes))
-            .finish()
-    }
-}
-
-impl Display for InternalAccountAddress {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "{}:{}", self.chain_id, hex::encode(self.bytes))
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
-    use std::str::FromStr;
+    use super::*;
 
     #[test]
     fn shard_context_account_data_to_string() {
