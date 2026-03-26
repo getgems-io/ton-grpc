@@ -1,10 +1,17 @@
-[test-groups]
-integration = { max-threads = 2 }
+[profile.default]
+default-filter = 'not test(::integration::)'
 
-[[profile.default.overrides]]
+[profile.ci]
+fail-fast = false
+default-filter = 'all()'
+
+[test-groups]
+integration = { max-threads = 4 }
+
+[[profile.ci.overrides]]
+platform = 'cfg(target_os = "macos")'
+default-filter = 'not test(::integration::)'
+
+[[profile.ci.overrides]]
 filter = 'test(::integration::)'
 test-group = 'integration'
-
-[[profile.default.overrides]]
-platform = 'cfg(target_os = "macos")'
-default-filter = 'test(::integration::)'
