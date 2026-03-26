@@ -2,6 +2,7 @@
 name = "ton-contract"
 version = "0.1.10"
 edition = "2024"
+rust-version.workspace = true
 authors = [
     "Arseny Mitin <mitinarseny@gmail.com>",
     "Andrei Kostylev <a.kostylev@pm.me>",
