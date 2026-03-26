@@ -4,7 +4,7 @@ use crate::block::{
     BlocksGetShards, BlocksGetTransactions, BlocksGetTransactionsExt, BlocksHeader,
     BlocksLookupBlock, BlocksMasterchainInfo, BlocksShards, BlocksShortTxId, BlocksTransactions,
     BlocksTransactionsExt, FullAccountState, GetAccountState, GetShardAccountCell,
-    GetShardAccountCellByTransaction, InternalTransactionId, RawFullAccountState,
+    GetShardAccountCellByTransaction, InternalTransactionId, MsgBoxedData, RawFullAccountState,
     RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage,
     RawSendMessageReturnHash, RawTransaction, RawTransactions, SmcBoxedMethodId, SmcRunResult,
     TonBlockId, TonBlockIdExt, TvmBoxedStackEntry, TvmCell, WithBlock,
@@ -17,6 +17,7 @@ use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use anyhow::anyhow;
 use async_stream::try_stream;
+use futures::stream::BoxStream;
 use futures::{Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt, stream, try_join};
 use itertools::Itertools;
 use serde_json::Value;
@@ -1025,5 +1026,347 @@ impl TonClient {
         let state = self.raw_get_account_state_on_block(account, block).await?;
 
         state.last_transaction_id.ok_or(anyhow!("tx not found"))
+    }
+}
+
+impl From<TonBlockIdExt> for ton_client::types::BlockIdExt {
+    fn from(v: TonBlockIdExt) -> Self {
+        Self::new(v.workchain, v.shard, v.seqno, v.root_hash, v.file_hash)
+    }
+}
+
+impl From<ton_client::types::BlockIdExt> for TonBlockIdExt {
+    fn from(v: ton_client::types::BlockIdExt) -> Self {
+        Self {
+            workchain: v.workchain,
+            shard: v.shard,
+            seqno: v.seqno,
+            root_hash: v.root_hash,
+            file_hash: v.file_hash,
+        }
+    }
+}
+
+impl From<InternalTransactionId> for ton_client::types::InternalTransactionId {
+    fn from(v: InternalTransactionId) -> Self {
+        Self {
+            hash: v.hash,
+            lt: v.lt,
+        }
+    }
+}
+
+impl From<ton_client::types::InternalTransactionId> for InternalTransactionId {
+    fn from(v: ton_client::types::InternalTransactionId) -> Self {
+        Self {
+            hash: v.hash,
+            lt: v.lt,
+        }
+    }
+}
+
+impl From<BlocksMasterchainInfo> for ton_client::types::MasterchainInfo {
+    fn from(v: BlocksMasterchainInfo) -> Self {
+        Self {
+            last: v.last.into(),
+        }
+    }
+}
+
+impl From<BlocksShortTxId> for ton_client::types::ShortTxId {
+    fn from(v: BlocksShortTxId) -> Self {
+        Self {
+            account: v.account,
+            lt: v.lt,
+            hash: v.hash,
+        }
+    }
+}
+
+impl From<RawFullAccountState> for ton_client::types::RawFullAccountState {
+    fn from(v: RawFullAccountState) -> Self {
+        Self {
+            balance: v.balance,
+            code: v.code,
+            data: v.data,
+            frozen_hash: v.frozen_hash,
+            last_transaction_id: v.last_transaction_id.map(Into::into),
+            block_id: v.block_id.into(),
+        }
+    }
+}
+
+impl From<BlocksHeader> for ton_client::types::BlocksHeader {
+    fn from(v: BlocksHeader) -> Self {
+        Self {
+            id: v.id.into(),
+            global_id: v.global_id,
+            version: v.version,
+            flags: v.flags,
+            after_merge: v.after_merge,
+            after_split: v.after_split,
+            before_split: v.before_split,
+            want_merge: v.want_merge,
+            want_split: v.want_split,
+            validator_list_hash_short: v.validator_list_hash_short,
+            catchain_seqno: v.catchain_seqno,
+            min_ref_mc_seqno: v.min_ref_mc_seqno,
+            is_key_block: v.is_key_block,
+            prev_key_block_seqno: v.prev_key_block_seqno,
+            start_lt: v.start_lt,
+            end_lt: v.end_lt,
+            gen_utime: v.gen_utime,
+            vert_seqno: v.vert_seqno,
+            prev_blocks: v.prev_blocks.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<TvmCell> for ton_client::types::TvmCell {
+    fn from(v: TvmCell) -> Self {
+        Self { bytes: v.bytes }
+    }
+}
+
+impl From<AccountAddress> for ton_client::types::AccountAddress {
+    fn from(v: AccountAddress) -> Self {
+        Self {
+            account_address: v.account_address,
+        }
+    }
+}
+
+impl From<MsgBoxedData> for ton_client::types::MsgData {
+    fn from(v: MsgBoxedData) -> Self {
+        match v {
+            MsgBoxedData::MsgDataRaw(d) => Self::Raw {
+                body: d.body,
+                init_state: d.init_state,
+            },
+            MsgBoxedData::MsgDataText(d) => Self::Text { text: d.text },
+            MsgBoxedData::MsgDataDecryptedText(d) => Self::DecryptedText { text: d.text },
+            MsgBoxedData::MsgDataEncryptedText(d) => Self::EncryptedText { text: d.text },
+        }
+    }
+}
+
+impl From<crate::block::RawMessage> for ton_client::types::RawMessage {
+    fn from(v: crate::block::RawMessage) -> Self {
+        Self {
+            source: v.source.into(),
+            destination: v.destination.into(),
+            value: v.value,
+            fwd_fee: v.fwd_fee,
+            ihr_fee: v.ihr_fee,
+            created_lt: v.created_lt,
+            body_hash: v.body_hash,
+            msg_data: v.msg_data.into(),
+        }
+    }
+}
+
+impl From<RawTransaction> for ton_client::types::RawTransaction {
+    fn from(v: RawTransaction) -> Self {
+        Self {
+            address: v.address.into(),
+            utime: v.utime,
+            data: v.data,
+            transaction_id: v.transaction_id.into(),
+            fee: v.fee,
+            storage_fee: v.storage_fee,
+            other_fee: v.other_fee,
+            in_msg: v.in_msg.map(Into::into),
+            out_msgs: v.out_msgs.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<InternalAccountAddress> for ton_client::types::InternalAccountAddress {
+    fn from(v: InternalAccountAddress) -> Self {
+        Self {
+            chain_id: v.chain_id,
+            bytes: v.bytes,
+        }
+    }
+}
+
+impl ton_client::client::TonClient for TonClient {
+    type Error = anyhow::Error;
+
+    async fn ready(&mut self) -> Result<(), Self::Error> {
+        self.ready().await
+    }
+
+    async fn get_masterchain_info(
+        &self,
+    ) -> Result<ton_client::types::MasterchainInfo, Self::Error> {
+        self.get_masterchain_info().await.map(Into::into)
+    }
+
+    async fn look_up_block_by_seqno(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: i32,
+    ) -> Result<ton_client::types::BlockIdExt, Self::Error> {
+        self.look_up_block_by_seqno(workchain, shard, seqno)
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_block_header(
+        &self,
+        workchain: i32,
+        shard: i64,
+        seqno: i32,
+        hashes: Option<(String, String)>,
+    ) -> Result<ton_client::types::BlocksHeader, Self::Error> {
+        self.get_block_header(workchain, shard, seqno, hashes)
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_shards_by_block_id(
+        &self,
+        block_id: ton_client::types::BlockIdExt,
+    ) -> Result<Vec<ton_client::types::BlockIdExt>, Self::Error> {
+        self.get_shards_by_block_id(block_id.into())
+            .await
+            .map(|v| v.into_iter().map(Into::into).collect())
+    }
+
+    async fn raw_get_account_state_on_block(
+        &self,
+        address: &str,
+        block_id: ton_client::types::BlockIdExt,
+    ) -> Result<ton_client::types::RawFullAccountState, Self::Error> {
+        self.raw_get_account_state_on_block(address, block_id.into())
+            .await
+            .map(Into::into)
+    }
+
+    async fn raw_get_account_state_at_least_block(
+        &self,
+        address: &str,
+        block_id: &ton_client::types::BlockIdExt,
+    ) -> Result<ton_client::types::RawFullAccountState, Self::Error> {
+        let block_id: TonBlockIdExt = ton_client::types::BlockIdExt::clone(block_id).into();
+        self.raw_get_account_state_at_least_block(address, &block_id)
+            .await
+            .map(Into::into)
+    }
+
+    async fn raw_get_account_state_by_transaction(
+        &self,
+        address: &str,
+        transaction_id: ton_client::types::InternalTransactionId,
+    ) -> Result<ton_client::types::RawFullAccountState, Self::Error> {
+        self.raw_get_account_state_by_transaction(address, transaction_id.into())
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_shard_account_cell_on_block(
+        &self,
+        address: &str,
+        block: ton_client::types::BlockIdExt,
+    ) -> Result<ton_client::types::TvmCell, Self::Error> {
+        self.get_shard_account_cell_on_block(address, block.into())
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_shard_account_cell_at_least_block(
+        &self,
+        address: &str,
+        block_id: &ton_client::types::BlockIdExt,
+    ) -> Result<ton_client::types::TvmCell, Self::Error> {
+        let block_id: TonBlockIdExt = ton_client::types::BlockIdExt::clone(block_id).into();
+        self.get_shard_account_cell_at_least_block(address, &block_id)
+            .await
+            .map(Into::into)
+    }
+
+    async fn send_message_returning_hash(&self, body: &str) -> Result<String, Self::Error> {
+        self.send_message_returning_hash(body).await
+    }
+
+    async fn get_account_tx_range_unordered(
+        &self,
+        address: &str,
+        range: (
+            Bound<ton_client::types::InternalTransactionId>,
+            Bound<ton_client::types::InternalTransactionId>,
+        ),
+    ) -> Result<
+        BoxStream<'static, Result<ton_client::types::RawTransaction, Self::Error>>,
+        Self::Error,
+    > {
+        let range = (
+            range.0.map(|v| InternalTransactionId::from(v)),
+            range.1.map(|v| InternalTransactionId::from(v)),
+        );
+        self.get_account_tx_range_unordered(address, range)
+            .await
+            .map(|s| s.map_ok(Into::into).boxed())
+    }
+
+    fn get_account_tx_range(
+        &self,
+        address: &str,
+        range: (
+            Bound<ton_client::types::InternalTransactionId>,
+            Bound<ton_client::types::InternalTransactionId>,
+        ),
+    ) -> BoxStream<'static, Result<ton_client::types::RawTransaction, Self::Error>> {
+        let range = (
+            range.0.map(|v| InternalTransactionId::from(v)),
+            range.1.map(|v| InternalTransactionId::from(v)),
+        );
+        self.get_account_tx_range(address, range)
+            .map_ok(Into::into)
+            .boxed()
+    }
+
+    fn get_block_tx_stream_unordered(
+        &self,
+        block: &ton_client::types::BlockIdExt,
+    ) -> BoxStream<'static, Result<ton_client::types::ShortTxId, Self::Error>> {
+        let block: TonBlockIdExt = ton_client::types::BlockIdExt::clone(block).into();
+        self.get_block_tx_stream_unordered(&block)
+            .map_ok(Into::into)
+            .boxed()
+    }
+
+    fn get_block_tx_id_stream(
+        &self,
+        block: &ton_client::types::BlockIdExt,
+        reverse: bool,
+    ) -> BoxStream<'static, Result<ton_client::types::ShortTxId, Self::Error>> {
+        let block: TonBlockIdExt = ton_client::types::BlockIdExt::clone(block).into();
+        self.get_block_tx_id_stream(&block, reverse)
+            .map_ok(Into::into)
+            .boxed()
+    }
+
+    fn get_block_tx_stream(
+        &self,
+        block: &ton_client::types::BlockIdExt,
+        reverse: bool,
+    ) -> BoxStream<'static, Result<ton_client::types::RawTransaction, Self::Error>> {
+        let block: TonBlockIdExt = ton_client::types::BlockIdExt::clone(block).into();
+        self.get_block_tx_stream(&block, reverse)
+            .map_ok(Into::into)
+            .boxed()
+    }
+
+    fn get_accounts_in_block_stream(
+        &self,
+        block: &ton_client::types::BlockIdExt,
+    ) -> BoxStream<'static, Result<ton_client::types::InternalAccountAddress, Self::Error>> {
+        let block: TonBlockIdExt = ton_client::types::BlockIdExt::clone(block).into();
+        self.get_accounts_in_block_stream(&block)
+            .map_ok(Into::into)
+            .boxed()
     }
 }

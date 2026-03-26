@@ -3486,6 +3486,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-client"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "hex",
+]
+
+[[package]]
 name = "ton-client-util"
 version = "0.1.0"
 dependencies = [
@@ -3737,6 +3745,7 @@ dependencies = [
  "tokio-retry",
  "tokio-stream",
  "tokio-util",
+ "ton-client",
  "ton-client-util",
  "tonlibjson-sys",
  "tower",
