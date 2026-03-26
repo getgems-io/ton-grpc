@@ -45,11 +45,17 @@ pub struct MasterchainInfo {
     pub last: BlockIdExt,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ShortTxId {
     pub account: String,
     pub lt: i64,
     pub hash: String,
+}
+
+impl ShortTxId {
+    pub fn account(&self) -> &str {
+        &self.account
+    }
 }
 
 #[derive(Debug, Clone)]

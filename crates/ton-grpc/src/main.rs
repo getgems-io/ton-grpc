@@ -15,6 +15,7 @@ use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::time::Duration;
+use ton_client::client::TonClient as _;
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
 use tonlibjson_client::ton::{TonClient, TonClientBuilder};

@@ -3490,8 +3490,15 @@ dependencies = [
 name = "ton-client"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-stream",
  "futures",
  "hex",
+ "itertools",
+ "serde",
+ "tokio",
+ "tokio-stream",
+ "tracing",
 ]
 
 [[package]]
