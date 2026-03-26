@@ -1,7 +1,7 @@
 use crate::ton;
 use crate::ton::get_account_transactions_request::bound::Bound::{BlockId, TransactionId};
 use crate::ton::get_account_transactions_request::bound::Type;
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::ops::Bound;
 use std::ops::Bound::{Excluded, Included};
 use tonlibjson_client::block;

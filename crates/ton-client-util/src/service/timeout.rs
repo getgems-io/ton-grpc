@@ -3,7 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::time::{sleep, Sleep};
+use tokio::time::{Sleep, sleep};
 use tower::load::Load;
 use tower::timeout::error::Elapsed;
 use tower::{BoxError, Layer, Service};

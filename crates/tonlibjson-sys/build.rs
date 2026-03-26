@@ -304,10 +304,10 @@ fn copy_dir_recursively(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io
         if entry.path().is_dir() {
             create_dir_all(&target_path)?;
         } else {
-            if let Some(parent) = target_path.parent() {
-                if !parent.exists() {
-                    create_dir_all(parent)?;
-                }
+            if let Some(parent) = target_path.parent()
+                && !parent.exists()
+            {
+                create_dir_all(parent)?;
             }
             copy(entry.path(), &target_path)?;
         }

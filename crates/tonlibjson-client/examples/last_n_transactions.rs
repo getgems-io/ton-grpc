@@ -1,4 +1,4 @@
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use tokio::time::Instant;
 use tonlibjson_client::ton::TonClientBuilder;
 

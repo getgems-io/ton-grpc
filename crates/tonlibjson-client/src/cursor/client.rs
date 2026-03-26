@@ -8,8 +8,8 @@ use crate::error::ErrorService;
 use crate::metric::ConcurrencyMetric;
 use crate::request::Specialized;
 use anyhow::Result;
-use futures::future::ready;
 use futures::FutureExt;
+use futures::future::ready;
 use std::borrow::Cow;
 use std::convert::Infallible;
 use std::future::Future;
@@ -17,15 +17,15 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::sync::watch::{Receiver, Sender};
-use ton_client_util::router::route::BlockCriteria;
 use ton_client_util::router::Routed;
+use ton_client_util::router::route::BlockCriteria;
 use ton_client_util::service::shared::SharedService;
 use ton_client_util::service::timeout::Timeout;
+use tower::Service;
 use tower::limit::ConcurrencyLimit;
-use tower::load::peak_ewma::Cost;
 use tower::load::Load;
 use tower::load::PeakEwma;
-use tower::Service;
+use tower::load::peak_ewma::Cost;
 
 pub type InnerClient =
     ConcurrencyMetric<ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<Client>>>>>>;

@@ -4,11 +4,11 @@ use crate::tl::{
 };
 use adnl_tcp::client::{Client, ServerKey};
 use adnl_tcp::connection::Connection;
-use adnl_tcp::deserializer::{from_bytes_boxed, DeserializeBoxed};
+use adnl_tcp::deserializer::{DeserializeBoxed, from_bytes_boxed};
 use adnl_tcp::packet::Packet;
 use adnl_tcp::ping::{is_pong_packet, ping_packet};
 use adnl_tcp::serializer::to_bytes_boxed;
-use futures::{ready, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, ready};
 use pin_project::pin_project;
 use rand::random;
 use std::collections::HashMap;

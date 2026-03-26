@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{adapters::TvmBoxedStackEntryExt, TonContract, TonContractError};
+use crate::{TonContract, TonContractError, adapters::TvmBoxedStackEntryExt};
 
 #[async_trait]
 pub trait WalletContract {

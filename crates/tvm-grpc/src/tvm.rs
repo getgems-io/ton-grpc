@@ -1,6 +1,6 @@
 use anyhow::anyhow;
 use serde::Deserialize;
-use tonic::{include_proto, Status};
+use tonic::{Status, include_proto};
 
 include_proto!("tvm");
 
@@ -22,9 +22,9 @@ where
         if value.success {
             Ok(value.data.unwrap_or_default())
         } else {
-            Err(anyhow!(value
-                .error
-                .unwrap_or("ambiguous response".to_owned())))
+            Err(anyhow!(
+                value.error.unwrap_or("ambiguous response".to_owned())
+            ))
         }
     }
 }

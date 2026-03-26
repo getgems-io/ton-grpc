@@ -1,7 +1,7 @@
-use crate::actor::cancellable_actor::CancellableActor;
 use crate::actor::Actor;
+use crate::actor::cancellable_actor::CancellableActor;
 use crate::discover::config::{
-    load_ton_config, read_ton_config, LiteServer, LiteServerId, TonConfig,
+    LiteServer, LiteServerId, TonConfig, load_ton_config, read_ton_config,
 };
 use futures::{Stream, StreamExt, TryStreamExt};
 use hickory_resolver::name_server::TokioConnectionProvider;
@@ -12,7 +12,7 @@ use std::convert::Infallible;
 use std::net::IpAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll, ready};
 use tokio::sync::mpsc;
 use tokio::time::Interval;
 use tokio_stream::wrappers::IntervalStream;

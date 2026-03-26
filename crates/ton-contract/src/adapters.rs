@@ -1,4 +1,4 @@
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use core::{fmt::Display, str::FromStr};
 use std::{error::Error as StdError, sync::Arc};
 use toner::{

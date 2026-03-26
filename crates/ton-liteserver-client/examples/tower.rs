@@ -1,4 +1,4 @@
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use std::time::Duration;
 use testcontainers_ton::LocalLiteServer;
 use ton_liteserver_client::client::LiteServerClient;

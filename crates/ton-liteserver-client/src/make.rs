@@ -1,14 +1,14 @@
 use crate::client::LiteServerClient;
 use adnl_tcp::client::ServerKey;
-use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::future::BoxFuture;
 use std::future::Future;
 use std::net::SocketAddrV4;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::time::{sleep, Sleep};
-use tokio_retry::strategy::{jitter, ExponentialBackoff};
+use tokio::time::{Sleep, sleep};
+use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::Service;
 
 pub struct MakeClient {

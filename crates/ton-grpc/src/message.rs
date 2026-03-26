@@ -3,7 +3,7 @@
 use crate::ton::message_service_server::MessageService as BaseMessageService;
 use crate::ton::{SendRequest, SendResponse};
 use derive_new::new;
-use tonic::{async_trait, Request, Response, Status};
+use tonic::{Request, Response, Status, async_trait};
 use tonlibjson_client::ton::TonClient;
 
 #[derive(new)]

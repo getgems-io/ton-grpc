@@ -18,8 +18,8 @@ use std::time::Duration;
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
 use tonlibjson_client::ton::TonClientBuilder;
-use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
 use url::Url;
 
 #[derive(Parser, Debug)]

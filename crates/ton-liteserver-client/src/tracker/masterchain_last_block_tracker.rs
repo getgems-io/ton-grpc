@@ -5,11 +5,11 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::watch;
-use tokio::sync::watch::error::RecvError;
 use tokio::sync::watch::Ref;
+use tokio::sync::watch::error::RecvError;
 use tokio_util::sync::{CancellationToken, DropGuard};
-use ton_client_util::actor::cancellable_actor::CancellableActor;
 use ton_client_util::actor::Actor;
+use ton_client_util::actor::cancellable_actor::CancellableActor;
 use tower::{Service, ServiceExt};
 
 pub struct MasterchainLastBlockTrackerActor<S> {
@@ -28,17 +28,17 @@ where
     E: Debug,
     S: Send + 'static,
     S: Service<
-        LiteServerGetMasterchainInfo,
-        Response = LiteServerMasterchainInfo,
-        Error = E,
-        Future: Send,
-    >,
+            LiteServerGetMasterchainInfo,
+            Response = LiteServerMasterchainInfo,
+            Error = E,
+            Future: Send,
+        >,
     S: Service<
-        WaitSeqno<LiteServerGetMasterchainInfo>,
-        Response = LiteServerMasterchainInfo,
-        Error = E,
-        Future: Send,
-    >,
+            WaitSeqno<LiteServerGetMasterchainInfo>,
+            Response = LiteServerMasterchainInfo,
+            Error = E,
+            Future: Send,
+        >,
 {
     type Output = ();
 

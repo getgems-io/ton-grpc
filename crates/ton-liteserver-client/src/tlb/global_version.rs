@@ -1,5 +1,5 @@
-use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 use toner::tlb::bits::NBits;
+use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 
 /// ```tlb
 /// capabilities#c4 version:uint32 capabilities:uint64 = GlobalVersion;

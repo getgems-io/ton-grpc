@@ -1,6 +1,6 @@
 use convert_case::Case::UpperCamel;
 use convert_case::{Case, Casing};
-use quote::{format_ident, quote, ToTokens};
+use quote::{ToTokens, format_ident, quote};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::{env, fs};

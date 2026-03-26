@@ -1,4 +1,4 @@
-use toner::tlb::bits::{de::BitReaderExt, NBits};
+use toner::tlb::bits::{NBits, de::BitReaderExt};
 use toner::tlb::de::{
     CellDeserialize, CellDeserializeAs, CellDeserializeOwned, CellParser, CellParserError,
 };
