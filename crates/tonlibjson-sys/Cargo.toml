@@ -2,6 +2,7 @@
 name = "tonlibjson-sys"
 version = "0.4.9"
 edition = "2024"
+rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 license = "MIT"
 links = "tonlibjson"

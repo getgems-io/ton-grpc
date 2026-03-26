@@ -2,6 +2,7 @@
 name = "adnl-tcp"
 version = "0.3.0"
 edition = "2024"
+rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
