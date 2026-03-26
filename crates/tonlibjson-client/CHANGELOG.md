@@ -6,6 +6,21 @@
 
 
 
+## [0.21.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.20.5...tonlibjson-client-v0.21.0) (2026-03-26)
+
+
+### Features
+
+* **ci:** init moon ([ff5a77d](https://github.com/getgems-io/ton-grpc/commit/ff5a77d34559180f45798b8b4414db182518683e))
+* mv sources to crates/ dir ([4a2b4ff](https://github.com/getgems-io/ton-grpc/commit/4a2b4ff1d8a9a132b75328b813fd6f36d3013f33))
+* **tl-parser:** rename tl_parser ([8d196e6](https://github.com/getgems-io/ton-grpc/commit/8d196e6df853b9de47c715a4da73710534ab5dc5))
+* **tonlibjson-client:** load config from str ([44060ca](https://github.com/getgems-io/ton-grpc/commit/44060ca32ad51f96d6235c1e2c4b61247fa1f48b))
+
+
+### Bug Fixes
+
+* **ci:** checkout submodules ([9185901](https://github.com/getgems-io/ton-grpc/commit/9185901cefe9dca5a35d18d915cf0c3bf4abd463))
+
 ## [0.20.5](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.20.4...tonlibjson-client-v0.20.5) (2026-01-22)
 
 ## [0.20.4](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-client-v0.20.3...tonlibjson-client-v0.20.4) (2025-10-08)

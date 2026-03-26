@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0](https://github.com/getgems-io/ton-grpc/compare/ton-liteserver-client-v0.2.3...ton-liteserver-client-v0.3.0) (2026-03-26)
+
+
+### Features
+
+* **ci:** init moon ([ff5a77d](https://github.com/getgems-io/ton-grpc/commit/ff5a77d34559180f45798b8b4414db182518683e))
+* mv sources to crates/ dir ([4a2b4ff](https://github.com/getgems-io/ton-grpc/commit/4a2b4ff1d8a9a132b75328b813fd6f36d3013f33))
+* **tl-parser:** rename tl_parser ([8d196e6](https://github.com/getgems-io/ton-grpc/commit/8d196e6df853b9de47c715a4da73710534ab5dc5))
+
+
+### Bug Fixes
+
+* **ci:** checkout submodules ([9185901](https://github.com/getgems-io/ton-grpc/commit/9185901cefe9dca5a35d18d915cf0c3bf4abd463))
+
 ## [0.2.3](https://github.com/getgems-io/ton-grpc/compare/ton-liteserver-client-v0.2.2...ton-liteserver-client-v0.2.3) (2025-04-30)
 
 
