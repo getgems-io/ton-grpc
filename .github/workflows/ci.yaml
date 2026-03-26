@@ -46,6 +46,7 @@ jobs:
                 with:
                     cache-base: master
                     inherit-toolchain: true
+                    bins: cargo-nextest
                 env:
                     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             -   uses: moonrepo/setup-toolchain@v0
