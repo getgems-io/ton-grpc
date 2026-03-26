@@ -37,7 +37,7 @@ Follow **TDD** (Test-Driven Development):
 
 ### Test Structure
 
-All tests MUST follow the **AAA** (Arrange-Act-Assert) pattern:
+All tests MUST follow the **AAA** (Arrange-Act-Assert) pattern. Do NOT write `// Arrange`, `// Act`, `// Assert` comments — separate these sections with blank lines instead.
 
 Unit tests MUST be placed in a `mod tests` module:
 
@@ -46,13 +46,10 @@ Unit tests MUST be placed in a `mod tests` module:
 mod tests {
     #[test]
     fn should_do_something() {
-        // Arrange
         let input = create_test_input();
 
-        // Act
         let result = function_under_test(input);
 
-        // Assert
         assert_eq!(result, expected);
     }
 }
@@ -71,6 +68,11 @@ mod integration {
     }
 }
 ```
+
+### Test Hygiene
+
+- Keep tests minimal and focused: no debug logging (`info!`, `debug!`), no artificial timeouts (`tokio::time::timeout`), no verbose comments.
+- Place tests close to the code they test — in the same source file (`mod tests` / `mod integration`), not in `tests/` directory, unless there is a specific reason.
 
 ### Running Tests
 

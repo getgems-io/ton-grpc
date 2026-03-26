@@ -3240,6 +3240,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
+ "serde_json",
  "testcontainers",
  "tokio",
 ]
@@ -3731,6 +3732,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn",
+ "testcontainers-ton",
  "thiserror 2.0.18",
  "tl-parser",
  "tokio",
