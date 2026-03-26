@@ -29,8 +29,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 use tokio_stream::StreamMap;
-use tokio_util::either;
-use ton_client_util::discover::config::LiteServerId;
+use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use ton_client_util::discover::{
     LiteServerDiscover, read_ton_config_from_file_stream, read_ton_config_from_url_stream,
 };
@@ -70,8 +69,9 @@ const MAIN_CHAIN: i32 = -1;
 const MAIN_SHARD: i64 = -9223372036854775808;
 
 enum ConfigSource {
-    FromFile { path: PathBuf },
-    FromUrl { url: Url, interval: Duration },
+    File { path: PathBuf },
+    Url { url: Url, interval: Duration },
+    Config { config: String },
 }
 
 pub struct TonClientBuilder {
@@ -90,7 +90,7 @@ pub struct TonClientBuilder {
 impl Default for TonClientBuilder {
     fn default() -> Self {
         Self {
-            config_source: ConfigSource::FromUrl {
+            config_source: ConfigSource::Url {
                 url: default_ton_config_url(),
                 interval: Duration::from_secs(60),
             },
@@ -110,14 +110,23 @@ impl Default for TonClientBuilder {
 impl TonClientBuilder {
     pub fn from_config_path(path: PathBuf) -> Self {
         Self {
-            config_source: ConfigSource::FromFile { path },
+            config_source: ConfigSource::File { path },
             ..Default::default()
         }
     }
 
     pub fn from_config_url(url: Url, interval: Duration) -> Self {
         Self {
-            config_source: ConfigSource::FromUrl { url, interval },
+            config_source: ConfigSource::Url { url, interval },
+            ..Default::default()
+        }
+    }
+
+    pub fn from_config(config: &str) -> Self {
+        Self {
+            config_source: ConfigSource::Config {
+                config: config.to_owned(),
+            },
             ..Default::default()
         }
     }
@@ -177,20 +186,25 @@ impl TonClientBuilder {
     }
 
     pub fn build(self) -> anyhow::Result<TonClient> {
-        let stream = match self.config_source {
-            ConfigSource::FromFile { path } => {
-                let mut interval = tokio::time::interval(Duration::from_secs(1));
-                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        let stream: Pin<Box<dyn Stream<Item = Result<TonConfig, anyhow::Error>> + Send>> =
+            match self.config_source {
+                ConfigSource::File { path } => {
+                    let mut interval = tokio::time::interval(Duration::from_secs(1));
+                    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-                either::Either::Left(read_ton_config_from_file_stream(path, interval))
-            }
-            ConfigSource::FromUrl { url, interval } => {
-                let mut interval = tokio::time::interval(interval);
-                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                    Box::pin(read_ton_config_from_file_stream(path, interval))
+                }
+                ConfigSource::Url { url, interval } => {
+                    let mut interval = tokio::time::interval(interval);
+                    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-                either::Either::Right(read_ton_config_from_url_stream(url.clone(), interval))
-            }
-        };
+                    Box::pin(read_ton_config_from_url_stream(url.clone(), interval))
+                }
+                ConfigSource::Config { config } => {
+                    let config: TonConfig = serde_json::from_str(&config)?;
+                    Box::pin(stream::once(async { Ok(config) }))
+                }
+            };
         let lite_server_discover = LiteServerDiscover::new(stream);
         let client_discover = lite_server_discover.then(|s| async {
             match s {
@@ -1025,5 +1039,24 @@ impl TonClient {
         let state = self.raw_get_account_state_on_block(account, block).await?;
 
         state.last_transaction_id.ok_or(anyhow!("tx not found"))
+    }
+}
+
+#[cfg(test)]
+mod integration {
+    use super::*;
+    use testcontainers_ton::LocalLiteServer;
+
+    #[tokio::test]
+    async fn should_get_masterchain_info() -> anyhow::Result<()> {
+        let server = LocalLiteServer::new().await?;
+        let mut client = TonClientBuilder::from_config(server.config()).build()?;
+        client.ready().await?;
+
+        let masterchain_info = client.get_masterchain_info().await?;
+
+        assert!(masterchain_info.last.seqno > 0);
+
+        Ok(())
     }
 }
