@@ -1,18 +1,8 @@
 id: 'root'
 
 tasks:
-  git/submodule/update:
-    command: 'git submodule update --init --single-branch --depth 1'
-    options:
-      cache: false
-      internal: true
-      mutex: "git-submodule-update"
-
   git/submodule/update/recursive:
     command: 'git submodule update --init --single-branch --recursive --depth 1'
-    deps:
-      - '~:git/submodule/update'
     options:
       cache: false
       internal: true
-      mutex: "git-submodule-update"

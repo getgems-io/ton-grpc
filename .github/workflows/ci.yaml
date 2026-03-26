@@ -41,6 +41,7 @@ jobs:
                 with:
                     submodules: false
                     fetch-depth: 0
+            -   run: git submodule update --init --single-branch
             -   uses: moonrepo/setup-rust@v1
                 with:
                     cache-base: master
