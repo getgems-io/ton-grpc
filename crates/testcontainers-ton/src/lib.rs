@@ -3,7 +3,7 @@ pub mod lite_server;
 
 use crate::genesis::Genesis;
 use crate::lite_server::LiteServer;
-use anyhow::Result;
+use anyhow::{Result, anyhow};
 use base64::Engine;
 use std::net::{Ipv4Addr, SocketAddrV4};
 use testcontainers::ContainerAsync;
@@ -39,7 +39,7 @@ impl LocalLiteServer {
             .try_into()?;
 
         let addr = SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), port);
-        let config = Self::build_config(&global_config, &addr, &server_key);
+        let config = Self::build_config(global_config, &addr, &server_key)?;
 
         Ok(Self {
             genesis,
@@ -63,17 +63,16 @@ impl LocalLiteServer {
     }
 
     fn build_config(
-        global_config: &serde_json::Value,
+        mut config: serde_json::Value,
         addr: &SocketAddrV4,
         server_key: &ServerKey,
-    ) -> String {
+    ) -> Result<String> {
         let ip: u32 = (*addr.ip()).into();
         let key = base64::engine::general_purpose::STANDARD.encode(server_key);
 
-        let mut data = global_config.clone();
-        let obj = data
+        let obj = config
             .as_object_mut()
-            .expect("global config must be a JSON object");
+            .ok_or(anyhow!("global config must be a JSON object"))?;
         obj.insert(
             "liteservers".to_string(),
             serde_json::json!([
@@ -88,6 +87,6 @@ impl LocalLiteServer {
             ]),
         );
 
-        data.to_string()
+        Ok(config.to_string())
     }
 }
