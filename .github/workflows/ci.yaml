@@ -21,6 +21,7 @@ env:
     IMAGE_NAME: ${{ github.repository }}
     SCCACHE_GHA_ENABLED: true
     NEXTEST_PROFILE: ci
+    MOON_TOOLCHAIN_FORCE_GLOBALS: true
 concurrency:
     group: ${{ github.workflow }}-${{ github.ref }}
     cancel-in-progress: false
@@ -48,8 +49,11 @@ jobs:
                     cache-base: master
                     inherit-toolchain: true
                     bins: cargo-nextest
+                    cache-extra-identifier: ${{ matrix.os }}
                 env:
                     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            -   name: Run sccache-cache
+                uses: mozilla-actions/sccache-action@v0.0.8
             -   uses: moonrepo/setup-toolchain@v0
                 with:
                     auto-install: true
