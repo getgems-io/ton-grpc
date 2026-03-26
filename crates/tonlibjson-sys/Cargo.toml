@@ -1,6 +1,6 @@
 [package]
 name = "tonlibjson-sys"
-version = "0.4.9"
+version = "0.5.0"
 edition = "2024"
 rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]

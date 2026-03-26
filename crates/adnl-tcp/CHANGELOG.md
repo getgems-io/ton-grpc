@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.4.0](https://github.com/getgems-io/ton-grpc/compare/adnl-tcp-v0.3.0...adnl-tcp-v0.4.0) (2026-03-26)
+
+
+### Features
+
+* **ci:** init moon ([ff5a77d](https://github.com/getgems-io/ton-grpc/commit/ff5a77d34559180f45798b8b4414db182518683e))
+* mv sources to crates/ dir ([4a2b4ff](https://github.com/getgems-io/ton-grpc/commit/4a2b4ff1d8a9a132b75328b813fd6f36d3013f33))
+
+
+### Bug Fixes
+
+* **deps:** bump sha2 from 0.10.9 to 0.11.0 ([8d6d396](https://github.com/getgems-io/ton-grpc/commit/8d6d3968c6cdef867544cb7fc9f191b9c9b7f93d))
+
 ## [0.3.0](https://github.com/getgems-io/ton-grpc/compare/adnl-tcp-v0.2.0...adnl-tcp-v0.3.0) (2024-07-23)
 
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.0](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.9...tonlibjson-sys-v0.5.0) (2026-03-26)
+
+
+### Features
+
+* **ci:** init moon ([ff5a77d](https://github.com/getgems-io/ton-grpc/commit/ff5a77d34559180f45798b8b4414db182518683e))
+* mv sources to crates/ dir ([4a2b4ff](https://github.com/getgems-io/ton-grpc/commit/4a2b4ff1d8a9a132b75328b813fd6f36d3013f33))
+* **tonlibjson-sys:** delete features ([4f015fa](https://github.com/getgems-io/ton-grpc/commit/4f015fa43c166067761ff2282b140878ef24fbf5))
+
 ## [0.4.9](https://github.com/getgems-io/ton-grpc/compare/tonlibjson-sys-v0.4.8...tonlibjson-sys-v0.4.9) (2026-01-22)
 
 

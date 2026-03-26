@@ -46,6 +46,14 @@
 
 
 
+## [0.12.0](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.11.6...ton-grpc-v0.12.0) (2026-03-26)
+
+
+### Features
+
+* **ci:** init moon ([ff5a77d](https://github.com/getgems-io/ton-grpc/commit/ff5a77d34559180f45798b8b4414db182518683e))
+* mv sources to crates/ dir ([4a2b4ff](https://github.com/getgems-io/ton-grpc/commit/4a2b4ff1d8a9a132b75328b813fd6f36d3013f33))
+
 ## [0.11.6](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.11.5...ton-grpc-v0.11.6) (2026-01-22)
 
 ## [0.11.5](https://github.com/getgems-io/ton-grpc/compare/ton-grpc-v0.11.4...ton-grpc-v0.11.5) (2025-10-08)
