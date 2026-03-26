@@ -1,14 +1,3 @@
 $schema: '../../.moon/cache/schemas/project.json'
 
 layer: 'library'
-
-tasks:
-  build:
-    deps:
-      - 'root:git/submodule/update'
-  check:
-    deps:
-      - 'root:git/submodule/update'
-  lint:
-    deps:
-      - 'root:git/submodule/update'
