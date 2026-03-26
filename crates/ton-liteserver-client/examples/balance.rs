@@ -1,9 +1,9 @@
 use base64::Engine;
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use std::net::SocketAddrV4;
 use std::time::Duration;
 use tokio::time::Instant;
-use ton_client_util::discover::{read_ton_config_from_url_stream, LiteServerDiscover};
+use ton_client_util::discover::{LiteServerDiscover, read_ton_config_from_url_stream};
 use ton_client_util::router::balance::Balance;
 use ton_client_util::service::shared::SharedLayer;
 use ton_client_util::service::timeout::TimeoutLayer;

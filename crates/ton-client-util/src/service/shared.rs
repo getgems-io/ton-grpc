@@ -2,7 +2,7 @@ use pin_project::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll, ready};
 use tower::load::Load;
 use tower::{Layer, Service};
 

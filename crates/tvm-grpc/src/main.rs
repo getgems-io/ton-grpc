@@ -14,8 +14,8 @@ use std::time::Duration;
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
 use tonlibjson_sys::TvmEmulator;
-use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
+use tracing_subscriber::fmt::format::FmtSpan;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]

@@ -1,5 +1,5 @@
 use rand::random;
-use sha2::{digest::Update, Digest, Sha256};
+use sha2::{Digest, Sha256, digest::Update};
 use std::fmt::{Debug, Formatter};
 
 #[derive(PartialEq, Eq)]

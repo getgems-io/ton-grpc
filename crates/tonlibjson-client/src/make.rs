@@ -2,7 +2,7 @@ use crate::block::BlocksGetMasterchainInfo;
 use crate::client::Client;
 use crate::cursor::client::CursorClient;
 use crate::error::ErrorLayer;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};

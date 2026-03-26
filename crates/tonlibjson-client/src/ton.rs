@@ -17,7 +17,7 @@ use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use anyhow::anyhow;
 use async_stream::try_stream;
-use futures::{stream, try_join, Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt};
+use futures::{Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt, stream, try_join};
 use itertools::Itertools;
 use serde_json::Value;
 use std::cmp::min;
@@ -32,15 +32,15 @@ use tokio_stream::StreamMap;
 use tokio_util::either;
 use ton_client_util::discover::config::LiteServerId;
 use ton_client_util::discover::{
-    read_ton_config_from_file_stream, read_ton_config_from_url_stream, LiteServerDiscover,
+    LiteServerDiscover, read_ton_config_from_file_stream, read_ton_config_from_url_stream,
 };
 use ton_client_util::router::balance::Balance;
 use ton_client_util::router::route::{BlockCriteria, Route};
 use ton_client_util::service::shared::SharedService;
 use tower::discover::Change;
 use tower::load::PeakEwmaDiscover;
-use tower::retry::budget::TpsBudget;
 use tower::retry::Retry;
+use tower::retry::budget::TpsBudget;
 use tower::timeout::Timeout;
 use tower::util::Either;
 use tower::{Layer, ServiceExt};
@@ -533,10 +533,10 @@ impl TonClient {
 
             for await (key, tx) in stream_map {
                 let tx = tx?;
-                if let Some(prev_tx) = last.get(&!key) {
-                    if prev_tx == &tx {
-                        return;
-                    }
+                if let Some(prev_tx) = last.get(&!key)
+                    && prev_tx == &tx
+                {
+                    return;
                 }
                 last.insert(key, tx.clone());
                 yield tx;
@@ -949,12 +949,16 @@ impl TonClient {
             for await (key, tx) in stream_map {
                 let tx = tx?;
 
-                if let Some(addr) = last.get(&!key) {
-                    if addr == tx.account() { return }
+                if let Some(addr) = last.get(&!key)
+                    && addr == tx.account()
+                {
+                    return;
                 }
 
-                if let Some(addr) = last.get(&key) {
-                    if addr == tx.account() { continue }
+                if let Some(addr) = last.get(&key)
+                    && addr == tx.account()
+                {
+                    continue;
                 }
 
                 last.insert(key, tx.account().to_owned());

@@ -1,9 +1,9 @@
-use anyhow::{anyhow, Context};
-use base64::display::Base64Display;
+use anyhow::{Context, anyhow};
 use base64::Engine;
+use base64::display::Base64Display;
 use bytes::BufMut;
 use crc::Crc;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 use std::str::FromStr;

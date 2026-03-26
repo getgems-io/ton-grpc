@@ -1,5 +1,5 @@
 use crate::tlb::block_info::BlockInfo;
-use toner::tlb::bits::{de::BitReaderExt, NBits};
+use toner::tlb::bits::{NBits, de::BitReaderExt};
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::{Cell, ParseFully, Ref};
 

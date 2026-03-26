@@ -11,7 +11,7 @@ use anyhow::Context;
 use derive_new::new;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};
-use tonic::{async_trait, Request, Response, Status};
+use tonic::{Request, Response, Status, async_trait};
 use tonlibjson_client::ton::TonClient;
 
 #[derive(new)]

@@ -4,8 +4,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
-use tower::load::Load;
 use tower::Service;
+use tower::load::Load;
 
 type Counter = Arc<std::sync::atomic::AtomicI32>;
 

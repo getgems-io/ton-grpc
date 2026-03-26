@@ -2,9 +2,9 @@ use crate::block::{
     BlocksGetBlockHeader, BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader,
     BlocksLookupBlock, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt,
 };
+use crate::cursor::ShardId;
 use crate::cursor::client::InnerClient;
 use crate::cursor::registry::Registry;
-use crate::cursor::ShardId;
 use anyhow::Result;
 use futures::never::Never;
 use std::borrow::Cow;
@@ -13,11 +13,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio::sync::watch::Sender;
-use tokio::time::{interval, MissedTickBehavior};
-use tokio_retry::strategy::{jitter, FibonacciBackoff};
+use tokio::time::{MissedTickBehavior, interval};
 use tokio_retry::Retry;
-use tower::load::Load;
+use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use tower::ServiceExt;
+use tower::load::Load;
 
 pub struct LastBlockDiscover {
     id: Cow<'static, str>,

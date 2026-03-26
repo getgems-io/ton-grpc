@@ -1,13 +1,13 @@
 use crate::block::{RawSendMessage, RawSendMessageReturnHash};
 use crate::error::Error;
-use futures::future::BoxFuture;
 use futures::FutureExt;
+use futures::future::BoxFuture;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio_retry::strategy::{jitter, FibonacciBackoff};
+use tokio_retry::strategy::{FibonacciBackoff, jitter};
 use ton_client_util::router::route::Error as RouterError;
-use tower::retry::budget::{Budget, TpsBudget};
 use tower::retry::Policy;
+use tower::retry::budget::{Budget, TpsBudget};
 
 #[derive(Clone)]
 pub struct RetryPolicy {

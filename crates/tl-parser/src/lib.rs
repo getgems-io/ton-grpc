@@ -1,7 +1,7 @@
 use crate::FieldType::{Plain, Repetition};
 use anyhow::{anyhow, bail};
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_till, take_until, take_while, take_while1, take_while_m_n};
+use nom::bytes::complete::{tag, take_till, take_until, take_while, take_while_m_n, take_while1};
 use nom::character::complete::{line_ending, multispace0, multispace1, satisfy, space0};
 use nom::combinator::{map, opt, recognize};
 use nom::error::{Error, ErrorKind};
@@ -1158,12 +1158,14 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
 
         assert_eq!(
             output,
-            vec![Combinator::new("vector", "Vector t")
-                .with_optional_fields(vec![OptionalField::new("t", "Type")])
-                .with_fields(vec![
-                    Field::unnamed_plain("#"),
-                    Field::repetition(None, None, vec![Field::unnamed_plain("t")]),
-                ])]
+            vec![
+                Combinator::new("vector", "Vector t")
+                    .with_optional_fields(vec![OptionalField::new("t", "Type")])
+                    .with_fields(vec![
+                        Field::unnamed_plain("#"),
+                        Field::repetition(None, None, vec![Field::unnamed_plain("t")]),
+                    ])
+            ]
         );
     }
 
@@ -1193,8 +1195,10 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
 
         assert_eq!(
             output,
-            vec![Combinator::new("exportedKey", "ExportedKey")
-                .with_fields(vec![Field::plain("word_list", "vector<secureString>")])]
+            vec![
+                Combinator::new("exportedKey", "ExportedKey")
+                    .with_fields(vec![Field::plain("word_list", "vector<secureString>")])
+            ]
         );
     }
 
@@ -1206,8 +1210,10 @@ boolStat statTrue:int statFalse:int statUnknown:int = BoolStat;";
 
         assert_eq!(
             output,
-            vec![Combinator::new("smc.libraryResult", "smc.LibraryResult")
-                .with_fields(vec![Field::plain("result", "vector smc.libraryEntry")])]
+            vec![
+                Combinator::new("smc.libraryResult", "smc.LibraryResult")
+                    .with_fields(vec![Field::plain("result", "vector smc.libraryEntry")])
+            ]
         );
     }
 
@@ -1295,16 +1301,18 @@ d = !D;
 
         assert_eq!(
             output,
-            vec![Combinator::new(
-                "storage.daemon.getTorrentPiecesInfo",
-                "storage.daemon.TorrentPiecesInfo"
-            )
-            .with_fields(vec![
-                Field::plain("hash", "int256"),
-                Field::plain("flags", "#"),
-                Field::plain("offset", "long"),
-                Field::plain("max_pieces", "long"),
-            ]),]
+            vec![
+                Combinator::new(
+                    "storage.daemon.getTorrentPiecesInfo",
+                    "storage.daemon.TorrentPiecesInfo"
+                )
+                .with_fields(vec![
+                    Field::plain("hash", "int256"),
+                    Field::plain("flags", "#"),
+                    Field::plain("offset", "long"),
+                    Field::plain("max_pieces", "long"),
+                ]),
+            ]
         );
     }
 
@@ -1321,8 +1329,10 @@ d = !D;
         assert_eq!(output[0].constructor_number_be(), 0x9a2b084d);
         assert_eq!(
             output,
-            vec![Combinator::new("tcp.ping", "tcp.Pong")
-                .with_fields(vec![Field::plain("random_id", "long")])]
+            vec![
+                Combinator::new("tcp.ping", "tcp.Pong")
+                    .with_fields(vec![Field::plain("random_id", "long")])
+            ]
         );
     }
 

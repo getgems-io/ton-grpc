@@ -3,8 +3,8 @@ use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetBlockHeader, LiteServerGetMasterchainInfo};
 use ton_liteserver_client::tlb::block_header::BlockHeader;
 use ton_liteserver_client::tlb::merkle_proof::MerkleProof;
-use toner::tlb::bits::de::unpack_bytes;
 use toner::tlb::BoC;
+use toner::tlb::bits::de::unpack_bytes;
 use tower::ServiceExt;
 
 #[tokio::main]

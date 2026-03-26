@@ -90,8 +90,8 @@ pub async fn read_ton_config(path: impl AsRef<Path>) -> anyhow::Result<TonConfig
 
 #[cfg(test)]
 mod tests {
-    use crate::discover::config::{load_ton_config, TonConfig};
-    use serde_json::{json, Value};
+    use crate::discover::config::{TonConfig, load_ton_config};
+    use serde_json::{Value, json};
 
     #[test]
     fn ton_config_to_string() {
