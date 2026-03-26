@@ -39,6 +39,8 @@ crc = "3.4.0"
 [dev-dependencies]
 tracing-test = "0.2.6"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+testcontainers-ton = { path = "../testcontainers-ton" }
+ton-client = { path = "../ton-client" }
 
 [build-dependencies]
 tl-parser = { path = "../tl-parser" }

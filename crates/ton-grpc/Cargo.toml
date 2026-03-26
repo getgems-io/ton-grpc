@@ -10,6 +10,7 @@ default = []
 testnet = ["tonlibjson-client/testnet"]
 
 [dependencies]
+ton-client = { path = "../ton-client" }
 tonlibjson-client = { path = "../tonlibjson-client" }
 tokio = { version = "1.50.0", features = ["full"] }
 futures = "0.3.32"

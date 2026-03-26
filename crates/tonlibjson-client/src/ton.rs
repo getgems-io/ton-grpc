@@ -30,8 +30,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 use tokio_stream::StreamMap;
-use tokio_util::either;
-use ton_client_util::discover::config::LiteServerId;
+use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use ton_client_util::discover::{
     LiteServerDiscover, read_ton_config_from_file_stream, read_ton_config_from_url_stream,
 };
@@ -73,6 +72,7 @@ const MAIN_SHARD: i64 = -9223372036854775808;
 enum ConfigSource {
     FromFile { path: PathBuf },
     FromUrl { url: Url, interval: Duration },
+    Static { config: TonConfig },
 }
 
 pub struct TonClientBuilder {
@@ -119,6 +119,13 @@ impl TonClientBuilder {
     pub fn from_config_url(url: Url, interval: Duration) -> Self {
         Self {
             config_source: ConfigSource::FromUrl { url, interval },
+            ..Default::default()
+        }
+    }
+
+    pub fn from_config(config: TonConfig) -> Self {
+        Self {
+            config_source: ConfigSource::Static { config },
             ..Default::default()
         }
     }
@@ -178,20 +185,24 @@ impl TonClientBuilder {
     }
 
     pub fn build(self) -> anyhow::Result<TonClient> {
-        let stream = match self.config_source {
-            ConfigSource::FromFile { path } => {
-                let mut interval = tokio::time::interval(Duration::from_secs(1));
-                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+        let stream: Pin<Box<dyn Stream<Item = Result<TonConfig, anyhow::Error>> + Send>> =
+            match self.config_source {
+                ConfigSource::FromFile { path } => {
+                    let mut interval = tokio::time::interval(Duration::from_secs(1));
+                    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-                either::Either::Left(read_ton_config_from_file_stream(path, interval))
-            }
-            ConfigSource::FromUrl { url, interval } => {
-                let mut interval = tokio::time::interval(interval);
-                interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
+                    Box::pin(read_ton_config_from_file_stream(path, interval))
+                }
+                ConfigSource::FromUrl { url, interval } => {
+                    let mut interval = tokio::time::interval(interval);
+                    interval.set_missed_tick_behavior(MissedTickBehavior::Skip);
 
-                either::Either::Right(read_ton_config_from_url_stream(url.clone(), interval))
-            }
-        };
+                    Box::pin(read_ton_config_from_url_stream(url.clone(), interval))
+                }
+                ConfigSource::Static { config } => {
+                    Box::pin(stream::once(async { Ok(config) }).chain(stream::pending()))
+                }
+            };
         let lite_server_discover = LiteServerDiscover::new(stream);
         let client_discover = lite_server_discover.then(|s| async {
             match s {
@@ -1303,8 +1314,8 @@ impl ton_client::client::TonClient for TonClient {
         Self::Error,
     > {
         let range = (
-            range.0.map(|v| InternalTransactionId::from(v)),
-            range.1.map(|v| InternalTransactionId::from(v)),
+            range.0.map(InternalTransactionId::from),
+            range.1.map(InternalTransactionId::from),
         );
         self.get_account_tx_range_unordered(address, range)
             .await
@@ -1320,8 +1331,8 @@ impl ton_client::client::TonClient for TonClient {
         ),
     ) -> BoxStream<'static, Result<ton_client::types::RawTransaction, Self::Error>> {
         let range = (
-            range.0.map(|v| InternalTransactionId::from(v)),
-            range.1.map(|v| InternalTransactionId::from(v)),
+            range.0.map(InternalTransactionId::from),
+            range.1.map(InternalTransactionId::from),
         );
         self.get_account_tx_range(address, range)
             .map_ok(Into::into)
@@ -1368,5 +1379,86 @@ impl ton_client::client::TonClient for TonClient {
         self.get_accounts_in_block_stream(&block)
             .map_ok(Into::into)
             .boxed()
+    }
+}
+
+#[cfg(test)]
+mod integration {
+    use testcontainers_ton::LocalLiteServer;
+    use ton_client::client::TonClient as TonClientTrait;
+    use ton_client_util::discover::config::TonConfig;
+
+    use super::*;
+
+    async fn setup() -> (TonClient, LocalLiteServer) {
+        let local = LocalLiteServer::new().await.unwrap();
+        let config: TonConfig = serde_json::from_value(local.get_config_json().clone()).unwrap();
+        let mut client = TonClientBuilder::from_config(config).build().unwrap();
+        client.ready().await.unwrap();
+
+        (client, local)
+    }
+
+    #[tokio::test]
+    async fn get_masterchain_info() {
+        let (client, _local) = setup().await;
+
+        let info = TonClientTrait::get_masterchain_info(&client).await.unwrap();
+
+        assert_eq!(info.last.workchain, -1);
+        assert!(info.last.seqno > 0);
+    }
+
+    #[tokio::test]
+    async fn look_up_block_and_get_header() {
+        let (client, _local) = setup().await;
+        let info = TonClientTrait::get_masterchain_info(&client).await.unwrap();
+
+        let block = TonClientTrait::look_up_block_by_seqno(
+            &client,
+            info.last.workchain,
+            info.last.shard,
+            info.last.seqno,
+        )
+        .await
+        .unwrap();
+        let header = TonClientTrait::get_block_header(
+            &client,
+            block.workchain,
+            block.shard,
+            block.seqno,
+            Some((block.root_hash.clone(), block.file_hash.clone())),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(block.workchain, -1);
+        assert_eq!(block.seqno, info.last.seqno);
+        assert_eq!(header.id.seqno, block.seqno);
+        assert!(header.end_lt >= header.start_lt);
+    }
+
+    #[tokio::test]
+    async fn get_shards_by_block_id() {
+        let (client, _local) = setup().await;
+        let info = TonClientTrait::get_masterchain_info(&client).await.unwrap();
+
+        let shards = TonClientTrait::get_shards_by_block_id(&client, info.last)
+            .await
+            .unwrap();
+
+        assert!(!shards.is_empty());
+        for shard in &shards {
+            assert_eq!(shard.workchain, 0);
+        }
+    }
+
+    #[tokio::test]
+    async fn send_message_returns_error_for_invalid_body() {
+        let (client, _local) = setup().await;
+
+        let result = TonClientTrait::send_message_returning_hash(&client, "invalid_boc").await;
+
+        assert!(result.is_err());
     }
 }

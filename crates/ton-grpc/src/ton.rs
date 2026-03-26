@@ -2,18 +2,21 @@ use crate::ton::get_account_state_response::AccountState;
 use crate::ton::message::MsgData;
 use anyhow::anyhow;
 use std::str::FromStr;
-use tonlibjson_client::address::AccountAddressData;
-use tonlibjson_client::block;
-use tonlibjson_client::block::{
-    MsgBoxedData, MsgDataDecryptedText, MsgDataEncryptedText, MsgDataRaw, MsgDataText,
+use ton_client::types::{
+    BlockIdExt as TonClientBlockIdExt, BlocksHeader as TonClientBlocksHeader,
+    InternalTransactionId as TonClientInternalTransactionId, MsgData as TonClientMsgData,
+    RawFullAccountState as TonClientRawFullAccountState, RawMessage as TonClientRawMessage,
+    RawTransaction as TonClientRawTransaction, ShortTxId as TonClientShortTxId,
+    TvmCell as TonClientTvmCell,
 };
+use tonlibjson_client::address::AccountAddressData;
 
 tonic::include_proto!("ton");
 
 pub(crate) const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("ton_descriptor");
 
-impl From<block::TonBlockIdExt> for BlockIdExt {
-    fn from(value: block::TonBlockIdExt) -> Self {
+impl From<TonClientBlockIdExt> for BlockIdExt {
+    fn from(value: TonClientBlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
             shard: value.shard,
@@ -24,7 +27,7 @@ impl From<block::TonBlockIdExt> for BlockIdExt {
     }
 }
 
-impl From<BlockIdExt> for block::TonBlockIdExt {
+impl From<BlockIdExt> for TonClientBlockIdExt {
     fn from(value: BlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
@@ -36,9 +39,13 @@ impl From<BlockIdExt> for block::TonBlockIdExt {
     }
 }
 
-impl From<(i32, block::BlocksShortTxId)> for TransactionId {
-    fn from((chain_id, value): (i32, block::BlocksShortTxId)) -> Self {
-        let address = value.clone().into_internal_string(chain_id);
+impl From<(i32, TonClientShortTxId)> for TransactionId {
+    fn from((chain_id, value): (i32, TonClientShortTxId)) -> Self {
+        let address =
+            tonlibjson_client::address::ShardContextAccountAddress::from_str(&value.account)
+                .expect("invalid shard context account address")
+                .into_internal(chain_id)
+                .to_string();
 
         Self {
             account_address: address,
@@ -48,8 +55,8 @@ impl From<(i32, block::BlocksShortTxId)> for TransactionId {
     }
 }
 
-impl From<block::BlocksHeader> for BlocksHeader {
-    fn from(value: block::BlocksHeader) -> Self {
+impl From<TonClientBlocksHeader> for BlocksHeader {
+    fn from(value: TonClientBlocksHeader) -> Self {
         Self {
             id: Some(value.id.into()),
             global_id: value.global_id,
@@ -74,8 +81,10 @@ impl From<block::BlocksHeader> for BlocksHeader {
     }
 }
 
-impl From<(&AccountAddressData, block::InternalTransactionId)> for TransactionId {
-    fn from((account_address, tx_id): (&AccountAddressData, block::InternalTransactionId)) -> Self {
+impl From<(&AccountAddressData, TonClientInternalTransactionId)> for TransactionId {
+    fn from(
+        (account_address, tx_id): (&AccountAddressData, TonClientInternalTransactionId),
+    ) -> Self {
         Self {
             account_address: account_address.to_raw_string(),
             lt: tx_id.lt,
@@ -84,7 +93,7 @@ impl From<(&AccountAddressData, block::InternalTransactionId)> for TransactionId
     }
 }
 
-impl From<TransactionId> for block::InternalTransactionId {
+impl From<TransactionId> for TonClientInternalTransactionId {
     fn from(value: TransactionId) -> Self {
         Self {
             hash: value.hash,
@@ -93,7 +102,7 @@ impl From<TransactionId> for block::InternalTransactionId {
     }
 }
 
-impl From<PartialTransactionId> for block::InternalTransactionId {
+impl From<PartialTransactionId> for TonClientInternalTransactionId {
     fn from(value: PartialTransactionId) -> Self {
         Self {
             hash: value.hash,
@@ -102,8 +111,8 @@ impl From<PartialTransactionId> for block::InternalTransactionId {
     }
 }
 
-impl From<block::RawFullAccountState> for AccountState {
-    fn from(value: block::RawFullAccountState) -> Self {
+impl From<TonClientRawFullAccountState> for AccountState {
+    fn from(value: TonClientRawFullAccountState) -> Self {
         if !value.code.is_empty() {
             AccountState::Active(ActiveAccountState {
                 code: value.code,
@@ -119,34 +128,34 @@ impl From<block::RawFullAccountState> for AccountState {
     }
 }
 
-impl From<block::TvmCell> for TvmCell {
-    fn from(value: block::TvmCell) -> Self {
+impl From<TonClientTvmCell> for TvmCell {
+    fn from(value: TonClientTvmCell) -> Self {
         Self { bytes: value.bytes }
     }
 }
 
-impl From<MsgBoxedData> for MsgData {
-    fn from(value: MsgBoxedData) -> Self {
+impl From<TonClientMsgData> for MsgData {
+    fn from(value: TonClientMsgData) -> Self {
         match value {
-            MsgBoxedData::MsgDataRaw(MsgDataRaw { body, init_state }) => {
+            TonClientMsgData::Raw { body, init_state } => {
                 Self::Raw(MessageDataRaw { body, init_state })
             }
-            MsgBoxedData::MsgDataText(MsgDataText { text }) => Self::Text(MessageDataText { text }),
-            MsgBoxedData::MsgDataDecryptedText(MsgDataDecryptedText { text }) => {
+            TonClientMsgData::Text { text } => Self::Text(MessageDataText { text }),
+            TonClientMsgData::DecryptedText { text } => {
                 Self::DecryptedText(MessageDataDecryptedText { text })
             }
-            MsgBoxedData::MsgDataEncryptedText(MsgDataEncryptedText { text }) => {
+            TonClientMsgData::EncryptedText { text } => {
                 Self::EncryptedText(MessageDataEncryptedText { text })
             }
         }
     }
 }
 
-impl From<block::RawMessage> for Message {
-    fn from(value: block::RawMessage) -> Self {
+impl From<TonClientRawMessage> for Message {
+    fn from(value: TonClientRawMessage) -> Self {
         Self {
-            source: value.source.account_address.map(|s| s.to_string()),
-            destination: value.destination.account_address.map(|s| s.to_string()),
+            source: value.source.account_address,
+            destination: value.destination.account_address,
             value: value.value,
             fwd_fee: value.fwd_fee,
             ihr_fee: value.ihr_fee,
@@ -157,8 +166,8 @@ impl From<block::RawMessage> for Message {
     }
 }
 
-impl From<(&AccountAddressData, block::RawTransaction)> for Transaction {
-    fn from((address, value): (&AccountAddressData, block::RawTransaction)) -> Self {
+impl From<(&AccountAddressData, TonClientRawTransaction)> for Transaction {
+    fn from((address, value): (&AccountAddressData, TonClientRawTransaction)) -> Self {
         Self {
             id: Some((address, value.transaction_id).into()),
             utime: value.utime,
@@ -172,10 +181,10 @@ impl From<(&AccountAddressData, block::RawTransaction)> for Transaction {
     }
 }
 
-impl TryFrom<(i32, block::RawTransaction)> for Transaction {
+impl TryFrom<(i32, TonClientRawTransaction)> for Transaction {
     type Error = anyhow::Error;
 
-    fn try_from((chain_id, value): (i32, block::RawTransaction)) -> Result<Self, Self::Error> {
+    fn try_from((chain_id, value): (i32, TonClientRawTransaction)) -> Result<Self, Self::Error> {
         let address = value
             .address
             .account_address

@@ -9,7 +9,7 @@ use crate::types::{
 };
 
 pub trait TonClient: Clone + Send + Sync + 'static {
-    type Error: Send + Sync + 'static;
+    type Error: std::fmt::Display + Send + Sync + 'static;
 
     fn ready(&mut self) -> impl Future<Output = Result<(), Self::Error>> + Send;
 
