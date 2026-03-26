@@ -43,7 +43,7 @@ mod tests {
 }
 
 #[link(name = "tonlib")]
-extern "C" {
+unsafe extern "C" {
     fn tonlib_client_json_create() -> *mut c_void;
 
     fn tonlib_client_json_destroy(p: *mut c_void);

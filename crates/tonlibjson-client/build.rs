@@ -428,11 +428,11 @@ impl Generator {
                                 .map(|s| generate_type_name(&s))
                                 .collect();
 
-                            let mut gen = format!("{}<{}>", type_name, args.join(","));
+                            let mut generic_argument = format!("{}<{}>", type_name, args.join(","));
                             if field.type_is_optional() || field_configuration.optional {
-                                gen = format!("Option<{gen}>");
+                                generic_argument = format!("Option<{generic_argument}>");
                             }
-                            Box::new(syn::parse_str::<GenericArgument>(&gen).unwrap())
+                            Box::new(syn::parse_str::<GenericArgument>(&generic_argument).unwrap())
                         } else {
                             let field_type = field.field_type();
                             if field_type.is_some_and(|s| {

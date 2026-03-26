@@ -1,7 +1,7 @@
 [package]
 name = "ton-contract"
 version = "0.1.10"
-edition = "2021"
+edition = "2024"
 authors = [
     "Arseny Mitin <mitinarseny@gmail.com>",
     "Andrei Kostylev <a.kostylev@pm.me>",

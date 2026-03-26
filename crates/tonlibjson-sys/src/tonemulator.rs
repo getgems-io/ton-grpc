@@ -3,7 +3,7 @@ use libc::{c_char, c_int, c_long, c_uint, c_ulong};
 use std::ffi::{c_void, CStr, CString};
 
 #[link(name = "emulator")]
-extern "C" {
+unsafe extern "C" {
     fn transaction_emulator_create(
         config_params_boc: *const c_char,
         vm_log_verbosity: c_int,

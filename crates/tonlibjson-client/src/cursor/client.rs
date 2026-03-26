@@ -106,7 +106,7 @@ impl CursorClient {
     fn last_block_loop(
         &self,
         mtx: Sender<Option<BlocksMasterchainInfo>>,
-    ) -> impl Future<Output = Infallible> {
+    ) -> impl Future<Output = Infallible> + use<> {
         let id = self.id.clone();
         let client = self.client.clone();
         let registry = self.registry.clone();
@@ -116,7 +116,7 @@ impl CursorClient {
         discover.discover()
     }
 
-    fn first_block_loop(&self) -> impl Future<Output = Infallible> {
+    fn first_block_loop(&self) -> impl Future<Output = Infallible> + use<> {
         let id = self.id.clone();
         let client = self.client.clone();
         let registry = self.registry.clone();
