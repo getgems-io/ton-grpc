@@ -53,7 +53,7 @@ jobs:
                 env:
                     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
             -   name: Run sccache-cache
-                uses: mozilla-actions/sccache-action@v0.0.8
+                uses: mozilla-actions/sccache-action@v0.0.9
             -   uses: moonrepo/setup-toolchain@v0
                 with:
                     auto-install: true
