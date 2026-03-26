@@ -34,5 +34,3 @@ runs:
     - run: brew install secp256k1 libsodium lz4 autoconf automake libtool zlib
       shell: bash
       if: runner.os == 'macOS'
-    - name: Run sccache-cache
-      uses: mozilla-actions/sccache-action@v0.0.8
