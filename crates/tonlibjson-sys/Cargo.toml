@@ -15,7 +15,7 @@ anyhow = { version = "1.0.102", features = ["backtrace"] }
 tracing = "0.1.44"
 
 [build-dependencies]
-cmake = "0.1.57"
+cmake = "0.1.58"
 pkg-config = "0.3.32"
 walkdir = "2.5"
 
