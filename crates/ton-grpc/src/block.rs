@@ -221,7 +221,9 @@ mod integration {
         assert_eq!(resp.workchain, last.workchain);
         assert_eq!(resp.shard, last.shard);
         assert_eq!(resp.seqno, last.seqno);
+        assert_eq!(resp.root_hash, last.root_hash);
         assert_eq!(resp.root_hash.len(), 44);
+        assert_eq!(resp.file_hash, last.file_hash);
         assert_eq!(resp.file_hash.len(), 44);
     }
 
@@ -280,6 +282,8 @@ mod integration {
 
         assert!(!resp.shards.is_empty());
         for shard in &resp.shards {
+            assert_eq!(shard.workchain, 0);
+            assert!(shard.seqno > 0);
             assert_eq!(shard.root_hash.len(), 44);
             assert_eq!(shard.file_hash.len(), 44);
         }
@@ -315,7 +319,7 @@ mod integration {
             let tx = tx.as_ref().unwrap();
             assert!(!tx.account_address.is_empty());
             assert!(tx.lt > 0);
-            assert!(!tx.hash.is_empty());
+            assert_eq!(tx.hash.len(), 44);
         }
     }
 
@@ -376,9 +380,13 @@ mod integration {
         assert!(!txs.is_empty());
         for tx in &txs {
             let tx = tx.as_ref().unwrap();
-            assert!(tx.id.is_some());
+            let id = tx.id.as_ref().unwrap();
+            assert!(!id.account_address.is_empty());
+            assert_eq!(id.hash.len(), 44);
+            assert!(id.lt > 0);
             assert!(tx.utime > 0);
             assert!(!tx.data.is_empty());
+            assert!(tx.fee >= 0);
         }
     }
 
