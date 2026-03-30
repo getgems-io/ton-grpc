@@ -14,5 +14,5 @@ async-trait = "0.1.89"
 base64 = "0.22.1"
 num-bigint = "0.4.6"
 thiserror = "2.0.17"
-tonlibjson-client = { path = "../tonlibjson-client" }
+ton-client = { path = "../ton-client" }
 toner = "0.7.3"

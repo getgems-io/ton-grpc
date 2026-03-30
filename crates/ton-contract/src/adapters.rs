@@ -1,6 +1,7 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use core::{fmt::Display, str::FromStr};
 use std::{error::Error as StdError, sync::Arc};
+use ton_client::StackEntry;
 use toner::{
     tlb::bits::de::unpack_bytes,
     tlb::bits::ser::pack,
@@ -10,14 +11,9 @@ use toner::{
     tlb::{BagOfCellsArgs, BoC, Cell, Error as TlbError},
 };
 
-use tonlibjson_client::block::{
-    TvmBoxedNumber, TvmBoxedStackEntry, TvmCell, TvmNumberDecimal, TvmSlice, TvmStackEntryCell,
-    TvmStackEntryNumber, TvmStackEntrySlice,
-};
-
 use crate::TonContractError;
 
-pub trait TvmBoxedStackEntryExt: Sized {
+pub trait StackEntryExt: Sized {
     fn to_boc(&self) -> Result<BoC, TonContractError>;
     #[inline]
     fn to_cell(&self) -> Result<Arc<Cell>, TonContractError> {
@@ -71,15 +67,10 @@ pub trait TvmBoxedStackEntryExt: Sized {
         T: Display;
 }
 
-impl TvmBoxedStackEntryExt for TvmBoxedStackEntry {
+impl StackEntryExt for StackEntry {
     fn to_boc(&self) -> Result<BoC, TonContractError> {
         let bytes = match self {
-            Self::TvmStackEntrySlice(TvmStackEntrySlice {
-                slice: TvmSlice { bytes },
-            })
-            | Self::TvmStackEntryCell(TvmStackEntryCell {
-                cell: TvmCell { bytes },
-            }) => bytes,
+            Self::Slice { bytes } | Self::Cell { bytes } => bytes,
             _ => return Err(TonContractError::InvalidStack),
         };
 
@@ -89,20 +80,18 @@ impl TvmBoxedStackEntryExt for TvmBoxedStackEntry {
     }
 
     fn from_boc(boc: BoC) -> Result<Self, TonContractError> {
-        Ok(Self::TvmStackEntrySlice(TvmStackEntrySlice {
-            slice: TvmSlice {
-                bytes: STANDARD.encode(
-                    pack(
-                        boc,
-                        BagOfCellsArgs {
-                            has_idx: false,
-                            has_crc32c: false,
-                        },
-                    )?
-                    .as_raw_slice(),
-                ),
-            },
-        }))
+        Ok(Self::Slice {
+            bytes: STANDARD.encode(
+                pack(
+                    boc,
+                    BagOfCellsArgs {
+                        has_idx: false,
+                        has_crc32c: false,
+                    },
+                )?
+                .as_raw_slice(),
+            ),
+        })
     }
 
     fn to_number<T>(&self) -> Result<T, TonContractError>
@@ -110,23 +99,19 @@ impl TvmBoxedStackEntryExt for TvmBoxedStackEntry {
         T: FromStr,
         T::Err: Display,
     {
-        let Self::TvmStackEntryNumber(TvmStackEntryNumber {
-            number: TvmBoxedNumber { number },
-        }) = self
-        else {
+        let Self::Number { number } = self else {
             return Err(TonContractError::InvalidStack);
         };
 
         T::from_str(number).map_err(|err| TonContractError::ParseNumber(err.to_string()))
     }
+
     fn from_number<T>(number: T) -> Self
     where
         T: Display,
     {
-        Self::TvmStackEntryNumber(TvmStackEntryNumber {
-            number: TvmNumberDecimal {
-                number: number.to_string(),
-            },
-        })
+        Self::Number {
+            number: number.to_string(),
+        }
     }
 }
