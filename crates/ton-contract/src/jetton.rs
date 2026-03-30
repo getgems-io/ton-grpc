@@ -1,5 +1,7 @@
-use crate::{TonContract, TonContractError, TvmBoxedStackEntryExt};
 use async_trait::async_trait;
+use ton_client::TonClient;
+
+use crate::{TonContract, TonContractError, StackEntryExt};
 use num_bigint::BigUint;
 use toner::{tlb::Data, ton::MsgAddress};
 
@@ -16,7 +18,7 @@ pub trait JettonWalletContract {
 }
 
 #[async_trait]
-impl JettonWalletContract for TonContract {
+impl<T: TonClient> JettonWalletContract for TonContract<T> {
     async fn get_wallet_data(&self) -> Result<JettonWalletData, TonContractError> {
         let [balance, owner, master, _jetton_wallet_code] = self
             .run_get_method("get_wallet_data", [].into())

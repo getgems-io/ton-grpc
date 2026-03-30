@@ -3525,8 +3525,8 @@ dependencies = [
  "base64 0.22.1",
  "num-bigint",
  "thiserror 2.0.18",
+ "ton-client",
  "toner",
- "tonlibjson-client",
 ]
 
 [[package]]

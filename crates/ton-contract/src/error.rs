@@ -1,6 +1,6 @@
 use thiserror::Error as ThisError;
 use toner::tlb::StringError as TlbError;
-use tonlibjson_client::block::TvmBoxedStackEntry;
+use ton_client::StackEntry;
 
 #[derive(Debug, ThisError)]
 pub enum TonContractError {
@@ -18,8 +18,8 @@ pub enum TonContractError {
     Client(#[from] anyhow::Error),
 }
 
-impl From<Vec<TvmBoxedStackEntry>> for TonContractError {
-    fn from(_: Vec<TvmBoxedStackEntry>) -> Self {
+impl From<Vec<StackEntry>> for TonContractError {
+    fn from(_: Vec<StackEntry>) -> Self {
         Self::InvalidStack
     }
 }

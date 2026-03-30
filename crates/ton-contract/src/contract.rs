@@ -1,18 +1,15 @@
+use ton_client::{StackEntry, TonClient};
 use toner::ton::MsgAddress;
-use tonlibjson_client::{
-    block::{SmcRunResult, TvmBoxedStackEntry},
-    ton::TonClient,
-};
 
 use crate::TonContractError;
 
-pub struct TonContract {
+pub struct TonContract<T> {
     address: MsgAddress,
-    client: TonClient,
+    client: T,
 }
 
-impl TonContract {
-    pub fn new(client: TonClient, address: MsgAddress) -> Self {
+impl<T: TonClient> TonContract<T> {
+    pub fn new(client: T, address: MsgAddress) -> Self {
         Self { client, address }
     }
 
@@ -20,28 +17,26 @@ impl TonContract {
         self.address
     }
 
-    pub fn client(&self) -> TonClient {
+    pub fn client(&self) -> T {
         self.client.clone()
     }
 
     pub async fn run_get_method(
         &self,
         method: impl AsRef<str>,
-        stack: Vec<TvmBoxedStackEntry>,
-    ) -> Result<Vec<TvmBoxedStackEntry>, TonContractError> {
-        let SmcRunResult {
-            stack, exit_code, ..
-        } = self
+        stack: Vec<StackEntry>,
+    ) -> Result<Vec<StackEntry>, TonContractError> {
+        let result = self
             .client
             .run_get_method(
-                self.address().to_base64_std(),
-                method.as_ref().to_string(),
+                &self.address().to_base64_std(),
+                method.as_ref(),
                 stack,
             )
             .await?;
-        Ok(match exit_code {
-            0 | 1 => stack,
-            _ => return Err(TonContractError::Contract(exit_code)),
+        Ok(match result.exit_code {
+            0 | 1 => result.stack,
+            _ => return Err(TonContractError::Contract(result.exit_code)),
         })
     }
 }
