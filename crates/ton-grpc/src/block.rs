@@ -384,7 +384,6 @@ mod integration {
         }
     }
 
-    // TODO[akostylev0]: check address format
     #[tokio::test]
     async fn should_have_correct_message_address_format() {
         let (_server, mut client) = setup().await;
@@ -393,7 +392,6 @@ mod integration {
             .await
             .unwrap()
             .into_inner();
-
         let stream = client
             .get_transactions(GetTransactionsRequest {
                 block_id: Some(BlockId {
@@ -418,49 +416,46 @@ mod integration {
         let in_msg = tx_with_in_msg.in_msg.as_ref().unwrap();
         if let Some(ref source) = in_msg.source {
             assert!(
-                is_user_friendly_address(source),
-                "source should be in user-friendly base64 format (48 chars), got: {}",
+                is_raw_address(source),
+                "source should be in raw format (workchain:hex), got: {}",
                 source
             );
         }
         if let Some(ref destination) = in_msg.destination {
             assert!(
-                is_user_friendly_address(destination),
-                "destination should be in user-friendly base64 format (48 chars), got: {}",
+                is_raw_address(destination),
+                "destination should be in raw format (workchain:hex), got: {}",
                 destination
             );
         }
         for out_msg in &tx_with_in_msg.out_msgs {
             if let Some(ref source) = out_msg.source {
                 assert!(
-                    is_user_friendly_address(source),
-                    "out_msg source should be in user-friendly base64 format, got: {}",
+                    is_raw_address(source),
+                    "out_msg source should be in raw format (workchain:hex), got: {}",
                     source
                 );
             }
             if let Some(ref destination) = out_msg.destination {
                 assert!(
-                    is_user_friendly_address(destination),
-                    "out_msg destination should be in user-friendly base64 format, got: {}",
+                    is_raw_address(destination),
+                    "out_msg destination should be in raw format (workchain:hex), got: {}",
                     destination
                 );
             }
         }
     }
 
-    fn is_user_friendly_address(addr: &str) -> bool {
+    fn is_raw_address(addr: &str) -> bool {
         if addr.is_empty() {
             return true;
         }
-        addr.len() == 48
-            && addr.chars().all(|c| {
-                c.is_ascii_alphanumeric()
-                    || c == '+'
-                    || c == '/'
-                    || c == '-'
-                    || c == '_'
-                    || c == '='
-            })
+        let Some((workchain, hex)) = addr.split_once(':') else {
+            return false;
+        };
+        workchain.parse::<i32>().is_ok()
+            && hex.len() == 64
+            && hex.chars().all(|c| c.is_ascii_hexdigit())
     }
 
     async fn setup() -> (LocalLiteServer, BlockServiceClient<Channel>) {

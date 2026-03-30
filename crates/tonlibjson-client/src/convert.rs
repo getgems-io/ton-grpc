@@ -148,8 +148,20 @@ impl From<block::RawMessage> for ton_client::Message {
     fn from(v: block::RawMessage) -> Self {
         Self {
             hash: v.hash,
-            source: v.source.account_address.unwrap_or_default(),
-            destination: v.destination.account_address.unwrap_or_default(),
+            source: v
+                .source
+                .account_address
+                .as_deref()
+                .and_then(|a| AccountAddressData::from_str(a).ok())
+                .map(|a| a.to_raw_string())
+                .unwrap_or_default(),
+            destination: v
+                .destination
+                .account_address
+                .as_deref()
+                .and_then(|a| AccountAddressData::from_str(a).ok())
+                .map(|a| a.to_raw_string())
+                .unwrap_or_default(),
             value: v.value,
             fwd_fee: v.fwd_fee,
             ihr_fee: v.ihr_fee,
