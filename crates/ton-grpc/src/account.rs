@@ -309,3 +309,225 @@ mod tests {
         assert!(resp.is_ok())
     }
 }
+
+#[cfg(test)]
+mod integration {
+    use crate::account::AccountService;
+    use crate::ton::account_service_client::AccountServiceClient;
+    use crate::ton::account_service_server::AccountServiceServer;
+    use crate::ton::{
+        BlockId, GetAccountStateRequest, GetAccountTransactionsRequest,
+        GetShardAccountCellRequest, get_account_state_request, get_shard_account_cell_request,
+    };
+    use futures::StreamExt;
+    use testcontainers_ton::LocalLiteServer;
+    use tokio::net::TcpListener;
+    use tonlibjson_client::ton::TonClientBuilder;
+    use tonic::transport::Channel;
+
+    const ACCOUNT_ADDRESS: &str = "-1:5555555555555555555555555555555555555555555555555555555555555555";
+
+    #[tokio::test]
+    async fn should_get_account_state() {
+        let (_server, mut accounts) = setup().await;
+
+        let resp = accounts
+            .get_account_state(GetAccountStateRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                criteria: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(resp.account_address, ACCOUNT_ADDRESS);
+        assert_eq!(resp.balance, 10000000000);
+        let block_id = resp.block_id.unwrap();
+        assert_eq!(block_id.workchain, -1);
+        assert_eq!(block_id.shard, -9223372036854775808);
+        assert!(block_id.seqno > 0);
+        assert_eq!(block_id.root_hash.len(), 44);
+        assert_eq!(block_id.file_hash.len(), 44);
+        let last_tx = resp.last_transaction_id.unwrap();
+        assert_eq!(last_tx.hash.len(), 44);
+        assert!(last_tx.lt > 0);
+        assert!(matches!(resp.account_state, Some(crate::ton::get_account_state_response::AccountState::Active(_))));
+    }
+
+    #[tokio::test]
+    async fn should_get_account_state_on_block() {
+        let (_server, mut accounts) = setup().await;
+        let state = accounts
+            .get_account_state(GetAccountStateRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                criteria: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        let block_id = state.block_id.unwrap();
+
+        let resp = accounts
+            .get_account_state(GetAccountStateRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                criteria: Some(get_account_state_request::Criteria::BlockId(BlockId {
+                    workchain: block_id.workchain,
+                    shard: block_id.shard,
+                    seqno: block_id.seqno,
+                    root_hash: Some(block_id.root_hash),
+                    file_hash: Some(block_id.file_hash),
+                })),
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(resp.balance, 10000000000);
+        assert!(resp.block_id.is_some());
+        assert!(resp.last_transaction_id.is_some());
+        assert!(matches!(resp.account_state, Some(crate::ton::get_account_state_response::AccountState::Active(_))));
+    }
+
+    #[tokio::test]
+    async fn should_get_account_state_by_transaction() {
+        let (_server, mut accounts) = setup().await;
+        let state = accounts
+            .get_account_state(GetAccountStateRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                criteria: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        let last_tx = state.last_transaction_id.unwrap();
+
+        let resp = accounts
+            .get_account_state(GetAccountStateRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                criteria: Some(get_account_state_request::Criteria::TransactionId(
+                    crate::ton::PartialTransactionId {
+                        hash: last_tx.hash,
+                        lt: last_tx.lt,
+                    },
+                )),
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(resp.balance, 10000000000);
+        assert!(resp.block_id.is_some());
+        assert!(matches!(resp.account_state, Some(crate::ton::get_account_state_response::AccountState::Active(_))));
+    }
+
+    #[tokio::test]
+    async fn should_get_shard_account_cell() {
+        let (_server, mut accounts) = setup().await;
+
+        let resp = accounts
+            .get_shard_account_cell(GetShardAccountCellRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                criteria: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(resp.account_address, ACCOUNT_ADDRESS);
+        let block_id = resp.block_id.unwrap();
+        assert_eq!(block_id.workchain, -1);
+        assert_eq!(block_id.shard, -9223372036854775808);
+        assert!(block_id.seqno > 0);
+        assert_eq!(block_id.root_hash.len(), 44);
+        assert_eq!(block_id.file_hash.len(), 44);
+        assert!(!resp.cell.unwrap().bytes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn should_get_shard_account_cell_on_block() {
+        let (_server, mut accounts) = setup().await;
+        let cell_resp = accounts
+            .get_shard_account_cell(GetShardAccountCellRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                criteria: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        let block_id = cell_resp.block_id.unwrap();
+
+        let resp = accounts
+            .get_shard_account_cell(GetShardAccountCellRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                criteria: Some(get_shard_account_cell_request::Criteria::BlockId(BlockId {
+                    workchain: block_id.workchain,
+                    shard: block_id.shard,
+                    seqno: block_id.seqno,
+                    root_hash: Some(block_id.root_hash),
+                    file_hash: Some(block_id.file_hash),
+                })),
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert!(resp.cell.is_some());
+        assert!(!resp.cell.unwrap().bytes.is_empty());
+    }
+
+    #[tokio::test]
+    async fn should_get_account_transactions() {
+        let (_server, mut accounts) = setup().await;
+
+        let stream = accounts
+            .get_account_transactions(GetAccountTransactionsRequest {
+                account_address: ACCOUNT_ADDRESS.to_string(),
+                order: 1,
+                from: None,
+                to: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        let txs: Vec<_> = stream.take(5).collect().await;
+
+        assert!(!txs.is_empty());
+        for tx in &txs {
+            let tx = tx.as_ref().unwrap();
+            let id = tx.id.as_ref().unwrap();
+            assert_eq!(id.account_address, ACCOUNT_ADDRESS);
+            assert_eq!(id.hash.len(), 44);
+            assert!(id.lt > 0);
+            assert!(tx.utime > 0);
+            assert_eq!(tx.fee, 0);
+            assert!(!tx.data.is_empty());
+        }
+    }
+
+    async fn setup() -> (LocalLiteServer, AccountServiceClient<Channel>) {
+        let server = LocalLiteServer::new().await.unwrap();
+        let mut client = TonClientBuilder::from_config(server.config())
+            .build()
+            .unwrap();
+        client.ready().await.unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .add_service(AccountServiceServer::new(AccountService::new(client)))
+                .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+                .await
+                .unwrap();
+        });
+
+        let channel = Channel::from_shared(format!("http://{}", addr))
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+
+        (server, AccountServiceClient::new(channel))
+    }
+}
