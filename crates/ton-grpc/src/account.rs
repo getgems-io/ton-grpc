@@ -316,16 +316,17 @@ mod integration {
     use crate::ton::account_service_client::AccountServiceClient;
     use crate::ton::account_service_server::AccountServiceServer;
     use crate::ton::{
-        BlockId, GetAccountStateRequest, GetAccountTransactionsRequest,
-        GetShardAccountCellRequest, get_account_state_request, get_shard_account_cell_request,
+        BlockId, GetAccountStateRequest, GetAccountTransactionsRequest, GetShardAccountCellRequest,
+        get_account_state_request, get_shard_account_cell_request,
     };
     use futures::StreamExt;
     use testcontainers_ton::LocalLiteServer;
     use tokio::net::TcpListener;
-    use tonlibjson_client::ton::TonClientBuilder;
     use tonic::transport::Channel;
+    use tonlibjson_client::ton::TonClientBuilder;
 
-    const ACCOUNT_ADDRESS: &str = "-1:5555555555555555555555555555555555555555555555555555555555555555";
+    const ACCOUNT_ADDRESS: &str =
+        "-1:5555555555555555555555555555555555555555555555555555555555555555";
 
     #[tokio::test]
     async fn should_get_account_state() {
@@ -351,7 +352,10 @@ mod integration {
         let last_tx = resp.last_transaction_id.unwrap();
         assert_eq!(last_tx.hash.len(), 44);
         assert!(last_tx.lt > 0);
-        assert!(matches!(resp.account_state, Some(crate::ton::get_account_state_response::AccountState::Active(_))));
+        assert!(matches!(
+            resp.account_state,
+            Some(crate::ton::get_account_state_response::AccountState::Active(_))
+        ));
     }
 
     #[tokio::test]
@@ -385,7 +389,10 @@ mod integration {
         assert_eq!(resp.balance, 10000000000);
         assert!(resp.block_id.is_some());
         assert!(resp.last_transaction_id.is_some());
-        assert!(matches!(resp.account_state, Some(crate::ton::get_account_state_response::AccountState::Active(_))));
+        assert!(matches!(
+            resp.account_state,
+            Some(crate::ton::get_account_state_response::AccountState::Active(_))
+        ));
     }
 
     #[tokio::test]
@@ -417,7 +424,10 @@ mod integration {
 
         assert_eq!(resp.balance, 10000000000);
         assert!(resp.block_id.is_some());
-        assert!(matches!(resp.account_state, Some(crate::ton::get_account_state_response::AccountState::Active(_))));
+        assert!(matches!(
+            resp.account_state,
+            Some(crate::ton::get_account_state_response::AccountState::Active(_))
+        ));
     }
 
     #[tokio::test]

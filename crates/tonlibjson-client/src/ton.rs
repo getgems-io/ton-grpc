@@ -1067,10 +1067,14 @@ mod integration {
         client.ready().await?;
 
         let info = client.get_masterchain_info().await?;
-        let header = client.get_block_header(
-            info.last.workchain, info.last.shard, info.last.seqno,
-            Some((info.last.root_hash, info.last.file_hash)),
-        ).await?;
+        let header = client
+            .get_block_header(
+                info.last.workchain,
+                info.last.shard,
+                info.last.seqno,
+                Some((info.last.root_hash, info.last.file_hash)),
+            )
+            .await?;
 
         assert_eq!(header.id.workchain, -1);
 
