@@ -33,13 +33,13 @@ impl BaseMessageService for MessageService {
 #[cfg(test)]
 mod integration {
     use crate::message::MessageService;
+    use crate::ton::SendRequest;
     use crate::ton::message_service_client::MessageServiceClient;
     use crate::ton::message_service_server::MessageServiceServer;
-    use crate::ton::SendRequest;
     use testcontainers_ton::LocalLiteServer;
     use tokio::net::TcpListener;
-    use tonlibjson_client::ton::TonClientBuilder;
     use tonic::transport::Channel;
+    use tonlibjson_client::ton::TonClientBuilder;
 
     // TODO[akostylev0]: add test for success send message
     #[tokio::test]

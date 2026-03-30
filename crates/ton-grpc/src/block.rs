@@ -174,12 +174,14 @@ mod integration {
     use crate::block::BlockService;
     use crate::ton::block_service_client::BlockServiceClient;
     use crate::ton::block_service_server::BlockServiceServer;
-    use crate::ton::{BlockId, GetLastBlockRequest, GetTransactionIdsRequest, GetTransactionsRequest};
+    use crate::ton::{
+        BlockId, GetLastBlockRequest, GetTransactionIdsRequest, GetTransactionsRequest,
+    };
     use futures::StreamExt;
     use testcontainers_ton::LocalLiteServer;
     use tokio::net::TcpListener;
-    use tonlibjson_client::ton::TonClientBuilder;
     use tonic::transport::Channel;
+    use tonlibjson_client::ton::TonClientBuilder;
 
     #[tokio::test]
     async fn should_get_last_block() {
