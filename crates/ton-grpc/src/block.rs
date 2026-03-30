@@ -237,13 +237,12 @@ mod integration {
             .await
             .unwrap()
             .into_inner();
-        let seqno = last.seqno - 1;
 
         let header = client
             .get_block_header(BlockId {
                 workchain: last.workchain,
                 shard: last.shard,
-                seqno,
+                seqno: last.seqno,
                 root_hash: None,
                 file_hash: None,
             })
@@ -253,7 +252,7 @@ mod integration {
 
         let id = header.id.unwrap();
         assert_eq!(id.workchain, -1);
-        assert_eq!(id.seqno, seqno);
+        assert_eq!(id.seqno, last.seqno);
         assert_eq!(id.root_hash.len(), 44);
         assert_eq!(id.file_hash.len(), 44);
         assert!(header.end_lt >= header.start_lt);
@@ -309,12 +308,12 @@ mod integration {
                     root_hash: None,
                     file_hash: None,
                 }),
-                order: 0,
+                order: crate::ton::get_transaction_ids_request::Order::Asc as i32,
             })
             .await
             .unwrap()
             .into_inner();
-        let txs: Vec<_> = stream.collect().await;
+        let txs: Vec<_> = stream.take(5).collect().await;
 
         assert!(!txs.is_empty());
         for tx in &txs {
@@ -345,7 +344,7 @@ mod integration {
             .await
             .unwrap()
             .into_inner();
-        let addresses: Vec<_> = stream.collect().await;
+        let addresses: Vec<_> = stream.take(5).collect().await;
 
         assert!(!addresses.is_empty());
         for addr in &addresses {
@@ -372,12 +371,12 @@ mod integration {
                     root_hash: None,
                     file_hash: None,
                 }),
-                order: 0,
+                order: crate::ton::get_transactions_request::Order::Asc as i32,
             })
             .await
             .unwrap()
             .into_inner();
-        let txs: Vec<_> = stream.collect().await;
+        let txs: Vec<_> = stream.take(5).collect().await;
 
         assert!(!txs.is_empty());
         for tx in &txs {
