@@ -2,8 +2,8 @@ use crate::address::InternalAccountAddress;
 use crate::block::{
     AccountAddress, BlocksAccountTransactionId, BlocksGetBlockHeader, BlocksGetMasterchainInfo,
     BlocksGetShards, BlocksGetTransactions, BlocksGetTransactionsExt, BlocksHeader,
-    BlocksLookupBlock, BlocksMasterchainInfo, BlocksShards, BlocksShortTxId, BlocksTransactions,
-    BlocksTransactionsExt, FullAccountState, GetAccountState, GetShardAccountCell,
+    BlocksLookupBlock, BlocksShards, BlocksShortTxId, BlocksTransactions,
+    BlocksTransactionsExt, GetShardAccountCell,
     GetShardAccountCellByTransaction, InternalTransactionId, RawFullAccountState,
     RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage,
     RawSendMessageReturnHash, RawTransaction, RawTransactions, SmcBoxedMethodId, SmcRunResult,
@@ -46,6 +46,7 @@ use tower::util::Either;
 use tower::{Layer, ServiceExt};
 use tracing::{instrument, trace};
 use url::Url;
+use ton_client::TonClient as _;
 
 #[cfg(not(feature = "testnet"))]
 pub fn default_ton_config_url() -> Url {
@@ -267,13 +268,6 @@ impl TonClient {
         Ok(())
     }
 
-    pub async fn get_masterchain_info(&self) -> anyhow::Result<BlocksMasterchainInfo> {
-        self.client
-            .clone()
-            .oneshot(Specialized::new(BlocksGetMasterchainInfo::default()))
-            .await
-    }
-
     #[instrument(skip_all, err)]
     pub async fn look_up_block_by_seqno(
         &self,
@@ -436,15 +430,6 @@ impl TonClient {
             .await
     }
 
-    pub async fn get_account_state(&self, address: &str) -> anyhow::Result<FullAccountState> {
-        let account_address = AccountAddress::new(address)?;
-
-        self.client
-            .clone()
-            .oneshot(GetAccountState::new(account_address))
-            .await
-    }
-
     #[instrument(skip_all, err)]
     pub async fn raw_get_transactions(
         &self,
@@ -492,24 +477,6 @@ impl TonClient {
         self.client
             .clone()
             .oneshot(BlocksGetTransactions::unverified(
-                block.to_owned(),
-                tx,
-                reverse,
-                count,
-            ))
-            .await
-    }
-
-    pub async fn blocks_get_transactions_verified(
-        &self,
-        block: &TonBlockIdExt,
-        tx: Option<BlocksAccountTransactionId>,
-        reverse: bool,
-        count: i32,
-    ) -> anyhow::Result<BlocksTransactions> {
-        self.client
-            .clone()
-            .oneshot(BlocksGetTransactions::verified(
                 block.to_owned(),
                 tx,
                 reverse,
@@ -1046,7 +1013,11 @@ impl TonClient {
 #[async_trait::async_trait]
 impl ton_client::TonClient for TonClient {
     async fn get_masterchain_info(&self) -> anyhow::Result<ton_client::MasterchainInfo> {
-        self.get_masterchain_info().await.map(Into::into)
+        self.client
+            .clone()
+            .oneshot(Specialized::new(BlocksGetMasterchainInfo::default()))
+            .await
+            .map(Into::into)
     }
 
     async fn look_up_block_by_seqno(
