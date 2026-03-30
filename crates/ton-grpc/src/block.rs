@@ -172,17 +172,18 @@ impl BaseBlockService for BlockService {
 #[cfg(test)]
 mod integration {
     use crate::block::BlockService;
-    use crate::ton::GetLastBlockRequest;
     use crate::ton::block_service_client::BlockServiceClient;
     use crate::ton::block_service_server::BlockServiceServer;
+    use crate::ton::{BlockId, GetLastBlockRequest, GetTransactionIdsRequest, GetTransactionsRequest};
+    use futures::StreamExt;
     use testcontainers_ton::LocalLiteServer;
     use tokio::net::TcpListener;
-    use tonic::transport::Channel;
     use tonlibjson_client::ton::TonClientBuilder;
+    use tonic::transport::Channel;
 
     #[tokio::test]
     async fn should_get_last_block() {
-        let mut client = setup().await;
+        let (_server, mut client) = setup().await;
 
         let resp = client
             .get_last_block(GetLastBlockRequest {})
@@ -196,7 +197,192 @@ mod integration {
         assert_eq!(resp.file_hash.len(), 44);
     }
 
-    async fn setup() -> BlockServiceClient<Channel> {
+    #[tokio::test]
+    async fn should_get_block() {
+        let (_server, mut client) = setup().await;
+        let last = client
+            .get_last_block(GetLastBlockRequest {})
+            .await
+            .unwrap()
+            .into_inner();
+
+        let resp = client
+            .get_block(BlockId {
+                workchain: last.workchain,
+                shard: last.shard,
+                seqno: last.seqno,
+                root_hash: None,
+                file_hash: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(resp.workchain, last.workchain);
+        assert_eq!(resp.shard, last.shard);
+        assert_eq!(resp.seqno, last.seqno);
+        assert_eq!(resp.root_hash.len(), 44);
+        assert_eq!(resp.file_hash.len(), 44);
+    }
+
+    #[tokio::test]
+    async fn should_get_block_header() {
+        let (_server, mut client) = setup().await;
+        let last = client
+            .get_last_block(GetLastBlockRequest {})
+            .await
+            .unwrap()
+            .into_inner();
+        let seqno = last.seqno - 1;
+
+        let header = client
+            .get_block_header(BlockId {
+                workchain: last.workchain,
+                shard: last.shard,
+                seqno,
+                root_hash: None,
+                file_hash: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        let id = header.id.unwrap();
+        assert_eq!(id.workchain, -1);
+        assert_eq!(id.seqno, seqno);
+        assert_eq!(id.root_hash.len(), 44);
+        assert_eq!(id.file_hash.len(), 44);
+        assert!(header.end_lt >= header.start_lt);
+        assert!(header.gen_utime > 0);
+        assert!(!header.prev_blocks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn should_get_shards() {
+        let (_server, mut client) = setup().await;
+        let last = client
+            .get_last_block(GetLastBlockRequest {})
+            .await
+            .unwrap()
+            .into_inner();
+
+        let resp = client
+            .get_shards(BlockId {
+                workchain: last.workchain,
+                shard: last.shard,
+                seqno: last.seqno,
+                root_hash: None,
+                file_hash: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert!(!resp.shards.is_empty());
+        for shard in &resp.shards {
+            assert_eq!(shard.root_hash.len(), 44);
+            assert_eq!(shard.file_hash.len(), 44);
+        }
+    }
+
+    #[tokio::test]
+    async fn should_get_transaction_ids() {
+        let (_server, mut client) = setup().await;
+        let last = client
+            .get_last_block(GetLastBlockRequest {})
+            .await
+            .unwrap()
+            .into_inner();
+
+        let stream = client
+            .get_transaction_ids(GetTransactionIdsRequest {
+                block_id: Some(BlockId {
+                    workchain: last.workchain,
+                    shard: last.shard,
+                    seqno: last.seqno,
+                    root_hash: None,
+                    file_hash: None,
+                }),
+                order: 0,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        let txs: Vec<_> = stream.collect().await;
+
+        assert!(!txs.is_empty());
+        for tx in &txs {
+            let tx = tx.as_ref().unwrap();
+            assert!(!tx.account_address.is_empty());
+            assert!(tx.lt > 0);
+            assert!(!tx.hash.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn should_get_account_addresses() {
+        let (_server, mut client) = setup().await;
+        let last = client
+            .get_last_block(GetLastBlockRequest {})
+            .await
+            .unwrap()
+            .into_inner();
+
+        let stream = client
+            .get_account_addresses(BlockId {
+                workchain: last.workchain,
+                shard: last.shard,
+                seqno: last.seqno,
+                root_hash: None,
+                file_hash: None,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        let addresses: Vec<_> = stream.collect().await;
+
+        assert!(!addresses.is_empty());
+        for addr in &addresses {
+            let addr = addr.as_ref().unwrap();
+            assert!(!addr.address.is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn should_get_transactions() {
+        let (_server, mut client) = setup().await;
+        let last = client
+            .get_last_block(GetLastBlockRequest {})
+            .await
+            .unwrap()
+            .into_inner();
+
+        let stream = client
+            .get_transactions(GetTransactionsRequest {
+                block_id: Some(BlockId {
+                    workchain: last.workchain,
+                    shard: last.shard,
+                    seqno: last.seqno,
+                    root_hash: None,
+                    file_hash: None,
+                }),
+                order: 0,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        let txs: Vec<_> = stream.collect().await;
+
+        assert!(!txs.is_empty());
+        for tx in &txs {
+            let tx = tx.as_ref().unwrap();
+            assert!(tx.id.is_some());
+            assert!(tx.utime > 0);
+            assert!(!tx.data.is_empty());
+        }
+    }
+
+    async fn setup() -> (LocalLiteServer, BlockServiceClient<Channel>) {
         let server = LocalLiteServer::new().await.unwrap();
         let mut client = TonClientBuilder::from_config(server.config())
             .build()
@@ -220,6 +406,6 @@ mod integration {
             .await
             .unwrap();
 
-        BlockServiceClient::new(channel)
+        (server, BlockServiceClient::new(channel))
     }
 }
