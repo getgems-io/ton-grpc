@@ -402,7 +402,7 @@ mod integration {
         let stream = accounts
             .get_account_transactions(GetAccountTransactionsRequest {
                 account_address: ACCOUNT_ADDRESS.to_string(),
-                order: 1,
+                order: crate::ton::get_account_transactions_request::Order::FromNewToOld as i32,
                 from: None,
                 to: None,
             })
