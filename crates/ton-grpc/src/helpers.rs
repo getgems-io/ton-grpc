@@ -4,23 +4,21 @@ use crate::ton::get_account_transactions_request::bound::Type;
 use anyhow::{Result, anyhow};
 use std::ops::Bound;
 use std::ops::Bound::{Excluded, Included};
-use tonlibjson_client::block;
-use tonlibjson_client::block::InternalTransactionId;
-use tonlibjson_client::ton::TonClient;
+use ton_client::TonClient;
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_block_id(
-    client: &TonClient,
+    client: &impl TonClient,
     block_id: &ton::BlockId,
-) -> Result<block::TonBlockIdExt> {
+) -> Result<ton_client::BlockIdExt> {
     if let (Some(root_hash), Some(file_hash)) = (&block_id.root_hash, &block_id.file_hash) {
-        Ok(block::TonBlockIdExt::new(
-            block_id.workchain,
-            block_id.shard,
-            block_id.seqno,
-            root_hash.clone(),
-            file_hash.clone(),
-        ))
+        Ok(ton_client::BlockIdExt {
+            workchain: block_id.workchain,
+            shard: block_id.shard,
+            seqno: block_id.seqno,
+            root_hash: root_hash.clone(),
+            file_hash: file_hash.clone(),
+        })
     } else {
         client
             .look_up_block_by_seqno(block_id.workchain, block_id.shard, block_id.seqno)
@@ -30,24 +28,18 @@ pub async fn extend_block_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_get_block_header(
-    client: &TonClient,
+    client: &impl TonClient,
     block_id: &ton::BlockId,
-) -> Result<block::BlocksHeader> {
-    client
-        .get_block_header(
-            block_id.workchain,
-            block_id.shard,
-            block_id.seqno,
-            block_id.root_hash.clone().zip(block_id.file_hash.clone()),
-        )
-        .await
+) -> Result<ton_client::BlockHeader> {
+    let block_id = extend_block_id(client, block_id).await?;
+    client.get_block_header(block_id).await
 }
 
 #[tracing::instrument(skip_all, err)]
 pub async fn prev_block_id(
-    client: &TonClient,
+    client: &impl TonClient,
     block_id: &ton::BlockId,
-) -> Result<block::TonBlockIdExt> {
+) -> Result<ton_client::BlockIdExt> {
     client
         .look_up_block_by_seqno(block_id.workchain, block_id.shard, block_id.seqno - 1)
         .await
@@ -55,10 +47,10 @@ pub async fn prev_block_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_from_tx_id(
-    client: &TonClient,
+    client: &impl TonClient,
     address: &str,
     from: Option<ton::get_account_transactions_request::Bound>,
-) -> Result<Bound<InternalTransactionId>> {
+) -> Result<Bound<ton_client::TransactionId>> {
     Ok(match from {
         None => Bound::Unbounded,
         Some(b) => {
@@ -68,9 +60,7 @@ pub async fn extend_from_tx_id(
                 Some(BlockId(block_id)) => match typ {
                     Type::Included => {
                         let block_id = extend_block_id(client, &block_id).await?;
-                        let state = client
-                            .raw_get_account_state_on_block(address, block_id)
-                            .await?;
+                        let state = client.get_account_state_on_block(address, block_id).await?;
 
                         Included(
                             state
@@ -80,9 +70,7 @@ pub async fn extend_from_tx_id(
                     }
                     Type::Excluded => {
                         let block_id = prev_block_id(client, &block_id).await?;
-                        let state = client
-                            .raw_get_account_state_on_block(address, block_id)
-                            .await?;
+                        let state = client.get_account_state_on_block(address, block_id).await?;
 
                         Included(
                             state
@@ -102,10 +90,10 @@ pub async fn extend_from_tx_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_to_tx_id(
-    client: &TonClient,
+    client: &impl TonClient,
     address: &str,
     to: Option<ton::get_account_transactions_request::Bound>,
-) -> Result<Bound<InternalTransactionId>> {
+) -> Result<Bound<ton_client::TransactionId>> {
     Ok(match to {
         None => Bound::Unbounded,
         Some(b) => {
@@ -115,9 +103,7 @@ pub async fn extend_to_tx_id(
                 Some(BlockId(block_id)) => match typ {
                     Type::Included => {
                         let block_id = prev_block_id(client, &block_id).await?;
-                        let state = client
-                            .raw_get_account_state_on_block(address, block_id)
-                            .await?;
+                        let state = client.get_account_state_on_block(address, block_id).await?;
 
                         Excluded(
                             state
@@ -127,9 +113,7 @@ pub async fn extend_to_tx_id(
                     }
                     Type::Excluded => {
                         let block_id = extend_block_id(client, &block_id).await?;
-                        let state = client
-                            .raw_get_account_state_on_block(address, block_id)
-                            .await?;
+                        let state = client.get_account_state_on_block(address, block_id).await?;
 
                         Excluded(
                             state

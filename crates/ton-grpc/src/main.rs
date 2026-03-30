@@ -116,15 +116,17 @@ async fn main() -> anyhow::Result<()> {
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
 
+    type Client = tonlibjson_client::ton::TonClient;
+
     let (health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter
-        .set_serving::<AccountServiceServer<AccountService>>()
+        .set_serving::<AccountServiceServer<AccountService<Client>>>()
         .await;
     health_reporter
-        .set_serving::<BlockServiceServer<BlockService>>()
+        .set_serving::<BlockServiceServer<BlockService<Client>>>()
         .await;
     health_reporter
-        .set_serving::<MessageServiceServer<MessageService>>()
+        .set_serving::<MessageServiceServer<MessageService<Client>>>()
         .await;
 
     tracing::info!("Listening on {:?}", &args.listen);

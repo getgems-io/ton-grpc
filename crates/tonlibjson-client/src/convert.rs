@@ -1,4 +1,6 @@
+use crate::address::AccountAddressData;
 use crate::block;
+use std::str::FromStr;
 
 impl From<block::TonBlockIdExt> for ton_client::BlockIdExt {
     fn from(v: block::TonBlockIdExt) -> Self {
@@ -114,7 +116,13 @@ impl From<block::RawFullAccountState> for ton_client::AccountState {
 impl From<block::RawTransaction> for ton_client::Transaction {
     fn from(v: block::RawTransaction) -> Self {
         Self {
-            address: v.address.account_address.unwrap_or_default(),
+            address: v
+                .address
+                .account_address
+                .as_deref()
+                .and_then(|a| AccountAddressData::from_str(a).ok())
+                .map(|a| a.to_raw_string())
+                .unwrap_or_default(),
             utime: v.utime,
             data: v.data,
             transaction_id: v.transaction_id.into(),

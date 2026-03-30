@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use ton_client::TonClient;
 
-use crate::{TonContract, TonContractError, StackEntryExt};
+use crate::{StackEntryExt, TonContract, TonContractError};
 use num_bigint::BigUint;
 use toner::{tlb::Data, ton::MsgAddress};
 

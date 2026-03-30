@@ -17,6 +17,7 @@ use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use anyhow::anyhow;
 use async_stream::try_stream;
+use futures::stream::BoxStream;
 use futures::{Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt, stream, try_join};
 use itertools::Itertools;
 use serde_json::Value;
@@ -1171,6 +1172,118 @@ impl ton_client::TonClient for TonClient {
 
     async fn send_message_returning_hash(&self, message: &str) -> anyhow::Result<String> {
         self.send_message_returning_hash(message).await
+    }
+
+    async fn get_shards_by_block_id(
+        &self,
+        block_id: ton_client::BlockIdExt,
+    ) -> anyhow::Result<Vec<ton_client::BlockIdExt>> {
+        self.get_shards_by_block_id(block_id.into())
+            .await
+            .map(|v| v.into_iter().map(Into::into).collect())
+    }
+
+    async fn get_account_state_at_least_block(
+        &self,
+        address: &str,
+        block_id: &ton_client::BlockIdExt,
+    ) -> anyhow::Result<ton_client::AccountState> {
+        let block_id: TonBlockIdExt = ton_client::BlockIdExt::clone(block_id).into();
+        self.raw_get_account_state_at_least_block(address, &block_id)
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_shard_account_cell_at_least_block(
+        &self,
+        address: &str,
+        block_id: &ton_client::BlockIdExt,
+    ) -> anyhow::Result<ton_client::Cell> {
+        let block_id: TonBlockIdExt = ton_client::BlockIdExt::clone(block_id).into();
+        self.get_shard_account_cell_at_least_block(address, &block_id)
+            .await
+            .map(Into::into)
+    }
+
+    fn get_block_tx_id_stream(
+        &self,
+        block: &ton_client::BlockIdExt,
+        reverse: bool,
+    ) -> BoxStream<'static, anyhow::Result<ton_client::ShortTxId>> {
+        let block: TonBlockIdExt = block.clone().into();
+        Box::pin(
+            self.get_block_tx_id_stream(&block, reverse)
+                .map(|r| r.map(Into::into)),
+        )
+    }
+
+    fn get_block_tx_stream_unordered(
+        &self,
+        block: &ton_client::BlockIdExt,
+    ) -> BoxStream<'static, anyhow::Result<ton_client::ShortTxId>> {
+        let block: TonBlockIdExt = block.clone().into();
+        Box::pin(
+            self.get_block_tx_stream_unordered(&block)
+                .map(|r| r.map(Into::into)),
+        )
+    }
+
+    fn get_block_tx_stream(
+        &self,
+        block: &ton_client::BlockIdExt,
+        reverse: bool,
+    ) -> BoxStream<'static, anyhow::Result<ton_client::Transaction>> {
+        let block: TonBlockIdExt = block.clone().into();
+        Box::pin(
+            self.get_block_tx_stream(&block, reverse)
+                .map(|r| r.map(Into::into)),
+        )
+    }
+
+    fn get_accounts_in_block_stream(
+        &self,
+        block: &ton_client::BlockIdExt,
+    ) -> BoxStream<'static, anyhow::Result<String>> {
+        let block: TonBlockIdExt = block.clone().into();
+        Box::pin(
+            self.get_accounts_in_block_stream(&block)
+                .map_ok(|a| a.to_string())
+                .map_err(Into::into),
+        )
+    }
+
+    fn get_account_tx_range(
+        &self,
+        address: &str,
+        range: (
+            Bound<ton_client::TransactionId>,
+            Bound<ton_client::TransactionId>,
+        ),
+    ) -> BoxStream<'static, anyhow::Result<ton_client::Transaction>> {
+        let range = (
+            range.0.map(Into::<InternalTransactionId>::into),
+            range.1.map(Into::<InternalTransactionId>::into),
+        );
+        Box::pin(
+            self.get_account_tx_range(address, range)
+                .map(|r| r.map(Into::into)),
+        )
+    }
+
+    async fn get_account_tx_range_unordered(
+        &self,
+        address: &str,
+        range: (
+            Bound<ton_client::TransactionId>,
+            Bound<ton_client::TransactionId>,
+        ),
+    ) -> anyhow::Result<BoxStream<'static, anyhow::Result<ton_client::Transaction>>> {
+        let range = (
+            range.0.map(Into::<InternalTransactionId>::into),
+            range.1.map(Into::<InternalTransactionId>::into),
+        );
+        let stream = self.get_account_tx_range_unordered(address, range).await?;
+        Ok(Box::pin(stream.map(|r| r.map(Into::into))))
     }
 }
 

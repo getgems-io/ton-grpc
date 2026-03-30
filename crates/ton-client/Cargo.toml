@@ -8,3 +8,4 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 [dependencies]
 async-trait = "0.1"
 anyhow = { version = "1.0", features = ["backtrace"] }
+futures = "0.3"

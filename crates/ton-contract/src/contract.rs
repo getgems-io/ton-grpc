@@ -28,11 +28,7 @@ impl<T: TonClient> TonContract<T> {
     ) -> Result<Vec<StackEntry>, TonContractError> {
         let result = self
             .client
-            .run_get_method(
-                &self.address().to_base64_std(),
-                method.as_ref(),
-                stack,
-            )
+            .run_get_method(&self.address().to_base64_std(), method.as_ref(), stack)
             .await?;
         Ok(match result.exit_code {
             0 | 1 => result.stack,
