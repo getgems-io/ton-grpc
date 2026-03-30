@@ -32,6 +32,8 @@ metrics-exporter-prometheus = { version = "0.18.1", features = ["http-listener"]
 
 [dev-dependencies]
 tracing-test = "0.2.6"
+testcontainers-ton = { path = "../testcontainers-ton" }
+tokio-stream = { version = "0.1", features = ["net"] }
 
 [build-dependencies]
 tonic-prost-build = "0.14.5"

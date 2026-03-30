@@ -69,6 +69,30 @@ mod integration {
 }
 ```
 
+### Test Module Ordering
+
+Inside test modules (`mod tests` / `mod integration`), place **test functions first**, then helper/setup functions below:
+
+```rust
+#[cfg(test)]
+mod integration {
+    use super::*;
+
+    #[tokio::test]
+    async fn should_do_something() {
+        let client = setup().await;
+
+        let result = client.call().await.unwrap();
+
+        assert!(result.is_ok());
+    }
+
+    async fn setup() -> Client {
+        // private helper goes after tests
+    }
+}
+```
+
 ### Test Hygiene
 
 - Keep tests minimal and focused: no debug logging (`info!`, `debug!`), no artificial timeouts (`tokio::time::timeout`), no verbose comments.

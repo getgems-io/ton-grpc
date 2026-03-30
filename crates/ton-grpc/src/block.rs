@@ -168,3 +168,58 @@ impl BaseBlockService for BlockService {
         Ok(Response::new(stream))
     }
 }
+
+#[cfg(test)]
+mod integration {
+    use crate::block::BlockService;
+    use crate::ton::GetLastBlockRequest;
+    use crate::ton::block_service_client::BlockServiceClient;
+    use crate::ton::block_service_server::BlockServiceServer;
+    use testcontainers_ton::LocalLiteServer;
+    use tokio::net::TcpListener;
+    use tonic::transport::Channel;
+    use tonlibjson_client::ton::TonClientBuilder;
+
+    #[tokio::test]
+    async fn should_get_last_block() {
+        let mut client = setup().await;
+
+        let resp = client
+            .get_last_block(GetLastBlockRequest {})
+            .await
+            .unwrap()
+            .into_inner();
+
+        assert_eq!(resp.workchain, -1);
+        assert!(resp.seqno > 0);
+        assert_eq!(resp.root_hash.len(), 44);
+        assert_eq!(resp.file_hash.len(), 44);
+    }
+
+    async fn setup() -> BlockServiceClient<Channel> {
+        let server = LocalLiteServer::new().await.unwrap();
+        let mut client = TonClientBuilder::from_config(server.config())
+            .build()
+            .unwrap();
+        client.ready().await.unwrap();
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            tonic::transport::Server::builder()
+                .add_service(BlockServiceServer::new(BlockService::new(client)))
+                .serve_with_incoming(tokio_stream::wrappers::TcpListenerStream::new(listener))
+                .await
+                .unwrap();
+        });
+
+        let channel = Channel::from_shared(format!("http://{}", addr))
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+
+        BlockServiceClient::new(channel)
+    }
+}
