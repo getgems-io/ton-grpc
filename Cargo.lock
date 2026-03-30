@@ -3487,6 +3487,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-client"
+version = "0.1.0"
+
+[[package]]
 name = "ton-client-util"
 version = "0.1.0"
 dependencies = [
