@@ -11,16 +11,16 @@ use anyhow::Context;
 use derive_new::new;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};
+use ton_client::TonClient;
 use tonic::{Request, Response, Status, async_trait};
-use tonlibjson_client::ton::TonClient;
 
 #[derive(new)]
-pub struct BlockService {
-    client: TonClient,
+pub struct BlockService<T: TonClient> {
+    client: T,
 }
 
 #[async_trait]
-impl BaseBlockService for BlockService {
+impl<T: TonClient> BaseBlockService for BlockService<T> {
     #[tracing::instrument(skip_all, err)]
     async fn get_last_block(
         &self,
@@ -92,7 +92,6 @@ impl BaseBlockService for BlockService {
             .context("block id is required")
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let chain_id = block_id.workchain;
         let block_id = extend_block_id(&self.client, &block_id)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
@@ -104,7 +103,7 @@ impl BaseBlockService for BlockService {
         };
 
         let stream = stream
-            .map_ok(move |t| (chain_id, t).into())
+            .map_ok(move |t| t.into())
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
 
@@ -126,9 +125,7 @@ impl BaseBlockService for BlockService {
         let stream = self
             .client
             .get_accounts_in_block_stream(&block_id)
-            .map_ok(|a| AccountAddress {
-                address: a.to_string(),
-            })
+            .map_ok(|a| AccountAddress { address: a })
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
 
@@ -150,18 +147,14 @@ impl BaseBlockService for BlockService {
             .context("block id is required")
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let chain_id = block_id.workchain;
         let block_id = extend_block_id(&self.client, &block_id)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let stream = self.client.get_block_tx_stream(&block_id, false).boxed();
-
-        let stream = stream
-            .map(move |tx| match tx {
-                Ok(tx) => (chain_id, tx).try_into(),
-                Err(e) => Err(e),
-            })
+        let stream = self
+            .client
+            .get_block_tx_stream(&block_id, false)
+            .map_ok(|tx| tx.into())
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
 
@@ -389,6 +382,85 @@ mod integration {
             assert!(!tx.data.is_empty());
             assert!(tx.fee >= 0);
         }
+    }
+
+    // TODO[akostylev0]: check address format
+    #[tokio::test]
+    async fn should_have_correct_message_address_format() {
+        let (_server, mut client) = setup().await;
+        let last = client
+            .get_last_block(GetLastBlockRequest {})
+            .await
+            .unwrap()
+            .into_inner();
+
+        let stream = client
+            .get_transactions(GetTransactionsRequest {
+                block_id: Some(BlockId {
+                    workchain: last.workchain,
+                    shard: last.shard,
+                    seqno: last.seqno,
+                    root_hash: None,
+                    file_hash: None,
+                }),
+                order: crate::ton::get_transactions_request::Order::Asc as i32,
+            })
+            .await
+            .unwrap()
+            .into_inner();
+        let txs: Vec<_> = stream.take(10).collect().await;
+        let tx_with_in_msg = txs
+            .iter()
+            .filter_map(|tx| tx.as_ref().ok())
+            .find(|tx| tx.in_msg.is_some())
+            .expect("expected at least one transaction with in_msg");
+
+        let in_msg = tx_with_in_msg.in_msg.as_ref().unwrap();
+        if let Some(ref source) = in_msg.source {
+            assert!(
+                is_user_friendly_address(source),
+                "source should be in user-friendly base64 format (48 chars), got: {}",
+                source
+            );
+        }
+        if let Some(ref destination) = in_msg.destination {
+            assert!(
+                is_user_friendly_address(destination),
+                "destination should be in user-friendly base64 format (48 chars), got: {}",
+                destination
+            );
+        }
+        for out_msg in &tx_with_in_msg.out_msgs {
+            if let Some(ref source) = out_msg.source {
+                assert!(
+                    is_user_friendly_address(source),
+                    "out_msg source should be in user-friendly base64 format, got: {}",
+                    source
+                );
+            }
+            if let Some(ref destination) = out_msg.destination {
+                assert!(
+                    is_user_friendly_address(destination),
+                    "out_msg destination should be in user-friendly base64 format, got: {}",
+                    destination
+                );
+            }
+        }
+    }
+
+    fn is_user_friendly_address(addr: &str) -> bool {
+        if addr.is_empty() {
+            return true;
+        }
+        addr.len() == 48
+            && addr.chars().all(|c| {
+                c.is_ascii_alphanumeric()
+                    || c == '+'
+                    || c == '/'
+                    || c == '-'
+                    || c == '_'
+                    || c == '='
+            })
     }
 
     async fn setup() -> (LocalLiteServer, BlockServiceClient<Channel>) {

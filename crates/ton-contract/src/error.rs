@@ -1,6 +1,6 @@
 use thiserror::Error as ThisError;
-use toner::tlb::StringError as TlbError;
 use ton_client::StackEntry;
+use toner::tlb::StringError as TlbError;
 
 #[derive(Debug, ThisError)]
 pub enum TonContractError {

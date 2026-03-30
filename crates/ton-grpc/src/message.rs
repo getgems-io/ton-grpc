@@ -3,16 +3,16 @@
 use crate::ton::message_service_server::MessageService as BaseMessageService;
 use crate::ton::{SendRequest, SendResponse};
 use derive_new::new;
+use ton_client::TonClient;
 use tonic::{Request, Response, Status, async_trait};
-use tonlibjson_client::ton::TonClient;
 
 #[derive(new)]
-pub struct MessageService {
-    client: TonClient,
+pub struct MessageService<T: TonClient> {
+    client: T,
 }
 
 #[async_trait]
-impl BaseMessageService for MessageService {
+impl<T: TonClient> BaseMessageService for MessageService<T> {
     #[tracing::instrument(skip_all, err)]
     async fn send_message(
         &self,
