@@ -1042,6 +1042,138 @@ impl TonClient {
     }
 }
 
+#[async_trait::async_trait]
+impl ton_client::TonClient for TonClient {
+    async fn get_masterchain_info(&self) -> anyhow::Result<ton_client::MasterchainInfo> {
+        self.get_masterchain_info().await.map(Into::into)
+    }
+
+    async fn look_up_block_by_seqno(
+        &self,
+        chain: i32,
+        shard: i64,
+        seqno: i32,
+    ) -> anyhow::Result<ton_client::BlockIdExt> {
+        self.look_up_block_by_seqno(chain, shard, seqno)
+            .await
+            .map(Into::into)
+    }
+
+    async fn look_up_block_by_lt(
+        &self,
+        chain: i32,
+        shard: i64,
+        lt: i64,
+    ) -> anyhow::Result<ton_client::BlockIdExt> {
+        self.look_up_block_by_lt(chain, shard, lt)
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<ton_client::Shards> {
+        self.get_shards(master_seqno).await.map(Into::into)
+    }
+
+    async fn get_block_header(
+        &self,
+        id: ton_client::BlockIdExt,
+    ) -> anyhow::Result<ton_client::BlockHeader> {
+        self.get_block_header(
+            id.workchain,
+            id.shard,
+            id.seqno,
+            Some((id.root_hash, id.file_hash)),
+        )
+        .await
+        .map(Into::into)
+    }
+
+    async fn get_account_state(&self, address: &str) -> anyhow::Result<ton_client::AccountState> {
+        self.raw_get_account_state(address).await.map(Into::into)
+    }
+
+    async fn get_account_state_on_block(
+        &self,
+        address: &str,
+        block_id: ton_client::BlockIdExt,
+    ) -> anyhow::Result<ton_client::AccountState> {
+        self.raw_get_account_state_on_block(address, block_id.into())
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_account_state_by_transaction(
+        &self,
+        address: &str,
+        tx: ton_client::TransactionId,
+    ) -> anyhow::Result<ton_client::AccountState> {
+        self.raw_get_account_state_by_transaction(address, tx.into())
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_transactions(
+        &self,
+        address: &str,
+        from: &ton_client::TransactionId,
+    ) -> anyhow::Result<ton_client::Transactions> {
+        let from = InternalTransactionId {
+            lt: from.lt,
+            hash: from.hash.clone(),
+        };
+        self.raw_get_transactions(address, &from)
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_shard_account_cell(&self, address: &str) -> anyhow::Result<ton_client::Cell> {
+        self.get_shard_account_cell(address).await.map(Into::into)
+    }
+
+    async fn get_shard_account_cell_on_block(
+        &self,
+        address: &str,
+        block: ton_client::BlockIdExt,
+    ) -> anyhow::Result<ton_client::Cell> {
+        self.get_shard_account_cell_on_block(address, block.into())
+            .await
+            .map(Into::into)
+    }
+
+    async fn get_shard_account_cell_by_transaction(
+        &self,
+        address: &str,
+        tx: ton_client::TransactionId,
+    ) -> anyhow::Result<ton_client::Cell> {
+        self.get_shard_account_cell_by_transaction(address, tx.into())
+            .await
+            .map(Into::into)
+    }
+
+    async fn run_get_method(
+        &self,
+        address: &str,
+        method: &str,
+        stack: Vec<ton_client::StackEntry>,
+    ) -> anyhow::Result<ton_client::SmcRunResult> {
+        self.run_get_method(
+            address.to_string(),
+            method.to_string(),
+            stack.into_iter().map(Into::into).collect(),
+        )
+        .await
+        .map(Into::into)
+    }
+
+    async fn send_message(&self, message: &str) -> anyhow::Result<()> {
+        self.send_message(message).await
+    }
+
+    async fn send_message_returning_hash(&self, message: &str) -> anyhow::Result<String> {
+        self.send_message_returning_hash(message).await
+    }
+}
+
 #[cfg(test)]
 mod integration {
     use super::*;

@@ -3489,6 +3489,10 @@ dependencies = [
 [[package]]
 name = "ton-client"
 version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+]
 
 [[package]]
 name = "ton-client-util"
@@ -3719,6 +3723,7 @@ version = "0.20.5"
 dependencies = [
  "anyhow",
  "async-stream",
+ "async-trait",
  "base64 0.22.1",
  "bytes",
  "convert_case",
@@ -3745,6 +3750,7 @@ dependencies = [
  "tokio-retry",
  "tokio-stream",
  "tokio-util",
+ "ton-client",
  "ton-client-util",
  "tonlibjson-sys",
  "tower",
