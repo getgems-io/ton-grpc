@@ -11,7 +11,7 @@ use anyhow::Context;
 use derive_new::new;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};
-use ton_client::{TonClient, TonClientExt};
+use ton_client::{BlockClientExt as _, TonClient};
 use tonic::{Request, Response, Status, async_trait};
 
 #[derive(new)]

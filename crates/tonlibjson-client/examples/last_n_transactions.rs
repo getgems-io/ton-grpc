@@ -1,6 +1,6 @@
 use futures::{StreamExt, stream};
 use tokio::time::Instant;
-use ton_client::{TonClient as _, TonClientExt};
+use ton_client::{AccountClient as _, BlockClient as _, BlockClientExt as _};
 use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]

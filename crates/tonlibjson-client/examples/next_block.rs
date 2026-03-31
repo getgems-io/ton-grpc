@@ -1,4 +1,4 @@
-use ton_client::TonClient as _;
+use ton_client::BlockClient as _;
 use tonlibjson_client::ton::{TonClient, TonClientBuilder};
 
 async fn client() -> TonClient {
@@ -19,7 +19,7 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!(current_seqno = current_block.seqno);
 
     for _ in 0..100 {
-        current_block = ton_client::TonClient::look_up_block_by_seqno(
+        current_block = ton_client::BlockClient::look_up_block_by_seqno(
             &client,
             current_block.workchain,
             current_block.shard,
