@@ -137,6 +137,18 @@ pub enum StackEntry {
 }
 
 #[derive(Debug, Clone)]
+pub struct BlockTransactions {
+    pub incomplete: bool,
+    pub transactions: Vec<ShortTxId>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BlockTransactionsExt {
+    pub incomplete: bool,
+    pub transactions: Vec<Transaction>,
+}
+
+#[derive(Debug, Clone)]
 pub struct ExtMessageInfo {
     pub hash: String,
 }

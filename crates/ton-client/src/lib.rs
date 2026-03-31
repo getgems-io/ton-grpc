@@ -90,22 +90,21 @@ pub trait TonClient: Clone + Send + Sync + 'static {
 
     async fn send_message_returning_hash(&self, message: &str) -> anyhow::Result<String>;
 
-    fn get_block_tx_id_stream(
+    async fn blocks_get_transactions(
         &self,
         block: &BlockIdExt,
+        after: Option<ShortTxId>,
         reverse: bool,
-    ) -> BoxStream<'static, anyhow::Result<ShortTxId>>;
+        count: i32,
+    ) -> anyhow::Result<BlockTransactions>;
 
-    fn get_block_tx_stream_unordered(
+    async fn blocks_get_transactions_ext(
         &self,
         block: &BlockIdExt,
-    ) -> BoxStream<'static, anyhow::Result<ShortTxId>>;
-
-    fn get_block_tx_stream(
-        &self,
-        block: &BlockIdExt,
+        after: Option<ShortTxId>,
         reverse: bool,
-    ) -> BoxStream<'static, anyhow::Result<Transaction>>;
+        count: i32,
+    ) -> anyhow::Result<BlockTransactionsExt>;
 
     fn get_accounts_in_block_stream(
         &self,
