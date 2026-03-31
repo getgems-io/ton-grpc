@@ -1,8 +1,7 @@
-use crate::address::InternalAccountAddress;
 use crate::block::{
     AccountAddress, BlocksAccountTransactionId, BlocksGetBlockHeader, BlocksGetMasterchainInfo,
     BlocksGetShards, BlocksGetTransactions, BlocksGetTransactionsExt, BlocksHeader,
-    BlocksLookupBlock, BlocksShards, BlocksShortTxId, BlocksTransactions, BlocksTransactionsExt,
+    BlocksLookupBlock, BlocksShards, BlocksTransactions, BlocksTransactionsExt,
     GetShardAccountCell, GetShardAccountCellByTransaction, InternalTransactionId,
     RawFullAccountState, RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2,
     RawSendMessage, RawSendMessageReturnHash, RawTransactions, SmcBoxedMethodId, SmcRunResult,
@@ -15,20 +14,18 @@ use crate::request::{Forward, Specialized};
 use crate::retry::RetryPolicy;
 use crate::session::RunGetMethod;
 use anyhow::anyhow;
-use async_stream::try_stream;
 use futures::stream::BoxStream;
-use futures::{Stream, StreamExt, TryFutureExt, TryStream, TryStreamExt, stream, try_join};
+use futures::{Stream, StreamExt, TryFutureExt, stream, try_join};
 use itertools::Itertools;
 use serde_json::Value;
 use std::cmp::min;
-use std::collections::{Bound, HashMap};
+use std::collections::Bound;
 use std::ops::RangeBounds;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
-use tokio_stream::StreamMap;
 use ton_client::TonClient as _;
 use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use ton_client_util::discover::{
@@ -675,47 +672,6 @@ impl TonClient {
             .await
     }
 
-    pub fn get_accounts_in_block_stream(
-        &self,
-        block: &TonBlockIdExt,
-    ) -> impl TryStream<Ok = InternalAccountAddress, Error = anyhow::Error> + 'static {
-        let chain = block.workchain;
-        let stream_map = StreamMap::from_iter([false, true].map(|r| {
-            (
-                r,
-                ton_client::TonClientExt::get_block_tx_id_stream(self, &block.clone().into(), r)
-                    .map_ok(|tx| -> BlocksShortTxId { tx.into() })
-                    .boxed(),
-            )
-        }));
-
-        let stream = try_stream! {
-            let mut last = HashMap::with_capacity(2);
-
-            for await (key, tx) in stream_map {
-                let tx = tx?;
-
-                if let Some(addr) = last.get(&!key)
-                    && addr == tx.account()
-                {
-                    return;
-                }
-
-                if let Some(addr) = last.get(&key)
-                    && addr == tx.account()
-                {
-                    continue;
-                }
-
-                last.insert(key, tx.account().to_owned());
-
-                yield tx.into_internal(chain);
-            }
-        };
-
-        stream
-    }
-
     #[instrument(skip_all, err)]
     async fn find_first_tx(&self, account: &str) -> anyhow::Result<InternalTransactionId> {
         let start = self.get_masterchain_info().await?.last;
@@ -966,18 +922,6 @@ impl ton_client::TonClient for TonClient {
         self.blocks_get_transactions_ext(&block, after, reverse, count)
             .await
             .map(Into::into)
-    }
-
-    fn get_accounts_in_block_stream(
-        &self,
-        block: &ton_client::BlockIdExt,
-    ) -> BoxStream<'static, anyhow::Result<String>> {
-        let block: TonBlockIdExt = block.clone().into();
-        Box::pin(
-            self.get_accounts_in_block_stream(&block)
-                .map_ok(|a| a.to_string())
-                .map_err(Into::into),
-        )
     }
 
     async fn get_account_tx_range_unordered(

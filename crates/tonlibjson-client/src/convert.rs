@@ -100,7 +100,7 @@ impl From<ton_client::ShortTxId> for block::BlocksAccountTransactionId {
 impl From<block::BlocksTransactions> for ton_client::BlockTransactions {
     fn from(v: block::BlocksTransactions) -> Self {
         Self {
-            incomplete: v.incomplete.into(),
+            incomplete: v.incomplete,
             transactions: v.transactions.into_iter().map(Into::into).collect(),
         }
     }
@@ -109,7 +109,7 @@ impl From<block::BlocksTransactions> for ton_client::BlockTransactions {
 impl From<block::BlocksTransactionsExt> for ton_client::BlockTransactionsExt {
     fn from(v: block::BlocksTransactionsExt) -> Self {
         Self {
-            incomplete: v.incomplete.into(),
+            incomplete: v.incomplete,
             transactions: v.transactions.into_iter().map(Into::into).collect(),
         }
     }

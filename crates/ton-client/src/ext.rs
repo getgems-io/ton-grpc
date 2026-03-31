@@ -206,6 +206,36 @@ pub trait TonClientExt: TonClient {
         }
     }
 
+    fn get_accounts_in_block_stream(
+        &self,
+        block: &BlockIdExt,
+    ) -> impl Stream<Item = anyhow::Result<String>> + Send + 'static {
+        let fwd = self.get_block_tx_id_stream(block, false).boxed();
+        let rev = self.get_block_tx_id_stream(block, true).boxed();
+
+        let merged = stream_select!(fwd.map(|r| (false, r)), rev.map(|r| (true, r)));
+
+        try_stream! {
+            let mut last: HashMap<bool, String> = HashMap::with_capacity(2);
+
+            for await (key, tx) in merged {
+                let tx: ShortTxId = tx?;
+                if let Some(prev) = last.get(&!key)
+                    && prev == &tx.account
+                {
+                    return;
+                }
+                if let Some(prev) = last.get(&key)
+                    && prev == &tx.account
+                {
+                    continue;
+                }
+                last.insert(key, tx.account.clone());
+                yield tx.account;
+            }
+        }
+    }
+
     fn get_account_tx_range(
         &self,
         address: &str,
