@@ -88,8 +88,46 @@ impl From<block::BlocksHeader> for ton_client::BlockHeader {
     }
 }
 
+impl From<ton_client::ShortTxId> for block::BlocksAccountTransactionId {
+    fn from(v: ton_client::ShortTxId) -> Self {
+        Self {
+            account: v.account,
+            lt: v.lt,
+        }
+    }
+}
+
+impl From<block::BlocksTransactions> for ton_client::BlockTransactions {
+    fn from(v: block::BlocksTransactions) -> Self {
+        Self {
+            incomplete: v.incomplete.into(),
+            transactions: v.transactions.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<block::BlocksTransactionsExt> for ton_client::BlockTransactionsExt {
+    fn from(v: block::BlocksTransactionsExt) -> Self {
+        Self {
+            incomplete: v.incomplete.into(),
+            transactions: v.transactions.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
 impl From<block::BlocksShortTxId> for ton_client::ShortTxId {
     fn from(v: block::BlocksShortTxId) -> Self {
+        Self {
+            mode: v.mode,
+            account: v.account,
+            lt: v.lt,
+            hash: v.hash,
+        }
+    }
+}
+
+impl From<ton_client::ShortTxId> for block::BlocksShortTxId {
+    fn from(v: ton_client::ShortTxId) -> Self {
         Self {
             mode: v.mode,
             account: v.account,
