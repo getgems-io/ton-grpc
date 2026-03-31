@@ -5,8 +5,6 @@ pub use ext::*;
 pub use types::*;
 
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use std::ops::Bound;
 
 #[async_trait]
 pub trait TonClient: Clone + Send + Sync + 'static {
@@ -105,10 +103,4 @@ pub trait TonClient: Clone + Send + Sync + 'static {
         reverse: bool,
         count: i32,
     ) -> anyhow::Result<BlockTransactionsExt>;
-
-    async fn get_account_tx_range_unordered(
-        &self,
-        address: &str,
-        range: (Bound<TransactionId>, Bound<TransactionId>),
-    ) -> anyhow::Result<BoxStream<'static, anyhow::Result<Transaction>>>;
 }
