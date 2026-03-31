@@ -106,11 +106,6 @@ pub trait TonClient: Clone + Send + Sync + 'static {
         count: i32,
     ) -> anyhow::Result<BlockTransactionsExt>;
 
-    fn get_accounts_in_block_stream(
-        &self,
-        block: &BlockIdExt,
-    ) -> BoxStream<'static, anyhow::Result<String>>;
-
     async fn get_account_tx_range_unordered(
         &self,
         address: &str,
