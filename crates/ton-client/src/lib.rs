@@ -1,5 +1,7 @@
+pub mod ext;
 pub mod types;
 
+pub use ext::*;
 pub use types::*;
 
 use async_trait::async_trait;
@@ -109,12 +111,6 @@ pub trait TonClient: Clone + Send + Sync + 'static {
         &self,
         block: &BlockIdExt,
     ) -> BoxStream<'static, anyhow::Result<String>>;
-
-    fn get_account_tx_range(
-        &self,
-        address: &str,
-        range: (Bound<TransactionId>, Bound<TransactionId>),
-    ) -> BoxStream<'static, anyhow::Result<Transaction>>;
 
     async fn get_account_tx_range_unordered(
         &self,

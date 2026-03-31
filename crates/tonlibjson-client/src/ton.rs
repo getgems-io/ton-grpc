@@ -2,12 +2,11 @@ use crate::address::InternalAccountAddress;
 use crate::block::{
     AccountAddress, BlocksAccountTransactionId, BlocksGetBlockHeader, BlocksGetMasterchainInfo,
     BlocksGetShards, BlocksGetTransactions, BlocksGetTransactionsExt, BlocksHeader,
-    BlocksLookupBlock, BlocksShards, BlocksShortTxId, BlocksTransactions,
-    BlocksTransactionsExt, GetShardAccountCell,
-    GetShardAccountCellByTransaction, InternalTransactionId, RawFullAccountState,
-    RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2, RawSendMessage,
-    RawSendMessageReturnHash, RawTransaction, RawTransactions, SmcBoxedMethodId, SmcRunResult,
-    TonBlockId, TonBlockIdExt, TvmBoxedStackEntry, TvmCell, WithBlock,
+    BlocksLookupBlock, BlocksShards, BlocksShortTxId, BlocksTransactions, BlocksTransactionsExt,
+    GetShardAccountCell, GetShardAccountCellByTransaction, InternalTransactionId,
+    RawFullAccountState, RawGetAccountState, RawGetAccountStateByTransaction, RawGetTransactionsV2,
+    RawSendMessage, RawSendMessageReturnHash, RawTransaction, RawTransactions, SmcBoxedMethodId,
+    SmcRunResult, TonBlockId, TonBlockIdExt, TvmBoxedStackEntry, TvmCell, WithBlock,
 };
 use crate::cursor::client::CursorClient;
 use crate::error::ErrorService;
@@ -30,6 +29,7 @@ use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 use tokio_stream::StreamMap;
+use ton_client::TonClient as _;
 use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use ton_client_util::discover::{
     LiteServerDiscover, read_ton_config_from_file_stream, read_ton_config_from_url_stream,
@@ -46,7 +46,6 @@ use tower::util::Either;
 use tower::{Layer, ServiceExt};
 use tracing::{instrument, trace};
 use url::Url;
-use ton_client::TonClient as _;
 
 #[cfg(not(feature = "testnet"))]
 pub fn default_ton_config_url() -> Url {
@@ -636,20 +635,13 @@ impl TonClient {
         .try_flatten()
     }
 
-    pub fn get_account_tx_stream(
-        &self,
-        address: &str,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
-        self.get_account_tx_stream_from(address, None)
-    }
-
     // TODO[akostylev0] run search of first tx in parallel with `range` stream
     #[instrument(skip_all, err)]
     pub async fn get_account_tx_range_unordered<R: RangeBounds<InternalTransactionId> + 'static>(
         &self,
         address: &str,
         range: R,
-    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<RawTransaction>> + 'static> {
+    ) -> anyhow::Result<impl Stream<Item = anyhow::Result<ton_client::Transaction>> + 'static> {
         let ((last_block, last_tx), (first_block, first_tx)) = try_join!(
             async {
                 let last_tx = match range.start_bound().cloned() {
@@ -734,115 +726,16 @@ impl TonClient {
                     Bound::Excluded(right.clone())
                 };
 
-                self.get_account_tx_range(address, (right_bound, left_bound))
-                    .boxed()
+                ton_client::TonClientExt::get_account_tx_range(
+                    self,
+                    address,
+                    (right_bound.map(Into::into), left_bound.map(Into::into)),
+                )
+                .boxed()
             })
             .collect_vec();
 
         Ok(stream::iter(streams).flatten_unordered(32))
-    }
-
-    #[instrument(skip_all)]
-    pub fn get_account_tx_range<R: RangeBounds<InternalTransactionId> + 'static>(
-        &self,
-        address: &str,
-        range: R,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
-        let last_tx = match range.start_bound() {
-            Bound::Included(tx) | Bound::Excluded(tx) => Some(tx.to_owned()),
-            Bound::Unbounded => None,
-        };
-        let stream = self.get_account_tx_stream_from(address, last_tx);
-
-        let exclude = if let Bound::Excluded(tx) = range.start_bound().cloned() {
-            Some(tx)
-        } else {
-            None
-        };
-        let stream = stream.try_skip_while(move |sx| {
-            std::future::ready(if let Some(tx) = exclude.as_ref() {
-                Ok(tx == &sx.transaction_id)
-            } else {
-                Ok(false)
-            })
-        });
-
-        let end = range.end_bound().cloned();
-        try_stream! {
-            tokio::pin!(stream);
-            while let Some(x) = stream.try_next().await? {
-                match end.as_ref() {
-                    Bound::Unbounded => { yield x; },
-                    Bound::Included(tx) => {
-                        let cond = tx == &x.transaction_id ;
-                        yield x;
-                        if cond { break; }
-                    },
-                    Bound::Excluded(tx) => {
-                        if tx == &x.transaction_id { break; }
-                        yield x;
-                    }
-                }
-            }
-        }
-    }
-
-    #[instrument(skip_all)]
-    pub fn get_account_tx_stream_from(
-        &self,
-        address: &str,
-        last_tx: Option<InternalTransactionId>,
-    ) -> impl Stream<Item = anyhow::Result<RawTransaction>> + 'static {
-        struct State {
-            address: String,
-            next_id: Option<InternalTransactionId>,
-            this: TonClient,
-            next: bool,
-        }
-
-        stream::try_unfold(
-            State {
-                address: address.to_owned(),
-                next_id: last_tx,
-                this: self.clone(),
-                next: true,
-            },
-            move |state| async move {
-                if !state.next {
-                    return anyhow::Ok(None);
-                }
-
-                let next_id = if let Some(id) = state.next_id {
-                    id
-                } else {
-                    let state = state.this.raw_get_account_state(&state.address).await?;
-                    let Some(tx_id) = state.last_transaction_id else {
-                        return anyhow::Ok(None);
-                    };
-
-                    tx_id
-                };
-
-                let txs = state
-                    .this
-                    .raw_get_transactions(&state.address, &next_id)
-                    .await?;
-
-                let items = txs.transactions;
-
-                let next = txs.previous_transaction_id.is_some();
-                anyhow::Ok(Some((
-                    stream::iter(items.into_iter().map(anyhow::Ok)),
-                    State {
-                        address: state.address,
-                        next_id: txs.previous_transaction_id,
-                        this: state.this,
-                        next,
-                    },
-                )))
-            },
-        )
-        .try_flatten()
     }
 
     pub async fn run_get_method(
@@ -1223,24 +1116,6 @@ impl ton_client::TonClient for TonClient {
         )
     }
 
-    fn get_account_tx_range(
-        &self,
-        address: &str,
-        range: (
-            Bound<ton_client::TransactionId>,
-            Bound<ton_client::TransactionId>,
-        ),
-    ) -> BoxStream<'static, anyhow::Result<ton_client::Transaction>> {
-        let range = (
-            range.0.map(Into::<InternalTransactionId>::into),
-            range.1.map(Into::<InternalTransactionId>::into),
-        );
-        Box::pin(
-            self.get_account_tx_range(address, range)
-                .map(|r| r.map(Into::into)),
-        )
-    }
-
     async fn get_account_tx_range_unordered(
         &self,
         address: &str,
@@ -1254,7 +1129,7 @@ impl ton_client::TonClient for TonClient {
             range.1.map(Into::<InternalTransactionId>::into),
         );
         let stream = self.get_account_tx_range_unordered(address, range).await?;
-        Ok(Box::pin(stream.map(|r| r.map(Into::into))))
+        Ok(Box::pin(stream))
     }
 }
 

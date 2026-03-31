@@ -1,7 +1,6 @@
 use futures::StreamExt;
 use tokio::time::Instant;
-use tonlibjson_client::block::RawTransaction;
-
+use ton_client::Transaction;
 use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]
@@ -19,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
         .get_account_tx_range_unordered(address, ..)
         .await?
         .filter_map(|tx| async {
-            let tx: RawTransaction = tx.unwrap();
+            let tx: Transaction = tx.unwrap();
             if let Some(msg) = tx.out_msgs.first() {
                 Some(-msg.value - tx.fee)
             } else if let Some(msg) = tx.in_msg {
