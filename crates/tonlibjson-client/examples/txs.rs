@@ -1,6 +1,6 @@
 use futures::stream::StreamExt;
 use std::time::Duration;
-use tonlibjson_client::block::RawTransaction;
+use ton_client::{TonClient as _, TonClientExt, Transaction};
 use tonlibjson_client::ton::{TonClient, TonClientBuilder};
 use url::Url;
 
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     let txs = client
         .get_block_tx_stream(&block, false)
-        .collect::<Vec<anyhow::Result<RawTransaction>>>()
+        .collect::<Vec<anyhow::Result<Transaction>>>()
         .await;
 
     tracing::info!( txs_count = ?txs.len());

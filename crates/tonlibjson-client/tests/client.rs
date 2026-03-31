@@ -106,14 +106,7 @@ async fn get_block_header_no_hashes() -> anyhow::Result<()> {
     let client = client().await;
     let mc_block = client.get_masterchain_info().await?;
 
-    let mc_header = client
-        .get_block_header(
-            mc_block.last.workchain,
-            mc_block.last.shard,
-            mc_block.last.seqno,
-            None,
-        )
-        .await?;
+    let mc_header = client.get_block_header(mc_block.last.clone()).await?;
 
     assert_eq!(mc_header.id.seqno, mc_block.last.seqno);
     assert!(!mc_header.want_split);
@@ -127,14 +120,7 @@ async fn get_block_header_with_hashes() -> anyhow::Result<()> {
     let client = client().await;
     let mc_block = client.get_masterchain_info().await?;
 
-    let mc_header = client
-        .get_block_header(
-            mc_block.last.workchain,
-            mc_block.last.shard,
-            mc_block.last.seqno,
-            Some((mc_block.last.root_hash, mc_block.last.file_hash)),
-        )
-        .await?;
+    let mc_header = client.get_block_header(mc_block.last.clone()).await?;
 
     assert_eq!(mc_header.id.seqno, mc_block.last.seqno);
     assert!(!mc_header.want_split);

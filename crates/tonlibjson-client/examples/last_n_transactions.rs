@@ -1,6 +1,6 @@
 use futures::{StreamExt, stream};
 use tokio::time::Instant;
-use ton_client::TonClient as _;
+use ton_client::{TonClient as _, TonClientExt};
 use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
                                     tracing::info!(tx = ?tx);
 
-                                    let address = tx.into_internal_string(block.workchain);
+                                    let address = format!("{}:{}", block.workchain, tx.account);
                                     match ton.get_account_state(&address).await {
                                         Ok(account) => {
                                             tracing::info!("{}: {:?}", &address, account.balance)
