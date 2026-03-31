@@ -244,8 +244,10 @@ pub trait AccountClientExt: BlockClient + AccountClient {
                 })
                 .collect_vec();
 
-            Ok(Box::pin(futures::stream::iter(streams).flatten_unordered(32))
-                as BoxStream<'static, anyhow::Result<Transaction>>)
+            Ok(
+                Box::pin(futures::stream::iter(streams).flatten_unordered(32))
+                    as BoxStream<'static, anyhow::Result<Transaction>>,
+            )
         }
     }
 
