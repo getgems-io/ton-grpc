@@ -3494,6 +3494,8 @@ dependencies = [
  "async-stream",
  "async-trait",
  "futures",
+ "itertools",
+ "tracing",
 ]
 
 [[package]]
