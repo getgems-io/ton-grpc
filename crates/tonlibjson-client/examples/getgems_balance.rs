@@ -1,6 +1,7 @@
 use futures::StreamExt;
+use std::ops::Bound;
 use tokio::time::Instant;
-use ton_client::Transaction;
+use ton_client::{TonClientExt, Transaction};
 use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]
@@ -15,7 +16,7 @@ async fn main() -> anyhow::Result<()> {
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS";
 
     let total_value: i64 = ton
-        .get_account_tx_range_unordered(address, ..)
+        .get_account_tx_range_unordered(address, (Bound::Unbounded, Bound::Unbounded))
         .await?
         .filter_map(|tx| async {
             let tx: Transaction = tx.unwrap();
