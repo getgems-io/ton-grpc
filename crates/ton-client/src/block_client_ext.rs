@@ -4,9 +4,25 @@ use futures::{Stream, StreamExt, TryStreamExt};
 use std::cmp::min;
 use std::collections::HashMap;
 
-use crate::{BlockClient, BlockIdExt, ShortTxId, Transaction};
+use crate::{BlockClient, BlockIdExt, Shards, ShortTxId, Transaction};
 
 pub trait BlockClientExt: BlockClient {
+    fn get_shards(
+        &self,
+        master_seqno: i32,
+    ) -> impl std::future::Future<Output = anyhow::Result<Shards>> + Send {
+        let client = self.clone();
+        async move {
+            let block = client
+                .look_up_block_by_seqno(-1, i64::MIN, master_seqno)
+                .await?;
+
+            let shards = client.get_shards_by_block_id(block).await?;
+
+            Ok(Shards { shards })
+        }
+    }
+
     fn get_block_tx_id_stream(
         &self,
         block: &BlockIdExt,

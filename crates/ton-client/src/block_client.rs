@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 
 use crate::{
-    BlockHeader, BlockIdExt, BlockTransactions, BlockTransactionsExt, MasterchainInfo, Shards,
-    ShortTxId,
+    BlockHeader, BlockIdExt, BlockTransactions, BlockTransactionsExt, MasterchainInfo, ShortTxId,
 };
 
 #[async_trait]
@@ -23,12 +22,8 @@ pub trait BlockClient: Clone + Send + Sync + 'static {
         lt: i64,
     ) -> anyhow::Result<BlockIdExt>;
 
-    async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<Shards>;
-
-    async fn get_shards_by_block_id(
-        &self,
-        block_id: BlockIdExt,
-    ) -> anyhow::Result<Vec<BlockIdExt>>;
+    async fn get_shards_by_block_id(&self, block_id: BlockIdExt)
+    -> anyhow::Result<Vec<BlockIdExt>>;
 
     async fn get_block_header(&self, id: BlockIdExt) -> anyhow::Result<BlockHeader>;
 

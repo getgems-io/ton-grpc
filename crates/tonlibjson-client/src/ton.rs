@@ -57,9 +57,6 @@ pub struct TonClient {
     client: ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance>, SharedBalance>>>,
 }
 
-const MAIN_CHAIN: i32 = -1;
-const MAIN_SHARD: i64 = -9223372036854775808;
-
 enum ConfigSource {
     File { path: PathBuf },
     Url { url: Url, interval: Duration },
@@ -305,24 +302,6 @@ impl ton_client::BlockClient for TonClient {
                 TonBlockId::new(chain, shard, 0),
                 lt,
             ))
-            .await
-            .map(Into::into)
-    }
-
-    async fn get_shards(&self, master_seqno: i32) -> anyhow::Result<ton_client::Shards> {
-        let block = self
-            .client
-            .clone()
-            .oneshot(BlocksLookupBlock::seqno(TonBlockId::new(
-                MAIN_CHAIN,
-                MAIN_SHARD,
-                master_seqno,
-            )))
-            .await?;
-
-        self.client
-            .clone()
-            .oneshot(BlocksGetShards::new(block))
             .await
             .map(Into::into)
     }
