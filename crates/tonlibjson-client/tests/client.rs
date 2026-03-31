@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use tonlibjson_client::block::{InternalTransactionId, RawTransaction};
+use ton_client::{TonClient as _, TonClientExt};
 use tonlibjson_client::ton::{TonClient, TonClientBuilder};
 use tracing::debug;
 use tracing_test::traced_test;
@@ -19,12 +19,12 @@ async fn get_account_tx_stream_starts_from() -> anyhow::Result<()> {
     let address = "EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS".to_owned();
     let hash = "752Szayka+Eh54Zvco5l84d6WL+zJFmyh1wqRxD08Uo=";
     let lt = 33756943000007;
-    let tx = InternalTransactionId {
+    let tx = ton_client::TransactionId {
         hash: hash.to_owned(),
-        lt: lt.to_owned(),
+        lt,
     };
 
-    let transaction_list: Vec<anyhow::Result<RawTransaction>> = client
+    let transaction_list: Vec<anyhow::Result<ton_client::Transaction>> = client
         .get_account_tx_stream_from(&address, Some(tx.clone()))
         .take(1)
         .collect()
@@ -43,7 +43,7 @@ async fn get_account_tx_stream_contains_only_one_transaction() -> anyhow::Result
     let client = client().await;
     let address = "EQBO_mAVkaHxt6Ibz7wqIJ_UIDmxZBFcgkk7fvIzkh7l42wO".to_owned();
 
-    let transaction_list: Vec<anyhow::Result<RawTransaction>> = client
+    let transaction_list: Vec<anyhow::Result<ton_client::Transaction>> = client
         .get_account_tx_stream(&address)
         .take(1)
         .collect()

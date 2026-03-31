@@ -13,7 +13,7 @@ use anyhow::Result;
 use derive_new::new;
 use futures::{Stream, StreamExt, TryFutureExt, TryStreamExt, try_join};
 use std::pin::Pin;
-use ton_client::TonClient;
+use ton_client::{TonClient, TonClientExt as _};
 use tonic::{Request, Response, Status, async_trait};
 
 #[derive(new)]
