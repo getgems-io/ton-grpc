@@ -1,7 +1,7 @@
 use futures::StreamExt;
 use std::ops::Bound;
 use tokio::time::Instant;
-use ton_client::{TonClientExt, Transaction};
+use ton_client::{AccountClientExt as _, Transaction};
 use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]

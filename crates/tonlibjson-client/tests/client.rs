@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use ton_client::{TonClient as _, TonClientExt};
+use ton_client::{AccountClientExt, BlockClient as _, BlockClientExt};
 use tonlibjson_client::ton::{TonClient, TonClientBuilder};
 use tracing::debug;
 use tracing_test::traced_test;

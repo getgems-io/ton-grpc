@@ -3,7 +3,7 @@ use futures::TryStreamExt;
 // use futures::{stream, StreamExt};
 // use tokio::sync::RwLock;
 use tokio::time::Instant;
-use ton_client::{TonClient as _, TonClientExt};
+use ton_client::{BlockClient as _, BlockClientExt as _};
 use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]
