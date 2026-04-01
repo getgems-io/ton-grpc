@@ -1,5 +1,5 @@
 [profile.default]
-default-filter = 'not test(::integration::)'
+default-filter = 'not test(::integration::) - binary(=integration)'
 
 [profile.ci]
 fail-fast = false
@@ -12,8 +12,8 @@ integration = { max-threads = 2 }
 
 [[profile.ci.overrides]]
 platform = 'cfg(target_os = "macos")'
-default-filter = 'not test(::integration::)'
+default-filter = 'not test(::integration::) - binary(=integration)'
 
 [[profile.ci.overrides]]
-filter = 'test(::integration::)'
+filter = 'test(::integration::) | binary(=integration)'
 test-group = 'integration'

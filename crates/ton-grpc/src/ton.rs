@@ -3,7 +3,7 @@ use crate::ton::message::MsgData;
 
 tonic::include_proto!("ton");
 
-pub(crate) const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("ton_descriptor");
+pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("ton_descriptor");
 
 impl From<ton_client::BlockIdExt> for BlockIdExt {
     fn from(value: ton_client::BlockIdExt) -> Self {
