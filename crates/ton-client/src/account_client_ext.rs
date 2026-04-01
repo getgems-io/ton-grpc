@@ -259,7 +259,7 @@ pub trait AccountClientExt: BlockClient + AccountClient {
             Bound::Included(tx) | Bound::Excluded(tx) => Some(tx.to_owned()),
             Bound::Unbounded => None,
         };
-        let stream = self.get_account_tx_stream_from(&address, last_tx);
+        let stream = self.get_account_tx_stream_from(address, last_tx);
 
         let exclude: Option<TransactionId> =
             if let Bound::Excluded(tx) = range.start_bound().cloned() {

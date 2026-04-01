@@ -126,9 +126,9 @@ impl Display for SmartContractAddress {
     }
 }
 
-impl Into<[u8; 32]> for SmartContractAddress {
-    fn into(self) -> [u8; 32] {
-        match self {
+impl From<SmartContractAddress> for [u8; 32] {
+    fn from(value: SmartContractAddress) -> Self {
+        match value {
             SmartContractAddress::Raw { data, .. }
             | SmartContractAddress::UserFriendly { data, .. } => data.0,
         }
