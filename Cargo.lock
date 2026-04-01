@@ -3487,6 +3487,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-address"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "base64 0.22.1",
+ "bytes",
+ "crc",
+ "hex",
+]
+
+[[package]]
 name = "ton-client"
 version = "0.1.0"
 dependencies = [
