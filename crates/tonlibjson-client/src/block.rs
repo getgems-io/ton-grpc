@@ -1,10 +1,8 @@
-use crate::address::{AccountAddressData, InternalAccountAddress, ShardContextAccountAddress};
 use crate::deserialize::{
     deserialize_default_as_none, deserialize_empty_as_none, deserialize_number_from_string,
     deserialize_ton_account_balance, serialize_none_as_empty,
 };
 use crate::request::Requestable;
-use anyhow::anyhow;
 use derive_new::new;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -13,6 +11,7 @@ use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 use std::time::Duration;
+use ton_address::SmartContractAddress;
 use ton_client_util::router::route::{BlockCriteria, Route, ToRoute};
 use ton_client_util::service::timeout::ToTimeout;
 
@@ -68,22 +67,6 @@ impl From<BlocksHeader> for TonBlockId {
     }
 }
 
-impl BlocksShortTxId {
-    pub fn account(&self) -> &str {
-        &self.account
-    }
-
-    pub fn into_internal(self, chain_id: i32) -> InternalAccountAddress {
-        ShardContextAccountAddress::from_str(&self.account)
-            .unwrap()
-            .into_internal(chain_id)
-    }
-
-    pub fn into_internal_string(self, chain_id: i32) -> String {
-        self.into_internal(chain_id).to_string()
-    }
-}
-
 impl PartialEq for BlocksShortTxId {
     fn eq(&self, other: &Self) -> bool {
         self.account == other.account && self.hash == other.hash && self.lt == other.lt
@@ -112,27 +95,24 @@ impl Default for InternalTransactionId {
 }
 
 impl AccountAddress {
-    // TODO[akostylev0]
-    pub fn new(account_address: &str) -> anyhow::Result<Self> {
-        AccountAddressData::from_str(account_address)?; // validate
-
-        Ok(Self {
-            account_address: Some(account_address.to_owned()),
-        })
+    pub fn new(account_address: &SmartContractAddress) -> Self {
+        Self {
+            account_address: Some(account_address.to_raw().to_string()),
+        }
     }
 
-    pub fn to_data(&self) -> Option<AccountAddressData> {
+    pub fn to_data(&self) -> Option<SmartContractAddress> {
         self.account_address
             .as_ref()
-            .and_then(|a| AccountAddressData::from_str(a).ok())
+            .and_then(|a| SmartContractAddress::from_str(a).ok())
     }
 
     // TODO[akostylev0]
     pub fn chain_id(&self) -> i32 {
         self.account_address
             .as_ref()
-            .and_then(|a| AccountAddressData::from_str(a).ok())
-            .map(|d| d.chain_id)
+            .and_then(|a| SmartContractAddress::from_str(a).ok())
+            .map(|d| d.workchain_id())
             .unwrap_or(-1)
     }
 }
@@ -153,9 +133,9 @@ impl ToRoute for GetShardAccountCellByTransaction {
             .expect("invalid account address");
 
         Route::Block {
-            chain: data.chain_id,
+            chain: data.workchain_id(),
             criteria: BlockCriteria::LogicalTime {
-                address: data.bytes,
+                address: data.into(),
                 lt: self.transaction_id.lt,
             },
         }
@@ -180,9 +160,9 @@ impl ToRoute for RawGetAccountStateByTransaction {
             .expect("invalid account address");
 
         Route::Block {
-            chain: data.chain_id,
+            chain: data.workchain_id(),
             criteria: BlockCriteria::LogicalTime {
-                address: data.bytes,
+                address: data.into(),
                 lt: self.transaction_id.lt,
             },
         }
@@ -388,24 +368,6 @@ impl From<&BlocksShortTxId> for BlocksAccountTransactionId {
     }
 }
 
-impl TryFrom<&RawTransaction> for BlocksAccountTransactionId {
-    type Error = anyhow::Error;
-
-    fn try_from(v: &RawTransaction) -> Result<Self, Self::Error> {
-        let address_data = v
-            .address
-            .account_address
-            .as_ref()
-            .ok_or(anyhow!("empty address"))
-            .and_then(|s| AccountAddressData::from_str(s))?;
-
-        Ok(Self {
-            account: address_data.into_shard_context().to_string(),
-            lt: v.transaction_id.lt,
-        })
-    }
-}
-
 impl ToRoute for RawSendMessage {
     fn to_route(&self) -> Route {
         Route::Latest
@@ -456,9 +418,9 @@ impl ToRoute for RawGetTransactionsV2 {
             .expect("invalid account address");
 
         Route::Block {
-            chain: data.chain_id,
+            chain: data.workchain_id(),
             criteria: BlockCriteria::LogicalTime {
-                address: data.bytes,
+                address: data.into(),
                 lt: self.from_transaction_id.lt,
             },
         }
@@ -534,7 +496,6 @@ impl<T: Functional> ToRoute for WithBlock<T> {
 mod tests {
     use super::*;
     use serde_json::json;
-    use tracing_test::traced_test;
 
     #[test]
     fn deserialize_account_address_empty() {
@@ -556,33 +517,6 @@ mod tests {
         assert_eq!(
             json,
             "{\"@type\":\"accountAddress\",\"account_address\":\"\"}"
-        );
-    }
-
-    #[test]
-    #[traced_test]
-    fn account_address_workchain_id() {
-        let tx_id =
-            AccountAddress::new("EQCjk1hh952vWaE9bRguFkAhDAL5jj3xj9p0uPWrFBq_GEMS").unwrap();
-        assert_eq!(0, tx_id.chain_id());
-
-        let tx_id = AccountAddress::new(
-            "-1:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18",
-        )
-        .unwrap();
-        assert_eq!(-1, tx_id.chain_id());
-
-        let tx_id = AccountAddress::new(
-            "0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18",
-        )
-        .unwrap();
-        assert_eq!(0, tx_id.chain_id());
-
-        assert!(
-            AccountAddress::new(
-                "-1:0:a3935861f79daf59a13d6d182e1640210c02f98e3df18fda74b8f5ab141abf18"
-            )
-            .is_err()
         );
     }
 

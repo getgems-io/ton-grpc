@@ -1,4 +1,3 @@
-pub mod address;
 pub mod block;
 mod client;
 mod convert;

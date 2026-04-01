@@ -32,7 +32,7 @@ impl From<BlockIdExt> for ton_client::BlockIdExt {
 impl From<ton_client::ShortTxId> for TransactionId {
     fn from(value: ton_client::ShortTxId) -> Self {
         Self {
-            account_address: value.account,
+            account_address: value.account.to_raw().to_string(),
             lt: value.lt,
             hash: value.hash,
         }
@@ -126,8 +126,8 @@ impl From<ton_client::MessageData> for MsgData {
 impl From<ton_client::Message> for Message {
     fn from(value: ton_client::Message) -> Self {
         Self {
-            source: Some(value.source),
-            destination: Some(value.destination),
+            source: Some(value.source.to_raw().to_string()),
+            destination: Some(value.destination.to_raw().to_string()),
             value: value.value,
             fwd_fee: value.fwd_fee,
             ihr_fee: value.ihr_fee,
@@ -142,7 +142,7 @@ impl From<ton_client::Transaction> for Transaction {
     fn from(value: ton_client::Transaction) -> Self {
         Self {
             id: Some(TransactionId {
-                account_address: value.address.clone(),
+                account_address: value.address.to_raw().to_string(),
                 lt: value.transaction_id.lt,
                 hash: value.transaction_id.hash,
             }),

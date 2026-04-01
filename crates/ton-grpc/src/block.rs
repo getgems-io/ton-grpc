@@ -125,7 +125,9 @@ impl<T: TonClient> BaseBlockService for BlockService<T> {
         let stream = self
             .client
             .get_accounts_in_block_stream(&block_id)
-            .map_ok(|a| AccountAddress { address: a })
+            .map_ok(|a| AccountAddress {
+                address: a.to_string(),
+            })
             .map_err(|e| Status::internal(e.to_string()))
             .boxed();
 

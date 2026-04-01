@@ -1,6 +1,13 @@
-use crate::address::AccountAddressData;
 use crate::block;
+use crate::block::{
+    BlocksTransactions, BlocksTransactionsExt, RawMessage, RawTransaction, RawTransactions,
+};
+use anyhow::{Context, anyhow};
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD as base64;
 use std::str::FromStr;
+use ton_address::SmartContractAddress;
+use ton_client::ShortTxId;
 
 impl From<block::TonBlockIdExt> for ton_client::BlockIdExt {
     fn from(v: block::TonBlockIdExt) -> Self {
@@ -89,51 +96,56 @@ impl From<block::BlocksHeader> for ton_client::BlockHeader {
 }
 
 impl From<ton_client::ShortTxId> for block::BlocksAccountTransactionId {
-    fn from(v: ton_client::ShortTxId) -> Self {
+    fn from(value: ShortTxId) -> Self {
         Self {
-            account: v.account,
-            lt: v.lt,
+            account: base64.encode(value.account.to_internal()),
+            lt: value.lt,
         }
     }
 }
 
-impl From<block::BlocksTransactions> for ton_client::BlockTransactions {
-    fn from(v: block::BlocksTransactions) -> Self {
-        Self {
+impl TryFrom<block::BlocksTransactions> for ton_client::BlockTransactions {
+    type Error = anyhow::Error;
+
+    fn try_from(v: BlocksTransactions) -> Result<Self, Self::Error> {
+        Ok(Self {
             incomplete: v.incomplete,
-            transactions: v.transactions.into_iter().map(Into::into).collect(),
-        }
+            transactions: v
+                .transactions
+                .into_iter()
+                .map(|tx| {
+                    tracing::info!("tx: {:?}", tx);
+
+                    Ok(ShortTxId {
+                        account: SmartContractAddress::raw(
+                            v.id.workchain,
+                            base64
+                                .decode(&tx.account)
+                                .context(format!("invalid base64 address: {}", &tx.account))?
+                                .try_into()
+                                .map_err(|_| anyhow!("invalid address: {}", &tx.account))?,
+                        ),
+                        lt: tx.lt,
+                        hash: tx.hash,
+                    })
+                })
+                .collect::<Result<Vec<ShortTxId>, anyhow::Error>>()?,
+        })
     }
 }
 
-impl From<block::BlocksTransactionsExt> for ton_client::BlockTransactionsExt {
-    fn from(v: block::BlocksTransactionsExt) -> Self {
-        Self {
+impl TryFrom<block::BlocksTransactionsExt> for ton_client::BlockTransactionsExt {
+    type Error = anyhow::Error;
+
+    fn try_from(v: BlocksTransactionsExt) -> Result<Self, Self::Error> {
+        Ok(Self {
             incomplete: v.incomplete,
-            transactions: v.transactions.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-
-impl From<block::BlocksShortTxId> for ton_client::ShortTxId {
-    fn from(v: block::BlocksShortTxId) -> Self {
-        Self {
-            mode: v.mode,
-            account: v.account,
-            lt: v.lt,
-            hash: v.hash,
-        }
-    }
-}
-
-impl From<ton_client::ShortTxId> for block::BlocksShortTxId {
-    fn from(v: ton_client::ShortTxId) -> Self {
-        Self {
-            mode: v.mode,
-            account: v.account,
-            lt: v.lt,
-            hash: v.hash,
-        }
+            transactions: v
+                .transactions
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<_, _>>()?,
+        })
     }
 }
 
@@ -151,62 +163,75 @@ impl From<block::RawFullAccountState> for ton_client::AccountState {
     }
 }
 
-impl From<block::RawTransaction> for ton_client::Transaction {
-    fn from(v: block::RawTransaction) -> Self {
-        Self {
-            address: v
-                .address
-                .account_address
-                .as_deref()
-                .and_then(|a| AccountAddressData::from_str(a).ok())
-                .map(|a| a.to_raw_string())
-                .unwrap_or_default(),
+impl TryFrom<block::RawTransaction> for ton_client::Transaction {
+    type Error = anyhow::Error;
+
+    fn try_from(v: RawTransaction) -> Result<Self, Self::Error> {
+        let address = v.address.account_address.ok_or_else(|| {
+            anyhow::anyhow!(
+                "transaction address is not set, transaction id: {:?}",
+                v.transaction_id
+            )
+        })?;
+
+        Ok(Self {
+            address: SmartContractAddress::from_str(&address)?,
             utime: v.utime,
             data: v.data,
             transaction_id: v.transaction_id.into(),
             fee: v.fee,
             storage_fee: v.storage_fee,
             other_fee: v.other_fee,
-            in_msg: v.in_msg.map(Into::into),
-            out_msgs: v.out_msgs.into_iter().map(Into::into).collect(),
-        }
+            in_msg: v.in_msg.map(TryInto::try_into).transpose()?,
+            out_msgs: v
+                .out_msgs
+                .into_iter()
+                .map(TryInto::try_into)
+                .collect::<Result<Vec<ton_client::Message>, _>>()?,
+        })
     }
 }
 
-impl From<block::RawTransactions> for ton_client::Transactions {
-    fn from(v: block::RawTransactions) -> Self {
-        Self {
-            transactions: v.transactions.into_iter().map(Into::into).collect(),
+impl TryFrom<block::RawTransactions> for ton_client::Transactions {
+    type Error = anyhow::Error;
+
+    fn try_from(v: RawTransactions) -> Result<Self, Self::Error> {
+        let transactions = v
+            .transactions
+            .into_iter()
+            .map(TryInto::try_into)
+            .collect::<Result<Vec<ton_client::Transaction>, _>>()?;
+
+        Ok(Self {
+            transactions,
             previous_transaction_id: v.previous_transaction_id.map(Into::into),
-        }
+        })
     }
 }
 
-impl From<block::RawMessage> for ton_client::Message {
-    fn from(v: block::RawMessage) -> Self {
-        Self {
+impl TryFrom<block::RawMessage> for ton_client::Message {
+    type Error = anyhow::Error;
+
+    fn try_from(v: RawMessage) -> Result<Self, Self::Error> {
+        let source = v
+            .source
+            .account_address
+            .ok_or_else(|| anyhow::anyhow!("invalid source address, message hash: {}", v.hash))?;
+        let destination = v.destination.account_address.ok_or_else(|| {
+            anyhow::anyhow!("invalid destination address, message hash: {}", v.hash)
+        })?;
+
+        Ok(Self {
             hash: v.hash,
-            source: v
-                .source
-                .account_address
-                .as_deref()
-                .and_then(|a| AccountAddressData::from_str(a).ok())
-                .map(|a| a.to_raw_string())
-                .unwrap_or_default(),
-            destination: v
-                .destination
-                .account_address
-                .as_deref()
-                .and_then(|a| AccountAddressData::from_str(a).ok())
-                .map(|a| a.to_raw_string())
-                .unwrap_or_default(),
+            source: SmartContractAddress::from_str(&source)?,
+            destination: SmartContractAddress::from_str(&destination)?,
             value: v.value,
             fwd_fee: v.fwd_fee,
             ihr_fee: v.ihr_fee,
             created_lt: v.created_lt,
             body_hash: v.body_hash,
             msg_data: v.msg_data.into(),
-        }
+        })
     }
 }
 

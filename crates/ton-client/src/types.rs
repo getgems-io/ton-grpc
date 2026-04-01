@@ -1,3 +1,5 @@
+use ton_address::SmartContractAddress;
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BlockId {
     pub workchain: i32,
@@ -57,8 +59,7 @@ pub struct BlockHeader {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ShortTxId {
-    pub mode: i32,
-    pub account: String,
+    pub account: SmartContractAddress,
     pub lt: i64,
     pub hash: String,
 }
@@ -76,7 +77,7 @@ pub struct AccountState {
 
 #[derive(Debug, Clone)]
 pub struct Transaction {
-    pub address: String,
+    pub address: SmartContractAddress,
     pub utime: i64,
     pub data: String,
     pub transaction_id: TransactionId,
@@ -96,8 +97,8 @@ pub struct Transactions {
 #[derive(Debug, Clone)]
 pub struct Message {
     pub hash: String,
-    pub source: String,
-    pub destination: String,
+    pub source: SmartContractAddress,
+    pub destination: SmartContractAddress,
     pub value: i64,
     pub fwd_fee: i64,
     pub ihr_fee: i64,
