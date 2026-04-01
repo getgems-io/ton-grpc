@@ -3495,6 +3495,7 @@ dependencies = [
  "bytes",
  "crc",
  "hex",
+ "serde",
 ]
 
 [[package]]
@@ -3506,6 +3507,7 @@ dependencies = [
  "async-trait",
  "futures",
  "itertools",
+ "ton-address",
  "tracing",
 ]
 
@@ -3540,6 +3542,7 @@ dependencies = [
  "base64 0.22.1",
  "num-bigint",
  "thiserror 2.0.18",
+ "ton-address",
  "ton-client",
  "toner",
 ]
@@ -3579,6 +3582,7 @@ dependencies = [
  "testcontainers-ton",
  "tokio",
  "tokio-stream",
+ "ton-address",
  "ton-client",
  "tonic",
  "tonic-health",
@@ -3760,6 +3764,7 @@ dependencies = [
  "tokio",
  "tokio-retry",
  "tokio-util",
+ "ton-address",
  "ton-client",
  "ton-client-util",
  "tonlibjson-sys",

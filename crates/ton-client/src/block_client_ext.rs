@@ -1,10 +1,10 @@
+use crate::{BlockClient, BlockIdExt, Shards, ShortTxId, Transaction};
 use async_stream::try_stream;
 use futures::stream_select;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::cmp::min;
 use std::collections::HashMap;
-
-use crate::{BlockClient, BlockIdExt, Shards, ShortTxId, Transaction};
+use ton_address::SmartContractAddress;
 
 pub trait BlockClientExt: BlockClient {
     fn get_shards(
@@ -113,7 +113,6 @@ pub trait BlockClientExt: BlockClient {
                     .await?;
 
                 let after = txs.transactions.last().map(|t| ShortTxId {
-                    mode: 0,
                     account: t.address.clone(),
                     lt: t.transaction_id.lt,
                     hash: t.transaction_id.hash.clone(),
@@ -162,14 +161,14 @@ pub trait BlockClientExt: BlockClient {
     fn get_accounts_in_block_stream(
         &self,
         block: &BlockIdExt,
-    ) -> impl Stream<Item = anyhow::Result<String>> + Send + 'static {
+    ) -> impl Stream<Item = anyhow::Result<SmartContractAddress>> + Send + 'static {
         let fwd = self.get_block_tx_id_stream(block, false).boxed();
         let rev = self.get_block_tx_id_stream(block, true).boxed();
 
         let merged = stream_select!(fwd.map(|r| (false, r)), rev.map(|r| (true, r)));
 
         try_stream! {
-            let mut last: HashMap<bool, String> = HashMap::with_capacity(2);
+            let mut last: HashMap<bool, SmartContractAddress> = HashMap::with_capacity(2);
 
             for await (key, tx) in merged {
                 let tx: ShortTxId = tx?;

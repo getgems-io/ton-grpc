@@ -31,10 +31,9 @@ async fn main() -> anyhow::Result<()> {
 
                                     tracing::info!(tx = ?tx);
 
-                                    let address = format!("{}:{}", block.workchain, tx.account);
-                                    match ton.get_account_state(&address).await {
+                                    match ton.get_account_state(&tx.account).await {
                                         Ok(account) => {
-                                            tracing::info!("{}: {:?}", &address, account.balance)
+                                            tracing::info!("{}: {:?}", &tx.account, account.balance)
                                         }
                                         Err(e) => tracing::error!("{:?}", e),
                                     }

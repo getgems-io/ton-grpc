@@ -1,3 +1,4 @@
+use crate::{AccountClient, AccountState, BlockClient, Transaction, TransactionId};
 use anyhow::anyhow;
 use async_stream::try_stream;
 use futures::stream::BoxStream;
@@ -5,18 +6,17 @@ use futures::{Stream, StreamExt, TryStreamExt};
 use itertools::Itertools;
 use std::cmp::min;
 use std::ops::{Bound, RangeBounds};
+use ton_address::SmartContractAddress;
 use tracing::{debug, trace};
-
-use crate::{AccountClient, AccountState, BlockClient, Transaction, TransactionId};
 
 pub trait AccountClientExt: BlockClient + AccountClient {
     fn get_account_tx_stream_from(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         last_tx: Option<TransactionId>,
     ) -> impl Stream<Item = anyhow::Result<Transaction>> + Send + 'static {
         struct State<C> {
-            address: String,
+            address: SmartContractAddress,
             next_id: Option<TransactionId>,
             client: C,
             next: bool,
@@ -67,18 +67,18 @@ pub trait AccountClientExt: BlockClient + AccountClient {
 
     fn get_account_tx_stream(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
     ) -> impl Stream<Item = anyhow::Result<Transaction>> + Send + 'static {
         self.get_account_tx_stream_from(address, None)
     }
 
     fn get_last_transaction_id(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         chain: i32,
         shard: i64,
         seqno: i32,
-    ) -> impl std::future::Future<Output = anyhow::Result<TransactionId>> + Send {
+    ) -> impl Future<Output = anyhow::Result<TransactionId>> + Send {
         let client = self.clone();
         let address = address.to_owned();
 
@@ -94,8 +94,8 @@ pub trait AccountClientExt: BlockClient + AccountClient {
 
     fn find_first_tx(
         &self,
-        address: &str,
-    ) -> impl std::future::Future<Output = anyhow::Result<TransactionId>> + Send {
+        address: &SmartContractAddress,
+    ) -> impl Future<Output = anyhow::Result<TransactionId>> + Send {
         let client = self.clone();
         let address = address.to_owned();
 
@@ -144,11 +144,10 @@ pub trait AccountClientExt: BlockClient + AccountClient {
 
     fn get_account_tx_range_unordered(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         range: (Bound<TransactionId>, Bound<TransactionId>),
-    ) -> impl std::future::Future<
-        Output = anyhow::Result<BoxStream<'static, anyhow::Result<Transaction>>>,
-    > + Send {
+    ) -> impl Future<Output = anyhow::Result<BoxStream<'static, anyhow::Result<Transaction>>>> + Send
+    {
         let client = self.clone();
         let address = address.to_owned();
 
@@ -253,14 +252,14 @@ pub trait AccountClientExt: BlockClient + AccountClient {
 
     fn get_account_tx_range(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         range: (Bound<TransactionId>, Bound<TransactionId>),
     ) -> impl Stream<Item = anyhow::Result<Transaction>> + Send + 'static {
         let last_tx: Option<TransactionId> = match range.start_bound() {
             Bound::Included(tx) | Bound::Excluded(tx) => Some(tx.to_owned()),
             Bound::Unbounded => None,
         };
-        let stream = self.get_account_tx_stream_from(address, last_tx);
+        let stream = self.get_account_tx_stream_from(&address, last_tx);
 
         let exclude: Option<TransactionId> =
             if let Bound::Excluded(tx) = range.start_bound().cloned() {

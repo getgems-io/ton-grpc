@@ -4,6 +4,7 @@ use crate::ton::get_account_transactions_request::bound::Type;
 use anyhow::{Result, anyhow};
 use std::ops::Bound;
 use std::ops::Bound::{Excluded, Included};
+use ton_address::SmartContractAddress;
 use ton_client::TonClient;
 
 #[tracing::instrument(skip_all, err)]
@@ -48,7 +49,7 @@ pub async fn prev_block_id(
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_from_tx_id(
     client: &impl TonClient,
-    address: &str,
+    address: &SmartContractAddress,
     from: Option<ton::get_account_transactions_request::Bound>,
 ) -> Result<Bound<ton_client::TransactionId>> {
     Ok(match from {
@@ -91,7 +92,7 @@ pub async fn extend_from_tx_id(
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_to_tx_id(
     client: &impl TonClient,
-    address: &str,
+    address: &SmartContractAddress,
     to: Option<ton::get_account_transactions_request::Bound>,
 ) -> Result<Bound<ton_client::TransactionId>> {
     Ok(match to {

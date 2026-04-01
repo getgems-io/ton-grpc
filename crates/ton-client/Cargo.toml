@@ -6,6 +6,7 @@ rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
+ton-address = { path = "../ton-address" }
 async-trait = "0.1"
 async-stream = "0.3"
 anyhow = { version = "1.0", features = ["backtrace"] }

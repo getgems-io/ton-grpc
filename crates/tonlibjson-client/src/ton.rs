@@ -20,6 +20,7 @@ use std::pin::Pin;
 use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
+use ton_address::SmartContractAddress;
 use ton_client::BlockClient;
 use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use ton_client_util::discover::{
@@ -339,6 +340,7 @@ impl ton_client::BlockClient for TonClient {
             .await
     }
 
+    #[tracing::instrument(skip_all, err)]
     async fn blocks_get_transactions(
         &self,
         block: &ton_client::BlockIdExt,
@@ -346,6 +348,10 @@ impl ton_client::BlockClient for TonClient {
         reverse: bool,
         count: i32,
     ) -> anyhow::Result<ton_client::BlockTransactions> {
+        tracing::info!(
+            "blocks_get_transactions: {:?}",
+            (block, &after, reverse, count)
+        );
         let block: TonBlockIdExt = block.clone().into();
         let after: Option<BlocksAccountTransactionId> = after.map(Into::into);
 
@@ -355,9 +361,11 @@ impl ton_client::BlockClient for TonClient {
                 block, after, reverse, count,
             ))
             .await
-            .map(Into::into)
+            .inspect(|res| tracing::info!("blocks_get_transactions: {:?}", res))
+            .map(TryInto::try_into)?
     }
 
+    #[instrument(skip_all, err)]
     async fn blocks_get_transactions_ext(
         &self,
         block: &ton_client::BlockIdExt,
@@ -365,6 +373,10 @@ impl ton_client::BlockClient for TonClient {
         reverse: bool,
         count: i32,
     ) -> anyhow::Result<ton_client::BlockTransactionsExt> {
+        tracing::info!(
+            "blocks_get_transactions_ext: {:?}",
+            (block, &after, reverse, count)
+        );
         let block: TonBlockIdExt = block.clone().into();
         let after: Option<BlocksAccountTransactionId> = after.map(Into::into);
 
@@ -374,15 +386,18 @@ impl ton_client::BlockClient for TonClient {
                 block, after, reverse, count,
             ))
             .await
-            .map(Into::into)
+            .map(TryInto::try_into)?
     }
 }
 
 #[async_trait::async_trait]
 impl ton_client::AccountClient for TonClient {
     #[instrument(skip_all, err)]
-    async fn get_account_state(&self, address: &str) -> anyhow::Result<ton_client::AccountState> {
-        let account_address = AccountAddress::new(address)?;
+    async fn get_account_state(
+        &self,
+        address: &SmartContractAddress,
+    ) -> anyhow::Result<ton_client::AccountState> {
+        let account_address = AccountAddress::new(address);
 
         self.client
             .clone()
@@ -394,10 +409,10 @@ impl ton_client::AccountClient for TonClient {
     #[instrument(skip_all, err)]
     async fn get_account_state_on_block(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         block_id: ton_client::BlockIdExt,
     ) -> anyhow::Result<ton_client::AccountState> {
-        let account_address = AccountAddress::new(address)?;
+        let account_address = AccountAddress::new(address);
 
         self.client
             .clone()
@@ -412,7 +427,7 @@ impl ton_client::AccountClient for TonClient {
     // TODO[akostylev0]: (optimization) use BlockId instead of BlockIdExt
     async fn get_account_state_at_least_block(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         block_id: &ton_client::BlockIdExt,
     ) -> anyhow::Result<ton_client::AccountState> {
         let route = Route::Block {
@@ -422,7 +437,7 @@ impl ton_client::AccountClient for TonClient {
                 seqno: block_id.seqno,
             },
         };
-        let account_address = AccountAddress::new(address)?;
+        let account_address = AccountAddress::new(address);
 
         self.client
             .clone()
@@ -437,10 +452,10 @@ impl ton_client::AccountClient for TonClient {
     #[instrument(skip_all, err)]
     async fn get_account_state_by_transaction(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         tx: ton_client::TransactionId,
     ) -> anyhow::Result<ton_client::AccountState> {
-        let account_address = AccountAddress::new(address)?;
+        let account_address = AccountAddress::new(address);
 
         self.client
             .clone()
@@ -455,10 +470,10 @@ impl ton_client::AccountClient for TonClient {
     #[instrument(skip_all, err)]
     async fn get_transactions(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         from: &ton_client::TransactionId,
     ) -> anyhow::Result<ton_client::Transactions> {
-        let address = AccountAddress::new(address)?;
+        let address = AccountAddress::new(address);
         let from = InternalTransactionId {
             lt: from.lt,
             hash: from.hash.clone(),
@@ -468,11 +483,14 @@ impl ton_client::AccountClient for TonClient {
             .clone()
             .oneshot(RawGetTransactionsV2::new(address, from, 16, false))
             .await
-            .map(Into::into)
+            .map(TryInto::try_into)?
     }
 
-    async fn get_shard_account_cell(&self, address: &str) -> anyhow::Result<ton_client::Cell> {
-        let address = AccountAddress::new(address)?;
+    async fn get_shard_account_cell(
+        &self,
+        address: &SmartContractAddress,
+    ) -> anyhow::Result<ton_client::Cell> {
+        let address = AccountAddress::new(address);
 
         self.client
             .clone()
@@ -483,10 +501,10 @@ impl ton_client::AccountClient for TonClient {
 
     async fn get_shard_account_cell_on_block(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         block: ton_client::BlockIdExt,
     ) -> anyhow::Result<ton_client::Cell> {
-        let address = AccountAddress::new(address)?;
+        let address = AccountAddress::new(address);
 
         self.client
             .clone()
@@ -501,7 +519,7 @@ impl ton_client::AccountClient for TonClient {
     // TODO[akostylev0]: (optimization) use BlockId instead of BlockIdExt
     async fn get_shard_account_cell_at_least_block(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         block_id: &ton_client::BlockIdExt,
     ) -> anyhow::Result<ton_client::Cell> {
         let route = Route::Block {
@@ -511,7 +529,7 @@ impl ton_client::AccountClient for TonClient {
                 seqno: block_id.seqno,
             },
         };
-        let address = AccountAddress::new(address)?;
+        let address = AccountAddress::new(address);
 
         self.client
             .clone()
@@ -522,10 +540,10 @@ impl ton_client::AccountClient for TonClient {
 
     async fn get_shard_account_cell_by_transaction(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         tx: ton_client::TransactionId,
     ) -> anyhow::Result<ton_client::Cell> {
-        let address = AccountAddress::new(address)?;
+        let address = AccountAddress::new(address);
 
         self.client
             .clone()
@@ -539,11 +557,11 @@ impl ton_client::AccountClient for TonClient {
 impl ton_client::SmcClient for TonClient {
     async fn run_get_method(
         &self,
-        address: &str,
+        address: &SmartContractAddress,
         method: &str,
         stack: Vec<ton_client::StackEntry>,
     ) -> anyhow::Result<ton_client::SmcRunResult> {
-        let address = AccountAddress::new(address)?;
+        let address = AccountAddress::new(address);
         let method = SmcBoxedMethodId::by_name(method);
         let stack: Vec<TvmBoxedStackEntry> = stack.into_iter().map(Into::into).collect();
 
