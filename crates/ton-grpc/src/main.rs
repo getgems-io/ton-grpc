@@ -1,20 +1,13 @@
-mod account;
-mod block;
-mod helpers;
-mod message;
-#[allow(clippy::enum_variant_names)]
-mod ton;
-
-use crate::account::AccountService;
-use crate::block::BlockService;
-use crate::message::MessageService;
-use crate::ton::account_service_server::AccountServiceServer;
-use crate::ton::block_service_server::BlockServiceServer;
-use crate::ton::message_service_server::MessageServiceServer;
 use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::time::Duration;
+use ton_grpc::AccountService;
+use ton_grpc::BlockService;
+use ton_grpc::MessageService;
+use ton_grpc::account_service_server::AccountServiceServer;
+use ton_grpc::block_service_server::BlockServiceServer;
+use ton_grpc::message_service_server::MessageServiceServer;
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
 use tonlibjson_client::ton::TonClientBuilder;
@@ -103,7 +96,7 @@ async fn main() -> anyhow::Result<()> {
 
     let reflection = tonic_reflection::server::Builder::configure()
         .register_encoded_file_descriptor_set(tonic_health::pb::FILE_DESCRIPTOR_SET)
-        .register_encoded_file_descriptor_set(ton::FILE_DESCRIPTOR_SET)
+        .register_encoded_file_descriptor_set(ton_grpc::ton::FILE_DESCRIPTOR_SET)
         .build_v1()?;
 
     let account_service = AccountServiceServer::new(AccountService::new(client.clone()))

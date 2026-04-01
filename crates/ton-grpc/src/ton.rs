@@ -10,7 +10,7 @@ use tonlibjson_client::block::{
 
 tonic::include_proto!("ton");
 
-pub(crate) const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("ton_descriptor");
+pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("ton_descriptor");
 
 impl From<block::TonBlockIdExt> for BlockIdExt {
     fn from(value: block::TonBlockIdExt) -> Self {
