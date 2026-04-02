@@ -1,6 +1,6 @@
 {
     "$schema": "https://raw.githubusercontent.com/googleapis/release-please/refs/heads/main/schemas/config.json",
-    "bootstrap-sha": "f2df351789bfb8969591b8731d53708a38492d23",
+    "bootstrap-sha": "1a87cb3e3075adb5e11194e469c84defcd5e8c9a",
     "plugins": [
         "cargo-workspace"
     ],
