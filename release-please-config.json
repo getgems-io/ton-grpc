@@ -1,13 +1,15 @@
 {
+    "$schema": "https://raw.githubusercontent.com/googleapis/release-please/refs/heads/main/schemas/config.json",
     "bootstrap-sha": "f2df351789bfb8969591b8731d53708a38492d23",
     "plugins": [
         "cargo-workspace"
     ],
     "separate-pull-requests": false,
+    "skip-changelog": true,
     "packages": {
         "charts/ton-grpc": {
             "release-type": "helm",
-            "package-name": "charts/ton-grpc"
+            "package-name": "charts/ton-grpc",
         },
         "charts/tvm-grpc": {
             "release-type": "helm",
