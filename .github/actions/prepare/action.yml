@@ -31,6 +31,13 @@ runs:
       run: |
         sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
         sudo update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/ld.lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/lld lld /usr/bin/lld-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/lld-link lld-link /usr/bin/lld-link-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/llvm-nm llvm-nm /usr/bin/llvm-nm-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+        sudo update-alternatives --install /usr/bin/llvm-ranlib llvm-ranlib /usr/bin/llvm-ranlib-${{ steps.llvm_setup.outputs.LLVM_MAJOR_VERSION }} 101
+
     - run: brew install secp256k1 libsodium lz4 autoconf automake libtool zlib
       shell: bash
       if: runner.os == 'macOS'
