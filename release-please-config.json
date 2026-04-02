@@ -9,7 +9,7 @@
     "packages": {
         "charts/ton-grpc": {
             "release-type": "helm",
-            "package-name": "charts/ton-grpc",
+            "package-name": "charts/ton-grpc"
         },
         "charts/tvm-grpc": {
             "release-type": "helm",
