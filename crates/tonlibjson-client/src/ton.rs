@@ -368,10 +368,6 @@ impl ton_client::BlockClient for TonClient {
         reverse: bool,
         count: i32,
     ) -> anyhow::Result<ton_client::BlockTransactionsExt> {
-        tracing::info!(
-            "blocks_get_transactions_ext: {:?}",
-            (block, &after, reverse, count)
-        );
         let block: TonBlockIdExt = block.clone().into();
         let after: Option<BlocksAccountTransactionId> = after.map(Into::into);
 
