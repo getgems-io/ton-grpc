@@ -258,7 +258,7 @@ impl TonClient {
 }
 
 #[async_trait::async_trait]
-impl ton_client::BlockClient for TonClient {
+impl BlockClient for TonClient {
     async fn get_masterchain_info(&self) -> anyhow::Result<ton_client::MasterchainInfo> {
         self.client
             .clone()
@@ -307,6 +307,22 @@ impl ton_client::BlockClient for TonClient {
             .map(Into::into)
     }
 
+    async fn get_shards_by_block_id(
+        &self,
+        block_id: ton_client::BlockIdExt,
+    ) -> anyhow::Result<Vec<ton_client::BlockIdExt>> {
+        let block_id: TonBlockIdExt = block_id.into();
+        if block_id.workchain != -1 {
+            return Err(anyhow!("workchain must be -1"));
+        }
+
+        self.client
+            .clone()
+            .oneshot(BlocksGetShards::new(block_id))
+            .map_ok(|res| res.shards.into_iter().map(Into::into).collect())
+            .await
+    }
+
     async fn get_block_header(
         &self,
         id: ton_client::BlockIdExt,
@@ -322,22 +338,6 @@ impl ton_client::BlockClient for TonClient {
             }))
             .await
             .map(Into::into)
-    }
-
-    async fn get_shards_by_block_id(
-        &self,
-        block_id: ton_client::BlockIdExt,
-    ) -> anyhow::Result<Vec<ton_client::BlockIdExt>> {
-        let block_id: TonBlockIdExt = block_id.into();
-        if block_id.workchain != -1 {
-            return Err(anyhow!("workchain must be -1"));
-        }
-
-        self.client
-            .clone()
-            .oneshot(BlocksGetShards::new(block_id))
-            .map_ok(|res| res.shards.into_iter().map(Into::into).collect())
-            .await
     }
 
     #[tracing::instrument(skip_all, err)]
