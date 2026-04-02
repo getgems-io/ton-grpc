@@ -184,6 +184,7 @@ pub trait AccountClientExt: BlockClient + AccountClient {
                 .block_id;
 
             let chunks = min(256, (last_block.seqno - first_block.seqno) / 28800);
+            // TODO[akostylev0]: chunks can become 0
             let step = (last_block.seqno - first_block.seqno) / chunks;
 
             let workchain = first_block.workchain;
