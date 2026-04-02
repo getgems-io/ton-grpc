@@ -97,8 +97,8 @@ pub struct Transactions {
 #[derive(Debug, Clone)]
 pub struct Message {
     pub hash: String,
-    pub source: SmartContractAddress,
-    pub destination: SmartContractAddress,
+    pub source: Option<SmartContractAddress>,
+    pub destination: Option<SmartContractAddress>,
     pub value: i64,
     pub fwd_fee: i64,
     pub ihr_fee: i64,

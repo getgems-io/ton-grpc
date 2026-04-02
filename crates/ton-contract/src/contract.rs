@@ -30,7 +30,7 @@ impl<T: TonClient> TonContract<T> {
         let result = self
             .client
             .run_get_method(
-                &SmartContractAddress::from_str(&self.address().to_base64_std())?,
+                &SmartContractAddress::from_str(&self.address().to_hex())?,
                 method.as_ref(),
                 stack,
             )

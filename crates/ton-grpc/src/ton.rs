@@ -126,8 +126,8 @@ impl From<ton_client::MessageData> for MsgData {
 impl From<ton_client::Message> for Message {
     fn from(value: ton_client::Message) -> Self {
         Self {
-            source: Some(value.source.to_raw().to_string()),
-            destination: Some(value.destination.to_raw().to_string()),
+            source: value.source.map(|a| a.to_raw().to_string()),
+            destination: value.destination.map(|a| a.to_raw().to_string()),
             value: value.value,
             fwd_fee: value.fwd_fee,
             ihr_fee: value.ihr_fee,
