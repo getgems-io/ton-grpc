@@ -33,10 +33,6 @@ jobs:
           CARGO_INCREMENTAL: "0"
           TONLIBJSON_SYS_LLD: "1"
           TONLIBJSON_SYS_LTO: "1"
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
-          CMAKE_C_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
       - run: ldd ./target/x86_64-unknown-linux-gnu/release/tvm-grpc
 
       - name: Log in to the Container registry
@@ -59,7 +55,7 @@ jobs:
             type=sha,format=long
             type=ref,event=branch
             type=match,pattern=tvm-grpc-v(.*),group=1
-            
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:

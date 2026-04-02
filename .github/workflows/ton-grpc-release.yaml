@@ -33,10 +33,6 @@ jobs:
           CARGO_INCREMENTAL: "0"
           TONLIBJSON_SYS_LLD: "1"
           TONLIBJSON_SYS_LTO: "1"
-          SCCACHE_GHA_ENABLED: "true"
-          RUSTC_WRAPPER: "sccache"
-          CMAKE_C_COMPILER_LAUNCHER: "sccache"
-          CMAKE_CXX_COMPILER_LAUNCHER: "sccache"
       - run: ldd ./target/x86_64-unknown-linux-gnu/release/ton-grpc
 
       - name: Log in to the Container registry
