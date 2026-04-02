@@ -1,33 +1,53 @@
 {
-  "bootstrap-sha": "f2df351789bfb8969591b8731d53708a38492d23",
-  "plugins": ["cargo-workspace"],
-  "separate-pull-requests": false,
-  "packages": {
-    "charts/ton-grpc": {
-      "release-type": "helm",
-      "package-name": "charts/ton-grpc"
-    },
-    "charts/tvm-grpc": {
-      "release-type": "helm",
-      "package-name": "charts/tvm-grpc"
-    },
-    "crates/tvm-grpc": {
-      "release-type": "rust"
-    },
-    "crates/ton-grpc": {
-      "release-type": "rust"
-    },
-    "crates/tonlibjson-sys": {
-      "release-type": "rust"
-    },
-    "crates/tonlibjson-client": {
-      "release-type": "rust"
-    },
-    "crates/adnl-tcp": {
-      "release-type": "rust"
-    },
-    "crates/ton-liteserver-client": {
-      "release-type": "rust"
+    "bootstrap-sha": "f2df351789bfb8969591b8731d53708a38492d23",
+    "plugins": [
+        "cargo-workspace"
+    ],
+    "separate-pull-requests": false,
+    "packages": {
+        "charts/ton-grpc": {
+            "release-type": "helm",
+            "package-name": "charts/ton-grpc"
+        },
+        "charts/tvm-grpc": {
+            "release-type": "helm",
+            "package-name": "charts/tvm-grpc"
+        },
+        "crates/tvm-grpc": {
+            "release-type": "rust"
+        },
+        "crates/ton-grpc": {
+            "release-type": "rust"
+        },
+        "crates/tonlibjson-sys": {
+            "release-type": "rust"
+        },
+        "crates/tonlibjson-client": {
+            "release-type": "rust"
+        },
+        "crates/adnl-tcp": {
+            "release-type": "rust"
+        },
+        "crates/ton-liteserver-client": {
+            "release-type": "rust"
+        },
+        "crates/testcontainers-ton": {
+            "release-type": "rust"
+        },
+        "crates/tl-parser": {
+            "release-type": "rust"
+        },
+        "crates/ton-address": {
+            "release-type": "rust"
+        },
+        "crates/ton-client": {
+            "release-type": "rust"
+        },
+        "crates/ton-client-util": {
+            "release-type": "rust"
+        },
+        "crates/ton-contract": {
+            "release-type": "rust"
+        }
     }
-  }
 }
