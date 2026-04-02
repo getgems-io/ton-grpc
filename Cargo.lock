@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "adnl-tcp"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "aes",
  "anyhow",
@@ -3236,7 +3236,7 @@ dependencies = [
 
 [[package]]
 name = "testcontainers-ton"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3352,7 +3352,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tl-parser"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "crc32fast",
@@ -3488,7 +3488,7 @@ dependencies = [
 
 [[package]]
 name = "ton-address"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3500,7 +3500,7 @@ dependencies = [
 
 [[package]]
 name = "ton-client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3513,7 +3513,7 @@ dependencies = [
 
 [[package]]
 name = "ton-client-util"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bitvec",
@@ -3535,7 +3535,7 @@ dependencies = [
 
 [[package]]
 name = "ton-contract"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3567,7 +3567,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.12.0"
+version = "0.12.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -3598,7 +3598,7 @@ dependencies = [
 
 [[package]]
 name = "ton-liteserver-client"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "adnl-tcp",
  "anyhow",
@@ -3739,7 +3739,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.21.0"
+version = "0.21.1"
 dependencies = [
  "anyhow",
  "async-trait",
