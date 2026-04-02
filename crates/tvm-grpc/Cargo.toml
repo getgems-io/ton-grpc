@@ -1,6 +1,6 @@
 [package]
 name = "tvm-grpc"
-version = "0.7.12"
+version = "0.8.0"
 edition = "2024"
 rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
