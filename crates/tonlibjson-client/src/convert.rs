@@ -114,8 +114,6 @@ impl TryFrom<block::BlocksTransactions> for ton_client::BlockTransactions {
                 .transactions
                 .into_iter()
                 .map(|tx| {
-                    tracing::info!("tx: {:?}", tx);
-
                     Ok(ShortTxId {
                         account: SmartContractAddress::raw(
                             v.id.workchain,
@@ -187,7 +185,7 @@ impl TryFrom<block::RawTransaction> for ton_client::Transaction {
                 .out_msgs
                 .into_iter()
                 .map(TryInto::try_into)
-                .collect::<Result<Vec<ton_client::Message>, _>>()?,
+                .collect::<Result<_, _>>()?,
         })
     }
 }
@@ -213,18 +211,20 @@ impl TryFrom<block::RawMessage> for ton_client::Message {
     type Error = anyhow::Error;
 
     fn try_from(v: RawMessage) -> Result<Self, Self::Error> {
-        let source = v
+        let source: Option<SmartContractAddress> = v
             .source
             .account_address
-            .ok_or_else(|| anyhow::anyhow!("invalid source address, message hash: {}", v.hash))?;
-        let destination = v.destination.account_address.ok_or_else(|| {
-            anyhow::anyhow!("invalid destination address, message hash: {}", v.hash)
-        })?;
-
+            .map(|s| SmartContractAddress::from_str(&s))
+            .transpose()?;
+        let destination: Option<SmartContractAddress> = v
+            .destination
+            .account_address
+            .map(|s| SmartContractAddress::from_str(&s))
+            .transpose()?;
         Ok(Self {
             hash: v.hash,
-            source: SmartContractAddress::from_str(&source)?,
-            destination: SmartContractAddress::from_str(&destination)?,
+            source,
+            destination,
             value: v.value,
             fwd_fee: v.fwd_fee,
             ihr_fee: v.ihr_fee,

@@ -58,6 +58,9 @@ impl FromStr for SmartContractAddress {
             let Ok(data) = base64_standard.decode(&s) else {
                 return Err(anyhow!("invalid base64 address: {}", &s));
             };
+            if data.len() != 36 {
+                return Err(anyhow!("invalid base64 address: {}", &s));
+            }
 
             let crc16 = CRC16.checksum(&data[..34]);
             let [flags, workchain_id, data @ .., crc16_l, crc16_r] = &data[..] else {
