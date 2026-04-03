@@ -12,7 +12,7 @@ async fn main() -> anyhow::Result<()> {
 
     let lite_server = LocalLiteServer::new().await?;
     let mut client =
-        LiteServerClient::connect(lite_server.get_addr(), lite_server.get_server_key()).await?;
+        LiteServerClient::connect(lite_server.addr(), lite_server.server_key()).await?;
 
     let info = (&mut client)
         .oneshot(LiteServerGetMasterchainInfo::default())

@@ -1,15 +1,8 @@
 use crate::actor::Actor;
 use crate::actor::cancellable_actor::CancellableActor;
-use crate::discover::config::{
-    LiteServer, LiteServerId, TonConfig, load_ton_config, read_ton_config,
-};
 use futures::{Stream, StreamExt, TryStreamExt};
-use hickory_resolver::name_server::TokioConnectionProvider;
-use hickory_resolver::{ResolveError, TokioResolver};
-use reqwest::Url;
 use std::collections::HashSet;
 use std::convert::Infallible;
-use std::net::IpAddr;
 use std::path::PathBuf;
 use std::pin::Pin;
 use std::task::{Context, Poll, ready};
@@ -17,9 +10,9 @@ use tokio::sync::mpsc;
 use tokio::time::Interval;
 use tokio_stream::wrappers::IntervalStream;
 use tokio_util::sync::{CancellationToken, DropGuard};
+use ton_config::{LiteServer, LiteServerId, TonConfig, load_ton_config, read_ton_config};
 use tower::discover::Change;
-
-pub mod config;
+use url::Url;
 
 pub fn read_ton_config_from_file_stream(
     path: PathBuf,
@@ -62,21 +55,13 @@ where
         let stream = self.stream;
         tokio::pin!(stream);
 
-        let dns = dns_resolver();
         let mut liteservers = HashSet::default();
 
         while let Ok(Some(new_config)) = stream.try_next().await {
             tracing::info!("tick service discovery");
 
-            let mut liteserver_new: HashSet<LiteServer> = HashSet::default();
-            for ls in new_config.liteservers.iter() {
-                match apply_dns(dns.clone(), ls.clone()).await {
-                    Err(e) => tracing::error!("dns error: {:?}", e),
-                    Ok(ls) => {
-                        liteserver_new.insert(ls);
-                    }
-                }
-            }
+            let liteserver_new: HashSet<LiteServer> =
+                new_config.liteservers.iter().cloned().collect();
 
             let remove = liteservers
                 .difference(&liteserver_new)
@@ -142,27 +127,4 @@ impl Stream for LiteServerDiscover {
 
         Poll::Ready(change)
     }
-}
-
-fn dns_resolver() -> TokioResolver {
-    TokioResolver::builder(TokioConnectionProvider::default())
-        .map(|builder| builder.build())
-        .expect("cannot build DNS resolver")
-}
-
-async fn apply_dns(
-    dns_resolver: TokioResolver,
-    ls: LiteServer,
-) -> Result<LiteServer, ResolveError> {
-    if let Some(host) = ls.host.as_ref() {
-        let records = dns_resolver.lookup_ip(host).await?;
-
-        for record in records {
-            if let IpAddr::V4(ip) = record {
-                return Ok(ls.with_ip(Into::<u32>::into(ip) as i32));
-            }
-        }
-    }
-
-    Ok(ls)
 }

@@ -134,11 +134,9 @@ mod test {
     #[ignore = "broken test"]
     async fn masterchain_first_block_tracker_delay() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
-        let client = LiteServerClient::connect(
-            local_lite_server.get_addr(),
-            local_lite_server.get_server_key(),
-        )
-        .await?;
+        let client =
+            LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                .await?;
         let last_tracker = MasterchainLastBlockTracker::new(client.clone());
         let first_tracker = MasterchainFirstBlockTracker::new(client, last_tracker);
         let mut prev_seqno = None;

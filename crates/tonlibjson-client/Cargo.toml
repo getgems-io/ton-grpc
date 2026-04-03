@@ -8,6 +8,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 [dependencies]
 tonlibjson-sys = { path = "../tonlibjson-sys" }
 ton-address = { path = "../ton-address" }
+ton-config = { path = "../ton-config" }
 ton-client-util = { path = "../ton-client-util" }
 ton-client = { path = "../ton-client" }
 async-trait = "0.1"
@@ -46,4 +47,4 @@ prettyplease = "0.2.37"
 convert_case = "0.11.0"
 
 [features]
-testnet = ["tonlibjson-sys/testnet"]
+testnet = ["tonlibjson-sys/testnet", "ton-config/testnet"]
