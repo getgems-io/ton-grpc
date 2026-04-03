@@ -9,7 +9,7 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 thiserror = "2.0.17"
 itertools = "0.14.0"
 tracing = "0.1.44"
-tokio = { version = "1.50.0", features = ["full"] }
+tokio = { version = "1.51.0", features = ["full"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }
 futures = "0.3.32"
 bitvec = "1.0.1"

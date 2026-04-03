@@ -17,7 +17,7 @@ adnl-tcp = { path = "../adnl-tcp", features = ["client"] }
 ton-client-util = { path = "../ton-client-util" }
 toner = "0.7.3"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
-tokio = { version = "1.50.0", features = ["full"] }
+tokio = { version = "1.51.0", features = ["full"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }
 tower = { version = "0.5.3", features = ["full"] }
 tracing = "0.1.44"
