@@ -30,7 +30,7 @@ impl LocalLiteServer {
         genesis
             .copy_file_from("/usr/share/data/global.config.json", &mut config_bytes)
             .await?;
-        let config: TonConfig = serde_json::from_slice(&config_bytes)?;
+        let config = TonConfig::try_from(config_bytes.as_slice())?;
         let liteserver = LiteServerImage::new(config_bytes).start().await?;
         let port = liteserver.get_host_port_ipv4(30004).await?;
 

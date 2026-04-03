@@ -16,6 +16,22 @@ pub struct TonConfig {
     pub data: Value,
 }
 
+impl FromStr for TonConfig {
+    type Err = serde_json::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+    }
+}
+
+impl TryFrom<&[u8]> for TonConfig {
+    type Error = serde_json::Error;
+
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        serde_json::from_slice(value)
+    }
+}
+
 impl TonConfig {
     pub fn with_liteserver(&self, liteserver: LiteServer) -> Self {
         TonConfig {
