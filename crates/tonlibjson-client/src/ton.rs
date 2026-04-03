@@ -17,18 +17,17 @@ use futures::{Stream, StreamExt, TryFutureExt, stream};
 use serde_json::Value;
 use std::path::PathBuf;
 use std::pin::Pin;
-use std::str::FromStr;
 use std::time::Duration;
 use tokio::time::MissedTickBehavior;
 use ton_address::SmartContractAddress;
 use ton_client::BlockClient;
-use ton_client_util::discover::config::{LiteServerId, TonConfig};
 use ton_client_util::discover::{
     LiteServerDiscover, read_ton_config_from_file_stream, read_ton_config_from_url_stream,
 };
 use ton_client_util::router::balance::Balance;
 use ton_client_util::router::route::{BlockCriteria, Route};
 use ton_client_util::service::shared::SharedService;
+use ton_config::{LiteServerId, TonConfig, default_ton_config_url};
 use tower::discover::Change;
 use tower::load::PeakEwmaDiscover;
 use tower::retry::Retry;
@@ -38,16 +37,6 @@ use tower::util::Either;
 use tower::{Layer, ServiceExt};
 use tracing::instrument;
 use url::Url;
-
-#[cfg(not(feature = "testnet"))]
-pub fn default_ton_config_url() -> Url {
-    Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/global.config.json").unwrap()
-}
-
-#[cfg(feature = "testnet")]
-pub fn default_ton_config_url() -> Url {
-    Url::from_str("https://raw.githubusercontent.com/ton-blockchain/ton-blockchain.github.io/main/testnet-global.config.json").unwrap()
-}
 
 type BoxCursorClientDiscover =
     Pin<Box<dyn Stream<Item = Result<Change<LiteServerId, CursorClient>, anyhow::Error>> + Send>>;
@@ -61,7 +50,7 @@ pub struct TonClient {
 enum ConfigSource {
     File { path: PathBuf },
     Url { url: Url, interval: Duration },
-    Config { config: String },
+    Config { config: TonConfig },
 }
 
 pub struct TonClientBuilder {
@@ -112,10 +101,10 @@ impl TonClientBuilder {
         }
     }
 
-    pub fn from_config(config: &str) -> Self {
+    pub fn from_config(config: &TonConfig) -> Self {
         Self {
             config_source: ConfigSource::Config {
-                config: config.to_owned(),
+                config: config.clone(),
             },
             ..Default::default()
         }
@@ -190,10 +179,7 @@ impl TonClientBuilder {
 
                     Box::pin(read_ton_config_from_url_stream(url, interval))
                 }
-                ConfigSource::Config { config } => {
-                    let config: TonConfig = serde_json::from_str(&config)?;
-                    Box::pin(stream::once(async { Ok(config) }))
-                }
+                ConfigSource::Config { config } => Box::pin(stream::once(async { Ok(config) })),
             };
         let lite_server_discover = LiteServerDiscover::new(stream);
         let client_discover = lite_server_discover.then(|s| async {

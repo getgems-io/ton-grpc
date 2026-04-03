@@ -18,8 +18,7 @@ async fn main() -> Result<(), tower::BoxError> {
     tracing_subscriber::fmt::init();
 
     let lite_server = LocalLiteServer::new().await?;
-    let client =
-        LiteServerClient::connect(lite_server.get_addr(), lite_server.get_server_key()).await?;
+    let client = LiteServerClient::connect(lite_server.addr(), lite_server.server_key()).await?;
     let mut svc = ServiceBuilder::new()
         .concurrency_limit(10)
         .timeout(Duration::from_secs(3))

@@ -185,11 +185,9 @@ mod integration {
     #[traced_test]
     async fn workchains_first_block_tracker() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
-        let client = LiteServerClient::connect(
-            local_lite_server.get_addr(),
-            local_lite_server.get_server_key(),
-        )
-        .await?;
+        let client =
+            LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                .await?;
         let masterchain_tracker = MasterchainLastBlockTracker::new(client.clone());
         let workchain_tracker =
             WorkchainsLastBlocksTracker::new(client.clone(), masterchain_tracker);

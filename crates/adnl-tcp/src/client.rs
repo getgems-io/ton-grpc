@@ -67,7 +67,7 @@ mod integration {
     async fn client_connect() -> anyhow::Result<()> {
         let server = LocalLiteServer::new().await?;
 
-        let _ = Client::connect(server.get_addr(), server.get_server_key()).await?;
+        let _ = Client::connect(server.addr(), server.server_key()).await?;
 
         Ok(())
     }
@@ -76,10 +76,10 @@ mod integration {
     #[tokio::test]
     async fn client_connect_wrong_key() -> anyhow::Result<()> {
         let server = LocalLiteServer::new().await?;
-        let mut invalid_key: ServerKey = server.get_server_key();
+        let mut invalid_key: ServerKey = server.server_key();
         invalid_key[0] = invalid_key[0] ^ 1;
 
-        let client = Client::connect(server.get_addr(), invalid_key).await;
+        let client = Client::connect(server.addr(), invalid_key).await;
 
         assert!(client.is_err());
         assert_eq!(
@@ -94,7 +94,7 @@ mod integration {
     #[tokio::test]
     async fn client_ping() -> anyhow::Result<()> {
         let server = LocalLiteServer::new().await?;
-        let mut client = Client::connect(server.get_addr(), server.get_server_key()).await?;
+        let mut client = Client::connect(server.addr(), server.server_key()).await?;
 
         let sent = client.send(ping_packet()).await;
         let received = client.next().await.unwrap()?;

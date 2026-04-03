@@ -270,11 +270,9 @@ mod integration {
     #[traced_test]
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
-        let client = LiteServerClient::connect(
-            local_lite_server.get_addr(),
-            local_lite_server.get_server_key(),
-        )
-        .await?;
+        let client =
+            LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                .await?;
 
         let response = client
             .oneshot(LiteServerGetMasterchainInfo::default())
@@ -290,11 +288,9 @@ mod integration {
     #[traced_test]
     async fn client_wait_seqno_info() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
-        let mut client = LiteServerClient::connect(
-            local_lite_server.get_addr(),
-            local_lite_server.get_server_key(),
-        )
-        .await?;
+        let mut client =
+            LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                .await?;
         let current = (&mut client)
             .oneshot(LiteServerGetMasterchainInfo::default())
             .await?;
@@ -316,11 +312,9 @@ mod integration {
     #[traced_test]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
-        let mut client = LiteServerClient::connect(
-            local_lite_server.get_addr(),
-            local_lite_server.get_server_key(),
-        )
-        .await?;
+        let mut client =
+            LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                .await?;
 
         let response = (&mut client)
             .oneshot(LiteServerGetMasterchainInfo::default())
@@ -340,11 +334,9 @@ mod integration {
     #[traced_test]
     async fn client_get_version() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
-        let client = LiteServerClient::connect(
-            local_lite_server.get_addr(),
-            local_lite_server.get_server_key(),
-        )
-        .await?;
+        let client =
+            LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                .await?;
 
         let response = client.oneshot(LiteServerGetVersion::default()).await?;
 
@@ -363,11 +355,9 @@ mod integration {
     #[traced_test]
     async fn client_error_test() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
-        let client = LiteServerClient::connect(
-            local_lite_server.get_addr(),
-            local_lite_server.get_server_key(),
-        )
-        .await?;
+        let client =
+            LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                .await?;
 
         let response = client
             .oneshot(LiteServerGetMasterchainInfoExt { mode: 1 })
@@ -387,11 +377,9 @@ mod integration {
     #[traced_test]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
         let local_lite_server = LocalLiteServer::new().await?;
-        let mut client = LiteServerClient::connect(
-            local_lite_server.get_addr(),
-            local_lite_server.get_server_key(),
-        )
-        .await?;
+        let mut client =
+            LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                .await?;
         let known_block = (&mut client)
             .oneshot(LiteServerGetMasterchainInfo::default())
             .await?
@@ -415,11 +403,9 @@ mod integration {
         let local_lite_server = LocalLiteServer::new().await?;
 
         let future = {
-            let client = LiteServerClient::connect(
-                local_lite_server.get_addr(),
-                local_lite_server.get_server_key(),
-            )
-            .await?;
+            let client =
+                LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
+                    .await?;
 
             client.oneshot(LiteServerGetMasterchainInfo::default())
         };

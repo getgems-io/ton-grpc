@@ -2,6 +2,7 @@ use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::time::Duration;
+use ton_config::default_ton_config_url;
 use ton_grpc::AccountService;
 use ton_grpc::BlockService;
 use ton_grpc::MessageService;
@@ -38,7 +39,7 @@ struct Args {
     #[clap(long, default_value = "0.0.0.0:9000")]
     metrics_listen: SocketAddr,
 
-    #[clap(long, value_parser = Url::parse, default_value_t = tonlibjson_client::ton::default_ton_config_url())]
+    #[clap(long, value_parser = Url::parse, default_value_t = default_ton_config_url())]
     ton_config_url: Url,
     #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
     ton_timeout: Duration,

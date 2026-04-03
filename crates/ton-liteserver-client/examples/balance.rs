@@ -1,6 +1,5 @@
 use base64::Engine;
 use futures::{StreamExt, stream};
-use std::net::SocketAddrV4;
 use std::time::Duration;
 use tokio::time::Instant;
 use ton_client_util::discover::{LiteServerDiscover, read_ton_config_from_url_stream};
@@ -36,7 +35,7 @@ async fn main() -> Result<(), BoxError> {
                 let mut secret_key: [u8; 32] = [0; 32];
                 base64::engine::general_purpose::STANDARD
                     .decode_slice(&ls.id.key, &mut secret_key[..])?;
-                let addr: SocketAddrV4 = ls.into();
+                let addr = ls.addr;
 
                 let client = ServiceBuilder::new()
                     .layer_fn(TrackedClient::new)
