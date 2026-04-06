@@ -1,6 +1,6 @@
 [package]
 name = "ton-contract"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 rust-version.workspace = true
 authors = [
@@ -16,4 +16,4 @@ base64 = "0.22.1"
 num-bigint = "0.4.6"
 thiserror = "2.0.17"
 ton-client = { path = "../ton-client" }
-toner = "0.7.4"
+toner = "0.7.3"

@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "adnl-tcp"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "aes",
  "anyhow",
@@ -3096,7 +3096,7 @@ dependencies = [
 
 [[package]]
 name = "testcontainers-ton"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3212,7 +3212,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tl-parser"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "crc32fast",
@@ -3221,9 +3221,9 @@ dependencies = [
 
 [[package]]
 name = "tlb"
-version = "0.7.4"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8956a1e3d689878bc255ca5c04f49704c199310081b6926bb75264df150e2e27"
+checksum = "416f2233c655807eb4bc0575f0803843971f06ce98b0d3059b1eaa79a4236bd3"
 dependencies = [
  "array-util",
  "base64 0.21.7",
@@ -3238,9 +3238,9 @@ dependencies = [
 
 [[package]]
 name = "tlb-ton"
-version = "0.7.4"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc712171c48b6acc620218108fc15f8caf0339b36a3c341dc5ea4698b48a350a"
+checksum = "e26b4014128b0ccc545f3d3bf2b7e2136ee9be3ed51a3447c082a30b20d5e85f"
 dependencies = [
  "base64 0.21.7",
  "chrono",
@@ -3258,9 +3258,9 @@ dependencies = [
 
 [[package]]
 name = "tlbits"
-version = "0.7.4"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "407aa226734ab69443a6cdf13c89bd27899c74976f467f3cd9f541d03bcb9b84"
+checksum = "35c0e5a456b59a6f89eb1200fbeebf837295e7dd729e52a206d75b65503acc0a"
 dependencies = [
  "array-util",
  "bitvec",
@@ -3348,7 +3348,7 @@ dependencies = [
 
 [[package]]
 name = "ton-address"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3360,7 +3360,7 @@ dependencies = [
 
 [[package]]
 name = "ton-client"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3373,7 +3373,7 @@ dependencies = [
 
 [[package]]
 name = "ton-client-util"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bitvec",
@@ -3405,7 +3405,7 @@ dependencies = [
 
 [[package]]
 name = "ton-contract"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3419,9 +3419,9 @@ dependencies = [
 
 [[package]]
 name = "ton-contracts"
-version = "0.7.4"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "18a3bbbb14813403abab255e6496982ddf1995951b27334d133c819e902546b7"
+checksum = "b6582842a68b2be6f4dce52e790fff1b6bbd4ce615cf728139621e073760f588"
 dependencies = [
  "anyhow",
  "bitvec",
@@ -3437,7 +3437,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -3469,7 +3469,7 @@ dependencies = [
 
 [[package]]
 name = "ton-liteserver-client"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
@@ -3503,9 +3503,9 @@ dependencies = [
 
 [[package]]
 name = "toner"
-version = "0.7.4"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51503962fc058d42ac1291234b1c5291315bc5e71d5a6a8bbb475472cdd165fe"
+checksum = "425ef7c6e432ae59209d6eddafa8f4348838d089ae5add90a2cc3f5dc8b94ab0"
 dependencies = [
  "tlb",
  "tlb-ton",
@@ -3610,7 +3610,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.21.0"
+version = "0.22.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3797,7 +3797,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tvm-grpc"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-stream",

@@ -1,6 +1,6 @@
 [package]
 name = "ton-liteserver-client"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 rust-version.workspace = true
 
@@ -15,7 +15,7 @@ convert_case = "0.11.0"
 [dependencies]
 adnl-tcp = { path = "../adnl-tcp", features = ["client"] }
 ton-client-util = { path = "../ton-client-util" }
-toner = "0.7.4"
+toner = "0.7.3"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }
