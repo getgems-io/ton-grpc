@@ -106,6 +106,4 @@ metrics:
     relabelings: []
     metricRelabelings: []
 
-dnsResolve:
-  host: ~
-  key: ~
+logLevel: "error,ton_grpc=info,tonlibjson_client=info"

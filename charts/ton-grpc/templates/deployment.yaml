@@ -48,12 +48,6 @@ spec:
             - --ton-config-url
             - {{ .Values.tonConfigUrl }}
             {{- end }}
-            {{- if .Values.dnsResolve.host }}
-            - --dns-host
-            - {{ .Values.dnsResolve.host }}
-            - --dns-key
-            - {{ .Values.dnsResolve.key }}
-            {{- end }}
           ports:
             - name: http
               containerPort: 50052
@@ -70,7 +64,7 @@ spec:
               value: {{ .Values.tonConfigUrl }}
             {{- end }}
             - name: RUST_LOG
-              value: error,ton_grpc=info,tonlibjson_client=info
+              value: "{{ .Values.logLevel }}"
             - name: RUST_BACKTRACE
               value: "1"
             {{- if .Values.extraEnvs }}
