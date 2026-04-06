@@ -16,10 +16,15 @@ where
     S: Service<LiteServerLookupBlock, Response = LiteServerBlockHeader, Error = Error>,
     S: Service<LiteServerGetBlock, Response = LiteServerBlockData, Error = Error>,
 {
+    const INITIAL_SHIFT: i32 = 200000;
     let start = start.borrow();
     let mut rhs = start.seqno;
     let mut lhs = lhs.unwrap_or(1);
-    let mut cur = cur.unwrap_or(start.seqno - 200000);
+    let mut cur = cur.unwrap_or(if start.seqno > INITIAL_SHIFT {
+        start.seqno - INITIAL_SHIFT
+    } else {
+        1
+    });
 
     let workchain = start.workchain;
     let shard = start.shard;
