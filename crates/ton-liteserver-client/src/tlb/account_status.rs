@@ -6,9 +6,8 @@ use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 /// acc_state_active$10 = AccountStatus;
 /// acc_state_nonexist$11 = AccountStatus;
 /// ```
-#[allow(dead_code)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum AccountStatus {
+pub enum AccountStatus {
     Uninit,
     Frozen,
     Active,
