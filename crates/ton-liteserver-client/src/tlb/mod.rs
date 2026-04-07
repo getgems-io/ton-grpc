@@ -1,3 +1,4 @@
+mod account;
 pub mod account_status;
 pub mod blk_master_info;
 pub mod blk_prev_info;
@@ -11,6 +12,7 @@ pub mod global_version;
 mod hash_update;
 pub mod merkle_proof;
 pub mod merkle_update;
+pub mod msg_address_int;
 pub mod shard_descr;
 pub mod shard_hashes;
 pub mod shard_ident;
