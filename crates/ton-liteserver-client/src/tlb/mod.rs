@@ -13,5 +13,6 @@ pub mod shard_descr;
 pub mod shard_hashes;
 pub mod shard_ident;
 
+mod account_status;
 #[cfg(test)]
 pub(crate) mod tests;
