@@ -4,10 +4,11 @@ use num_bigint::BigUint;
 use toner::tlb::bits::NBits;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::{Cell, Error, ParseFully, Ref};
+use toner::tlb::{Cell, Context, Error, ParseFully, Ref};
 use toner::ton::currency::Grams;
 use toner::ton::message::Message;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InMsg {
     /// ```tlb
     /// msg_import_ext$000 msg:^(Message Any) transaction:^Transaction
@@ -94,23 +95,44 @@ pub enum InMsg {
 impl<'de> CellDeserialize<'de> for InMsg {
     type Args = ();
 
-    fn parse(parser: &mut CellParser<'de>, args: Self::Args) -> Result<Self, CellParserError<'de>> {
+    fn parse(
+        parser: &mut CellParser<'de>,
+        _args: Self::Args,
+    ) -> Result<Self, CellParserError<'de>> {
         let tag: u8 = parser.unpack_as::<_, NBits<3>>(())?;
         Ok(match tag {
             0b000 => Self::ImportExt {
-                msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                transaction: parser.parse_as::<_, Ref<ParseFully>>(())?,
+                msg: parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("msg_import_ext msg")?,
+                transaction: parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("msg_import_ext transaction")?,
             },
             0b010 => Self::ImportIhr {
-                msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                transaction: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                ihr_fee: parser.unpack_as::<_, Grams>(())?,
-                proof_created: parser.parse_as::<_, Ref<ParseFully>>(())?,
+                msg: parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("msg_import_ihr msg")?,
+                transaction: parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("msg_import_ihr transaction")?,
+                ihr_fee: parser
+                    .unpack_as::<_, Grams>(())
+                    .context("msg_import_ihr ihr_fee")?,
+                proof_created: parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("msg_import_ihr proof_created")?,
             },
             0b011 => Self::ImportImm {
-                in_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                transaction: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                fwd_fee: parser.unpack_as::<_, Grams>(())?,
+                in_msg: parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("msg_import_imm msg")?,
+                transaction: parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("msg_import_imm transaction")?,
+                fwd_fee: parser
+                    .unpack_as::<_, Grams>(())
+                    .context("msg_import_imm fwd_fee")?,
             },
             0b100 => Self::ImportFin {
                 in_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,

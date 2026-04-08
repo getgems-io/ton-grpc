@@ -1,11 +1,8 @@
 use crate::tlb::msg_address_int::MsgAddressInt;
 use num_bigint::BigUint;
-use toner::tlb::bits::VarLen;
-use toner::tlb::bits::bitvec::order::Msb0;
-use toner::tlb::bits::bitvec::prelude::BitVec;
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 use toner::tlb::de::{CellParser, CellParserError};
-use toner::tlb::{Error, Ref};
+use toner::tlb::{Context, Error, Ref};
 use toner::ton::ParseFully;
 use toner::ton::bits::NBits;
 use toner::ton::currency::Grams;
@@ -22,6 +19,7 @@ use toner::ton::message::Message;
 ///   emitted_lt:(Maybe uint64)
 ///   metadata:(Maybe MsgMetadata) = MsgEnvelope;
 /// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MsgEnvelope {
     V1 {
         cur_addr: IntermediateAddress,
@@ -46,13 +44,17 @@ impl<'de> CellDeserialize<'de> for MsgEnvelope {
         parser: &mut CellParser<'de>,
         _args: Self::Args,
     ) -> Result<Self, CellParserError<'de>> {
-        let tag: u8 = parser.unpack_as::<_, NBits<4>>(())?;
+        let tag: u8 = parser.unpack_as::<_, NBits<4>>(()).context("tag")?;
         let msg_envelope = match tag {
             0x4 => {
-                let cur_addr = parser.unpack(())?;
-                let next_addr = parser.unpack(())?;
-                let fwd_fee_remaining = parser.unpack_as::<_, Grams>(())?;
-                let msg = parser.parse_as::<_, Ref<ParseFully>>(())?;
+                let cur_addr = parser.unpack(()).context("v1 cur_addr")?;
+                let next_addr = parser.unpack(()).context("v1 next_addr")?;
+                let fwd_fee_remaining = parser
+                    .unpack_as::<_, Grams>(())
+                    .context("v1 fwd_fee_remaining")?;
+                let msg = parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("v1 msg")?;
 
                 MsgEnvelope::V1 {
                     cur_addr,
@@ -62,12 +64,16 @@ impl<'de> CellDeserialize<'de> for MsgEnvelope {
                 }
             }
             0x5 => {
-                let cur_addr = parser.unpack(())?;
-                let next_addr = parser.unpack(())?;
-                let fwd_fee_remaining = parser.unpack_as::<_, Grams>(())?;
-                let msg = parser.parse_as::<_, Ref<ParseFully>>(())?;
-                let emitted_lt = parser.unpack(())?;
-                let metadata = parser.unpack(())?;
+                let cur_addr = parser.unpack(()).context("v2 cur_addr")?;
+                let next_addr = parser.unpack(()).context("v2 next_addr")?;
+                let fwd_fee_remaining = parser
+                    .unpack_as::<_, Grams>(())
+                    .context("v2 fwd_fee_remaining")?;
+                let msg = parser
+                    .parse_as::<_, Ref<ParseFully>>(())
+                    .context("v2 msg")?;
+                let emitted_lt = parser.unpack(()).context("v2 emitted_lt")?;
+                let metadata = parser.unpack(()).context("v2 metadata")?;
 
                 MsgEnvelope::V2 {
                     cur_addr,
@@ -97,7 +103,7 @@ impl<'de> CellDeserialize<'de> for MsgEnvelope {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum IntermediateAddress {
-    Regular { use_dest_bits: BitVec<u8, Msb0> },
+    Regular { use_dest_bits: u8 },
     Simple { workchain_id: i8, addr_pfx: u64 },
     Ext { workchain_id: i32, addr_pfx: u64 },
 }
@@ -111,18 +117,24 @@ impl<'de> BitUnpack<'de> for IntermediateAddress {
     {
         match reader.read_bit()? {
             None => Err(Error::custom("not enough bits")),
-            Some(false) => Ok(IntermediateAddress::Regular {
-                use_dest_bits: reader.unpack_as::<_, VarLen<_, 7>>(())?,
-            }),
+            Some(false) => {
+                println!("remaining bits: {}", reader.bits_left());
+
+                Ok(IntermediateAddress::Regular {
+                    use_dest_bits: reader
+                        .unpack_as::<_, NBits<7>>(())
+                        .context("regular use_dest_bits")?,
+                })
+            }
             Some(true) => match reader.read_bit()? {
                 None => Err(Error::custom("not enough bits")),
                 Some(false) => Ok(IntermediateAddress::Simple {
-                    workchain_id: reader.unpack(())?,
-                    addr_pfx: reader.unpack(())?,
+                    workchain_id: reader.unpack(()).context("workchain_id")?,
+                    addr_pfx: reader.unpack(()).context("addr_pfx")?,
                 }),
                 Some(true) => Ok(IntermediateAddress::Ext {
-                    workchain_id: reader.unpack(())?,
-                    addr_pfx: reader.unpack(())?,
+                    workchain_id: reader.unpack(()).context("simple workchain_id")?,
+                    addr_pfx: reader.unpack(()).context("ext addr_pfx")?,
                 }),
             },
         }

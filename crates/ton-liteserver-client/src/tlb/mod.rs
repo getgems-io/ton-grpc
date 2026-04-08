@@ -16,6 +16,7 @@ pub mod future_split_merge;
 pub mod global_version;
 mod hash_update;
 mod in_msg;
+mod in_msg_descr;
 pub mod merkle_proof;
 pub mod merkle_update;
 pub mod msg_address_int;

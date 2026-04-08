@@ -10,6 +10,7 @@ use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 /// account$1 addr:MsgAddressInt storage_stat:StorageInfo
 ///           storage:AccountStorage = Account;
 /// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Account {
     None,
     Account {

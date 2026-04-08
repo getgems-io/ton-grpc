@@ -3,7 +3,7 @@ use crate::tlb::block_info::BlockInfo;
 use crate::tlb::merkle_update::MerkleUpdate;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::{Cell, Ref};
+use toner::tlb::{Cell, Context, Ref};
 
 /// ```tlb
 /// block#11ef55aa global_id:int32
@@ -35,11 +35,11 @@ impl<'de> CellDeserialize<'de> for Block {
             )));
         }
 
-        let global_id = parser.unpack(())?;
-        let info = parser.parse_as::<_, Ref>(())?;
-        let value_flow = parser.parse_as::<_, Ref>(())?;
-        let state_update = parser.parse_as::<_, Ref>(())?;
-        let extra = parser.parse_as::<_, Ref>(())?;
+        let global_id = parser.unpack(()).context("global_id")?;
+        let info = parser.parse_as::<_, Ref>(()).context("info")?;
+        let value_flow = parser.parse_as::<_, Ref>(()).context("value_flow")?;
+        let state_update = parser.parse_as::<_, Ref>(()).context("state_update")?;
+        let extra = parser.parse_as::<_, Ref>(()).context("extra")?;
 
         parser.ensure_empty()?;
 

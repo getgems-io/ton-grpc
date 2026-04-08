@@ -8,6 +8,7 @@ use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 ///     balance:CurrencyCollection state:AccountState
 ///   = AccountStorage;
 /// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountStorage {
     last_trans_lt: u64,
     balance: CurrencyCollection,

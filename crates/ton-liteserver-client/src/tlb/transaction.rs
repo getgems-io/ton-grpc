@@ -3,13 +3,15 @@ use crate::tlb::account_status::AccountStatus;
 use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::hash_update::HashUpdate;
 use std::collections::HashMap;
+use toner::tlb::bits::NBits;
 use toner::tlb::bits::bitvec::field::BitField;
 use toner::tlb::bits::bitvec::order::Msb0;
 use toner::tlb::bits::bitvec::prelude::BitVec;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::hashmap::HashmapE;
-use toner::tlb::{Cell, ParseFully, Ref};
+use toner::tlb::{Cell, Context, Data, Error, ParseFully, Ref};
+use toner::ton::message::Message;
 
 /// ```tlb
 /// transaction$0111 account_addr:bits256 lt:uint64
@@ -20,6 +22,7 @@ use toner::tlb::{Cell, ParseFully, Ref};
 ///   total_fees:CurrencyCollection state_update:^(HASH_UPDATE Account)
 ///   description:^TransactionDescr = Transaction;
 /// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
     account_addr: [u8; 32],
     lt: u64,
@@ -29,8 +32,8 @@ pub struct Transaction {
     outmsg_cnt: u16,
     orig_status: AccountStatus,
     end_status: AccountStatus,
-    in_msg: Option<Cell>,         // TODO[akostylev0]: Message
-    out_msgs: HashMap<u16, Cell>, // TODO[akostylev0]: Message
+    in_msg: Option<Message>,         // TODO[akostylev0]: Message
+    out_msgs: HashMap<u16, Message>, // TODO[akostylev0]: Message
     total_fees: CurrencyCollection,
     state_update: HashUpdate<Account>,
     description: Cell, // TODO[akostylev0]: TransactionDescr
@@ -43,27 +46,48 @@ impl<'de> CellDeserialize<'de> for Transaction {
         parser: &mut CellParser<'de>,
         _args: Self::Args,
     ) -> Result<Self, CellParserError<'de>> {
-        let account_addr = parser.unpack(())?;
-        let lt = parser.unpack(())?;
-        let prev_trans_hash = parser.unpack(())?;
-        let prev_trans_lt = parser.unpack(())?;
-        let now = parser.unpack(())?;
-        let outmsg_cnt = parser.unpack(())?;
-        let orig_status = parser.unpack(())?;
-        let end_status = parser.unpack(())?;
+        let tag: u8 = parser.unpack_as::<_, NBits<4>>(()).context("tag")?;
+        if tag != 0b0111 {
+            return Err(Error::custom(format!("invalid tag: {:b}", tag)));
+        }
+
+        println!("remaining bits: {}", parser.bits_left());
+        let account_addr = parser.unpack(()).context("account_addr")?;
+        println!("remaining bits: {}", parser.bits_left());
+        let lt = parser.unpack(()).context("lt")?;
+        println!("remaining bits: {}", parser.bits_left());
+        let prev_trans_hash = parser.unpack(()).context("prev_trans_hash")?;
+        println!("remaining bits: {}", parser.bits_left());
+        let prev_trans_lt = parser.unpack(()).context("prev_trans_lt")?;
+        println!("remaining bits: {}", parser.bits_left());
+        let now = parser.unpack(()).context("now")?;
+        println!("remaining bits: {}", parser.bits_left());
+        let outmsg_cnt = parser.unpack_as::<_, NBits<15>>(()).context("outmsg_cnt")?;
+        println!("remaining bits: {}", parser.bits_left());
+        let orig_status = parser.unpack(()).context("orig_status")?;
+        println!("remaining bits: {}", parser.bits_left());
+        let end_status = parser.unpack(()).context("end_status")?;
+        println!("remaining bits: {}", parser.bits_left());
 
         // TODO[akostylev0]: parse as Key
-        let (in_msg, out_msgs): (_, HashMap<BitVec<u8, Msb0>, Cell>) =
-            parser.parse_as::<_, Ref<ParseFully<(Option<Ref>, HashmapE<Ref>)>>>(((), (15, ())))?;
+        let (in_msg, out_msgs): (_, HashMap<BitVec<u8, Msb0>, _>) = parser
+            .parse_as::<_, Ref<ParseFully<(Option<Ref>, HashmapE<Ref>)>>>(((), (15, ())))
+            .context("(in_msg, out_msgs)")?;
 
         let out_msgs = out_msgs
             .into_iter()
-            .map(|(k, v): (BitVec<u8, Msb0>, Cell)| (k.load_be::<u16>(), v))
+            .map(|(k, v): (BitVec<u8, Msb0>, _)| (k.load_be::<u16>(), v))
             .collect();
 
-        let total_fees = parser.parse(())?;
-        let state_update = parser.unpack(())?;
-        let description = parser.parse_as::<_, Ref>(())?;
+        println!("in_msg: {:?}", in_msg);
+        println!("out_msgs: {:?}", out_msgs);
+        println!("remaining bits: {}", parser.bits_left());
+
+        let total_fees = parser.parse(()).context("total_fees")?;
+        let state_update = parser
+            .parse_as::<_, Ref<ParseFully<Data>>>(())
+            .context("state_update")?;
+        let description = parser.parse_as::<_, Ref>(()).context("description")?;
 
         Ok(Self {
             account_addr,

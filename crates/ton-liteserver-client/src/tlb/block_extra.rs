@@ -1,6 +1,7 @@
+use crate::tlb::in_msg_descr::InMsgDescr;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellParser, CellParserError};
-use toner::tlb::{Cell, Error, ParseFully, Ref};
+use toner::tlb::{Cell, Context, Error, ParseFully, Ref};
 use toner::ton::de::CellDeserialize;
 
 /// ```tlb
@@ -13,7 +14,7 @@ use toner::ton::de::CellDeserialize;
 /// ```
 #[derive(Debug, Clone)]
 pub struct BlockExtra {
-    pub in_msg_descr: Cell,   // TODO[akostylev0]
+    pub in_msg_descr: InMsgDescr,
     pub out_msg_descr: Cell,  // TODO[akostylev0]
     pub account_blocks: Cell, // TODO[akostylev0]
     pub rand_seed: [u8; 32],
@@ -36,12 +37,20 @@ impl<'de> CellDeserialize<'de> for BlockExtra {
             )));
         }
 
-        let in_msg_descr = parser.parse_as::<_, Ref<ParseFully>>(())?;
-        let out_msg_descr = parser.parse_as::<_, Ref<ParseFully>>(())?;
-        let account_blocks = parser.parse_as::<_, Ref<ParseFully>>(())?;
-        let rand_seed = parser.unpack(())?;
-        let created_by = parser.unpack(())?;
-        let custom = parser.parse_as::<_, Option<Ref<ParseFully>>>(())?;
+        let in_msg_descr = parser
+            .parse_as::<_, Ref<ParseFully>>(())
+            .context("in_msg_descr")?;
+        let out_msg_descr = parser
+            .parse_as::<_, Ref<ParseFully>>(())
+            .context("out_msg_descr")?;
+        let account_blocks = parser
+            .parse_as::<_, Ref<ParseFully>>(())
+            .context("account_blocks")?;
+        let rand_seed = parser.unpack(()).context("rand_seed")?;
+        let created_by = parser.unpack(()).context("created_by")?;
+        let custom = parser
+            .parse_as::<_, Option<Ref<ParseFully>>>(())
+            .context("custom")?;
 
         parser.ensure_empty()?;
 
