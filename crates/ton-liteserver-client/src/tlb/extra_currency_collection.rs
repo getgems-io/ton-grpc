@@ -22,6 +22,7 @@ impl<'de> CellDeserialize<'de> for ExtraCurrencyCollection {
         parser: &mut CellParser<'de>,
         _args: Self::Args,
     ) -> Result<Self, CellParserError<'de>> {
+        // TODO[akostylev0]: parse as Key
         let hashmap = parser
             .parse_as::<HashMap<BitVec<u8, Msb0>, BigUint>, HashmapE<Data<VarInt<5>>>>((32, ()))?;
 
