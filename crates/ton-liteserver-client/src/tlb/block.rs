@@ -1,3 +1,4 @@
+use crate::tlb::block_extra::BlockExtra;
 use crate::tlb::block_info::BlockInfo;
 use crate::tlb::merkle_update::MerkleUpdate;
 use toner::tlb::bits::de::BitReaderExt;
@@ -16,7 +17,7 @@ pub struct Block {
     pub info: BlockInfo,
     pub value_flow: Cell,
     pub state_update: MerkleUpdate<Cell>,
-    pub extra: Cell,
+    pub extra: BlockExtra,
 }
 
 impl<'de> CellDeserialize<'de> for Block {
