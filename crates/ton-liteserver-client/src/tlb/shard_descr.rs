@@ -1,9 +1,9 @@
+use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::future_split_merge::FutureSplitMerge;
 use adnl_tcp::types::Int256;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::{ParseFully, Ref, bits::NBits};
-use toner::ton::currency::CurrencyCollection;
 
 /// ```tlb
 /// shard_descr_new#a

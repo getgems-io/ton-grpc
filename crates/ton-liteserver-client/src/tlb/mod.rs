@@ -1,12 +1,16 @@
 mod account;
+mod account_state;
 pub mod account_status;
+mod account_storage;
 pub mod blk_master_info;
 pub mod blk_prev_info;
 pub mod block;
 pub mod block_header;
 pub mod block_id_ext;
 pub mod block_info;
+mod currency_collection;
 pub mod ext_blk_ref;
+mod extra_currency_collection;
 pub mod future_split_merge;
 pub mod global_version;
 mod hash_update;
