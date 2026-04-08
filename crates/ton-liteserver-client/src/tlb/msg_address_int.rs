@@ -11,7 +11,7 @@ use toner::ton::Anycast;
 /// addr_var$11 anycast:(Maybe Anycast) addr_len:(## 9)
 ///    workchain_id:int32 address:(bits addr_len) = MsgAddressInt;
 /// ```
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 // TODO[akostylev0]: impl traits on Anycast
 pub enum MsgAddressInt {
     Std {

@@ -27,3 +27,4 @@ pub mod storage_used;
 #[cfg(test)]
 pub(crate) mod tests;
 pub mod transaction;
+mod msg_envelope;
