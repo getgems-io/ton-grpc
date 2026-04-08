@@ -1,4 +1,5 @@
 use crate::tlb::msg_address_int::MsgAddressInt;
+use crate::tlb::storage_info::StorageInfo;
 
 /// ```tlb
 /// account_none$0 = Account;
@@ -9,7 +10,7 @@ enum Account {
     None,
     Account {
         addr: MsgAddressInt,
-        // storage_stat: StorageInfo,
+        storage_stat: StorageInfo,
         // storage: AccountStorage,
     },
 }

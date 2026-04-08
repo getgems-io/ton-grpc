@@ -1,8 +1,8 @@
 use crate::tlb::account_status::AccountStatus;
+use crate::tlb::hash_update::HashUpdate;
 use std::collections::HashMap;
 use toner::tlb::Cell;
 use toner::ton::currency::CurrencyCollection;
-use crate::tlb::hash_update::HashUpdate;
 
 /// ```tlb
 /// transaction$0111 account_addr:bits256 lt:uint64
@@ -26,5 +26,4 @@ pub struct Transaction {
     out_msgs: HashMap<u16, Cell>,
     total_fees: CurrencyCollection,
     state_update: HashUpdate<AccountStatus>, // TODO[akostylev0]: Account
-
 }

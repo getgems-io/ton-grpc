@@ -31,6 +31,7 @@ dashmap = "6.1.0"
 tokio-retry = "0.3.0"
 url = { version = "2.5.7", features = ["serde"] }
 hex = "0.4.3"
+num-bigint = "0.4.6"
 
 [dev-dependencies]
 base64 = "0.22.1"

@@ -16,6 +16,9 @@ pub mod msg_address_int;
 pub mod shard_descr;
 pub mod shard_hashes;
 pub mod shard_ident;
+mod storage_extra_info;
+pub mod storage_info;
+pub mod storage_used;
 #[cfg(test)]
 pub(crate) mod tests;
 pub mod transaction;

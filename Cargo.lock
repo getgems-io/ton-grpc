@@ -3479,6 +3479,7 @@ dependencies = [
  "dashmap",
  "futures",
  "hex",
+ "num-bigint",
  "pin-project",
  "prettyplease",
  "quote",
