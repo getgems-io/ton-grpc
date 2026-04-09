@@ -1,176 +1,127 @@
 use crate::tlb::msg_envelope::MsgEnvelope;
 use crate::tlb::transaction::Transaction;
 use num_bigint::BigUint;
-use toner::tlb::bits::NBits;
-use toner::tlb::bits::de::BitReaderExt;
-use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::{Cell, Context, Error, ParseFully, Ref};
+use toner::tlb::{Cell, ParseFully, Ref};
 use toner::ton::currency::Grams;
 use toner::ton::message::Message;
+use toner_tlb_macros::CellDeserialize;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 pub enum InMsg {
     /// ```tlb
     /// msg_import_ext$000 msg:^(Message Any) transaction:^Transaction
     ///               = InMsg;
     /// ```
+    #[tlb(tag = "0b000")]
     ImportExt {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         msg: Message,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         transaction: Transaction,
     },
     /// ```tlb
     /// msg_import_ihr$010 msg:^(Message Any) transaction:^Transaction
     ///     ihr_fee:Grams proof_created:^Cell = InMsg;
     /// ```
+    #[tlb(tag = "0b010")]
     ImportIhr {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         msg: Message,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         transaction: Transaction,
+        #[tlb(unpack_as = "Grams")]
         ihr_fee: BigUint,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         proof_created: Cell,
     },
     /// ```tlb
     /// msg_import_imm$011 in_msg:^MsgEnvelope
     ///     transaction:^Transaction fwd_fee:Grams = InMsg;
     /// ```
+    #[tlb(tag = "0b011")]
     ImportImm {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         transaction: Transaction,
+        #[tlb(unpack_as = "Grams")]
         fwd_fee: BigUint,
     },
     /// ```tlb
     /// msg_import_fin$100 in_msg:^MsgEnvelope
     ///     transaction:^Transaction fwd_fee:Grams = InMsg;
     /// ```
+    #[tlb(tag = "0b100")]
     ImportFin {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         transaction: Transaction,
+        #[tlb(unpack_as = "Grams")]
         fwd_fee: BigUint,
     },
     /// ```tlb
     /// msg_import_tr$101  in_msg:^MsgEnvelope out_msg:^MsgEnvelope
     ///     transit_fee:Grams = InMsg;
     /// ```
+    #[tlb(tag = "0b101")]
     ImportTr {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
+        #[tlb(unpack_as = "Grams")]
         transit_fee: BigUint,
     },
     /// ```tlb
     /// msg_discard_fin$110 in_msg:^MsgEnvelope transaction_id:uint64
     ///     fwd_fee:Grams = InMsg;
     /// ```
+    #[tlb(tag = "0b110")]
     DiscardFin {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
+        #[tlb(unpack)]
         transaction_id: u64,
+        #[tlb(unpack_as = "Grams")]
         fwd_fee: BigUint,
     },
     /// ```tlb
     /// msg_discard_tr$111 in_msg:^MsgEnvelope transaction_id:uint64
     ///     fwd_fee:Grams proof_delivered:^Cell = InMsg;
     /// ```
+    #[tlb(tag = "0b111")]
     DiscardTr {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
+        #[tlb(unpack)]
         transaction_id: u64,
+        #[tlb(unpack_as = "Grams")]
         fwd_fee: BigUint,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         proof_delivered: Cell,
     },
     /// ```tlb
     /// msg_import_deferred_fin$00100 in_msg:^MsgEnvelope
     ///     transaction:^Transaction fwd_fee:Grams = InMsg;
     /// ```
+    #[tlb(tag = "0b00100")]
     ImportDeferredFin {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         transaction: Transaction,
+        #[tlb(unpack_as = "Grams")]
         fwd_fee: BigUint,
     },
     /// ```tlb
     /// msg_import_deferred_tr$00101 in_msg:^MsgEnvelope out_msg:^MsgEnvelope = InMsg;
     /// ```
+    #[tlb(tag = "0b00101")]
     ImportDeferredTr {
+        #[tlb(parse_as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
+        #[tlb(parse_as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
     },
-}
-
-impl<'de> CellDeserialize<'de> for InMsg {
-    type Args = ();
-
-    fn parse(
-        parser: &mut CellParser<'de>,
-        _args: Self::Args,
-    ) -> Result<Self, CellParserError<'de>> {
-        let tag: u8 = parser.unpack_as::<_, NBits<3>>(())?;
-        Ok(match tag {
-            0b000 => Self::ImportExt {
-                msg: parser
-                    .parse_as::<_, Ref<ParseFully>>(())
-                    .context("msg_import_ext msg")?,
-                transaction: parser
-                    .parse_as::<_, Ref<ParseFully>>(())
-                    .context("msg_import_ext transaction")?,
-            },
-            0b010 => Self::ImportIhr {
-                msg: parser
-                    .parse_as::<_, Ref<ParseFully>>(())
-                    .context("msg_import_ihr msg")?,
-                transaction: parser
-                    .parse_as::<_, Ref<ParseFully>>(())
-                    .context("msg_import_ihr transaction")?,
-                ihr_fee: parser
-                    .unpack_as::<_, Grams>(())
-                    .context("msg_import_ihr ihr_fee")?,
-                proof_created: parser
-                    .parse_as::<_, Ref<ParseFully>>(())
-                    .context("msg_import_ihr proof_created")?,
-            },
-            0b011 => Self::ImportImm {
-                in_msg: parser
-                    .parse_as::<_, Ref<ParseFully>>(())
-                    .context("msg_import_imm msg")?,
-                transaction: parser
-                    .parse_as::<_, Ref<ParseFully>>(())
-                    .context("msg_import_imm transaction")?,
-                fwd_fee: parser
-                    .unpack_as::<_, Grams>(())
-                    .context("msg_import_imm fwd_fee")?,
-            },
-            0b100 => Self::ImportFin {
-                in_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                transaction: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                fwd_fee: parser.unpack_as::<_, Grams>(())?,
-            },
-            0b101 => Self::ImportTr {
-                in_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                out_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                transit_fee: parser.unpack_as::<_, Grams>(())?,
-            },
-            0b110 => Self::DiscardFin {
-                in_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                transaction_id: parser.unpack(())?,
-                fwd_fee: parser.unpack_as::<_, Grams>(())?,
-            },
-            0b111 => Self::DiscardTr {
-                in_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                transaction_id: parser.unpack(())?,
-                fwd_fee: parser.unpack_as::<_, Grams>(())?,
-                proof_delivered: parser.parse_as::<_, Ref<ParseFully>>(())?,
-            },
-            0b001 => {
-                let tag: u8 = parser.unpack_as::<_, NBits<2>>(())?;
-                match tag {
-                    0b00 => Self::ImportDeferredFin {
-                        in_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                        transaction: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                        fwd_fee: parser.unpack_as::<_, Grams>(())?,
-                    },
-                    0b01 => Self::ImportDeferredTr {
-                        in_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                        out_msg: parser.parse_as::<_, Ref<ParseFully>>(())?,
-                    },
-                    _ => return Err(Error::custom(format!("invalid InMsg tag: {}", tag))),
-                }
-            }
-            _ => return Err(Error::custom(format!("invalid InMsg tag: {}", tag))),
-        })
-    }
 }

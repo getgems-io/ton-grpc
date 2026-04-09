@@ -3494,6 +3494,7 @@ dependencies = [
  "tokio-util",
  "ton-client-util",
  "toner",
+ "toner-tlb-macros",
  "tower",
  "tracing",
  "tracing-subscriber",
@@ -3509,6 +3510,16 @@ dependencies = [
  "tlb",
  "tlb-ton",
  "ton-contracts",
+]
+
+[[package]]
+name = "toner-tlb-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+ "toner",
 ]
 
 [[package]]
