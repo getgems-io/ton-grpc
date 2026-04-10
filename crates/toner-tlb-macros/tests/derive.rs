@@ -249,4 +249,79 @@ mod tests {
 
         assert_eq!(result, WithNBits { nibble: 0b1010 });
     }
+
+    #[test]
+    fn tuple_struct_single_field() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct Wrapper(#[tlb(unpack)] u8);
+
+        let mut bits = vec![false; 8];
+        bits[7] = true;
+        let cell = make_leaf_cell(&bits);
+
+        let result: Wrapper = cell.parse_fully(()).unwrap();
+
+        assert_eq!(result, Wrapper(1));
+    }
+
+    #[test]
+    fn tuple_struct_multiple_fields() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct Pair(#[tlb(unpack)] u8, #[tlb(unpack)] u16);
+
+        let mut bits = vec![false; 8 + 16];
+        bits[7] = true;
+        bits[8 + 15] = true;
+        bits[8 + 14] = true;
+        let cell = make_leaf_cell(&bits);
+
+        let result: Pair = cell.parse_fully(()).unwrap();
+
+        assert_eq!(result, Pair(1, 3));
+    }
+
+    #[test]
+    fn tuple_struct_with_tag() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        #[tlb(tag = "0b11")]
+        struct Tagged(#[tlb(unpack)] u8);
+
+        let bits = vec![
+            true, true, false, false, false, false, false, false, false, true,
+        ];
+        let cell = make_leaf_cell(&bits);
+
+        let result: Tagged = cell.parse_fully(()).unwrap();
+
+        assert_eq!(result, Tagged(1));
+    }
+
+    #[test]
+    fn tuple_struct_ensure_empty_ok() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        #[tlb(ensure_empty)]
+        struct Wrapper(#[tlb(unpack)] u8);
+
+        let mut bits = vec![false; 8];
+        bits[7] = true;
+        let cell = make_leaf_cell(&bits);
+
+        let result: Wrapper = cell.parse_fully(()).unwrap();
+
+        assert_eq!(result, Wrapper(1));
+    }
+
+    #[test]
+    fn tuple_struct_ensure_empty_fails_on_trailing_bits() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        #[tlb(ensure_empty)]
+        struct Wrapper(#[tlb(unpack)] u8);
+
+        let bits = vec![false; 8 + 1];
+        let cell = make_leaf_cell(&bits);
+
+        let result: Result<Wrapper, _> = cell.parse_fully(());
+
+        assert!(result.is_err());
+    }
 }

@@ -207,23 +207,23 @@ fn expand_struct(input: &DeriveInput, data: &syn::DataStruct) -> Result<TokenStr
     let name = &input.ident;
     let container_attrs = parse_container_attrs(&input.attrs)?;
 
-    let fields = match &data.fields {
-        Fields::Named(f) => &f.named,
-        Fields::Unnamed(_) => {
-            return Err(syn::Error::new_spanned(
-                name,
-                "CellDeserialize derive does not support tuple structs",
-            ));
-        }
-        Fields::Unit => {
-            return Err(syn::Error::new_spanned(
-                name,
-                "CellDeserialize derive does not support unit structs",
-            ));
-        }
-    };
+    match &data.fields {
+        Fields::Named(f) => expand_named_struct(input, &container_attrs, &f.named),
+        Fields::Unnamed(f) => expand_tuple_struct(input, &container_attrs, &f.unnamed),
+        Fields::Unit => Err(syn::Error::new_spanned(
+            name,
+            "CellDeserialize derive does not support unit structs",
+        )),
+    }
+}
 
-    let tag_stmt = gen_tag_validation(&container_attrs, &name.to_string())?;
+fn expand_named_struct(
+    input: &DeriveInput,
+    container_attrs: &ContainerAttrs,
+    fields: &Punctuated<syn::Field, Comma>,
+) -> Result<TokenStream> {
+    let name = &input.ident;
+    let tag_stmt = gen_tag_validation(container_attrs, &name.to_string())?;
 
     let mut field_stmts = Vec::new();
     let mut field_names = Vec::new();
@@ -267,6 +267,59 @@ fn expand_struct(input: &DeriveInput, data: &syn::DataStruct) -> Result<TokenStr
                 Ok(Self {
                     #(#field_names,)*
                 })
+            }
+        }
+    })
+}
+
+fn expand_tuple_struct(
+    input: &DeriveInput,
+    container_attrs: &ContainerAttrs,
+    fields: &Punctuated<syn::Field, Comma>,
+) -> Result<TokenStream> {
+    let name = &input.ident;
+    let tag_stmt = gen_tag_validation(container_attrs, &name.to_string())?;
+
+    let mut field_stmts = Vec::new();
+    let mut field_idents = Vec::new();
+
+    for (i, field) in fields.iter().enumerate() {
+        let field_ident = format_ident!("__field_{}", i);
+        let mode = parse_field_mode(&field.attrs)?.unwrap_or(FieldMode {
+            kind: FieldModeKind::Parse,
+            args: None,
+        });
+        let context = i.to_string();
+        field_stmts.push(gen_field_parse(&field_ident, &mode, &context));
+        field_idents.push(field_ident);
+    }
+
+    let ensure_empty = if container_attrs.ensure_empty {
+        quote! { parser.ensure_empty()?; }
+    } else {
+        quote! {}
+    };
+
+    let (_impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    Ok(quote! {
+        impl<'de> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
+            type Args = ();
+
+            fn parse(
+                parser: &mut toner::tlb::de::CellParser<'de>,
+                _args: Self::Args,
+            ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
+                use toner::tlb::bits::de::BitReaderExt;
+                use toner::tlb::Context;
+
+                #tag_stmt
+
+                #(#field_stmts)*
+
+                #ensure_empty
+
+                Ok(Self(#(#field_idents,)*))
             }
         }
     })
