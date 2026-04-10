@@ -1,6 +1,6 @@
+use toner::tlb::Cell;
 use toner::tlb::bits::bitvec::order::Msb0;
 use toner::tlb::bits::bitvec::vec::BitVec;
-use toner::tlb::Cell;
 use toner_tlb_macros::CellDeserialize;
 
 fn make_cell(data_bits: &[bool], refs: Vec<Cell>) -> Cell {

@@ -1,4 +1,5 @@
 mod account;
+pub mod account_block;
 mod account_state;
 pub mod account_status;
 mod account_storage;
@@ -23,6 +24,7 @@ pub mod msg_address_int;
 mod msg_envelope;
 mod out_msg;
 mod out_msg_descr;
+pub mod shard_account_blocks;
 pub mod shard_descr;
 pub mod shard_hashes;
 pub mod shard_ident;

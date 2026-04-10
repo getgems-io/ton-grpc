@@ -1,5 +1,5 @@
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{DeriveInput, parse_macro_input};
 
 mod cell_deserialize;
 
@@ -16,6 +16,7 @@ mod cell_deserialize;
 /// - `#[tlb(parse_as = "Ref<ParseFully>")]` — use `parser.parse_as::<_, Ref<ParseFully>>(())?`
 /// - `#[tlb(unpack)]` — use `parser.unpack(())?` (for `BitUnpack` types)
 /// - `#[tlb(unpack_as = "Grams")]` — use `parser.unpack_as::<_, Grams>(())?`
+/// - `#[tlb(parse_as = "Hashmap<Ref<T>, C>", args = "(64, (), ())")]` — pass custom args instead of `()`
 ///
 /// # Enum variant attributes
 ///

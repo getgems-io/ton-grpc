@@ -1,5 +1,6 @@
 use crate::tlb::in_msg_descr::InMsgDescr;
 use crate::tlb::out_msg_descr::OutMsgDescr;
+use crate::tlb::shard_account_blocks::ShardAccountBlocks;
 use toner::tlb::{Cell, ParseFully, Ref};
 use toner_tlb_macros::CellDeserialize;
 
@@ -20,7 +21,7 @@ pub struct BlockExtra {
     #[tlb(parse_as = "Ref<ParseFully>")]
     pub out_msg_descr: OutMsgDescr,
     #[tlb(parse_as = "Ref<ParseFully>")]
-    pub account_blocks: Cell, // TODO[akostylev0]
+    pub account_blocks: ShardAccountBlocks,
     #[tlb(unpack)]
     pub rand_seed: [u8; 32],
     #[tlb(unpack)]

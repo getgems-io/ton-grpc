@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
 use syn::{
-    punctuated::Punctuated, token::Comma, Data, DeriveInput, Fields, Ident, LitStr, Result, Type,
+    Data, DeriveInput, Fields, Ident, LitStr, Result, Type, punctuated::Punctuated, token::Comma,
 };
 
 pub fn expand(input: DeriveInput) -> Result<TokenStream> {
@@ -122,7 +122,12 @@ fn parse_container_attrs(attrs: &[syn::Attribute]) -> Result<ContainerAttrs> {
     Ok(result)
 }
 
-enum FieldMode {
+struct FieldMode {
+    kind: FieldModeKind,
+    args: Option<syn::Expr>,
+}
+
+enum FieldModeKind {
     Parse,
     ParseAs(Type),
     Unpack,
@@ -130,7 +135,8 @@ enum FieldMode {
 }
 
 fn parse_field_mode(attrs: &[syn::Attribute]) -> Result<Option<FieldMode>> {
-    let mut mode = None;
+    let mut kind = None;
+    let mut args = None;
     for attr in attrs {
         if !attr.path().is_ident("tlb") {
             continue;
@@ -140,47 +146,58 @@ fn parse_field_mode(attrs: &[syn::Attribute]) -> Result<Option<FieldMode>> {
                 if meta.input.peek(syn::Token![=]) {
                     return Err(meta.error("use `parse_as` for typed parse"));
                 }
-                mode = Some(FieldMode::Parse);
+                kind = Some(FieldModeKind::Parse);
             } else if meta.path.is_ident("parse_as") {
                 let value = meta.value()?;
                 let lit: LitStr = value.parse()?;
                 let ty: Type = syn::parse_str(&lit.value())?;
-                mode = Some(FieldMode::ParseAs(ty));
+                kind = Some(FieldModeKind::ParseAs(ty));
             } else if meta.path.is_ident("unpack") {
                 if meta.input.peek(syn::Token![=]) {
                     return Err(meta.error("use `unpack_as` for typed unpack"));
                 }
-                mode = Some(FieldMode::Unpack);
+                kind = Some(FieldModeKind::Unpack);
             } else if meta.path.is_ident("unpack_as") {
                 let value = meta.value()?;
                 let lit: LitStr = value.parse()?;
                 let ty: Type = syn::parse_str(&lit.value())?;
-                mode = Some(FieldMode::UnpackAs(ty));
+                kind = Some(FieldModeKind::UnpackAs(ty));
+            } else if meta.path.is_ident("args") {
+                let value = meta.value()?;
+                let lit: LitStr = value.parse()?;
+                let expr: syn::Expr = syn::parse_str(&lit.value())?;
+                args = Some(expr);
             } else {
                 return Err(meta.error("unknown tlb field attribute"));
             }
             Ok(())
         })?;
     }
-    Ok(mode)
+    Ok(kind.map(|kind| FieldMode { kind, args }))
 }
 
 fn gen_field_parse(field_name: &Ident, mode: &FieldMode, context: &str) -> TokenStream {
-    match mode {
-        FieldMode::Parse => quote! {
-            let #field_name = parser.parse(())
+    let args = mode
+        .args
+        .as_ref()
+        .map(|expr| quote! { #expr })
+        .unwrap_or_else(|| quote! { () });
+
+    match &mode.kind {
+        FieldModeKind::Parse => quote! {
+            let #field_name = parser.parse(#args)
                 .context(#context)?;
         },
-        FieldMode::ParseAs(ty) => quote! {
-            let #field_name = parser.parse_as::<_, #ty>(())
+        FieldModeKind::ParseAs(ty) => quote! {
+            let #field_name = parser.parse_as::<_, #ty>(#args)
                 .context(#context)?;
         },
-        FieldMode::Unpack => quote! {
-            let #field_name = parser.unpack(())
+        FieldModeKind::Unpack => quote! {
+            let #field_name = parser.unpack(#args)
                 .context(#context)?;
         },
-        FieldMode::UnpackAs(ty) => quote! {
-            let #field_name = parser.unpack_as::<_, #ty>(())
+        FieldModeKind::UnpackAs(ty) => quote! {
+            let #field_name = parser.unpack_as::<_, #ty>(#args)
                 .context(#context)?;
         },
     }
@@ -213,7 +230,10 @@ fn expand_struct(input: &DeriveInput, data: &syn::DataStruct) -> Result<TokenStr
 
     for field in fields {
         let field_name = field.ident.as_ref().unwrap();
-        let mode = parse_field_mode(&field.attrs)?.unwrap_or(FieldMode::Parse);
+        let mode = parse_field_mode(&field.attrs)?.unwrap_or(FieldMode {
+            kind: FieldModeKind::Parse,
+            args: None,
+        });
         let context = field_name.to_string();
         field_stmts.push(gen_field_parse(field_name, &mode, &context));
         field_names.push(field_name);
@@ -345,7 +365,10 @@ fn gen_variant_body(type_name: &Ident, variant: &VariantInfo) -> Result<TokenStr
 
     for field in &variant.fields {
         let field_name = field.ident.as_ref().unwrap();
-        let mode = parse_field_mode(&field.attrs)?.unwrap_or(FieldMode::Parse);
+        let mode = parse_field_mode(&field.attrs)?.unwrap_or(FieldMode {
+            kind: FieldModeKind::Parse,
+            args: None,
+        });
         let context = field_name.to_string();
         field_stmts.push(gen_field_parse(field_name, &mode, &context));
         field_names.push(field_name);
