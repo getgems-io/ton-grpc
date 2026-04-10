@@ -21,6 +21,8 @@ pub mod merkle_proof;
 pub mod merkle_update;
 pub mod msg_address_int;
 mod msg_envelope;
+mod out_msg;
+mod out_msg_descr;
 pub mod shard_descr;
 pub mod shard_hashes;
 pub mod shard_ident;
@@ -30,5 +32,3 @@ pub mod storage_used;
 #[cfg(test)]
 pub(crate) mod tests;
 pub mod transaction;
-mod out_msg;
-mod out_msg_descr;
