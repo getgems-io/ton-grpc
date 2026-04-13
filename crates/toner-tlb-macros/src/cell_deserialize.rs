@@ -478,17 +478,17 @@ impl TagTreeNode {
     }
 }
 
-fn gen_match_tree(
-    node: &TagTreeNode,
-    variants: &[VariantInfo],
-    type_name: &Ident,
-    enum_name: &str,
-    depth: usize,
+struct MatchTreeCtx<'a> {
+    variants: &'a [VariantInfo],
+    type_name: &'a Ident,
+    enum_name: &'a str,
     format: TagFormat,
-) -> Result<TokenStream> {
+}
+
+fn gen_match_tree(node: &TagTreeNode, ctx: &MatchTreeCtx, depth: usize) -> Result<TokenStream> {
     if let Some(idx) = node.leaf {
         if node.children.is_empty() {
-            return gen_variant_body(type_name, &variants[idx]);
+            return gen_variant_body(ctx.type_name, &ctx.variants[idx]);
         }
     }
 
@@ -501,18 +501,15 @@ fn gen_match_tree(
     let mut match_arms: Vec<TokenStream> = Vec::new();
     collect_arms_at_depth(
         node,
-        variants,
-        type_name,
-        enum_name,
+        ctx,
         depth,
         read_bits,
         read_bits,
-        format,
         &mut Vec::new(),
         &mut match_arms,
     )?;
 
-    let err_msg = format!("invalid {enum_name} tag");
+    let err_msg = format!("invalid {} tag", ctx.enum_name);
 
     Ok(quote! {
         {
@@ -529,47 +526,33 @@ fn gen_match_tree(
 
 fn collect_arms_at_depth(
     node: &TagTreeNode,
-    variants: &[VariantInfo],
-    type_name: &Ident,
-    enum_name: &str,
+    ctx: &MatchTreeCtx,
     depth: usize,
     remaining: usize,
     total_bits: usize,
-    format: TagFormat,
     prefix: &mut Vec<bool>,
     arms: &mut Vec<TokenStream>,
 ) -> Result<()> {
     if remaining == 0 {
         let val = prefix.iter().fold(0u64, |acc, &b| (acc << 1) | (b as u64));
-        let val_lit = make_literal(val, total_bits, format);
+        let val_lit = make_literal(val, total_bits, ctx.format);
 
         if let Some(idx) = node.leaf {
             if node.children.is_empty() {
-                let body = gen_variant_body(type_name, &variants[idx])?;
+                let body = gen_variant_body(ctx.type_name, &ctx.variants[idx])?;
                 arms.push(quote! { #val_lit => #body, });
                 return Ok(());
             }
         }
 
-        let body = gen_match_tree(node, variants, type_name, enum_name, depth + 1, format)?;
+        let body = gen_match_tree(node, ctx, depth + 1)?;
         arms.push(quote! { #val_lit => #body, });
         return Ok(());
     }
 
     for (&bit, child) in &node.children {
         prefix.push(bit);
-        collect_arms_at_depth(
-            child,
-            variants,
-            type_name,
-            enum_name,
-            depth,
-            remaining - 1,
-            total_bits,
-            format,
-            prefix,
-            arms,
-        )?;
+        collect_arms_at_depth(child, ctx, depth, remaining - 1, total_bits, prefix, arms)?;
         prefix.pop();
     }
     Ok(())
@@ -599,7 +582,13 @@ fn expand_enum(input: &DeriveInput, data: &syn::DataEnum) -> Result<TokenStream>
         .first()
         .map(|v| v.tag.format)
         .unwrap_or(TagFormat::Binary);
-    let body = gen_match_tree(&root, &variants, name, &name.to_string(), 0, format)?;
+    let ctx = MatchTreeCtx {
+        variants: &variants,
+        type_name: name,
+        enum_name: &name.to_string(),
+        format,
+    };
+    let body = gen_match_tree(&root, &ctx, 0)?;
 
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
