@@ -10,7 +10,7 @@ anyhow = { version = "1.0.102", features = ["backtrace"] }
 tokio = { version = "1.50.0", features = ["full"] }
 tracing = "0.1.44"
 tokio-util = { version = "0.7.18", features = ["codec"] }
-rand = "0.10.0"
+rand = "0.10.1"
 futures = "0.3.32"
 pin-project = "1.1.10"
 bytes = "1.11.1"
