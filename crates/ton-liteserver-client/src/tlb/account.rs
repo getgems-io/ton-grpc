@@ -8,6 +8,7 @@ use toner_tlb_macros::CellDeserialize;
 /// account$1 addr:MsgAddressInt storage_stat:StorageInfo
 ///           storage:AccountStorage = Account;
 /// ```
+#[allow(clippy::large_enum_variant)] // TODO[akostylev0]: maybe replace with Option<struct Account>
 #[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 pub enum Account {
     #[tlb(tag = "$0")]
