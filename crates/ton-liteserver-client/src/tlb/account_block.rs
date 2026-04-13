@@ -11,6 +11,7 @@ use toner_tlb_macros::CellDeserialize;
 ///             transactions:(HashmapAug 64 ^Transaction CurrencyCollection)
 ///             state_update:^(HASH_UPDATE Account)
 ///           = AccountBlock;
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 #[tlb(tag = "#5")]
 pub struct AccountBlock {
