@@ -3543,7 +3543,7 @@ dependencies = [
 
 [[package]]
 name = "ton-liteserver-client"
-version = "0.4.0"
+version = "0.5.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
