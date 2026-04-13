@@ -2,6 +2,7 @@ use crate::tlb::account::Account;
 use crate::tlb::account_status::AccountStatus;
 use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::hash_update::HashUpdate;
+use crate::tlb::transaction_descr::TransactionDescr;
 use std::collections::HashMap;
 use toner::tlb::bits::NBits;
 use toner::tlb::bits::bitvec::field::BitField;
@@ -10,7 +11,7 @@ use toner::tlb::bits::bitvec::prelude::BitVec;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::hashmap::HashmapE;
-use toner::tlb::{Cell, Context, Data, Error, ParseFully, Ref};
+use toner::tlb::{Context, Data, Error, ParseFully, Ref};
 use toner::ton::message::Message;
 
 /// ```tlb
@@ -32,11 +33,11 @@ pub struct Transaction {
     outmsg_cnt: u16,
     orig_status: AccountStatus,
     end_status: AccountStatus,
-    in_msg: Option<Message>,         // TODO[akostylev0]: Message
-    out_msgs: HashMap<u16, Message>, // TODO[akostylev0]: Message
+    in_msg: Option<Message>,
+    out_msgs: HashMap<u16, Message>,
     total_fees: CurrencyCollection,
     state_update: HashUpdate<Account>,
-    description: Cell, // TODO[akostylev0]: TransactionDescr
+    description: TransactionDescr,
 }
 
 impl<'de> CellDeserialize<'de> for Transaction {
@@ -51,23 +52,14 @@ impl<'de> CellDeserialize<'de> for Transaction {
             return Err(Error::custom(format!("invalid tag: {:b}", tag)));
         }
 
-        println!("remaining bits: {}", parser.bits_left());
         let account_addr = parser.unpack(()).context("account_addr")?;
-        println!("remaining bits: {}", parser.bits_left());
         let lt = parser.unpack(()).context("lt")?;
-        println!("remaining bits: {}", parser.bits_left());
         let prev_trans_hash = parser.unpack(()).context("prev_trans_hash")?;
-        println!("remaining bits: {}", parser.bits_left());
         let prev_trans_lt = parser.unpack(()).context("prev_trans_lt")?;
-        println!("remaining bits: {}", parser.bits_left());
         let now = parser.unpack(()).context("now")?;
-        println!("remaining bits: {}", parser.bits_left());
         let outmsg_cnt = parser.unpack_as::<_, NBits<15>>(()).context("outmsg_cnt")?;
-        println!("remaining bits: {}", parser.bits_left());
         let orig_status = parser.unpack(()).context("orig_status")?;
-        println!("remaining bits: {}", parser.bits_left());
         let end_status = parser.unpack(()).context("end_status")?;
-        println!("remaining bits: {}", parser.bits_left());
 
         // TODO[akostylev0]: parse as Key
         let (in_msg, out_msgs): (_, HashMap<BitVec<u8, Msb0>, _>) = parser
@@ -78,10 +70,6 @@ impl<'de> CellDeserialize<'de> for Transaction {
             .into_iter()
             .map(|(k, v): (BitVec<u8, Msb0>, _)| (k.load_be::<u16>(), v))
             .collect();
-
-        println!("in_msg: {:?}", in_msg);
-        println!("out_msgs: {:?}", out_msgs);
-        println!("remaining bits: {}", parser.bits_left());
 
         let total_fees = parser.parse(()).context("total_fees")?;
         let state_update = parser

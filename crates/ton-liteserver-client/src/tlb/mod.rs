@@ -34,3 +34,4 @@ pub mod storage_used;
 #[cfg(test)]
 pub(crate) mod tests;
 pub mod transaction;
+pub mod transaction_descr;
