@@ -29,6 +29,7 @@ impl<'de> CellDeserialize<'de> for ShardHashes {
         parser: &mut CellParser<'de>,
         _args: Self::Args,
     ) -> Result<Self, CellParserError<'de>> {
+        // TODO[akostylev0]: parse as Key
         let hashmap = parser.parse_as::<
             HashMap<BitVec<u8, Msb0>, Vec<ShardDescr>>,
             HashmapE<Ref<ParseFully<BinTree<DefaultArgs>>>, ()>

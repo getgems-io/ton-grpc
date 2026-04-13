@@ -1,0 +1,17 @@
+[package]
+name = "toner-tlb-macros"
+version = "0.1.0"
+edition = "2024"
+rust-version.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = { version = "2", features = ["full", "extra-traits"] }
+quote = "1"
+proc-macro2 = "1"
+
+[dev-dependencies]
+toner = "0.7.4"
+trybuild = "1"
