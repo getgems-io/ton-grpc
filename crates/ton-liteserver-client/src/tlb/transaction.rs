@@ -4,11 +4,11 @@ use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::hash_update::HashUpdate;
 use crate::tlb::transaction_descr::TransactionDescr;
 use std::collections::HashMap;
-use toner::tlb::bits::NBits;
 use toner::tlb::bits::bitvec::field::BitField;
 use toner::tlb::bits::bitvec::order::Msb0;
 use toner::tlb::bits::bitvec::prelude::BitVec;
 use toner::tlb::bits::de::BitReaderExt;
+use toner::tlb::bits::NBits;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::hashmap::HashmapE;
 use toner::tlb::{Context, Data, Error, ParseFully, Ref};
@@ -25,19 +25,19 @@ use toner::ton::message::Message;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
-    account_addr: [u8; 32],
-    lt: u64,
-    prev_trans_hash: [u8; 32],
-    prev_trans_lt: u64,
-    now: u32,
-    outmsg_cnt: u16,
-    orig_status: AccountStatus,
-    end_status: AccountStatus,
-    in_msg: Option<Message>,
-    out_msgs: HashMap<u16, Message>,
-    total_fees: CurrencyCollection,
-    state_update: HashUpdate<Account>,
-    description: TransactionDescr,
+    pub account_addr: [u8; 32],
+    pub lt: u64,
+    pub prev_trans_hash: [u8; 32],
+    pub prev_trans_lt: u64,
+    pub now: u32,
+    pub outmsg_cnt: u16,
+    pub orig_status: AccountStatus,
+    pub end_status: AccountStatus,
+    pub in_msg: Option<Message>,
+    pub out_msgs: HashMap<u16, Message>,
+    pub total_fees: CurrencyCollection,
+    pub state_update: HashUpdate<Account>,
+    pub description: TransactionDescr,
 }
 
 impl<'de> CellDeserialize<'de> for Transaction {
