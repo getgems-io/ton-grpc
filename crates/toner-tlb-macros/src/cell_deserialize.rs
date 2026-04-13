@@ -68,12 +68,12 @@ impl TagValue {
 fn make_literal(val: u64, bit_len: usize, format: TagFormat) -> proc_macro2::Literal {
     match format {
         TagFormat::Binary => {
-            let s = format!("0b{:0>width$b}u8", val, width = bit_len);
+            let s = format!("0b{:0>width$b}", val, width = bit_len);
             s.parse::<proc_macro2::Literal>().unwrap()
         }
         TagFormat::Hex => {
             let hex_digits = bit_len.div_ceil(4);
-            let s = format!("0x{:0>width$x}u32", val, width = hex_digits);
+            let s = format!("0x{:0>width$x}", val, width = hex_digits);
             s.parse::<proc_macro2::Literal>().unwrap()
         }
     }
@@ -245,31 +245,31 @@ fn expand_named_struct(
         quote! {}
     };
 
-    let (_impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     Ok(quote! {
-        impl<'de> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
-            type Args = ();
+            impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
+                type Args = ();
 
-            fn parse(
-                parser: &mut toner::tlb::de::CellParser<'de>,
-                _args: Self::Args,
-            ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
-                use toner::tlb::bits::de::BitReaderExt;
-                use toner::tlb::Context;
+                fn parse(
+                    parser: &mut toner::tlb::de::CellParser<'de>,
+                    _args: Self::Args,
+                ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
+                    use toner::tlb::bits::de::BitReaderExt;
+                    use toner::tlb::Context;
 
-                #tag_stmt
+                    #tag_stmt
 
-                #(#field_stmts)*
+                    #(#field_stmts)*
 
-                #ensure_empty
+                    #ensure_empty
 
-                Ok(Self {
-                    #(#field_names,)*
-                })
+                    Ok(Self {
+                        #(#field_names,)*
+        })
+    }
             }
-        }
-    })
+        })
 }
 
 fn expand_tuple_struct(
@@ -300,10 +300,10 @@ fn expand_tuple_struct(
         quote! {}
     };
 
-    let (_impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     Ok(quote! {
-        impl<'de> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
+        impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
             type Args = ();
 
             fn parse(
@@ -325,6 +325,18 @@ fn expand_tuple_struct(
     })
 }
 
+fn int_type_for_bits(bit_len: usize) -> Result<TokenStream> {
+    match bit_len {
+        0..=8 => Ok(quote! { u8 }),
+        9..=16 => Ok(quote! { u16 }),
+        17..=32 => Ok(quote! { u32 }),
+        _ => Err(syn::Error::new(
+            proc_macro2::Span::call_site(),
+            format!("tags longer than 32 bits are not supported (got {bit_len})"),
+        )),
+    }
+}
+
 fn gen_tag_validation(attrs: &ContainerAttrs, type_name: &str) -> Result<TokenStream> {
     let Some(tag) = &attrs.tag else {
         return Ok(quote! {});
@@ -335,31 +347,19 @@ fn gen_tag_validation(attrs: &ContainerAttrs, type_name: &str) -> Result<TokenSt
     let err_msg = format!("invalid {type_name} tag");
     let tag_lit = make_literal(tag_val, bit_len, tag.format);
 
-    if bit_len <= 8 {
-        let nbits_val = proc_macro2::Literal::usize_unsuffixed(bit_len);
-        Ok(quote! {
-            let __tag: u8 = parser.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
-            if __tag != #tag_lit as u8 {
-                return Err(toner::tlb::Error::custom(format!(
-                    concat!(#err_msg, ": 0x{:x}"), __tag
-                )));
-            }
-        })
-    } else if bit_len <= 32 {
-        Ok(quote! {
-            let __tag: u32 = parser.unpack(())?;
-            if __tag != #tag_lit as u32 {
-                return Err(toner::tlb::Error::custom(format!(
-                    concat!(#err_msg, ": 0x{:08x}"), __tag
-                )));
-            }
-        })
-    } else {
-        Err(syn::Error::new(
-            proc_macro2::Span::call_site(),
-            "tags longer than 32 bits are not supported",
-        ))
-    }
+    let int_ty = int_type_for_bits(bit_len)?;
+    let nbits_val = proc_macro2::Literal::usize_unsuffixed(bit_len);
+    let hex_width = bit_len.div_ceil(4);
+    let fmt_str = format!("{err_msg}: 0x{{:0>{hex_width}x}}");
+
+    Ok(quote! {
+        let __tag: #int_ty = parser.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
+        if __tag != #tag_lit as #int_ty {
+            return Err(toner::tlb::Error::custom(format!(
+                #fmt_str, __tag
+            )));
+        }
+    })
 }
 
 struct VariantInfo {
@@ -493,6 +493,7 @@ fn gen_match_tree(
     }
 
     let read_bits = node.min_leaf_depth();
+    let int_ty = int_type_for_bits(read_bits)?;
 
     let tag_ident = format_ident!("__tag_{}", depth);
     let nbits_val = proc_macro2::Literal::usize_unsuffixed(read_bits);
@@ -515,7 +516,7 @@ fn gen_match_tree(
 
     Ok(quote! {
         {
-            let #tag_ident: u8 = parser.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
+            let #tag_ident: #int_ty = parser.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
             match #tag_ident {
                 #(#match_arms)*
                 _ => return Err(toner::tlb::Error::custom(
@@ -539,8 +540,8 @@ fn collect_arms_at_depth(
     arms: &mut Vec<TokenStream>,
 ) -> Result<()> {
     if remaining == 0 {
-        let val = prefix.iter().fold(0u8, |acc, &b| (acc << 1) | (b as u8));
-        let val_lit = make_literal(val as u64, total_bits, format);
+        let val = prefix.iter().fold(0u64, |acc, &b| (acc << 1) | (b as u64));
+        let val_lit = make_literal(val, total_bits, format);
 
         if let Some(idx) = node.leaf {
             if node.children.is_empty() {
@@ -600,10 +601,10 @@ fn expand_enum(input: &DeriveInput, data: &syn::DataEnum) -> Result<TokenStream>
         .unwrap_or(TagFormat::Binary);
     let body = gen_match_tree(&root, &variants, name, &name.to_string(), 0, format)?;
 
-    let (_impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     Ok(quote! {
-        impl<'de> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
+        impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
             type Args = ();
 
             fn parse(

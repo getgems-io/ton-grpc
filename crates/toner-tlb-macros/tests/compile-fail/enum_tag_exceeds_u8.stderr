@@ -1,0 +1,7 @@
+error: tags longer than 32 bits are not supported (got 33)
+ --> tests/compile-fail/enum_tag_exceeds_u8.rs:3:10
+  |
+3 | #[derive(CellDeserialize)]
+  |          ^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the derive macro `CellDeserialize` (in Nightly builds, run with -Z macro-backtrace for more info)

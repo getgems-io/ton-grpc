@@ -324,4 +324,52 @@ mod tests {
 
         assert!(result.is_err());
     }
+
+    #[test]
+    fn struct_with_short_hex_tag() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        #[tlb(tag = "0xab", ensure_empty)]
+        struct ShortHex {
+            #[tlb(unpack)]
+            val: u8,
+        }
+
+        // 0xab = 10101011 (8 bits) + val=3 = 00000011
+        let bits = vec![
+            true, false, true, false, true, false, true, true, false, false, false, false, false,
+            false, true, true,
+        ];
+        let cell = make_leaf_cell(&bits);
+
+        let result: ShortHex = cell.parse_fully(()).unwrap();
+
+        assert_eq!(result, ShortHex { val: 3 });
+    }
+
+    #[test]
+    fn struct_with_12bit_hex_tag() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        #[tlb(tag = "0xabc", ensure_empty)]
+        struct Hex12 {
+            #[tlb(unpack)]
+            val: u8,
+        }
+
+        // 0xabc = 1010 1011 1100 (12 bits) + val=1 = 00000001
+        let bits = vec![
+            true, false, true, false, true, false, true, true, true, true, false, false, false,
+            false, false, false, false, false, false, true,
+        ];
+        let cell = make_leaf_cell(&bits);
+
+        let result: Hex12 = cell.parse_fully(()).unwrap();
+
+        assert_eq!(result, Hex12 { val: 1 });
+    }
+
+    #[test]
+    fn enum_tag_exceeds_u8() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/enum_tag_exceeds_u8.rs");
+    }
 }
