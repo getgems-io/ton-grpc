@@ -8,8 +8,8 @@ use crate::tlb::ext_blk_ref::ExtBlkRef;
 use crate::tlb::shard_ident::ShardIdent;
 use crate::tlb::transaction::Transaction;
 use anyhow::anyhow;
-use base64::engine::general_purpose::STANDARD as base64_standard;
 use base64::Engine;
+use base64::engine::general_purpose::STANDARD as base64_standard;
 use std::sync::Arc;
 use ton_address::SmartContractAddress;
 use ton_client::ShortTxId;
@@ -138,7 +138,6 @@ pub fn block_transactions_to_ton_client(
         .map(|tx| {
             let account = tx
                 .account
-                .as_ref()
                 .ok_or_else(|| anyhow!("transaction id missing account"))?;
             let lt = tx.lt.ok_or_else(|| anyhow!("transaction id missing lt"))?;
             let hash = tx
@@ -147,12 +146,7 @@ pub fn block_transactions_to_ton_client(
                 .ok_or_else(|| anyhow!("transaction id missing hash"))?;
 
             Ok(ShortTxId {
-                account: SmartContractAddress::raw(
-                    workchain,
-                    (*account)
-                        .try_into()
-                        .map_err(|_| anyhow!("invalid account address"))?,
-                ),
+                account: SmartContractAddress::raw(workchain, account),
                 lt,
                 hash: hex::encode(hash),
             })
