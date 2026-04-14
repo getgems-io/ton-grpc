@@ -3547,6 +3547,7 @@ version = "0.4.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "convert_case",
  "dashmap",
@@ -3566,6 +3567,8 @@ dependencies = [
  "tokio-retry",
  "tokio-stream",
  "tokio-util",
+ "ton-address",
+ "ton-client",
  "ton-client-util",
  "toner",
  "toner-tlb-macros",
