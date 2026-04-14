@@ -11,13 +11,14 @@ use toner_tlb_macros::CellDeserialize;
 ///             transactions:(HashmapAug 64 ^Transaction CurrencyCollection)
 ///             state_update:^(HASH_UPDATE Account)
 ///           = AccountBlock;
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 #[tlb(tag = "#5")]
 pub struct AccountBlock {
     #[tlb(unpack)]
-    pub account_addr: [u8; 32],
+    account_addr: [u8; 32],
     #[tlb(parse_as = "Hashmap<Ref, Same>", args = "(64, (), ())")]
-    pub transaction: Hashmap<Transaction, CurrencyCollection>,
+    transaction: Hashmap<Transaction, CurrencyCollection>,
     #[tlb(parse_as = "Ref<Data>")]
-    pub state_update: HashUpdate<Account>,
+    state_update: HashUpdate<Account>,
 }

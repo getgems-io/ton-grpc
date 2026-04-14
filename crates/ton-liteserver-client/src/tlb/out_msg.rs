@@ -8,6 +8,7 @@ use toner_tlb_macros::CellDeserialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 #[allow(clippy::enum_variant_names)]
+#[allow(clippy::large_enum_variant)] // TODO[akostylev0]: remove this
 pub enum OutMsg {
     /// ```tlb
     /// msg_export_ext$000 msg:^(Message Any)

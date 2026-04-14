@@ -1,4 +1,5 @@
 use std::marker::PhantomData;
+use toner::tlb::Error;
 use toner::tlb::bits::NBits;
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 
@@ -28,7 +29,10 @@ impl<'de, X> BitUnpack<'de> for HashUpdate<X> {
     {
         let tag: u8 = reader.unpack_as::<_, NBits<8>>(())?;
         if tag != 0x72 {
-            unreachable!("invalid HASH_UPDATE tag: 0x{:02x}, expected 0x72", tag);
+            return Err(Error::custom(format!(
+                "invalid HASH_UPDATE tag: 0x{:02x}, expected 0x72",
+                tag
+            )));
         }
 
         let old_hash = reader.unpack(())?;

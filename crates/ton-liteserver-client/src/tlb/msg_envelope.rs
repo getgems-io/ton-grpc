@@ -1,12 +1,12 @@
 use crate::tlb::msg_address_int::MsgAddressInt;
 use num_bigint::BigUint;
+use toner::tlb::ParseFully;
+use toner::tlb::bits::NBits;
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
+use toner::tlb::de::CellDeserialize;
 use toner::tlb::de::{CellParser, CellParserError};
 use toner::tlb::{Context, Error, Ref};
-use toner::ton::ParseFully;
-use toner::ton::bits::NBits;
 use toner::ton::currency::Grams;
-use toner::ton::de::CellDeserialize;
 use toner::ton::message::Message;
 
 /// ```tlb
@@ -117,15 +117,11 @@ impl<'de> BitUnpack<'de> for IntermediateAddress {
     {
         match reader.read_bit()? {
             None => Err(Error::custom("not enough bits")),
-            Some(false) => {
-                println!("remaining bits: {}", reader.bits_left());
-
-                Ok(IntermediateAddress::Regular {
-                    use_dest_bits: reader
-                        .unpack_as::<_, NBits<7>>(())
-                        .context("regular use_dest_bits")?,
-                })
-            }
+            Some(false) => Ok(IntermediateAddress::Regular {
+                use_dest_bits: reader
+                    .unpack_as::<_, NBits<7>>(())
+                    .context("regular use_dest_bits")?,
+            }),
             Some(true) => match reader.read_bit()? {
                 None => Err(Error::custom("not enough bits")),
                 Some(false) => Ok(IntermediateAddress::Simple {
