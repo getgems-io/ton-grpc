@@ -16,7 +16,7 @@ convert_case = "0.11.0"
 adnl-tcp = { path = "../adnl-tcp", features = ["client"] }
 ton-client = { path = "../ton-client" }
 ton-client-util = { path = "../ton-client-util" }
-toner = "0.7.4"
+toner = { path = "../../../toner/crates/toner" }
 toner-tlb-macros = { path = "../toner-tlb-macros" }
 ton-address = { path = "../ton-address" }
 async-trait = "0.1"

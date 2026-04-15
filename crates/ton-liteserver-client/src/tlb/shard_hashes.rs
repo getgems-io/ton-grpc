@@ -1,46 +1,27 @@
 use crate::tlb::shard_descr::ShardDescr;
 use std::collections::HashMap;
 use std::ops::Deref;
-use toner::tlb::bits::bitvec::field::BitField;
-use toner::tlb::bits::bitvec::order::Msb0;
-use toner::tlb::bits::bitvec::vec::BitVec;
-use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::{DefaultArgs, ParseFully, Ref, bin_tree::BinTree, hashmap::HashmapE};
+use toner_tlb_macros::CellDeserialize;
 
 /// ```tlb
 /// _ (HashmapE 32 ^(BinTree ShardDescr)) = ShardHashes;
 /// ```
 /// NOTE[akostylev0]: next_validator_shard == shard_id
-#[derive(Debug)]
-pub struct ShardHashes(HashMap<u32, Vec<ShardDescr>>);
+#[derive(Debug, Clone, CellDeserialize)]
+pub struct ShardHashes(
+    #[tlb(
+        parse_as = "HashmapE<Ref<ParseFully<BinTree<DefaultArgs>>>, ()>",
+        args = "(32, (), ())"
+    )]
+    pub HashMap<u32, Vec<ShardDescr>>,
+);
 
 impl Deref for ShardHashes {
     type Target = HashMap<u32, Vec<ShardDescr>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-impl<'de> CellDeserialize<'de> for ShardHashes {
-    type Args = ();
-
-    fn parse(
-        parser: &mut CellParser<'de>,
-        _args: Self::Args,
-    ) -> Result<Self, CellParserError<'de>> {
-        // TODO[akostylev0]: parse as Key
-        let hashmap = parser.parse_as::<
-            HashMap<BitVec<u8, Msb0>, Vec<ShardDescr>>,
-            HashmapE<Ref<ParseFully<BinTree<DefaultArgs>>>, ()>
-        >((32, ()))?;
-
-        let inner = hashmap
-            .into_iter()
-            .map(|(k, v): (BitVec<u8, Msb0>, Vec<ShardDescr>)| (k.load_be::<u32>(), v))
-            .collect();
-
-        Ok(Self(inner))
     }
 }
 

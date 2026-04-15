@@ -1,6 +1,6 @@
 use crate::tl::{
-    BoxedBool, LiteServerBlockTransactions, LiteServerBlockTransactionsExt,
-    LiteServerMasterchainInfo, LiteServerTransactionId3, TonNodeBlockId, TonNodeBlockIdExt,
+    BoxedBool, LiteServerBlockTransactions, LiteServerMasterchainInfo, LiteServerTransactionId3,
+    TonNodeBlockId, TonNodeBlockIdExt,
 };
 use crate::tlb::blk_prev_info::BlkPrevInfo;
 use crate::tlb::block_header::BlockHeader;
@@ -13,7 +13,6 @@ use base64::engine::general_purpose::STANDARD as base64_standard;
 use std::sync::Arc;
 use ton_address::SmartContractAddress;
 use ton_client::ShortTxId;
-use toner::tlb::bits::de::unpack_bytes;
 use toner::tlb::{BagOfCellsArgs, BoC, Cell};
 use toner::ton::message::{CommonMsgInfo, InternalMsgInfo, Message};
 
@@ -23,8 +22,8 @@ impl From<TonNodeBlockIdExt> for ton_client::BlockIdExt {
             workchain: v.workchain,
             shard: v.shard,
             seqno: v.seqno,
-            root_hash: hex::encode(v.root_hash),
-            file_hash: hex::encode(v.file_hash),
+            root_hash: base64_standard.encode(v.root_hash),
+            file_hash: base64_standard.encode(v.file_hash),
         }
     }
 }
@@ -35,12 +34,14 @@ impl From<ton_client::BlockIdExt> for TonNodeBlockIdExt {
             workchain: v.workchain,
             shard: v.shard,
             seqno: v.seqno,
-            root_hash: hex::decode(&v.root_hash)
-                .expect("valid hex root_hash")
+            root_hash: base64_standard
+                .decode(&v.root_hash)
+                .expect("valid base64 root_hash")
                 .try_into()
                 .expect("root_hash must be 32 bytes"),
-            file_hash: hex::decode(&v.file_hash)
-                .expect("valid hex file_hash")
+            file_hash: base64_standard
+                .decode(&v.file_hash)
+                .expect("valid base64 file_hash")
                 .try_into()
                 .expect("file_hash must be 32 bytes"),
         }
@@ -61,13 +62,13 @@ impl From<LiteServerMasterchainInfo> for ton_client::MasterchainInfo {
     fn from(v: LiteServerMasterchainInfo) -> Self {
         Self {
             last: v.last.into(),
-            state_root_hash: hex::encode(v.state_root_hash),
+            state_root_hash: base64_standard.encode(v.state_root_hash),
             init: ton_client::BlockIdExt {
                 workchain: v.init.workchain,
                 shard: 0,
                 seqno: 0,
-                root_hash: hex::encode(v.init.root_hash),
-                file_hash: hex::encode(v.init.file_hash),
+                root_hash: base64_standard.encode(v.init.root_hash),
+                file_hash: base64_standard.encode(v.init.file_hash),
             },
         }
     }
@@ -78,8 +79,8 @@ fn ext_blk_ref_to_block_id_ext(shard: &ShardIdent, r: &ExtBlkRef) -> ton_client:
         workchain: shard.workchain_id,
         shard: shard.shard_prefix as i64,
         seqno: r.seq_no as i32,
-        root_hash: hex::encode(r.root_hash),
-        file_hash: hex::encode(r.file_hash),
+        root_hash: base64_standard.encode(r.root_hash),
+        file_hash: base64_standard.encode(r.file_hash),
     }
 }
 
@@ -146,9 +147,9 @@ pub fn block_transactions_to_ton_client(
                 .ok_or_else(|| anyhow!("transaction id missing hash"))?;
 
             Ok(ShortTxId {
-                account: SmartContractAddress::raw(workchain, account),
+                account: SmartContractAddress::raw(workchain, account).to_bounceable(),
                 lt,
-                hash: hex::encode(hash),
+                hash: base64_standard.encode(hash),
             })
         })
         .collect::<anyhow::Result<Vec<ShortTxId>>>()?;
@@ -166,11 +167,6 @@ impl From<ton_client::ShortTxId> for LiteServerTransactionId3 {
             lt: v.lt,
         }
     }
-}
-
-/// SAFETY: `BagOfCells` is a struct with a single field `roots: Vec<Arc<Cell>>`.
-fn boc_into_roots(boc: BoC) -> Vec<Arc<Cell>> {
-    unsafe { std::mem::transmute::<BoC, Vec<Arc<Cell>>>(boc) }
 }
 
 fn tlb_message_to_ton_client(msg: &Message) -> ton_client::Message {
@@ -221,7 +217,7 @@ fn msg_address_to_sca(addr: &toner::ton::MsgAddress) -> Option<SmartContractAddr
     if addr.address == [0u8; 32] && addr.workchain_id == 0 {
         return None;
     }
-    Some(SmartContractAddress::raw(addr.workchain_id, addr.address))
+    Some(SmartContractAddress::raw(addr.workchain_id, addr.address).to_bounceable())
 }
 
 fn biguint_to_i64(v: &num_bigint::BigUint) -> i64 {
@@ -240,12 +236,15 @@ pub fn transaction_to_ton_client(
     let data = {
         let boc = BoC::from_root(root.clone());
         let bytes = boc
-            .serialize(BagOfCellsArgs::default())
+            .serialize(BagOfCellsArgs {
+                has_crc32c: true,
+                ..BagOfCellsArgs::default()
+            })
             .map_err(|e| anyhow!("{e}"))?;
         base64_standard.encode(&bytes)
     };
 
-    let address = SmartContractAddress::raw(workchain, tx.account_addr);
+    let address = SmartContractAddress::raw(workchain, tx.account_addr).to_bounceable();
     let fee = extract_total_fees(&tx);
 
     let in_msg = tx.in_msg.as_ref().map(tlb_message_to_ton_client);
@@ -263,35 +262,12 @@ pub fn transaction_to_ton_client(
         data,
         transaction_id: ton_client::TransactionId {
             lt: tx.lt as i64,
-            hash: hex::encode(root.hash()),
+            hash: base64_standard.encode(root.hash()),
         },
         fee,
         storage_fee: 0,
         other_fee: 0,
         in_msg,
         out_msgs,
-    })
-}
-
-pub fn block_transactions_ext_to_ton_client(
-    v: LiteServerBlockTransactionsExt,
-) -> anyhow::Result<ton_client::BlockTransactionsExt> {
-    let workchain = v.id.workchain;
-    let incomplete = matches!(v.incomplete, BoxedBool::BoolTrue(_));
-
-    let boc: BoC = unpack_bytes(&v.transactions, ())?;
-    let roots = boc_into_roots(boc);
-
-    let transactions = roots
-        .iter()
-        .map(|root| {
-            let tx: Transaction = root.parse_fully(())?;
-            transaction_to_ton_client(workchain, root, tx)
-        })
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    Ok(ton_client::BlockTransactionsExt {
-        incomplete,
-        transactions,
     })
 }

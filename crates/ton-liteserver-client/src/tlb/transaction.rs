@@ -5,9 +5,6 @@ use crate::tlb::hash_update::HashUpdate;
 use crate::tlb::transaction_descr::TransactionDescr;
 use std::collections::HashMap;
 use toner::tlb::bits::NBits;
-use toner::tlb::bits::bitvec::field::BitField;
-use toner::tlb::bits::bitvec::order::Msb0;
-use toner::tlb::bits::bitvec::prelude::BitVec;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::hashmap::HashmapE;
@@ -61,15 +58,9 @@ impl<'de> CellDeserialize<'de> for Transaction {
         let orig_status = parser.unpack(()).context("orig_status")?;
         let end_status = parser.unpack(()).context("end_status")?;
 
-        // TODO[akostylev0]: parse as Key
-        let (in_msg, out_msgs): (_, HashMap<BitVec<u8, Msb0>, _>) = parser
-            .parse_as::<_, Ref<ParseFully<(Option<Ref>, HashmapE<Ref>)>>>(((), (15, ())))
+        let (in_msg, out_msgs): (_, HashMap<_, _>) = parser
+            .parse_as::<_, Ref<ParseFully<(Option<Ref>, HashmapE<Ref>)>>>(((), (15, (), ())))
             .context("(in_msg, out_msgs)")?;
-
-        let out_msgs = out_msgs
-            .into_iter()
-            .map(|(k, v): (BitVec<u8, Msb0>, _)| (k.load_be::<u16>(), v))
-            .collect();
 
         let total_fees = parser.parse(()).context("total_fees")?;
         let state_update = parser

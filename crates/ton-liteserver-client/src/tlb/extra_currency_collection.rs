@@ -2,9 +2,6 @@ use num_bigint::BigUint;
 use std::collections::HashMap;
 use toner::tlb::Data;
 use toner::tlb::bits::VarInt;
-use toner::tlb::bits::bitvec::field::BitField;
-use toner::tlb::bits::bitvec::order::Msb0;
-use toner::tlb::bits::bitvec::prelude::BitVec;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::hashmap::HashmapE;
 
@@ -22,14 +19,8 @@ impl<'de> CellDeserialize<'de> for ExtraCurrencyCollection {
         parser: &mut CellParser<'de>,
         _args: Self::Args,
     ) -> Result<Self, CellParserError<'de>> {
-        // TODO[akostylev0]: parse as Key
-        let hashmap = parser
-            .parse_as::<HashMap<BitVec<u8, Msb0>, BigUint>, HashmapE<Data<VarInt<5>>>>((32, ()))?;
-
-        let inner = hashmap
-            .into_iter()
-            .map(|(k, v): (BitVec<u8, Msb0>, BigUint)| (k.load_be::<u32>(), v))
-            .collect();
+        let inner =
+            parser.parse_as::<HashMap<_, BigUint>, HashmapE<Data<VarInt<5>>>>((32, (), ()))?;
 
         Ok(Self(inner))
     }

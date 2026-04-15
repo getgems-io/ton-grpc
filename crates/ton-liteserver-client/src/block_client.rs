@@ -1,17 +1,20 @@
 use crate::client::LiteServerClient;
 use crate::convert::{
-    block_header_to_ton_client, block_transactions_ext_to_ton_client, block_transactions_to_ton_client,
+    block_header_to_ton_client, block_transactions_to_ton_client, transaction_to_ton_client,
 };
 use crate::tl::{
-    LiteServerGetAllShardsInfo, LiteServerGetBlockHeader, LiteServerGetMasterchainInfo,
-    LiteServerListBlockTransactions, LiteServerListBlockTransactionsExt, LiteServerLookupBlock,
+    LiteServerGetAllShardsInfo, LiteServerGetBlock, LiteServerGetBlockHeader,
+    LiteServerGetMasterchainInfo, LiteServerListBlockTransactions, LiteServerLookupBlock,
     TonNodeBlockId, TonNodeBlockIdExt, True,
 };
+use crate::tlb::block::Block;
 use crate::tlb::block_header::BlockHeader;
 use crate::tlb::merkle_proof::MerkleProof;
 use crate::tlb::shard_descr::ShardDescr;
 use crate::tlb::shard_hashes::ShardHashes;
+use crate::tlb::transaction::Transaction;
 use anyhow::anyhow;
+use std::sync::Arc;
 use ton_client::{BlockTransactions, BlockTransactionsExt, MasterchainInfo, ShortTxId};
 use toner::tlb::BoC;
 use toner::tlb::bits::de::{unpack_bytes, unpack_bytes_fully};
@@ -96,15 +99,15 @@ impl ton_client::BlockClient for LiteServerClient {
         let block_ids = shard_hashes
             .iter()
             .flat_map(|(workchain_id, shards)| {
-                shards.iter().map(move |shard: &ShardDescr| {
-                    ton_client::BlockIdExt {
+                shards
+                    .iter()
+                    .map(move |shard: &ShardDescr| ton_client::BlockIdExt {
                         workchain: *workchain_id as i32,
                         shard: shard.next_validator_shard as i64,
                         seqno: shard.seq_no as i32,
                         root_hash: hex::encode(shard.root_hash),
                         file_hash: hex::encode(shard.file_hash),
-                    }
-                })
+                    })
             })
             .collect();
 
@@ -160,25 +163,37 @@ impl ton_client::BlockClient for LiteServerClient {
     async fn blocks_get_transactions_ext(
         &self,
         block: &ton_client::BlockIdExt,
-        after: Option<ShortTxId>,
-        reverse: bool,
-        count: i32,
+        _after: Option<ShortTxId>,
+        _reverse: bool,
+        _count: i32,
     ) -> anyhow::Result<BlockTransactionsExt> {
         let id: TonNodeBlockIdExt = block.clone().into();
 
         let response = self
             .clone()
-            .oneshot(LiteServerListBlockTransactionsExt {
-                id,
-                mode: 0,
-                count,
-                after: after.map(Into::into),
-                reverse_order: if reverse { Some(True {}) } else { None },
-                want_proof: None,
-            })
+            .oneshot(LiteServerGetBlock::new(id))
             .await
             .map_err(|e| anyhow!(e))?;
 
-        block_transactions_ext_to_ton_client(response)
+        let boc: BoC = unpack_bytes(&response.data, ())?;
+        let root = boc
+            .single_root()
+            .ok_or_else(|| anyhow!("single root expected"))?;
+        let parsed: Block = root.parse_fully(())?;
+        let workchain = parsed.info.shard.workchain_id;
+
+        let mut transactions = Vec::new();
+        for (_account_key, account_block) in &parsed.extra.account_blocks.0 {
+            for (_tx_key, tx_cell) in &account_block.transactions {
+                let tx_cell = Arc::new(tx_cell.clone());
+                let tx: Transaction = tx_cell.parse_fully(())?;
+                transactions.push(transaction_to_ton_client(workchain, &tx_cell, tx)?);
+            }
+        }
+
+        Ok(BlockTransactionsExt {
+            incomplete: false,
+            transactions,
+        })
     }
 }

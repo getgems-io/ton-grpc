@@ -2,6 +2,7 @@ use testcontainers_ton::LocalLiteServer;
 use ton_liteserver_client::client::LiteServerClient;
 use ton_liteserver_client::tl::{LiteServerGetBlock, LiteServerGetMasterchainInfo};
 use ton_liteserver_client::tlb::block::Block;
+use ton_liteserver_client::tlb::transaction::Transaction;
 use toner::tlb::BoC;
 use toner::tlb::bits::de::unpack_bytes;
 use tower::ServiceExt;
@@ -30,7 +31,21 @@ async fn main() -> anyhow::Result<()> {
         "block: seqno={}, gen_utime={}",
         block.info.seq_no, block.info.gen_utime
     );
-    println!("account_blocks: {} accounts", block.extra.account_blocks.0.len());
+    println!(
+        "account_blocks: {} accounts",
+        block.extra.account_blocks.0.len()
+    );
+
+    for (_account_key, account_block) in &block.extra.account_blocks.0 {
+        let addr = hex::encode(account_block.account_addr);
+        for (tx_key, tx_cell) in &account_block.transactions {
+            let tx: Transaction = tx_cell.parse_fully(())?;
+            println!(
+                "  tx: key={} addr={}, lt={}, now={}",
+                tx_key, addr, tx.lt, tx.now
+            );
+        }
+    }
 
     Ok(())
 }
