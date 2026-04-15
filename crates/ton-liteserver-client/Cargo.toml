@@ -28,7 +28,7 @@ thiserror = "2.0.17"
 futures = "0.3.32"
 tokio-stream = { version = "0.1.18", features = ["sync"] }
 dashmap = "6.1.0"
-tokio-retry = "0.3.0"
+tokio-retry = "0.3.1"
 hex = "0.4.3"
 num-bigint = "0.4.6"
 
