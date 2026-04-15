@@ -14,7 +14,7 @@ ton-address = { path = "../ton-address" }
 ton-client = { path = "../ton-client" }
 ton-config = { path = "../ton-config" }
 tonlibjson-client = { path = "../tonlibjson-client" }
-tokio = { version = "1.50.0", features = ["full"] }
+tokio = { version = "1.52.0", features = ["full"] }
 futures = "0.3.32"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 tracing = "0.1.44"

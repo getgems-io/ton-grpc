@@ -8,6 +8,6 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 [dependencies]
 ton-config = { path = "../ton-config" }
 anyhow = { version = "1.0.102", features = ["backtrace"] }
-tokio = { version = "1.50.0", features = ["full"] }
+tokio = { version = "1.52.0", features = ["full"] }
 testcontainers = "0.27.1"
 base64 = "0.22.1"
