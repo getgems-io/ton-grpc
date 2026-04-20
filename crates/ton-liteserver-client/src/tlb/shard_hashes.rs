@@ -11,8 +11,8 @@ use toner::tlb::{DefaultArgs, ParseFully, Ref, bin_tree::BinTree, hashmap::Hashm
 /// _ (HashmapE 32 ^(BinTree ShardDescr)) = ShardHashes;
 /// ```
 /// NOTE[akostylev0]: next_validator_shard == shard_id
-#[derive(Debug)]
-pub struct ShardHashes(HashMap<u32, Vec<ShardDescr>>);
+#[derive(Debug, Clone)]
+pub struct ShardHashes(pub HashMap<u32, Vec<ShardDescr>>);
 
 impl Deref for ShardHashes {
     type Target = HashMap<u32, Vec<ShardDescr>>;

@@ -3257,6 +3257,21 @@ dependencies = [
 [[package]]
 name = "tlb"
 version = "0.7.4"
+dependencies = [
+ "array-util",
+ "base64 0.21.7",
+ "bitvec",
+ "crc",
+ "digest 0.10.7",
+ "hex",
+ "impl-tools",
+ "sha2 0.10.9",
+ "tlbits 0.7.4",
+]
+
+[[package]]
+name = "tlb"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8956a1e3d689878bc255ca5c04f49704c199310081b6926bb75264df150e2e27"
 dependencies = [
@@ -3268,7 +3283,25 @@ dependencies = [
  "hex",
  "impl-tools",
  "sha2 0.10.9",
- "tlbits",
+ "tlbits 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tlb-ton"
+version = "0.7.4"
+dependencies = [
+ "base64 0.21.7",
+ "chrono",
+ "crc",
+ "digest 0.10.7",
+ "hex",
+ "impl-tools",
+ "lazy_static",
+ "num-bigint",
+ "num-traits",
+ "sha2 0.10.9",
+ "strum",
+ "tlb 0.7.4",
 ]
 
 [[package]]
@@ -3288,7 +3321,21 @@ dependencies = [
  "num-traits",
  "sha2 0.10.9",
  "strum",
- "tlb",
+ "tlb 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tlbits"
+version = "0.7.4"
+dependencies = [
+ "array-util",
+ "bitvec",
+ "either",
+ "impl-tools",
+ "num-bigint",
+ "num-traits",
+ "rustversion",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3488,7 +3535,23 @@ dependencies = [
  "thiserror 2.0.18",
  "ton-address",
  "ton-client",
- "toner",
+ "toner 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ton-contracts"
+version = "0.7.4"
+dependencies = [
+ "anyhow",
+ "bitvec",
+ "chrono",
+ "hmac",
+ "lazy_static",
+ "nacl",
+ "num-bigint",
+ "pbkdf2",
+ "sha2 0.10.9",
+ "tlb-ton 0.7.4",
 ]
 
 [[package]]
@@ -3506,7 +3569,7 @@ dependencies = [
  "num-bigint",
  "pbkdf2",
  "sha2 0.10.9",
- "tlb-ton",
+ "tlb-ton 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3529,6 +3592,7 @@ dependencies = [
  "ton-address",
  "ton-client",
  "ton-config",
+ "ton-liteserver-client",
  "tonic",
  "tonic-health",
  "tonic-prost",
@@ -3547,6 +3611,7 @@ version = "0.4.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "convert_case",
  "dashmap",
@@ -3566,8 +3631,10 @@ dependencies = [
  "tokio-retry",
  "tokio-stream",
  "tokio-util",
+ "ton-address",
+ "ton-client",
  "ton-client-util",
- "toner",
+ "toner 0.7.4",
  "toner-tlb-macros",
  "tower",
  "tracing",
@@ -3578,12 +3645,21 @@ dependencies = [
 [[package]]
 name = "toner"
 version = "0.7.4"
+dependencies = [
+ "tlb 0.7.4",
+ "tlb-ton 0.7.4",
+ "ton-contracts 0.7.4",
+]
+
+[[package]]
+name = "toner"
+version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51503962fc058d42ac1291234b1c5291315bc5e71d5a6a8bbb475472cdd165fe"
 dependencies = [
- "tlb",
- "tlb-ton",
- "ton-contracts",
+ "tlb 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tlb-ton 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ton-contracts 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -3593,7 +3669,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "toner",
+ "toner 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "trybuild",
 ]
 

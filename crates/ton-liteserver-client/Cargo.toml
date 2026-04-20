@@ -14,9 +14,12 @@ convert_case = "0.11.0"
 
 [dependencies]
 adnl-tcp = { path = "../adnl-tcp", features = ["client"] }
+ton-client = { path = "../ton-client" }
 ton-client-util = { path = "../ton-client-util" }
-toner = "0.7.4"
+toner = { path = "../../../toner/crates/toner" }
 toner-tlb-macros = { path = "../toner-tlb-macros" }
+ton-address = { path = "../ton-address" }
+async-trait = "0.1"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 tokio = { version = "1.50.0", features = ["full"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }
@@ -31,9 +34,9 @@ dashmap = "6.1.0"
 tokio-retry = "0.3.0"
 hex = "0.4.3"
 num-bigint = "0.4.6"
+base64 = "0.22.1"
 
 [dev-dependencies]
-base64 = "0.22.1"
 tracing-test = "0.2.6"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 testcontainers = "0.27.1"
