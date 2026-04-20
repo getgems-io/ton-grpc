@@ -18,9 +18,18 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("liteserver client ready");
 
     let master2 = liteserver.get_masterchain_info().await?;
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-    let master = tonlib.get_masterchain_info().await?;
-    tracing::info!(seqno = master.last.seqno, "masterchain info");
+    let mut master;
+    loop {
+        master = tonlib.get_masterchain_info().await?;
+        tracing::info!(seqno = master.last.seqno, "masterchain info");
+        if master.last.seqno == master2.last.seqno {
+            break;
+        } else if master2.last.seqno < master.last.seqno {
+            return Err(anyhow::anyhow!("masterchain info is behind"));
+        }
+
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
 
     assert_eq!(master, master2, "masterchain info mismatch");
 
