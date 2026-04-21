@@ -9,5 +9,5 @@ authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 ton-config = { path = "../ton-config" }
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 tokio = { version = "1.50.0", features = ["full"] }
-testcontainers = "0.27.1"
+testcontainers = "0.27.3"
 base64 = "0.22.1"

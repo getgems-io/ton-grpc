@@ -36,7 +36,7 @@ num-bigint = "0.4.6"
 base64 = "0.22.1"
 tracing-test = "0.2.6"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-testcontainers = "0.27.1"
+testcontainers = "0.27.3"
 testcontainers-ton = { path = "../testcontainers-ton" }
 
 [features]
