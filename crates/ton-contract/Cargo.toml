@@ -16,4 +16,4 @@ base64 = "0.22.1"
 num-bigint = "0.4.6"
 thiserror = "2.0.17"
 ton-client = { path = "../ton-client" }
-toner = "0.7.4"
+toner = "0.8.0"
