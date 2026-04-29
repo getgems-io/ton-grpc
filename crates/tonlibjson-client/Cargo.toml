@@ -26,7 +26,7 @@ tokio-util = { version = "0.7.18", features = ["codec"] }
 dashmap = "6.1.0"
 pin-project = "1.1.10"
 thiserror = "2.0.17"
-metrics = "0.24.2"
+metrics = "0.24.4"
 tokio-retry = "0.3.0"
 derive-new = "0.7.0"
 
