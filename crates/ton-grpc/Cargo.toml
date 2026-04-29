@@ -31,7 +31,7 @@ clap = { version = "4.6.0", features = ["derive"] }
 humantime = "2.3.0"
 either = "1.15.0"
 derive-new = "0.7.0"
-metrics-exporter-prometheus = { version = "0.18.1", features = ["http-listener"], default-features = false }
+metrics-exporter-prometheus = { version = "0.18.2", features = ["http-listener"], default-features = false }
 
 [dev-dependencies]
 tracing-test = "0.2.6"
