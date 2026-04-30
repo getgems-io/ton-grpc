@@ -15,7 +15,7 @@ tokio-util = { version = "0.7.18", features = ["codec"] }
 futures = "0.3.32"
 bitvec = "1.0.1"
 tower = { version = "0.5.3", features = ["full"] }
-metrics = "0.24.2"
+metrics = "0.24.5"
 pin-project = "1.1.10"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 url = { version = "2.5.7", features = ["serde"] }
