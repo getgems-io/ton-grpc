@@ -33,24 +33,27 @@ where
             )));
         };
 
-        let virtual_hash = parser.unpack(())?;
-        let depth = parser.unpack(())?;
+        let expected_hash = parser.unpack(())?;
+        let expected_depth = parser.unpack(())?;
         let virtual_root_cell = parser.parse_as::<Cell, Ref>(())?;
+        let Some((actual_depth, actual_hash)) = virtual_root_cell.level_hash(0) else {
+            return Err(Error::custom(
+                "MerkleProof virtual_root_cell has no level hash".to_string(),
+            ));
+        };
 
-        let actual_hash = virtual_root_cell.hash();
-        if actual_hash != virtual_hash {
+        if actual_hash != expected_hash {
             return Err(Error::custom(format!(
                 "MerkleProof virtual_hash mismatch: expected {}, actual {}",
-                hex::encode(virtual_hash),
+                hex::encode(expected_hash),
                 hex::encode(actual_hash)
             )));
         }
 
-        let actual_depth = virtual_root_cell.max_depth();
-        if actual_depth != depth {
+        if actual_depth != expected_depth {
             return Err(Error::custom(format!(
                 "MerkleProof depth mismatch: expected {}, actual {}",
-                depth, actual_depth
+                expected_depth, actual_depth
             )));
         }
 
@@ -59,8 +62,8 @@ where
         parser.ensure_empty()?;
 
         Ok(Self {
-            virtual_hash,
-            depth,
+            virtual_hash: expected_hash,
+            depth: expected_depth,
             virtual_root,
         })
     }

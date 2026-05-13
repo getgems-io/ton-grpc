@@ -37,45 +37,49 @@ where
             )));
         };
 
-        let old_hash: [u8; 32] = parser.unpack(())?;
-        let new_hash: [u8; 32] = parser.unpack(())?;
-        let old_depth: u16 = parser.unpack(())?;
-        let new_depth: u16 = parser.unpack(())?;
+        let expected_old_hash: [u8; 32] = parser.unpack(())?;
+        let expected_new_hash: [u8; 32] = parser.unpack(())?;
+        let expected_old_depth: u16 = parser.unpack(())?;
+        let expected_new_depth: u16 = parser.unpack(())?;
 
         let old_cell: Cell = parser.parse_as::<_, Ref>(())?;
         let new_cell: Cell = parser.parse_as::<_, Ref>(())?;
 
-        let actual_old_hash = old_cell.hash();
-        if actual_old_hash != old_hash {
+        let Some((actual_old_depth, actual_old_hash)) = old_cell.level_hash(0) else {
+            return Err(Error::custom(
+                "MerkleUpdate old_cell has no level hash".to_string(),
+            ));
+        };
+        if actual_old_hash != expected_old_hash {
             return Err(Error::custom(format!(
                 "MerkleUpdate old_hash mismatch: expected {}, actual {}",
-                hex::encode(old_hash),
+                hex::encode(expected_old_hash),
                 hex::encode(actual_old_hash)
             )));
         }
+        if actual_old_depth != expected_old_depth {
+            return Err(Error::custom(format!(
+                "MerkleUpdate old_depth mismatch: expected {}, actual {}",
+                expected_old_depth, actual_old_depth
+            )));
+        }
 
-        let actual_new_hash = new_cell.hash();
-        if actual_new_hash != new_hash {
+        let Some((actual_new_depth, actual_new_hash)) = new_cell.level_hash(0) else {
+            return Err(Error::custom(
+                "MerkleUpdate new_cell has no level hash".to_string(),
+            ));
+        };
+        if actual_new_hash != expected_new_hash {
             return Err(Error::custom(format!(
                 "MerkleUpdate new_hash mismatch: expected {}, actual {}",
-                hex::encode(new_hash),
+                hex::encode(expected_new_hash),
                 hex::encode(actual_new_hash)
             )));
         }
-
-        let actual_old_depth = old_cell.max_depth();
-        if actual_old_depth != old_depth {
-            return Err(Error::custom(format!(
-                "MerkleUpdate old_depth mismatch: expected {}, actual {}",
-                old_depth, actual_old_depth
-            )));
-        }
-
-        let actual_new_depth = new_cell.max_depth();
-        if actual_new_depth != new_depth {
+        if actual_new_depth != expected_new_depth {
             return Err(Error::custom(format!(
                 "MerkleUpdate new_depth mismatch: expected {}, actual {}",
-                new_depth, actual_new_depth
+                expected_new_depth, actual_new_depth
             )));
         }
 
@@ -85,10 +89,10 @@ where
         parser.ensure_empty()?;
 
         Ok(Self {
-            old_hash,
-            new_hash,
-            old_depth,
-            new_depth,
+            old_hash: expected_old_hash,
+            new_hash: expected_new_hash,
+            old_depth: expected_old_depth,
+            new_depth: expected_new_depth,
             old,
             new,
         })
