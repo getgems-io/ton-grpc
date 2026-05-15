@@ -4,7 +4,6 @@ use crate::tlb::transaction::Transaction;
 use num_bigint::BigUint;
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 use toner::tlb::bits::{NBits, VarInt};
-use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::{Data, Error, ParseFully, Ref};
 use toner::ton::currency::Grams;
 use toner_tlb_macros::CellDeserialize;
@@ -265,96 +264,42 @@ impl<'de> BitUnpack<'de> for ComputeSkipReason {
 ///   vm_init_state_hash:bits256 vm_final_state_hash:bits256 ]
 ///   = TrComputePhase;
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 pub enum TrComputePhase {
+    #[tlb(tag = "$0")]
     Skipped {
+        #[tlb(unpack)]
         reason: ComputeSkipReason,
     },
+    #[tlb(tag = "$1")]
     Vm {
+        #[tlb(unpack)]
         success: bool,
+        #[tlb(unpack)]
         msg_state_used: bool,
+        #[tlb(unpack)]
         account_activated: bool,
+        #[tlb(unpack_as = "Grams")]
         gas_fees: BigUint,
+        #[tlb(separate_cell_start, unpack_as = "VarInt<3>")]
         gas_used: BigUint,
+        #[tlb(unpack_as = "VarInt<3>")]
         gas_limit: BigUint,
+        #[tlb(unpack_as = "Option<VarInt<2>>")]
         gas_credit: Option<BigUint>,
+        #[tlb(unpack)]
         mode: i8,
+        #[tlb(unpack)]
         exit_code: i32,
+        #[tlb(unpack)]
         exit_arg: Option<i32>,
+        #[tlb(unpack)]
         vm_steps: u32,
+        #[tlb(unpack)]
         vm_init_state_hash: [u8; 32],
+        #[tlb(separate_cell_end, unpack)]
         vm_final_state_hash: [u8; 32],
     },
-}
-
-impl<'de> CellDeserialize<'de> for TrComputePhase {
-    type Args = ();
-
-    fn parse(
-        parser: &mut CellParser<'de>,
-        _args: Self::Args,
-    ) -> Result<Self, CellParserError<'de>> {
-        let tag: bool = parser.unpack(())?;
-        match tag {
-            false => Ok(Self::Skipped {
-                reason: parser.unpack(())?,
-            }),
-            true => {
-                let success = parser.unpack(())?;
-                let msg_state_used = parser.unpack(())?;
-                let account_activated = parser.unpack(())?;
-                let gas_fees = parser.unpack_as::<_, Grams>(())?;
-                let data: TrComputePhaseVmInnerCell = parser.parse_as::<_, Ref>(())?;
-
-                Ok(Self::Vm {
-                    success,
-                    msg_state_used,
-                    account_activated,
-                    gas_fees,
-                    gas_used: data.gas_used,
-                    gas_limit: data.gas_limit,
-                    gas_credit: data.gas_credit,
-                    mode: data.mode,
-                    exit_code: data.exit_code,
-                    exit_arg: data.exit_arg,
-                    vm_steps: data.vm_steps,
-                    vm_init_state_hash: data.vm_init_state_hash,
-                    vm_final_state_hash: data.vm_final_state_hash,
-                })
-            }
-        }
-    }
-}
-
-/// ```tlb
-///   ^[ gas_used:(VarUInteger 7)
-///   gas_limit:(VarUInteger 7) gas_credit:(Maybe (VarUInteger 3))
-///   mode:int8 exit_code:int32 exit_arg:(Maybe int32)
-///   vm_steps:uint32
-///   vm_init_state_hash:bits256 vm_final_state_hash:bits256 ]
-/// ```
-#[derive(CellDeserialize)]
-#[tlb(ensure_empty)]
-// TODO[akostylev0] implement BitUnpack
-struct TrComputePhaseVmInnerCell {
-    #[tlb(unpack_as = "VarInt<3>")]
-    gas_used: BigUint,
-    #[tlb(unpack_as = "VarInt<3>")]
-    gas_limit: BigUint,
-    #[tlb(unpack_as = "Option<VarInt<2>>")]
-    gas_credit: Option<BigUint>,
-    #[tlb(unpack)]
-    mode: i8,
-    #[tlb(unpack)]
-    exit_code: i32,
-    #[tlb(unpack)]
-    exit_arg: Option<i32>,
-    #[tlb(unpack)]
-    vm_steps: u32,
-    #[tlb(unpack)]
-    vm_init_state_hash: [u8; 32],
-    #[tlb(unpack)]
-    vm_final_state_hash: [u8; 32],
 }
 
 /// ```tlb
