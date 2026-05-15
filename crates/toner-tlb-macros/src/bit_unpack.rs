@@ -3,10 +3,10 @@ use quote::{format_ident, quote};
 use syn::{Data, DeriveInput, Fields, Ident, Result, punctuated::Punctuated, token::Comma};
 
 use crate::common::{
-    ContainerAttrs, DefaultFieldMode, FieldMode, FieldModeKind, FieldSection, TagFormat,
-    TagTreeNode, VariantInfo, collect_named_field_inputs, collect_tuple_field_inputs,
-    gen_field_entries, group_fields_into_sections, int_type_for_bits, make_literal,
-    parse_container_attrs, parse_variant_info,
+    ContainerAttrs, DefaultFieldMode, FieldEntry, FieldMode, FieldModeKind, FieldSection,
+    SeparateCellMarker, TagFormat, TagTreeNode, VariantInfo, collect_named_field_inputs,
+    collect_tuple_field_inputs, gen_field_entries, group_fields_into_sections, int_type_for_bits,
+    make_literal, parse_container_attrs, parse_variant_info,
 };
 
 pub fn expand(input: DeriveInput) -> Result<TokenStream> {
@@ -15,17 +15,52 @@ pub fn expand(input: DeriveInput) -> Result<TokenStream> {
         Data::Enum(data) => expand_enum(&input, data),
         Data::Union(_) => Err(syn::Error::new_spanned(
             &input.ident,
-            "CellDeserialize cannot be derived for unions",
+            "BitUnpack cannot be derived for unions",
         )),
     }
 }
 
-fn gen_field_parse(
-    parser_ident: &Ident,
-    field_name: &Ident,
-    mode: &FieldMode,
-    context: &str,
-) -> TokenStream {
+fn validate_for_bit_unpack(entries: &[FieldEntry]) -> Result<()> {
+    for entry in entries {
+        match entry.separate_cell {
+            SeparateCellMarker::None => {}
+            _ => {
+                return Err(syn::Error::new(
+                    entry.span,
+                    "`separate_cell_start`/`separate_cell_end` cannot be used with derive(BitUnpack); BitUnpack operates on bits only and has no concept of cell references",
+                ));
+            }
+        }
+        match &entry.mode.kind {
+            FieldModeKind::Parse => {
+                return Err(syn::Error::new(
+                    entry.span,
+                    "`parse` cannot be used with derive(BitUnpack); use `unpack` instead",
+                ));
+            }
+            FieldModeKind::ParseAs(_) => {
+                return Err(syn::Error::new(
+                    entry.span,
+                    "`parse_as` cannot be used with derive(BitUnpack); use `unpack_as` instead",
+                ));
+            }
+            FieldModeKind::Unpack | FieldModeKind::UnpackAs(_) => {}
+        }
+    }
+    Ok(())
+}
+
+fn validate_container_for_bit_unpack(attrs: &ContainerAttrs, ident: &Ident) -> Result<()> {
+    if attrs.ensure_empty {
+        return Err(syn::Error::new_spanned(
+            ident,
+            "`ensure_empty` cannot be used with derive(BitUnpack); BitReader has no notion of trailing data",
+        ));
+    }
+    Ok(())
+}
+
+fn gen_field_unpack(field_name: &Ident, mode: &FieldMode, context: &str) -> TokenStream {
     let args = mode
         .args
         .as_ref()
@@ -33,60 +68,45 @@ fn gen_field_parse(
         .unwrap_or_else(|| quote! { () });
 
     match &mode.kind {
-        FieldModeKind::Parse => quote! {
-            let #field_name = #parser_ident.parse(#args)
-                .context(#context)?;
-        },
-        FieldModeKind::ParseAs(ty) => quote! {
-            let #field_name = #parser_ident.parse_as::<_, #ty>(#args)
-                .context(#context)?;
-        },
         FieldModeKind::Unpack => quote! {
-            let #field_name = #parser_ident.unpack(#args)
+            let #field_name = reader.unpack(#args)
                 .context(#context)?;
         },
         FieldModeKind::UnpackAs(ty) => quote! {
-            let #field_name = #parser_ident.unpack_as::<_, #ty>(#args)
+            let #field_name = reader.unpack_as::<_, #ty>(#args)
                 .context(#context)?;
         },
+        FieldModeKind::Parse | FieldModeKind::ParseAs(_) => unreachable!(
+            "validate_for_bit_unpack should have rejected parse/parse_as before reaching code generation",
+        ),
     }
 }
 
 fn gen_section(section: &FieldSection) -> TokenStream {
     match section {
         FieldSection::Flat(entries) => {
-            let parser_ident: Ident = format_ident!("parser");
             let stmts = entries
                 .iter()
-                .map(|e| gen_field_parse(&parser_ident, &e.binding, &e.mode, &e.context));
+                .map(|e| gen_field_unpack(&e.binding, &e.mode, &e.context));
             quote! { #(#stmts)* }
         }
-        FieldSection::SeparateCell(entries) => {
-            let sub_parser: Ident = format_ident!("__separate_cell_parser");
-            let stmts = entries
-                .iter()
-                .map(|e| gen_field_parse(&sub_parser, &e.binding, &e.mode, &e.context));
-            quote! {
-                let mut #sub_parser: toner::tlb::de::CellParser<'de> = parser
-                    .parse_as::<toner::tlb::de::CellParser<'de>, toner::tlb::Ref>(())
-                    .context("^[")?;
-                #(#stmts)*
-                #sub_parser.ensure_empty().context("^]")?;
-            }
-        }
+        FieldSection::SeparateCell(_) => unreachable!(
+            "validate_for_bit_unpack should have rejected separate_cell markers before reaching code generation",
+        ),
     }
 }
 
 fn expand_struct(input: &DeriveInput, data: &syn::DataStruct) -> Result<TokenStream> {
     let name = &input.ident;
     let container_attrs = parse_container_attrs(&input.attrs)?;
+    validate_container_for_bit_unpack(&container_attrs, name)?;
 
     match &data.fields {
         Fields::Named(f) => expand_named_struct(input, &container_attrs, &f.named),
         Fields::Unnamed(f) => expand_tuple_struct(input, &container_attrs, &f.unnamed),
         Fields::Unit => Err(syn::Error::new_spanned(
             name,
-            "CellDeserialize derive does not support unit structs",
+            "BitUnpack derive does not support unit structs",
         )),
     }
 }
@@ -99,35 +119,31 @@ fn expand_named_struct(
     let name = &input.ident;
     let tag_stmt = gen_tag_validation(container_attrs, &name.to_string())?;
 
-    let entries = gen_field_entries(collect_named_field_inputs(fields), DefaultFieldMode::Parse)?;
+    let entries = gen_field_entries(collect_named_field_inputs(fields), DefaultFieldMode::Unpack)?;
+    validate_for_bit_unpack(&entries)?;
     let field_names: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
     let sections = group_fields_into_sections(entries)?;
     let section_stmts = sections.iter().map(gen_section);
 
-    let ensure_empty = if container_attrs.ensure_empty {
-        quote! { parser.ensure_empty()?; }
-    } else {
-        quote! {}
-    };
-
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     Ok(quote! {
-        impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
+        impl<'de, #impl_generics> toner::tlb::bits::de::BitUnpack<'de> for #name #ty_generics #where_clause {
             type Args = ();
 
-            fn parse(
-                parser: &mut toner::tlb::de::CellParser<'de>,
+            fn unpack<__R>(
+                reader: &mut __R,
                 _args: Self::Args,
-            ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
+            ) -> ::core::result::Result<Self, __R::Error>
+            where
+                __R: toner::tlb::bits::de::BitReader<'de> + ?Sized,
+            {
                 use toner::tlb::bits::de::BitReaderExt;
                 use toner::tlb::Context;
 
                 #tag_stmt
 
                 #(#section_stmts)*
-
-                #ensure_empty
 
                 Ok(Self {
                     #(#field_names,)*
@@ -145,35 +161,31 @@ fn expand_tuple_struct(
     let name = &input.ident;
     let tag_stmt = gen_tag_validation(container_attrs, &name.to_string())?;
 
-    let entries = gen_field_entries(collect_tuple_field_inputs(fields), DefaultFieldMode::Parse)?;
+    let entries = gen_field_entries(collect_tuple_field_inputs(fields), DefaultFieldMode::Unpack)?;
+    validate_for_bit_unpack(&entries)?;
     let field_idents: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
     let sections = group_fields_into_sections(entries)?;
     let section_stmts = sections.iter().map(gen_section);
 
-    let ensure_empty = if container_attrs.ensure_empty {
-        quote! { parser.ensure_empty()?; }
-    } else {
-        quote! {}
-    };
-
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     Ok(quote! {
-        impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
+        impl<'de, #impl_generics> toner::tlb::bits::de::BitUnpack<'de> for #name #ty_generics #where_clause {
             type Args = ();
 
-            fn parse(
-                parser: &mut toner::tlb::de::CellParser<'de>,
+            fn unpack<__R>(
+                reader: &mut __R,
                 _args: Self::Args,
-            ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
+            ) -> ::core::result::Result<Self, __R::Error>
+            where
+                __R: toner::tlb::bits::de::BitReader<'de> + ?Sized,
+            {
                 use toner::tlb::bits::de::BitReaderExt;
                 use toner::tlb::Context;
 
                 #tag_stmt
 
                 #(#section_stmts)*
-
-                #ensure_empty
 
                 Ok(Self(#(#field_idents,)*))
             }
@@ -197,7 +209,7 @@ fn gen_tag_validation(attrs: &ContainerAttrs, type_name: &str) -> Result<TokenSt
     let fmt_str = format!("{err_msg}: 0x{{:0>{hex_width}x}}");
 
     Ok(quote! {
-        let __tag: #int_ty = parser.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
+        let __tag: #int_ty = reader.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
         if __tag != #tag_lit as #int_ty {
             return Err(toner::tlb::Error::custom(format!(
                 #fmt_str, __tag
@@ -215,8 +227,9 @@ fn gen_variant_body(type_name: &Ident, variant: &VariantInfo) -> Result<TokenStr
 
     let entries = gen_field_entries(
         collect_named_field_inputs(&variant.fields),
-        DefaultFieldMode::Parse,
+        DefaultFieldMode::Unpack,
     )?;
+    validate_for_bit_unpack(&entries)?;
     let field_names: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
     let sections = group_fields_into_sections(entries)?;
     let section_stmts = sections.iter().map(gen_section);
@@ -266,7 +279,7 @@ fn gen_match_tree(node: &TagTreeNode, ctx: &MatchTreeCtx, depth: usize) -> Resul
 
     Ok(quote! {
         {
-            let #tag_ident: #int_ty = parser.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
+            let #tag_ident: #int_ty = reader.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
             match #tag_ident {
                 #(#match_arms)*
                 _ => return Err(toner::tlb::Error::custom(
@@ -314,6 +327,7 @@ fn collect_arms_at_depth(
 fn expand_enum(input: &DeriveInput, data: &syn::DataEnum) -> Result<TokenStream> {
     let name = &input.ident;
     let container_attrs = parse_container_attrs(&input.attrs)?;
+    validate_container_for_bit_unpack(&container_attrs, name)?;
 
     let mut variants: Vec<VariantInfo> = Vec::new();
     for variant in &data.variants {
@@ -344,28 +358,23 @@ fn expand_enum(input: &DeriveInput, data: &syn::DataEnum) -> Result<TokenStream>
     };
     let body = gen_match_tree(&root, &ctx, 0)?;
 
-    let ensure_empty = if container_attrs.ensure_empty {
-        quote! { parser.ensure_empty()?; }
-    } else {
-        quote! {}
-    };
-
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
     Ok(quote! {
-        impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
+        impl<'de, #impl_generics> toner::tlb::bits::de::BitUnpack<'de> for #name #ty_generics #where_clause {
             type Args = ();
 
-            fn parse(
-                parser: &mut toner::tlb::de::CellParser<'de>,
+            fn unpack<__R>(
+                reader: &mut __R,
                 _args: Self::Args,
-            ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
+            ) -> ::core::result::Result<Self, __R::Error>
+            where
+                __R: toner::tlb::bits::de::BitReader<'de> + ?Sized,
+            {
                 use toner::tlb::bits::de::BitReaderExt;
                 use toner::tlb::Context;
 
-                let __result = #body;
-                #ensure_empty
-                Ok(__result)
+                Ok(#body)
             }
         }
     })

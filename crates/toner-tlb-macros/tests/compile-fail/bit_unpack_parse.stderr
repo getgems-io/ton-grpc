@@ -1,0 +1,5 @@
+error: `parse` cannot be used with derive(BitUnpack); use `unpack` instead
+ --> tests/compile-fail/bit_unpack_parse.rs:5:5
+  |
+5 |     #[tlb(parse)]
+  |     ^

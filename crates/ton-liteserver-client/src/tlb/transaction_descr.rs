@@ -4,9 +4,9 @@ use crate::tlb::transaction::Transaction;
 use num_bigint::BigUint;
 use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 use toner::tlb::bits::{NBits, VarInt};
-use toner::tlb::{Data, Error, ParseFully, Ref};
+use toner::tlb::{Data, ParseFully, Ref};
 use toner::ton::currency::Grams;
-use toner_tlb_macros::CellDeserialize;
+use toner_tlb_macros::{BitUnpack, CellDeserialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 pub enum TransactionDescr {
@@ -147,26 +147,13 @@ pub enum TransactionDescr {
 ///   status_change:AccStatusChange
 ///   = TrStoragePhase;
 ///
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BitUnpack)]
 pub struct TrStoragePhase {
+    #[tlb(unpack_as = "Grams")]
     storage_fees_collected: BigUint,
+    #[tlb(unpack_as = "Option<Grams>")]
     storage_fees_due: Option<BigUint>,
     status_change: AccStatusChange,
-}
-
-impl<'de> BitUnpack<'de> for TrStoragePhase {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        Ok(Self {
-            storage_fees_collected: reader.unpack_as::<_, Grams>(())?,
-            storage_fees_due: reader.unpack_as::<_, Option<Grams>>(())?,
-            status_change: reader.unpack(())?,
-        })
-    }
 }
 
 /// ```tlb
@@ -185,32 +172,14 @@ pub struct TrCreditPhase {
 /// acst_frozen$10 = AccStatusChange;    // init -> frozen
 /// acst_deleted$11 = AccStatusChange;   // frozen -> deleted
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, BitUnpack)]
 pub enum AccStatusChange {
+    #[tlb(tag = "0b0")]
     Unchanged,
+    #[tlb(tag = "0b10")]
     Frozen,
+    #[tlb(tag = "0b11")]
     Deleted,
-}
-
-impl<'de> BitUnpack<'de> for AccStatusChange {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        let bit: bool = reader.unpack(())?;
-        if !bit {
-            return Ok(AccStatusChange::Unchanged);
-        }
-
-        let bit: bool = reader.unpack(())?;
-
-        match bit {
-            true => Ok(AccStatusChange::Deleted),
-            false => Ok(AccStatusChange::Frozen),
-        }
-    }
 }
 
 /// ```tlb
@@ -219,37 +188,16 @@ impl<'de> BitUnpack<'de> for AccStatusChange {
 /// cskip_no_gas$10 = ComputeSkipReason;
 /// cskip_suspended$110 = ComputeSkipReason;
 /// ```
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, BitUnpack)]
 pub enum ComputeSkipReason {
+    #[tlb(tag = "0b00")]
     NoState,
+    #[tlb(tag = "0b01")]
     BadState,
+    #[tlb(tag = "0b10")]
     NoGas,
+    #[tlb(tag = "0b110")]
     Suspended,
-}
-
-impl<'de> BitUnpack<'de> for ComputeSkipReason {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        let bits = reader.unpack_as::<_, NBits<2>>(())?;
-        match bits {
-            0b00 => Ok(ComputeSkipReason::NoState),
-            0b01 => Ok(ComputeSkipReason::BadState),
-            0b10 => Ok(ComputeSkipReason::NoGas),
-            0b11 => {
-                let bit: bool = reader.unpack(())?;
-                if bit {
-                    return Err(Error::custom("invalid tag"));
-                }
-
-                Ok(ComputeSkipReason::Suspended)
-            }
-            _ => unreachable!(),
-        }
-    }
 }
 
 /// ```tlb
@@ -311,13 +259,15 @@ pub enum TrComputePhase {
 ///   action_list_hash:bits256 tot_msg_size:StorageUsed
 ///   = TrActionPhase;
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BitUnpack)]
 pub struct TrActionPhase {
     success: bool,
     valid: bool,
     no_funds: bool,
     status_change: AccStatusChange,
+    #[tlb(unpack_as = "Option<Grams>")]
     total_fwd_fees: Option<BigUint>,
+    #[tlb(unpack_as = "Option<Grams>")]
     total_action_fees: Option<BigUint>,
     result_code: i32,
     result_arg: Option<i32>,
@@ -327,32 +277,6 @@ pub struct TrActionPhase {
     msgs_created: u16,
     action_list_hash: [u8; 32],
     tot_msg_size: StorageUsed,
-}
-
-impl<'de> BitUnpack<'de> for TrActionPhase {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        Ok(Self {
-            success: reader.unpack(())?,
-            valid: reader.unpack(())?,
-            no_funds: reader.unpack(())?,
-            status_change: reader.unpack(())?,
-            total_fwd_fees: reader.unpack_as::<_, Option<Grams>>(())?,
-            total_action_fees: reader.unpack_as::<_, Option<Grams>>(())?,
-            result_code: reader.unpack(())?,
-            result_arg: reader.unpack(())?,
-            tot_actions: reader.unpack(())?,
-            spec_actions: reader.unpack(())?,
-            skipped_actions: reader.unpack(())?,
-            msgs_created: reader.unpack(())?,
-            action_list_hash: reader.unpack(())?,
-            tot_msg_size: reader.unpack(())?,
-        })
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -413,26 +337,12 @@ impl<'de> BitUnpack<'de> for TrBouncePhase {
 ///   acc_split_depth:(## 6) this_addr:bits256 sibling_addr:bits256
 ///   = SplitMergeInfo;
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BitUnpack)]
 pub struct SplitMergeInfo {
+    #[tlb(unpack_as = "NBits<6>")]
     cur_shard_pfx_len: u8,
+    #[tlb(unpack_as = "NBits<6>")]
     acc_split_depth: u8,
     this_addr: [u8; 32],
     sibling_addr: [u8; 32],
-}
-
-impl<'de> BitUnpack<'de> for SplitMergeInfo {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        Ok(Self {
-            cur_shard_pfx_len: reader.unpack_as::<_, NBits<6>>(())?,
-            acc_split_depth: reader.unpack_as::<_, NBits<6>>(())?,
-            this_addr: reader.unpack(())?,
-            sibling_addr: reader.unpack(())?,
-        })
-    }
 }
