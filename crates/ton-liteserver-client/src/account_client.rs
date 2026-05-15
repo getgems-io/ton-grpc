@@ -378,7 +378,7 @@ fn storage_state_components(storage: &AccountStorage) -> anyhow::Result<(String,
             String::new(),
             base64_standard.encode(state_hash),
         )),
-        TlbAccountState::Active(state_init) => {
+        TlbAccountState::Active { state_init } => {
             let code = encode_optional_cell_boc(state_init.code.as_ref())?;
             let data = encode_optional_cell_boc(state_init.data.as_ref())?;
             Ok((code, data, String::new()))

@@ -2,7 +2,6 @@ use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::storage_used::StorageUsed;
 use crate::tlb::transaction::Transaction;
 use num_bigint::BigUint;
-use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
 use toner::tlb::bits::{NBits, VarInt};
 use toner::tlb::{Data, ParseFully, Ref};
 use toner::ton::currency::Grams;
@@ -279,57 +278,31 @@ pub struct TrActionPhase {
     tot_msg_size: StorageUsed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// ```tlb
+/// tr_phase_bounce_negfunds$00 = TrBouncePhase;
+/// tr_phase_bounce_nofunds$01 msg_size:StorageUsed
+///   req_fwd_fees:Grams = TrBouncePhase;
+/// tr_phase_bounce_ok$1 msg_size:StorageUsed
+///   msg_fees:Grams fwd_fees:Grams = TrBouncePhase;
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq, BitUnpack)]
 pub enum TrBouncePhase {
-    /// ```tlb
-    /// tr_phase_bounce_negfunds$00 = TrBouncePhase;
-    /// ```
+    #[tlb(tag = "$00")]
     NegFunds,
-    /// ```tlb
-    /// tr_phase_bounce_nofunds$01 msg_size:StorageUsed
-    ///   req_fwd_fees:Grams = TrBouncePhase;
-    /// ```
+    #[tlb(tag = "$01")]
     NoFunds {
         msg_size: StorageUsed,
+        #[tlb(unpack_as = "Grams")]
         req_fwd_fees: BigUint,
     },
-    /// ```tlb
-    /// tr_phase_bounce_ok$1 msg_size:StorageUsed
-    ///   msg_fees:Grams fwd_fees:Grams = TrBouncePhase;
-    /// ```
+    #[tlb(tag = "$1")]
     Ok {
         msg_size: StorageUsed,
+        #[tlb(unpack_as = "Grams")]
         msg_fees: BigUint,
+        #[tlb(unpack_as = "Grams")]
         fwd_fees: BigUint,
     },
-}
-
-impl<'de> BitUnpack<'de> for TrBouncePhase {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        let tag: bool = reader.unpack(())?;
-        match tag {
-            false => {
-                let tag: bool = reader.unpack(())?;
-                match tag {
-                    false => Ok(Self::NegFunds),
-                    true => Ok(Self::NoFunds {
-                        msg_size: reader.unpack(())?,
-                        req_fwd_fees: reader.unpack_as::<_, Grams>(())?,
-                    }),
-                }
-            }
-            true => Ok(Self::Ok {
-                msg_size: reader.unpack(())?,
-                msg_fees: reader.unpack_as::<_, Grams>(())?,
-                fwd_fees: reader.unpack_as::<_, Grams>(())?,
-            }),
-        }
-    }
 }
 
 /// ```tlb

@@ -1,7 +1,7 @@
 use crate::tlb::shard_ident::ShardIdent;
-use toner::tlb::bits::de::BitReaderExt;
-use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::{Cell, Error, Ref};
+use toner::tlb::Cell;
+use toner::tlb::Ref;
+use toner_tlb_macros::CellDeserialize;
 
 /// ```tlb
 /// shard_state#9023afe2 global_id:int32
@@ -20,68 +20,36 @@ use toner::tlb::{Cell, Error, Ref};
 ///   custom:(Maybe ^McStateExtra)
 ///   = ShardStateUnsplit;
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, CellDeserialize)]
+#[tlb(tag = "0x9023afe2")]
 pub struct ShardStateUnsplit {
+    #[tlb(unpack)]
     pub global_id: i32,
+    #[tlb(unpack)]
     pub shard_id: ShardIdent,
+    #[tlb(unpack)]
     pub seq_no: u32,
+    #[tlb(unpack)]
     pub vert_seq_no: u32,
+    #[tlb(unpack)]
     pub gen_utime: u32,
+    #[tlb(unpack)]
     pub gen_lt: u64,
+    #[tlb(unpack)]
     pub min_ref_mc_seqno: u32,
     // TODO[akostylev0]: typed struct for OutMsgQueueInfo
+    #[tlb(parse_as = "Ref")]
     pub out_msg_queue_info: Cell,
+    #[tlb(unpack)]
     pub before_split: bool,
     // TODO[akostylev0]: typed struct for ShardAccounts (HashmapAugE 256 ShardAccount DepthBalanceInfo)
+    #[tlb(parse_as = "Ref")]
     pub accounts: Cell,
     // TODO[akostylev0]: typed struct for the inline tuple
     //   (overload_history, underload_history, total_balance, total_validator_fees, libraries, master_ref)
+    #[tlb(parse_as = "Ref")]
     pub stats: Cell,
     // TODO[akostylev0]: typed struct for McStateExtra
+    #[tlb(parse_as = "Option<Ref>")]
     pub custom: Option<Cell>,
-}
-
-impl<'de> CellDeserialize<'de> for ShardStateUnsplit {
-    type Args = ();
-
-    fn parse(
-        parser: &mut CellParser<'de>,
-        _args: Self::Args,
-    ) -> Result<Self, CellParserError<'de>> {
-        let tag: u32 = parser.unpack(())?;
-        if tag != 0x9023afe2 {
-            return Err(Error::custom(format!(
-                "invalid ShardStateUnsplit tag: 0x{:08x}",
-                tag
-            )));
-        }
-
-        let global_id = parser.unpack(())?;
-        let shard_id = parser.unpack(())?;
-        let seq_no = parser.unpack(())?;
-        let vert_seq_no = parser.unpack(())?;
-        let gen_utime = parser.unpack(())?;
-        let gen_lt = parser.unpack(())?;
-        let min_ref_mc_seqno = parser.unpack(())?;
-        let out_msg_queue_info = parser.parse_as::<Cell, Ref>(())?;
-        let before_split = parser.unpack(())?;
-        let accounts = parser.parse_as::<Cell, Ref>(())?;
-        let stats = parser.parse_as::<Cell, Ref>(())?;
-        let custom: Option<Cell> = parser.parse_as::<_, Option<Ref>>(())?;
-
-        Ok(Self {
-            global_id,
-            shard_id,
-            seq_no,
-            vert_seq_no,
-            gen_utime,
-            gen_lt,
-            min_ref_mc_seqno,
-            out_msg_queue_info,
-            before_split,
-            accounts,
-            stats,
-            custom,
-        })
-    }
 }

@@ -1,40 +1,22 @@
-use toner::tlb::bits::de::BitReaderExt;
-use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::ton::state_init::StateInit;
+use toner_tlb_macros::CellDeserialize;
 
 /// ```tlb
 /// account_uninit$00 = AccountState;
 /// account_active$1 _:StateInit = AccountState;
 /// account_frozen$01 state_hash:bits256 = AccountState;
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 pub enum AccountState {
+    #[tlb(tag = "$00")]
     Uninit,
-    Active(StateInit),
-    Frozen { state_hash: [u8; 32] },
-}
-
-impl<'de> CellDeserialize<'de> for AccountState {
-    type Args = ();
-
-    fn parse(
-        parser: &mut CellParser<'de>,
-        _args: Self::Args,
-    ) -> Result<Self, CellParserError<'de>> {
-        let first: bool = parser.unpack(())?;
-        if first {
-            let state_init: StateInit = parser.parse(())?;
-            return Ok(AccountState::Active(state_init));
-        }
-
-        let second: bool = parser.unpack(())?;
-        if second {
-            let state_hash: [u8; 32] = parser.unpack(())?;
-            return Ok(AccountState::Frozen { state_hash });
-        }
-
-        Ok(AccountState::Uninit)
-    }
+    #[tlb(tag = "$1")]
+    Active { state_init: StateInit },
+    #[tlb(tag = "$01")]
+    Frozen {
+        #[tlb(unpack)]
+        state_hash: [u8; 32],
+    },
 }
 
 #[cfg(test)]
@@ -100,6 +82,6 @@ mod tests {
 
         let actual: AccountState = cell.parse_fully(()).unwrap();
 
-        assert_eq!(actual, AccountState::Active(state_init));
+        assert_eq!(actual, AccountState::Active { state_init });
     }
 }
