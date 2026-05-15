@@ -1,0 +1,5 @@
+error: `separate_cell_start`/`separate_cell_end` cannot be used with derive(BitUnpack); BitUnpack operates on bits only and has no concept of cell references
+ --> tests/compile-fail/bit_unpack_separate_cell.rs:5:5
+  |
+5 |     #[tlb(separate_cell_start, unpack)]
+  |     ^

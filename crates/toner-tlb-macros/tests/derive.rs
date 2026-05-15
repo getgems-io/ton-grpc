@@ -1,7 +1,7 @@
 use toner::tlb::Cell;
 use toner::tlb::bits::bitvec::order::Msb0;
 use toner::tlb::bits::bitvec::vec::BitVec;
-use toner_tlb_macros::CellDeserialize;
+use toner_tlb_macros::{BitUnpack, CellDeserialize};
 
 fn make_cell(data_bits: &[bool], refs: Vec<Cell>) -> Cell {
     let mut bv = BitVec::<u8, Msb0>::new();
@@ -18,6 +18,10 @@ fn make_cell(data_bits: &[bool], refs: Vec<Cell>) -> Cell {
 
 fn make_leaf_cell(data_bits: &[bool]) -> Cell {
     make_cell(data_bits, vec![])
+}
+
+fn byte_bits(value: u8) -> Vec<bool> {
+    (0..8).rev().map(|i| (value >> i) & 1 == 1).collect()
 }
 
 #[cfg(test)]
@@ -371,5 +375,489 @@ mod tests {
     fn enum_tag_exceeds_u8() {
         let t = trybuild::TestCases::new();
         t.compile_fail("tests/compile-fail/enum_tag_exceeds_u8.rs");
+    }
+
+    #[test]
+    fn separate_cell_block_loads_fields_from_child_cell() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct WithBlock {
+            #[tlb(unpack)]
+            head: u8,
+            #[tlb(separate_cell_start, unpack)]
+            inner_a: u8,
+            #[tlb(separate_cell_end, unpack)]
+            inner_b: u16,
+        }
+
+        let mut head_bits = vec![false; 8];
+        head_bits[7] = true;
+        let mut inner_bits = vec![false; 8 + 16];
+        inner_bits[7] = true;
+        inner_bits[8 + 14] = true;
+        let inner_cell = make_leaf_cell(&inner_bits);
+        let cell = make_cell(&head_bits, vec![inner_cell]);
+
+        let result: WithBlock = cell.parse_fully(()).unwrap();
+
+        assert_eq!(
+            result,
+            WithBlock {
+                head: 1,
+                inner_a: 1,
+                inner_b: 2,
+            }
+        );
+    }
+
+    #[test]
+    fn separate_cell_block_fails_when_child_has_trailing_bits() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct WithBlock {
+            #[tlb(separate_cell_start, unpack)]
+            inner_a: u8,
+            #[tlb(separate_cell_end, unpack)]
+            inner_b: u8,
+        }
+
+        let inner_bits = vec![false; 8 + 8 + 1];
+        let inner_cell = make_leaf_cell(&inner_bits);
+        let cell = make_cell(&[], vec![inner_cell]);
+
+        let result: Result<WithBlock, _> = cell.parse_fully(());
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn separate_cell_block_fails_when_no_reference_left() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct WithBlock {
+            #[tlb(separate_cell_start, unpack)]
+            inner_a: u8,
+            #[tlb(separate_cell_end, unpack)]
+            inner_b: u8,
+        }
+
+        let cell = make_leaf_cell(&[]);
+
+        let result: Result<WithBlock, _> = cell.parse_fully(());
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn separate_cell_single_field_block() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct WithBlock {
+            #[tlb(unpack)]
+            head: u8,
+            #[tlb(separate_cell_start, separate_cell_end, unpack)]
+            tail: u16,
+        }
+
+        let mut head_bits = vec![false; 8];
+        head_bits[7] = true;
+        let mut inner_bits = vec![false; 16];
+        inner_bits[15] = true;
+        inner_bits[14] = true;
+        let inner_cell = make_leaf_cell(&inner_bits);
+        let cell = make_cell(&head_bits, vec![inner_cell]);
+
+        let result: WithBlock = cell.parse_fully(()).unwrap();
+
+        assert_eq!(result, WithBlock { head: 1, tail: 3 });
+    }
+
+    #[test]
+    fn separate_cell_two_blocks_in_a_row() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct TwoBlocks {
+            #[tlb(separate_cell_start, separate_cell_end, unpack)]
+            first: u8,
+            #[tlb(separate_cell_start, separate_cell_end, unpack)]
+            second: u8,
+        }
+
+        let mut first_inner = vec![false; 8];
+        first_inner[7] = true;
+        let mut second_inner = vec![false; 8];
+        second_inner[6] = true;
+        let cell = make_cell(
+            &[],
+            vec![make_leaf_cell(&first_inner), make_leaf_cell(&second_inner)],
+        );
+
+        let result: TwoBlocks = cell.parse_fully(()).unwrap();
+
+        assert_eq!(
+            result,
+            TwoBlocks {
+                first: 1,
+                second: 2
+            }
+        );
+    }
+
+    #[test]
+    fn separate_cell_in_enum_variant() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        enum Msg {
+            #[tlb(tag = "0b0")]
+            Skipped {
+                #[tlb(unpack)]
+                reason: u8,
+            },
+            #[tlb(tag = "0b1")]
+            Vm {
+                #[tlb(unpack)]
+                head: u8,
+                #[tlb(separate_cell_start, unpack)]
+                tail_a: u8,
+                #[tlb(separate_cell_end, unpack)]
+                tail_b: u16,
+            },
+        }
+
+        let mut data_bits = vec![true];
+        data_bits.extend(std::iter::repeat_n(false, 8));
+        data_bits[8] = true;
+        let mut inner_bits = vec![false; 8 + 16];
+        inner_bits[7] = true;
+        inner_bits[8 + 15] = true;
+        inner_bits[8 + 14] = true;
+        let cell = make_cell(&data_bits, vec![make_leaf_cell(&inner_bits)]);
+
+        let result: Msg = cell.parse_fully(()).unwrap();
+
+        assert_eq!(
+            result,
+            Msg::Vm {
+                head: 1,
+                tail_a: 1,
+                tail_b: 3,
+            }
+        );
+    }
+
+    #[test]
+    fn separate_cell_in_tuple_struct() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct Pair(
+            #[tlb(unpack)] u8,
+            #[tlb(separate_cell_start, unpack)] u8,
+            #[tlb(separate_cell_end, unpack)] u8,
+        );
+
+        let mut head_bits = vec![false; 8];
+        head_bits[7] = true;
+        let mut inner_bits = vec![false; 16];
+        inner_bits[7] = true;
+        inner_bits[15] = true;
+        inner_bits[14] = true;
+        let cell = make_cell(&head_bits, vec![make_leaf_cell(&inner_bits)]);
+
+        let result: Pair = cell.parse_fully(()).unwrap();
+
+        assert_eq!(result, Pair(1, 1, 3));
+    }
+
+    #[test]
+    fn enum_with_ensure_empty_validates_full_consumption() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        #[tlb(ensure_empty)]
+        enum Msg {
+            #[tlb(tag = "0b0")]
+            A {
+                #[tlb(unpack)]
+                val: u8,
+            },
+            #[tlb(tag = "0b1")]
+            B {
+                #[tlb(unpack)]
+                val: u16,
+            },
+        }
+
+        let mut a_bits = vec![false];
+        a_bits.extend(byte_bits(0x42));
+        let cell = make_leaf_cell(&a_bits);
+        let result: Msg = cell.parse_fully(()).unwrap();
+        assert_eq!(result, Msg::A { val: 0x42 });
+
+        let mut trailing_bits = vec![false];
+        trailing_bits.extend(byte_bits(0x42));
+        trailing_bits.push(true);
+        let bad_cell = make_leaf_cell(&trailing_bits);
+        let bad: Result<Msg, _> = bad_cell.parse_fully(());
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn separate_cell_nested_via_composition() {
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct Inner {
+            #[tlb(unpack)]
+            inner_head: u8,
+            #[tlb(separate_cell_start, unpack)]
+            a: u8,
+            #[tlb(separate_cell_end, unpack)]
+            b: u8,
+        }
+
+        #[derive(Debug, PartialEq, CellDeserialize)]
+        struct Outer {
+            #[tlb(unpack)]
+            head: u8,
+            #[tlb(separate_cell_start, unpack)]
+            mid: u8,
+            #[tlb(separate_cell_end)]
+            inner: Inner,
+        }
+
+        let head_bits = byte_bits(1);
+        let mid_bits = byte_bits(2);
+        let inner_head_bits = byte_bits(4);
+        let mut ab_bits = byte_bits(16);
+        ab_bits.extend(byte_bits(32));
+
+        let ab_cell = make_leaf_cell(&ab_bits);
+        let mut block_data = mid_bits.clone();
+        block_data.extend(inner_head_bits);
+        let block_cell = make_cell(&block_data, vec![ab_cell]);
+        let cell = make_cell(&head_bits, vec![block_cell]);
+
+        let result: Outer = cell.parse_fully(()).unwrap();
+
+        assert_eq!(
+            result,
+            Outer {
+                head: 1,
+                mid: 2,
+                inner: Inner {
+                    inner_head: 4,
+                    a: 16,
+                    b: 32,
+                },
+            }
+        );
+    }
+
+    #[test]
+    fn separate_cell_orphan_start_fails_to_compile() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/separate_cell_orphan_start.rs");
+    }
+
+    #[test]
+    fn separate_cell_orphan_end_fails_to_compile() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/separate_cell_orphan_end.rs");
+    }
+
+    #[test]
+    fn separate_cell_nested_start_fails_to_compile() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/separate_cell_nested_start.rs");
+    }
+
+    #[test]
+    fn separate_cell_nested_both_fails_to_compile() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/separate_cell_nested_both.rs");
+    }
+
+    #[test]
+    fn separate_cell_double_end_fails_to_compile() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/separate_cell_double_end.rs");
+    }
+
+    #[test]
+    fn bit_unpack_struct_named_fields() {
+        use toner::tlb::bits::de::unpack_fully;
+
+        #[derive(Debug, PartialEq, BitUnpack)]
+        struct ExtBlkRefLike {
+            end_lt: u64,
+            seq_no: u32,
+        }
+
+        let mut bv = BitVec::<u8, Msb0>::new();
+        for byte in 1u64.to_be_bytes() {
+            for &b in &byte_bits(byte) {
+                bv.push(b);
+            }
+        }
+        for byte in 2u32.to_be_bytes() {
+            for &b in &byte_bits(byte) {
+                bv.push(b);
+            }
+        }
+
+        let result: ExtBlkRefLike = unpack_fully(bv.as_bitslice(), ()).unwrap();
+
+        assert_eq!(
+            result,
+            ExtBlkRefLike {
+                end_lt: 1,
+                seq_no: 2
+            }
+        );
+    }
+
+    #[test]
+    fn bit_unpack_enum_flat_tags() {
+        use toner::tlb::bits::bitvec::bits;
+        use toner::tlb::bits::de::unpack_fully;
+
+        #[derive(Debug, PartialEq, BitUnpack)]
+        enum AccountStatusLike {
+            #[tlb(tag = "0b00")]
+            Uninit,
+            #[tlb(tag = "0b01")]
+            Frozen,
+            #[tlb(tag = "0b10")]
+            Active,
+            #[tlb(tag = "0b11")]
+            Nonexist,
+        }
+
+        assert_eq!(
+            unpack_fully::<AccountStatusLike>(bits![u8, Msb0; 0, 0], ()).unwrap(),
+            AccountStatusLike::Uninit
+        );
+        assert_eq!(
+            unpack_fully::<AccountStatusLike>(bits![u8, Msb0; 0, 1], ()).unwrap(),
+            AccountStatusLike::Frozen
+        );
+        assert_eq!(
+            unpack_fully::<AccountStatusLike>(bits![u8, Msb0; 1, 0], ()).unwrap(),
+            AccountStatusLike::Active
+        );
+        assert_eq!(
+            unpack_fully::<AccountStatusLike>(bits![u8, Msb0; 1, 1], ()).unwrap(),
+            AccountStatusLike::Nonexist
+        );
+    }
+
+    #[test]
+    fn bit_unpack_struct_with_tag_validation() {
+        use toner::tlb::bits::bitvec::bits;
+        use toner::tlb::bits::de::unpack_fully;
+
+        #[derive(Debug, PartialEq, BitUnpack)]
+        #[tlb(tag = "0b0111")]
+        struct Tagged {
+            val: bool,
+        }
+
+        let result: Tagged = unpack_fully(bits![u8, Msb0; 0, 1, 1, 1, 1], ()).unwrap();
+        assert_eq!(result, Tagged { val: true });
+
+        let bad: Result<Tagged, _> = unpack_fully(bits![u8, Msb0; 0, 0, 0, 0, 1], ());
+        assert!(bad.is_err());
+    }
+
+    #[test]
+    fn bit_unpack_struct_with_unpack_as() {
+        use toner::tlb::bits::NBits;
+        use toner::tlb::bits::bitvec::bits;
+        use toner::tlb::bits::de::unpack_fully;
+
+        #[derive(Debug, PartialEq, BitUnpack)]
+        struct Nibble {
+            #[tlb(unpack_as = "NBits<4>")]
+            val: u8,
+        }
+
+        let result: Nibble = unpack_fully(bits![u8, Msb0; 1, 0, 1, 0], ()).unwrap();
+        assert_eq!(result, Nibble { val: 0b1010 });
+    }
+
+    #[test]
+    fn bit_unpack_tuple_struct() {
+        use toner::tlb::bits::bitvec::bits;
+        use toner::tlb::bits::de::unpack_fully;
+
+        #[derive(Debug, PartialEq, BitUnpack)]
+        struct Pair(bool, bool);
+
+        let result: Pair = unpack_fully(bits![u8, Msb0; 1, 0], ()).unwrap();
+        assert_eq!(result, Pair(true, false));
+    }
+
+    #[test]
+    fn bit_unpack_enum_with_fields() {
+        use toner::tlb::bits::NBits;
+        use toner::tlb::bits::bitvec::bits;
+        use toner::tlb::bits::de::unpack_fully;
+
+        #[derive(Debug, PartialEq, BitUnpack)]
+        enum Msg {
+            #[tlb(tag = "0b0")]
+            Ping,
+            #[tlb(tag = "0b1")]
+            WithVal {
+                #[tlb(unpack_as = "NBits<4>")]
+                val: u8,
+            },
+        }
+
+        let ping: Msg = unpack_fully(bits![u8, Msb0; 0], ()).unwrap();
+        assert_eq!(ping, Msg::Ping);
+
+        let with_val: Msg = unpack_fully(bits![u8, Msb0; 1, 1, 0, 1, 0], ()).unwrap();
+        assert_eq!(with_val, Msg::WithVal { val: 0b1010 });
+    }
+
+    #[test]
+    fn bit_unpack_nested_struct_via_unpack_default() {
+        use toner::tlb::bits::bitvec::bits;
+        use toner::tlb::bits::de::unpack_fully;
+
+        #[derive(Debug, PartialEq, BitUnpack)]
+        struct Inner {
+            a: bool,
+            b: bool,
+        }
+
+        #[derive(Debug, PartialEq, BitUnpack)]
+        struct Outer {
+            head: bool,
+            inner: Inner,
+        }
+
+        let result: Outer = unpack_fully(bits![u8, Msb0; 1, 0, 1], ()).unwrap();
+        assert_eq!(
+            result,
+            Outer {
+                head: true,
+                inner: Inner { a: false, b: true },
+            }
+        );
+    }
+
+    #[test]
+    fn bit_unpack_rejects_parse_attr() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/bit_unpack_parse.rs");
+    }
+
+    #[test]
+    fn bit_unpack_rejects_parse_as_attr() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/bit_unpack_parse_as.rs");
+    }
+
+    #[test]
+    fn bit_unpack_rejects_separate_cell_attr() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/bit_unpack_separate_cell.rs");
+    }
+
+    #[test]
+    fn bit_unpack_rejects_ensure_empty_attr() {
+        let t = trybuild::TestCases::new();
+        t.compile_fail("tests/compile-fail/bit_unpack_ensure_empty.rs");
     }
 }

@@ -1,7 +1,9 @@
 use proc_macro::TokenStream;
 use syn::{DeriveInput, parse_macro_input};
 
+mod bit_unpack;
 mod cell_deserialize;
+mod common;
 
 /// Derive macro for `CellDeserialize<'de>` trait.
 ///
@@ -17,6 +19,8 @@ mod cell_deserialize;
 /// - `#[tlb(unpack)]` — use `parser.unpack(())?` (for `BitUnpack` types)
 /// - `#[tlb(unpack_as = "Grams")]` — use `parser.unpack_as::<_, Grams>(())?`
 /// - `#[tlb(parse_as = "Hashmap<Ref<T>, C>", args = "(64, (), ())")]` — pass custom args instead of `()`
+/// - `#[tlb(separate_cell_start)]` / `#[tlb(separate_cell_end)]` — load fields from a child cell
+///   (TLB `^[ ... ]` notation)
 ///
 /// # Enum variant attributes
 ///
@@ -28,6 +32,39 @@ mod cell_deserialize;
 pub fn derive_cell_deserialize(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     cell_deserialize::expand(input)
+        .unwrap_or_else(|e| e.to_compile_error())
+        .into()
+}
+
+/// Derive macro for `BitUnpack<'de>` trait.
+///
+/// Operates on bit-level only — has no concept of cell references.
+///
+/// # Struct attributes
+///
+/// - `#[tlb(tag = "0b01")]` or `#[tlb(tag = "0x4f")]` — validate a fixed tag prefix
+///
+/// # Field attributes
+///
+/// Unannotated fields default to `reader.unpack(())?` — equivalent to `#[tlb(unpack)]`.
+///
+/// - `#[tlb(unpack)]` — explicit form of the default
+/// - `#[tlb(unpack_as = "NBits<4>")]` — use `reader.unpack_as::<_, NBits<4>>(())?`
+/// - `#[tlb(unpack_as = "...", args = "...")]` — pass custom args instead of `()`
+///
+/// # Enum variant attributes
+///
+/// - `#[tlb(tag = "0b00")]` — tag value for this variant. Tree-like tags are resolved
+///   automatically (same algorithm as `CellDeserialize`).
+///
+/// # Forbidden attributes
+///
+/// `parse`, `parse_as`, `separate_cell_start`, `separate_cell_end`, `ensure_empty`
+/// are not allowed — they require cell-level operations.
+#[proc_macro_derive(BitUnpack, attributes(tlb))]
+pub fn derive_bit_unpack(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    bit_unpack::expand(input)
         .unwrap_or_else(|e| e.to_compile_error())
         .into()
 }
