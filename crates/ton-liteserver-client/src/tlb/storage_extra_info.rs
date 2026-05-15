@@ -1,33 +1,15 @@
-use toner::tlb::Error;
-use toner::tlb::bits::NBits;
-use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
+use toner_tlb_macros::BitUnpack;
 
 /// ```tlb
 /// storage_extra_none$000 = StorageExtraInfo;
 /// storage_extra_info$001 dict_hash:uint256 = StorageExtraInfo;
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BitUnpack)]
 pub enum StorageExtraInfo {
+    #[tlb(tag = "0b000")]
     None,
+    #[tlb(tag = "0b001")]
     Info { dict_hash: [u8; 32] },
-}
-
-impl<'de> BitUnpack<'de> for StorageExtraInfo {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        let tag: u8 = reader.unpack_as::<_, NBits<3>>(())?;
-        match tag {
-            0b000 => Ok(StorageExtraInfo::None),
-            0b001 => Ok(StorageExtraInfo::Info {
-                dict_hash: reader.unpack(())?,
-            }),
-            _ => Err(R::Error::custom("Invalid StorageExtraInfo tag")),
-        }
-    }
 }
 
 #[cfg(test)]

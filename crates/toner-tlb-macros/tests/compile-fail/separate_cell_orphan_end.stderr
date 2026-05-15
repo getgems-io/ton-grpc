@@ -1,0 +1,5 @@
+error: `separate_cell_end` without a preceding `separate_cell_start`
+ --> tests/compile-fail/separate_cell_orphan_end.rs:7:5
+  |
+7 |     #[tlb(separate_cell_end, unpack)]
+  |     ^

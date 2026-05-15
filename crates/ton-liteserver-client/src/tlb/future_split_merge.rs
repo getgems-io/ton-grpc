@@ -1,44 +1,16 @@
-use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
+use toner_tlb_macros::BitUnpack;
 
 /// ```tlb
 /// fsm_none$0 = FutureSplitMerge;
 /// fsm_split$10 split_utime:uint32 interval:uint32 = FutureSplitMerge;
 /// fsm_merge$11 merge_utime:uint32 interval:uint32 = FutureSplitMerge;
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, BitUnpack)]
 pub enum FutureSplitMerge {
-    None,                                      // fsm_none$0
-    Split { split_utime: u32, interval: u32 }, // fsm_split$10
-    Merge { merge_utime: u32, interval: u32 }, // fsm_merge$11
-}
-
-impl<'de> BitUnpack<'de> for FutureSplitMerge {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        if !reader.unpack::<bool>(())? {
-            return Ok(FutureSplitMerge::None);
-        }
-
-        if !reader.unpack::<bool>(())? {
-            let split_utime = reader.unpack(())?;
-            let interval = reader.unpack(())?;
-
-            Ok(FutureSplitMerge::Split {
-                split_utime,
-                interval,
-            })
-        } else {
-            let merge_utime = reader.unpack(())?;
-            let interval = reader.unpack(())?;
-
-            Ok(FutureSplitMerge::Merge {
-                merge_utime,
-                interval,
-            })
-        }
-    }
+    #[tlb(tag = "0b0")]
+    None,
+    #[tlb(tag = "0b10")]
+    Split { split_utime: u32, interval: u32 },
+    #[tlb(tag = "0b11")]
+    Merge { merge_utime: u32, interval: u32 },
 }
