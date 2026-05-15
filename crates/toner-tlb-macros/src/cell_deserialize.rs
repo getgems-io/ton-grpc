@@ -1,372 +1,49 @@
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
-use syn::{Data, DeriveInput, Fields, Ident, Result, punctuated::Punctuated, token::Comma};
+use syn::{DeriveInput, Generics, Ident, Result};
 
-use crate::common::{
-    ContainerAttrs, DefaultFieldMode, FieldMode, FieldModeKind, FieldSection, TagFormat,
-    TagTreeNode, VariantInfo, collect_named_field_inputs, collect_tuple_field_inputs,
-    gen_field_entries, group_fields_into_sections, int_type_for_bits, make_literal,
-    parse_container_attrs, parse_variant_info,
-};
+use crate::common::{self, Backend, FieldModeKind, SeparateCellMarker, extend_generics_with_de};
 
 pub fn expand(input: DeriveInput) -> Result<TokenStream> {
-    match &input.data {
-        Data::Struct(data) => expand_struct(&input, data),
-        Data::Enum(data) => expand_enum(&input, data),
-        Data::Union(_) => Err(syn::Error::new_spanned(
-            &input.ident,
-            "CellDeserialize cannot be derived for unions",
-        )),
-    }
+    common::expand::<CellBackend>(input)
 }
 
-fn gen_field_parse(
-    parser_ident: &Ident,
-    field_name: &Ident,
-    mode: &FieldMode,
-    context: &str,
-) -> TokenStream {
-    let args = mode
-        .args
-        .as_ref()
-        .map(|expr| quote! { #expr })
-        .unwrap_or_else(|| quote! { () });
+struct CellBackend;
 
-    match &mode.kind {
-        FieldModeKind::Parse => quote! {
-            let #field_name = #parser_ident.parse(#args)
-                .context(#context)?;
-        },
-        FieldModeKind::ParseAs(ty) => quote! {
-            let #field_name = #parser_ident.parse_as::<_, #ty>(#args)
-                .context(#context)?;
-        },
-        FieldModeKind::Unpack => quote! {
-            let #field_name = #parser_ident.unpack(#args)
-                .context(#context)?;
-        },
-        FieldModeKind::UnpackAs(ty) => quote! {
-            let #field_name = #parser_ident.unpack_as::<_, #ty>(#args)
-                .context(#context)?;
-        },
+impl Backend for CellBackend {
+    fn reader_ident() -> Ident {
+        format_ident!("parser")
     }
-}
 
-fn gen_section(section: &FieldSection) -> TokenStream {
-    match section {
-        FieldSection::Flat(entries) => {
-            let parser_ident: Ident = format_ident!("parser");
-            let stmts = entries
-                .iter()
-                .map(|e| gen_field_parse(&parser_ident, &e.binding, &e.mode, &e.context));
-            quote! { #(#stmts)* }
-        }
-        FieldSection::SeparateCell(entries) => {
-            let sub_parser: Ident = format_ident!("__separate_cell_parser");
-            let stmts = entries
-                .iter()
-                .map(|e| gen_field_parse(&sub_parser, &e.binding, &e.mode, &e.context));
-            quote! {
-                let mut #sub_parser: toner::tlb::de::CellParser<'de> = parser
-                    .parse_as::<toner::tlb::de::CellParser<'de>, toner::tlb::Ref>(())
-                    .context("^[")?;
-                #(#stmts)*
-                #sub_parser.ensure_empty().context("^]")?;
+    fn impl_block(name: &Ident, generics: &Generics, body: TokenStream) -> TokenStream {
+        let (impl_g, ty_g, where_g) = extend_generics_with_de(generics);
+        quote! {
+            impl #impl_g toner::tlb::de::CellDeserialize<'de> for #name #ty_g #where_g {
+                type Args = ();
+
+                fn parse(
+                    parser: &mut toner::tlb::de::CellParser<'de>,
+                    _args: Self::Args,
+                ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
+                    #body
+                }
             }
         }
     }
-}
 
-fn expand_struct(input: &DeriveInput, data: &syn::DataStruct) -> Result<TokenStream> {
-    let name = &input.ident;
-    let container_attrs = parse_container_attrs(&input.attrs)?;
-
-    match &data.fields {
-        Fields::Named(f) => expand_named_struct(input, &container_attrs, &f.named),
-        Fields::Unnamed(f) => expand_tuple_struct(input, &container_attrs, &f.unnamed),
-        Fields::Unit => Err(syn::Error::new_spanned(
-            name,
-            "CellDeserialize derive does not support unit structs",
-        )),
-    }
-}
-
-fn expand_named_struct(
-    input: &DeriveInput,
-    container_attrs: &ContainerAttrs,
-    fields: &Punctuated<syn::Field, Comma>,
-) -> Result<TokenStream> {
-    let name = &input.ident;
-    let tag_stmt = gen_tag_validation(container_attrs, &name.to_string())?;
-
-    let entries = gen_field_entries(collect_named_field_inputs(fields), DefaultFieldMode::Parse)?;
-    let field_names: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
-    let sections = group_fields_into_sections(entries)?;
-    let section_stmts = sections.iter().map(gen_section);
-
-    let ensure_empty = if container_attrs.ensure_empty {
-        quote! { parser.ensure_empty()?; }
-    } else {
-        quote! {}
-    };
-
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-
-    Ok(quote! {
-        impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
-            type Args = ();
-
-            fn parse(
-                parser: &mut toner::tlb::de::CellParser<'de>,
-                _args: Self::Args,
-            ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
-                use toner::tlb::bits::de::BitReaderExt;
-                use toner::tlb::Context;
-
-                #tag_stmt
-
-                #(#section_stmts)*
-
-                #ensure_empty
-
-                Ok(Self {
-                    #(#field_names,)*
-                })
-            }
-        }
-    })
-}
-
-fn expand_tuple_struct(
-    input: &DeriveInput,
-    container_attrs: &ContainerAttrs,
-    fields: &Punctuated<syn::Field, Comma>,
-) -> Result<TokenStream> {
-    let name = &input.ident;
-    let tag_stmt = gen_tag_validation(container_attrs, &name.to_string())?;
-
-    let entries = gen_field_entries(collect_tuple_field_inputs(fields), DefaultFieldMode::Parse)?;
-    let field_idents: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
-    let sections = group_fields_into_sections(entries)?;
-    let section_stmts = sections.iter().map(gen_section);
-
-    let ensure_empty = if container_attrs.ensure_empty {
-        quote! { parser.ensure_empty()?; }
-    } else {
-        quote! {}
-    };
-
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-
-    Ok(quote! {
-        impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
-            type Args = ();
-
-            fn parse(
-                parser: &mut toner::tlb::de::CellParser<'de>,
-                _args: Self::Args,
-            ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
-                use toner::tlb::bits::de::BitReaderExt;
-                use toner::tlb::Context;
-
-                #tag_stmt
-
-                #(#section_stmts)*
-
-                #ensure_empty
-
-                Ok(Self(#(#field_idents,)*))
-            }
-        }
-    })
-}
-
-fn gen_tag_validation(attrs: &ContainerAttrs, type_name: &str) -> Result<TokenStream> {
-    let Some(tag) = &attrs.tag else {
-        return Ok(quote! {});
-    };
-
-    let bit_len = tag.bit_len();
-    let tag_val = tag.as_u64();
-    let err_msg = format!("invalid {type_name} tag");
-    let tag_lit = make_literal(tag_val, bit_len, tag.format);
-
-    let int_ty = int_type_for_bits(bit_len)?;
-    let nbits_val = proc_macro2::Literal::usize_unsuffixed(bit_len);
-    let hex_width = bit_len.div_ceil(4);
-    let fmt_str = format!("{err_msg}: 0x{{:0>{hex_width}x}}");
-
-    Ok(quote! {
-        let __tag: #int_ty = parser.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
-        if __tag != #tag_lit as #int_ty {
-            return Err(toner::tlb::Error::custom(format!(
-                #fmt_str, __tag
-            )));
-        }
-    })
-}
-
-fn gen_variant_body(type_name: &Ident, variant: &VariantInfo) -> Result<TokenStream> {
-    let variant_ident = &variant.ident;
-
-    if variant.fields.is_empty() {
-        return Ok(quote! { #type_name::#variant_ident });
+    fn validate_field_mode(_kind: &FieldModeKind, _span: Span) -> Result<()> {
+        Ok(())
     }
 
-    let entries = gen_field_entries(
-        collect_named_field_inputs(&variant.fields),
-        DefaultFieldMode::Parse,
-    )?;
-    let field_names: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
-    let sections = group_fields_into_sections(entries)?;
-    let section_stmts = sections.iter().map(gen_section);
-
-    Ok(quote! {
-        {
-            #(#section_stmts)*
-            #type_name::#variant_ident {
-                #(#field_names,)*
-            }
-        }
-    })
-}
-
-struct MatchTreeCtx<'a> {
-    variants: &'a [VariantInfo],
-    type_name: &'a Ident,
-    enum_name: &'a str,
-    format: TagFormat,
-}
-
-fn gen_match_tree(node: &TagTreeNode, ctx: &MatchTreeCtx, depth: usize) -> Result<TokenStream> {
-    if let Some(idx) = node.leaf {
-        if node.children.is_empty() {
-            return gen_variant_body(ctx.type_name, &ctx.variants[idx]);
-        }
+    fn validate_separate_cell_marker(_marker: SeparateCellMarker, _span: Span) -> Result<()> {
+        Ok(())
     }
 
-    let read_bits = node.min_leaf_depth();
-    let int_ty = int_type_for_bits(read_bits)?;
-
-    let tag_ident = format_ident!("__tag_{}", depth);
-    let nbits_val = proc_macro2::Literal::usize_unsuffixed(read_bits);
-
-    let mut match_arms: Vec<TokenStream> = Vec::new();
-    collect_arms_at_depth(
-        node,
-        ctx,
-        depth,
-        read_bits,
-        read_bits,
-        &mut Vec::new(),
-        &mut match_arms,
-    )?;
-
-    let err_msg = format!("invalid {} tag", ctx.enum_name);
-
-    Ok(quote! {
-        {
-            let #tag_ident: #int_ty = parser.unpack_as::<_, toner::tlb::bits::NBits<#nbits_val>>(())?;
-            match #tag_ident {
-                #(#match_arms)*
-                _ => return Err(toner::tlb::Error::custom(
-                    format!(concat!(#err_msg, ": {}"), #tag_ident)
-                )),
-            }
-        }
-    })
-}
-
-fn collect_arms_at_depth(
-    node: &TagTreeNode,
-    ctx: &MatchTreeCtx,
-    depth: usize,
-    remaining: usize,
-    total_bits: usize,
-    prefix: &mut Vec<bool>,
-    arms: &mut Vec<TokenStream>,
-) -> Result<()> {
-    if remaining == 0 {
-        let val = prefix.iter().fold(0u64, |acc, &b| (acc << 1) | (b as u64));
-        let val_lit = make_literal(val, total_bits, ctx.format);
-
-        if let Some(idx) = node.leaf {
-            if node.children.is_empty() {
-                let body = gen_variant_body(ctx.type_name, &ctx.variants[idx])?;
-                arms.push(quote! { #val_lit => #body, });
-                return Ok(());
-            }
-        }
-
-        let body = gen_match_tree(node, ctx, depth + 1)?;
-        arms.push(quote! { #val_lit => #body, });
-        return Ok(());
+    fn validate_container_ensure_empty(_ensure_empty: bool, _span: Span) -> Result<()> {
+        Ok(())
     }
 
-    for (&bit, child) in &node.children {
-        prefix.push(bit);
-        collect_arms_at_depth(child, ctx, depth, remaining - 1, total_bits, prefix, arms)?;
-        prefix.pop();
+    fn default_mode_kind() -> FieldModeKind {
+        FieldModeKind::Parse
     }
-    Ok(())
-}
-
-fn expand_enum(input: &DeriveInput, data: &syn::DataEnum) -> Result<TokenStream> {
-    let name = &input.ident;
-    let container_attrs = parse_container_attrs(&input.attrs)?;
-
-    let mut variants: Vec<VariantInfo> = Vec::new();
-    for variant in &data.variants {
-        variants.push(parse_variant_info(variant)?);
-    }
-
-    if variants.is_empty() {
-        return Err(syn::Error::new_spanned(
-            name,
-            "enum must have at least one variant",
-        ));
-    }
-
-    let mut root = TagTreeNode::new();
-    for (i, v) in variants.iter().enumerate() {
-        root.insert(&v.tag.bits, i);
-    }
-
-    let format = variants
-        .first()
-        .map(|v| v.tag.format)
-        .unwrap_or(TagFormat::Binary);
-    let ctx = MatchTreeCtx {
-        variants: &variants,
-        type_name: name,
-        enum_name: &name.to_string(),
-        format,
-    };
-    let body = gen_match_tree(&root, &ctx, 0)?;
-
-    let ensure_empty = if container_attrs.ensure_empty {
-        quote! { parser.ensure_empty()?; }
-    } else {
-        quote! {}
-    };
-
-    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
-
-    Ok(quote! {
-        impl<'de, #impl_generics> toner::tlb::de::CellDeserialize<'de> for #name #ty_generics #where_clause {
-            type Args = ();
-
-            fn parse(
-                parser: &mut toner::tlb::de::CellParser<'de>,
-                _args: Self::Args,
-            ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
-                use toner::tlb::bits::de::BitReaderExt;
-                use toner::tlb::Context;
-
-                let __result = #body;
-                #ensure_empty
-                Ok(__result)
-            }
-        }
-    })
 }
