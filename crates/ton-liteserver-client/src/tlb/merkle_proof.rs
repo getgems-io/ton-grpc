@@ -36,11 +36,7 @@ where
         let expected_hash = parser.unpack(())?;
         let expected_depth = parser.unpack(())?;
         let virtual_root_cell = parser.parse_as::<Cell, Ref>(())?;
-        let Some((actual_depth, actual_hash)) = virtual_root_cell.level_hash(0) else {
-            return Err(Error::custom(
-                "MerkleProof virtual_root_cell has no level hash".to_string(),
-            ));
-        };
+        let (actual_depth, actual_hash) = virtual_root_cell.level_hash(0);
 
         if actual_hash != expected_hash {
             return Err(Error::custom(format!(

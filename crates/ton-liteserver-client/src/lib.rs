@@ -1,3 +1,4 @@
+pub mod account_client;
 pub mod block_client;
 pub mod client;
 mod convert;
