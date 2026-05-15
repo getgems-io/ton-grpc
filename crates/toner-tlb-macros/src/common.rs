@@ -251,77 +251,70 @@ fn build_entry<B: Backend>(f: &Field, index: usize, named: bool) -> Result<Field
     })
 }
 
-/// Models a flat field run or a `^[ ... ]` (TLB "separate cell") block,
-/// loaded as a fresh child cell and required to be fully consumed.
-pub enum FieldSection {
-    Flat(Vec<FieldEntry>),
-    SeparateCell(Vec<FieldEntry>),
-}
-
-fn group_sections(entries: Vec<FieldEntry>) -> Result<Vec<FieldSection>> {
-    let mut sections: Vec<FieldSection> = Vec::new();
-    let mut flat: Vec<FieldEntry> = Vec::new();
-    let mut open: Option<Vec<FieldEntry>> = None;
-
-    let flush_flat = |flat: &mut Vec<FieldEntry>, sections: &mut Vec<FieldSection>| {
-        if !flat.is_empty() {
-            sections.push(FieldSection::Flat(std::mem::take(flat)));
-        }
-    };
+/// Linear codegen for a sequence of fields where `^[ ... ]` (TLB "separate cell")
+/// blocks are inlined: each block opens a fresh child-cell parser, fields inside
+/// are read from it, and the block must be fully consumed at its end.
+fn gen_field_stmts(reader: &Ident, entries: &[FieldEntry]) -> Result<TokenStream> {
+    let sub = format_ident!("__separate_cell_parser");
+    let mut out = TokenStream::new();
+    let mut block_open_span: Option<Span> = None;
 
     for entry in entries {
-        match (open.as_mut(), entry.separate_cell) {
-            (None, SeparateCellMarker::None) => flat.push(entry),
-            (None, SeparateCellMarker::Start) => {
-                flush_flat(&mut flat, &mut sections);
-                open = Some(vec![entry]);
-            }
-            (None, SeparateCellMarker::Both) => {
-                flush_flat(&mut flat, &mut sections);
-                sections.push(FieldSection::SeparateCell(vec![entry]));
-            }
-            (None, SeparateCellMarker::End) => {
+        let span = entry.span;
+        let (opens, closes) = match entry.separate_cell {
+            SeparateCellMarker::None => (false, false),
+            SeparateCellMarker::Start => (true, false),
+            SeparateCellMarker::End => (false, true),
+            SeparateCellMarker::Both => (true, true),
+        };
+        let inside_block = block_open_span.is_some();
+
+        match (inside_block, opens, closes) {
+            (true, true, _) => {
                 return Err(syn::Error::new(
-                    entry.span,
-                    "`separate_cell_end` without a preceding `separate_cell_start`",
-                ));
-            }
-            (Some(_), SeparateCellMarker::Start) => {
-                return Err(syn::Error::new(
-                    entry.span,
+                    span,
                     "nested `separate_cell_start` is not allowed; close the previous block with `separate_cell_end` first",
                 ));
             }
-            (Some(_), SeparateCellMarker::Both) => {
+            (false, false, true) => {
                 return Err(syn::Error::new(
-                    entry.span,
-                    "cannot have both `separate_cell_start` and `separate_cell_end` on a field that is already inside an open separate-cell block",
+                    span,
+                    "`separate_cell_end` without a preceding `separate_cell_start`",
                 ));
             }
-            (Some(buf), SeparateCellMarker::None) => buf.push(entry),
-            (Some(_), SeparateCellMarker::End) => {
-                let mut buf = open.take().unwrap();
-                buf.push(entry);
-                sections.push(FieldSection::SeparateCell(buf));
-            }
+            _ => {}
+        }
+
+        if opens {
+            out.extend(quote! {
+                let mut #sub: toner::tlb::de::CellParser<'de> = #reader
+                    .parse_as::<toner::tlb::de::CellParser<'de>, toner::tlb::Ref>(())
+                    .context("^[")?;
+            });
+            block_open_span = Some(span);
+        }
+
+        let active = if block_open_span.is_some() {
+            &sub
+        } else {
+            reader
+        };
+        out.extend(gen_field_call(active, entry));
+
+        if closes {
+            out.extend(quote! { #sub.ensure_empty().context("^]")?; });
+            block_open_span = None;
         }
     }
 
-    if let Some(orphan) = open {
-        let span = orphan
-            .first()
-            .map(|f| f.span)
-            .unwrap_or_else(Span::call_site);
+    if let Some(span) = block_open_span {
         return Err(syn::Error::new(
             span,
             "`separate_cell_start` without a matching `separate_cell_end`",
         ));
     }
 
-    if !flat.is_empty() {
-        sections.push(FieldSection::Flat(flat));
-    }
-    Ok(sections)
+    Ok(out)
 }
 
 fn gen_field_call(reader: &Ident, entry: &FieldEntry) -> TokenStream {
@@ -344,26 +337,6 @@ fn gen_field_call(reader: &Ident, entry: &FieldEntry) -> TokenStream {
     quote! { let #binding = #call.context(#context)?; }
 }
 
-fn gen_section(reader: &Ident, section: &FieldSection) -> TokenStream {
-    match section {
-        FieldSection::Flat(entries) => {
-            let stmts = entries.iter().map(|e| gen_field_call(reader, e));
-            quote! { #(#stmts)* }
-        }
-        FieldSection::SeparateCell(entries) => {
-            let sub = format_ident!("__separate_cell_parser");
-            let stmts = entries.iter().map(|e| gen_field_call(&sub, e));
-            quote! {
-                let mut #sub: toner::tlb::de::CellParser<'de> = #reader
-                    .parse_as::<toner::tlb::de::CellParser<'de>, toner::tlb::Ref>(())
-                    .context("^[")?;
-                #(#stmts)*
-                #sub.ensure_empty().context("^]")?;
-            }
-        }
-    }
-}
-
 fn gen_tag_check(reader: &Ident, tag: &TagValue, type_name: &str) -> Result<TokenStream> {
     let bit_len = tag.bit_len();
     let int_ty = tag_int_type(bit_len, tag.span())?;
@@ -378,12 +351,6 @@ fn gen_tag_check(reader: &Ident, tag: &TagValue, type_name: &str) -> Result<Toke
             return Err(toner::tlb::Error::custom(format!(#fmt_str, __tag)));
         }
     })
-}
-
-fn gen_section_stmts(reader: &Ident, entries: Vec<FieldEntry>) -> Result<TokenStream> {
-    let sections = group_sections(entries)?;
-    let stmts = sections.iter().map(|s| gen_section(reader, s));
-    Ok(quote! { #(#stmts)* })
 }
 
 struct VariantInfo {
@@ -429,7 +396,7 @@ fn gen_variant_body<B: Backend>(
     }
     let entries = build_entries::<B>(&variant.fields, true)?;
     let names: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
-    let stmts = gen_section_stmts(reader, entries)?;
+    let stmts = gen_field_stmts(reader, &entries)?;
     Ok(quote! {
         {
             #stmts
@@ -615,7 +582,7 @@ fn expand_struct<B: Backend>(input: &DeriveInput, data: &DataStruct) -> Result<T
     };
     let entries = build_entries::<B>(fields, named)?;
     let idents: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
-    let stmts = gen_section_stmts(&reader, entries)?;
+    let stmts = gen_field_stmts(&reader, &entries)?;
     let constructor = if named {
         quote! { Self { #(#idents,)* } }
     } else {
