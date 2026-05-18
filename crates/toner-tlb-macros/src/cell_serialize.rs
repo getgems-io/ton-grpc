@@ -2,30 +2,31 @@ use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote};
 use syn::{DeriveInput, Generics, Ident, Result};
 
-use crate::common::{Backend, FieldLayer, SeparateCellMarker, extend_generics_with_de};
-use crate::reader;
+use crate::common::{Backend, FieldLayer, SeparateCellMarker, split_generics};
+use crate::writer;
 
 pub fn expand(input: DeriveInput) -> Result<TokenStream> {
-    reader::expand::<CellDeserializeBackend>(input)
+    writer::expand::<CellSerializeBackend>(input)
 }
 
-struct CellDeserializeBackend;
+struct CellSerializeBackend;
 
-impl Backend for CellDeserializeBackend {
+impl Backend for CellSerializeBackend {
     fn ident() -> Ident {
-        format_ident!("parser")
+        format_ident!("builder")
     }
 
     fn impl_block(name: &Ident, generics: &Generics, body: TokenStream) -> TokenStream {
-        let (impl_g, ty_g, where_g) = extend_generics_with_de(generics);
+        let (impl_g, ty_g, where_g) = split_generics(generics);
         quote! {
-            impl #impl_g toner::tlb::de::CellDeserialize<'de> for #name #ty_g #where_g {
+            impl #impl_g toner::tlb::ser::CellSerialize for #name #ty_g #where_g {
                 type Args = ();
 
-                fn parse(
-                    parser: &mut toner::tlb::de::CellParser<'de>,
+                fn store(
+                    &self,
+                    builder: &mut toner::tlb::ser::CellBuilder,
                     _args: Self::Args,
-                ) -> ::core::result::Result<Self, toner::tlb::de::CellParserError<'de>> {
+                ) -> ::core::result::Result<(), toner::tlb::ser::CellBuilderError> {
                     #body
                 }
             }

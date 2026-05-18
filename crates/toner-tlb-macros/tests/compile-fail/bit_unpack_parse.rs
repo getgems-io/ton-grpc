@@ -2,7 +2,7 @@ use toner_tlb_macros::BitUnpack;
 
 #[derive(BitUnpack)]
 struct Bad {
-    #[tlb(parse)]
+    #[tlb(cell)]
     val: bool,
 }
 
