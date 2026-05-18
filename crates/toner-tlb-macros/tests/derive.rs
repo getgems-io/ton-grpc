@@ -1131,4 +1131,60 @@ mod tests {
 
         assert_eq!(decoded, value);
     }
+
+    #[test]
+    fn cell_serialize_iter_field_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, Clone, CellSerialize, CellDeserialize)]
+        struct Item {
+            #[tlb(bits)]
+            val: u8,
+        }
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        struct WithIter {
+            #[tlb(bits)]
+            header: u16,
+            #[tlb(iter)]
+            items: Vec<Item>,
+        }
+
+        let value = WithIter {
+            header: 0xbeef,
+            items: vec![Item { val: 1 }, Item { val: 2 }, Item { val: 3 }],
+        };
+        let cell = value.to_cell(()).unwrap();
+        let decoded: WithIter = cell.parse_fully(()).unwrap();
+
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn cell_serialize_iter_empty_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, Clone, CellSerialize, CellDeserialize)]
+        struct Item {
+            #[tlb(bits)]
+            val: u8,
+        }
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        struct WithIter {
+            #[tlb(bits)]
+            header: u8,
+            #[tlb(iter)]
+            items: Vec<Item>,
+        }
+
+        let value = WithIter {
+            header: 0x42,
+            items: vec![],
+        };
+        let cell = value.to_cell(()).unwrap();
+        let decoded: WithIter = cell.parse_fully(()).unwrap();
+
+        assert_eq!(decoded, value);
+    }
 }

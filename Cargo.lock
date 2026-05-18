@@ -3518,11 +3518,17 @@ dependencies = [
  "anyhow",
  "async-trait",
  "base64 0.22.1",
+ "chrono",
+ "lazy_static",
  "num-bigint",
+ "testcontainers-ton",
  "thiserror 2.0.18",
+ "tokio",
  "ton-address",
  "ton-client",
  "toner",
+ "toner-tlb-macros",
+ "tonlibjson-client",
 ]
 
 [[package]]

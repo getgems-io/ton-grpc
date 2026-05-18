@@ -12,6 +12,7 @@ pub trait Backend {
     fn validate_field_layer(layer: FieldLayer, span: Span) -> Result<()>;
     fn validate_separate_cell_marker(marker: SeparateCellMarker, span: Span) -> Result<()>;
     fn default_layer() -> FieldLayer;
+    fn iter_stop(reader: &Ident) -> TokenStream;
 }
 
 #[derive(Default)]
@@ -42,6 +43,7 @@ pub struct RawField {
     pub args: Option<Expr>,
     pub separate_cell_start: darling::util::Flag,
     pub separate_cell_end: darling::util::Flag,
+    pub iter: darling::util::Flag,
 }
 
 pub fn parse_container_attrs(input: &DeriveInput) -> Result<ContainerAttrs> {
@@ -154,10 +156,12 @@ pub struct FieldMode {
     pub layer: FieldLayer,
     pub as_ty: Option<Type>,
     pub args: Option<Expr>,
+    pub iter: bool,
 }
 
 impl FieldMode {
     pub fn from_raw<B: Backend>(raw: RawField, span: Span) -> Result<Self> {
+        let iter = raw.iter.is_present();
         let layer = match (raw.cell.is_present(), raw.bits.is_present()) {
             (true, true) => {
                 return Err(syn::Error::new(
@@ -181,6 +185,7 @@ impl FieldMode {
             layer,
             as_ty: raw.as_ty,
             args: raw.args,
+            iter,
         })
     }
 }
