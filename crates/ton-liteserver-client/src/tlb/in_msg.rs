@@ -14,9 +14,9 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b000")]
     ImportExt {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         msg: Message,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
     },
     /// ```tlb
@@ -25,13 +25,13 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b010")]
     ImportIhr {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         msg: Message,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         ihr_fee: BigUint,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         proof_created: Cell,
     },
     /// ```tlb
@@ -40,11 +40,11 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b011")]
     ImportImm {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         fwd_fee: BigUint,
     },
     /// ```tlb
@@ -53,11 +53,11 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b100")]
     ImportFin {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         fwd_fee: BigUint,
     },
     /// ```tlb
@@ -66,11 +66,11 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b101")]
     ImportTr {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         transit_fee: BigUint,
     },
     /// ```tlb
@@ -79,11 +79,11 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b110")]
     DiscardFin {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         transaction_id: u64,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         fwd_fee: BigUint,
     },
     /// ```tlb
@@ -92,13 +92,13 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b111")]
     DiscardTr {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         transaction_id: u64,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         fwd_fee: BigUint,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         proof_delivered: Cell,
     },
     /// ```tlb
@@ -107,11 +107,11 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b00100")]
     ImportDeferredFin {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         fwd_fee: BigUint,
     },
     /// ```tlb
@@ -119,9 +119,9 @@ pub enum InMsg {
     /// ```
     #[tlb(tag = "0b00101")]
     ImportDeferredTr {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         in_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
     },
 }

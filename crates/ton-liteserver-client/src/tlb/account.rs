@@ -15,9 +15,9 @@ pub enum Account {
     None,
     #[tlb(tag = "$1")]
     Account {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         addr: MsgAddressInt,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         storage_stat: StorageInfo,
         storage: AccountStorage,
     },

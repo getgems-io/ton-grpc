@@ -16,32 +16,31 @@ use toner_tlb_macros::{BitUnpack, CellDeserialize};
 ///   metadata:(Maybe MsgMetadata) = MsgEnvelope;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
-#[tlb(ensure_empty)]
 pub enum MsgEnvelope {
     #[tlb(tag = "0x4")]
     V1 {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         cur_addr: IntermediateAddress,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         next_addr: IntermediateAddress,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         fwd_fee_remaining: BigUint,
-        #[tlb(parse_as = "toner::tlb::Ref<toner::tlb::ParseFully>")]
+        #[tlb(cell, as = "toner::tlb::Ref<toner::tlb::ParseFully>")]
         msg: Message,
     },
     #[tlb(tag = "0x5")]
     V2 {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         cur_addr: IntermediateAddress,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         next_addr: IntermediateAddress,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         fwd_fee_remaining: BigUint,
-        #[tlb(parse_as = "toner::tlb::Ref<toner::tlb::ParseFully>")]
+        #[tlb(cell, as = "toner::tlb::Ref<toner::tlb::ParseFully>")]
         msg: Message,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         emitted_lt: Option<u64>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         metadata: Option<MsgMetadata>,
     },
 }
@@ -58,7 +57,7 @@ pub enum MsgEnvelope {
 pub enum IntermediateAddress {
     #[tlb(tag = "0b0")]
     Regular {
-        #[tlb(unpack_as = "NBits<7>")]
+        #[tlb(bits, as = "NBits<7>")]
         use_dest_bits: u8,
     },
     #[tlb(tag = "0b10")]
