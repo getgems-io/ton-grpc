@@ -6,12 +6,12 @@ use crate::common::{Backend, FieldLayer, SeparateCellMarker, extend_generics_wit
 use crate::reader;
 
 pub fn expand(input: DeriveInput) -> Result<TokenStream> {
-    reader::expand::<BitBackend>(input)
+    reader::expand::<BitUnpackBackend>(input)
 }
 
-struct BitBackend;
+struct BitUnpackBackend;
 
-impl Backend for BitBackend {
+impl Backend for BitUnpackBackend {
     fn ident() -> Ident {
         format_ident!("reader")
     }

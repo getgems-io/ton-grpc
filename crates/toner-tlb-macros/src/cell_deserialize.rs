@@ -6,12 +6,12 @@ use crate::common::{Backend, FieldLayer, SeparateCellMarker, extend_generics_wit
 use crate::reader;
 
 pub fn expand(input: DeriveInput) -> Result<TokenStream> {
-    reader::expand::<CellBackend>(input)
+    reader::expand::<CellDeserializeBackend>(input)
 }
 
-struct CellBackend;
+struct CellDeserializeBackend;
 
-impl Backend for CellBackend {
+impl Backend for CellDeserializeBackend {
     fn ident() -> Ident {
         format_ident!("parser")
     }
