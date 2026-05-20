@@ -14,5 +14,5 @@ proc-macro2 = "1"
 darling = "0.23"
 
 [dev-dependencies]
-toner = "0.7.4"
+toner = "0.8.0"
 trybuild = "1"
