@@ -172,19 +172,6 @@ fn gen_field_call(writer: &Ident, entry: &FieldEntry) -> TokenStream {
         Some(expr) => quote! { #expr },
         None => quote! { () },
     };
-    if mode.iter {
-        let call = match (mode.layer, &mode.as_ty) {
-            (FieldLayer::Cell, None) => quote! { #writer.store_many(&#access, #args) },
-            (FieldLayer::Cell, Some(ty)) => {
-                quote! { #writer.store_many_as::<_, #ty>(&#access, #args) }
-            }
-            (FieldLayer::Bits, None) => quote! { #writer.pack_many(&#access, #args) },
-            (FieldLayer::Bits, Some(ty)) => {
-                quote! { #writer.pack_many_as::<_, #ty>(&#access, #args) }
-            }
-        };
-        return quote! { #call.context(#context)?; };
-    }
     let call = match (mode.layer, &mode.as_ty) {
         (FieldLayer::Cell, None) => quote! { #writer.store(&#access, #args) },
         (FieldLayer::Cell, Some(ty)) => quote! { #writer.store_as::<_, &#ty>(&#access, #args) },

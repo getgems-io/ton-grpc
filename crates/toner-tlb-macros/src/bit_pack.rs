@@ -59,8 +59,4 @@ impl Backend for BitPackBackend {
     fn default_layer() -> FieldLayer {
         FieldLayer::Bits
     }
-
-    fn iter_stop(reader: &Ident) -> TokenStream {
-        quote! { #reader.is_empty() }
-    }
 }

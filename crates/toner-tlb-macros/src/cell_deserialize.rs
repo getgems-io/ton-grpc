@@ -43,8 +43,4 @@ impl Backend for CellDeserializeBackend {
     fn default_layer() -> FieldLayer {
         FieldLayer::Cell
     }
-
-    fn iter_stop(reader: &Ident) -> TokenStream {
-        quote! { #reader.is_empty() }
-    }
 }

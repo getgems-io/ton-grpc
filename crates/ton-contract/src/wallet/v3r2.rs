@@ -4,6 +4,11 @@ use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use toner::{
     contracts::wallet::{PUBLIC_KEY_LENGTH, WalletVersion},
+    tlb::{
+        bits::{de::BitReaderExt, ser::BitWriterExt},
+        de::{CellDeserialize, CellParser, CellParserError},
+        ser::{CellBuilder, CellBuilderError, CellSerialize},
+    },
     ton::{BagOfCells, Cell, UnixTimestamp, action::SendMsgAction},
 };
 use toner_tlb_macros::{CellDeserialize, CellSerialize};
@@ -69,16 +74,44 @@ pub struct WalletV3R2Data {
     pub pubkey: [u8; PUBLIC_KEY_LENGTH],
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, CellSerialize, CellDeserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WalletV3R2SignBody {
-    #[tlb(bits)]
     pub wallet_id: u32,
-    #[tlb(bits, as = "UnixTimestamp")]
     pub expire_at: DateTime<Utc>,
-    #[tlb(bits)]
     pub seqno: u32,
-    #[tlb(iter)]
     pub msgs: Vec<SendMsgAction>,
+}
+
+impl CellSerialize for WalletV3R2SignBody {
+    type Args = ();
+
+    fn store(&self, builder: &mut CellBuilder, _: Self::Args) -> Result<(), CellBuilderError> {
+        builder
+            .pack(self.wallet_id, ())?
+            .pack_as::<_, UnixTimestamp>(self.expire_at, ())?
+            .pack(self.seqno, ())?
+            .store_many(&self.msgs, ())?;
+        Ok(())
+    }
+}
+
+impl<'de> CellDeserialize<'de> for WalletV3R2SignBody {
+    type Args = ();
+
+    fn parse(parser: &mut CellParser<'de>, _: Self::Args) -> Result<Self, CellParserError<'de>> {
+        Ok(Self {
+            wallet_id: parser.unpack(())?,
+            expire_at: parser.unpack_as::<_, UnixTimestamp>(())?,
+            seqno: parser.unpack(())?,
+            msgs: core::iter::from_fn(|| {
+                if parser.no_references_left() {
+                    return None;
+                }
+                Some(parser.parse(()))
+            })
+            .collect::<Result<_, _>>()?,
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, CellSerialize, CellDeserialize)]

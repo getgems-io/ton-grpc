@@ -65,7 +65,7 @@ fn build_entry<B: Backend>(f: &Field, index: usize, named: bool) -> Result<Field
 /// Linear codegen for a sequence of fields where `^[ ... ]` (TLB "separate cell")
 /// blocks are inlined: each block opens a fresh child-cell parser, fields inside
 /// are read from it, and the block must be fully consumed at its end.
-fn gen_field_stmts<B: Backend>(reader: &Ident, entries: &[FieldEntry]) -> Result<TokenStream> {
+fn gen_field_stmts(reader: &Ident, entries: &[FieldEntry]) -> Result<TokenStream> {
     let sub = format_ident!("__separate_cell_parser");
     let mut out = TokenStream::new();
     let mut block_open_span: Option<Span> = None;
@@ -110,7 +110,7 @@ fn gen_field_stmts<B: Backend>(reader: &Ident, entries: &[FieldEntry]) -> Result
         } else {
             reader
         };
-        out.extend(gen_field_call::<B>(active, entry));
+        out.extend(gen_field_call(active, entry));
 
         if closes {
             out.extend(quote! { #sub.ensure_empty().context("^]")?; });
@@ -128,7 +128,7 @@ fn gen_field_stmts<B: Backend>(reader: &Ident, entries: &[FieldEntry]) -> Result
     Ok(out)
 }
 
-fn gen_field_call<B: Backend>(reader: &Ident, entry: &FieldEntry) -> TokenStream {
+fn gen_field_call(reader: &Ident, entry: &FieldEntry) -> TokenStream {
     let FieldEntry {
         binding,
         mode,
@@ -139,25 +139,6 @@ fn gen_field_call<B: Backend>(reader: &Ident, entry: &FieldEntry) -> TokenStream
         Some(expr) => quote! { #expr },
         None => quote! { () },
     };
-    if mode.iter {
-        let parse_call = match (mode.layer, &mode.as_ty) {
-            (FieldLayer::Cell, None) => quote! { #reader.parse(#args) },
-            (FieldLayer::Cell, Some(ty)) => quote! { #reader.parse_as::<_, #ty>(#args) },
-            (FieldLayer::Bits, None) => quote! { #reader.unpack(#args) },
-            (FieldLayer::Bits, Some(ty)) => quote! { #reader.unpack_as::<_, #ty>(#args) },
-        };
-        let stop = B::iter_stop(reader);
-        return quote! {
-            let #binding = ::core::iter::from_fn(|| {
-                if #stop {
-                    return None;
-                }
-                Some(#parse_call)
-            })
-            .collect::<::core::result::Result<_, _>>()
-            .context(#context)?;
-        };
-    }
     let call = match (mode.layer, &mode.as_ty) {
         (FieldLayer::Cell, None) => quote! { #reader.parse(#args) },
         (FieldLayer::Cell, Some(ty)) => quote! { #reader.parse_as::<_, #ty>(#args) },
@@ -194,7 +175,7 @@ fn gen_variant_body<B: Backend>(
     }
     let entries = build_entries::<B>(&variant.fields, true)?;
     let names: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
-    let stmts = gen_field_stmts::<B>(reader, &entries)?;
+    let stmts = gen_field_stmts(reader, &entries)?;
     Ok(quote! {
         {
             #stmts
@@ -361,7 +342,7 @@ fn expand_struct<B: Backend>(input: &DeriveInput, data: &DataStruct) -> Result<T
     };
     let entries = build_entries::<B>(fields, named)?;
     let idents: Vec<Ident> = entries.iter().map(|e| e.binding.clone()).collect();
-    let stmts = gen_field_stmts::<B>(&reader, &entries)?;
+    let stmts = gen_field_stmts(&reader, &entries)?;
     let constructor = if named {
         quote! { Self { #(#idents,)* } }
     } else {
