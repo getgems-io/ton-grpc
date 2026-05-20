@@ -22,7 +22,7 @@ pub struct TransactionId {
     pub hash: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct MasterchainInfo {
     pub last: BlockIdExt,
     pub state_root_hash: String,
@@ -75,7 +75,7 @@ pub struct AccountState {
     pub sync_utime: i64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transaction {
     pub address: SmartContractAddress,
     pub utime: i64,
@@ -94,7 +94,7 @@ pub struct Transactions {
     pub previous_transaction_id: Option<TransactionId>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Message {
     pub hash: String,
     pub source: Option<SmartContractAddress>,
@@ -107,7 +107,7 @@ pub struct Message {
     pub msg_data: MessageData,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MessageData {
     Raw { body: String, init_state: String },
     Text { text: String },

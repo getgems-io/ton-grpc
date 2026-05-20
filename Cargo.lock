@@ -3302,7 +3302,23 @@ dependencies = [
  "hex",
  "impl-tools",
  "sha2 0.10.9",
- "tlbits",
+ "tlbits 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tlb"
+version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+dependencies = [
+ "array-util",
+ "base64 0.21.7",
+ "bitvec",
+ "crc",
+ "digest 0.10.7",
+ "hex",
+ "impl-tools",
+ "sha2 0.10.9",
+ "tlbits 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
 ]
 
 [[package]]
@@ -3322,7 +3338,26 @@ dependencies = [
  "num-traits",
  "sha2 0.10.9",
  "strum",
- "tlb",
+ "tlb 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "tlb-ton"
+version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+dependencies = [
+ "base64 0.21.7",
+ "chrono",
+ "crc",
+ "digest 0.10.7",
+ "hex",
+ "impl-tools",
+ "lazy_static",
+ "num-bigint",
+ "num-traits",
+ "sha2 0.10.9",
+ "strum",
+ "tlb 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
 ]
 
 [[package]]
@@ -3330,6 +3365,21 @@ name = "tlbits"
 version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "407aa226734ab69443a6cdf13c89bd27899c74976f467f3cd9f541d03bcb9b84"
+dependencies = [
+ "array-util",
+ "bitvec",
+ "either",
+ "impl-tools",
+ "num-bigint",
+ "num-traits",
+ "rustversion",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "tlbits"
+version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
 dependencies = [
  "array-util",
  "bitvec",
@@ -3526,7 +3576,7 @@ dependencies = [
  "tokio",
  "ton-address",
  "ton-client",
- "toner",
+ "toner 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "toner-tlb-macros",
  "tonlibjson-client",
 ]
@@ -3546,7 +3596,24 @@ dependencies = [
  "num-bigint",
  "pbkdf2",
  "sha2 0.10.9",
- "tlb-ton",
+ "tlb-ton 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ton-contracts"
+version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+dependencies = [
+ "anyhow",
+ "bitvec",
+ "chrono",
+ "hmac",
+ "lazy_static",
+ "nacl",
+ "num-bigint",
+ "pbkdf2",
+ "sha2 0.10.9",
+ "tlb-ton 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
 ]
 
 [[package]]
@@ -3569,6 +3636,7 @@ dependencies = [
  "ton-address",
  "ton-client",
  "ton-config",
+ "ton-liteserver-client",
  "tonic",
  "tonic-health",
  "tonic-prost",
@@ -3587,6 +3655,7 @@ version = "0.4.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
+ "async-trait",
  "base64 0.22.1",
  "convert_case",
  "dashmap",
@@ -3606,8 +3675,10 @@ dependencies = [
  "tokio-retry",
  "tokio-stream",
  "tokio-util",
+ "ton-address",
+ "ton-client",
  "ton-client-util",
- "toner",
+ "toner 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
  "toner-tlb-macros",
  "tower",
  "tracing",
@@ -3621,9 +3692,19 @@ version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "51503962fc058d42ac1291234b1c5291315bc5e71d5a6a8bbb475472cdd165fe"
 dependencies = [
- "tlb",
- "tlb-ton",
- "ton-contracts",
+ "tlb 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "tlb-ton 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ton-contracts 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "toner"
+version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+dependencies = [
+ "tlb 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
+ "tlb-ton 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
+ "ton-contracts 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
 ]
 
 [[package]]
@@ -3634,7 +3715,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
- "toner",
+ "toner 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "trybuild",
 ]
 

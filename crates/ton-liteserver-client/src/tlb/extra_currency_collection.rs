@@ -4,7 +4,7 @@ use toner::tlb::Data;
 use toner::tlb::bits::VarInt;
 use toner::tlb::bits::bitvec::field::BitField;
 use toner::tlb::bits::bitvec::order::Msb0;
-use toner::tlb::bits::bitvec::prelude::BitVec;
+use toner::tlb::bits::bitvec::vec::BitVec;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::hashmap::HashmapE;
 

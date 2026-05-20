@@ -12,7 +12,7 @@ const CRC16: Crc<u16> = Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
 pub type WorkchainId = i32;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SmartContractInternalAddress([u8; 32]);
 
 impl Deref for SmartContractInternalAddress {
@@ -35,7 +35,7 @@ impl Display for SmartContractInternalAddress {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SmartContractAddress {
     Raw {
         workchain_id: WorkchainId,
