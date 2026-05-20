@@ -1,8 +1,8 @@
 use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::storage_used::StorageUsed;
 use crate::tlb::transaction::Transaction;
-use num_bigint::BigUint;
 
+use num_bigint::BigUint;
 use toner::tlb::bits::{NBits, VarInt};
 use toner::tlb::{Data, ParseFully, Ref};
 use toner::ton::currency::Grams;
@@ -279,28 +279,24 @@ pub struct TrActionPhase {
     tot_msg_size: StorageUsed,
 }
 
+/// ```tlb
+/// tr_phase_bounce_negfunds$00 = TrBouncePhase;
+/// tr_phase_bounce_nofunds$01 msg_size:StorageUsed
+///   req_fwd_fees:Grams = TrBouncePhase;
+/// tr_phase_bounce_ok$1 msg_size:StorageUsed
+///   msg_fees:Grams fwd_fees:Grams = TrBouncePhase;
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, BitUnpack)]
 pub enum TrBouncePhase {
-    /// ```tlb
-    /// tr_phase_bounce_negfunds$00 = TrBouncePhase;
-    /// ```
-    #[tlb(tag = "0b00")]
+    #[tlb(tag = "$00")]
     NegFunds,
-    /// ```tlb
-    /// tr_phase_bounce_nofunds$01 msg_size:StorageUsed
-    ///   req_fwd_fees:Grams = TrBouncePhase;
-    /// ```
-    #[tlb(tag = "0b01")]
+    #[tlb(tag = "$01")]
     NoFunds {
         msg_size: StorageUsed,
         #[tlb(bits, as = "Grams")]
         req_fwd_fees: BigUint,
     },
-    /// ```tlb
-    /// tr_phase_bounce_ok$1 msg_size:StorageUsed
-    ///   msg_fees:Grams fwd_fees:Grams = TrBouncePhase;
-    /// ```
-    #[tlb(tag = "0b1")]
+    #[tlb(tag = "$1")]
     Ok {
         msg_size: StorageUsed,
         #[tlb(bits, as = "Grams")]

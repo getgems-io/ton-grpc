@@ -10,8 +10,7 @@ use toner_tlb_macros::CellDeserialize;
 #[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 pub struct AccountStorage {
     #[tlb(bits)]
-    last_trans_lt: u64,
-    balance: CurrencyCollection,
-    #[tlb(bits)]
-    state: AccountState,
+    pub last_trans_lt: u64,
+    pub balance: CurrencyCollection,
+    pub state: AccountState,
 }

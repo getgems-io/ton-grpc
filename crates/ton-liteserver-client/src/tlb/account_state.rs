@@ -1,66 +1,87 @@
-use toner::tlb::Error;
-use toner::tlb::bits::NBits;
-use toner::tlb::bits::de::{BitReader, BitReaderExt, BitUnpack};
+use toner::ton::state_init::StateInit;
+use toner_tlb_macros::CellDeserialize;
 
 /// ```tlb
 /// account_uninit$00 = AccountState;
 /// account_active$1 _:StateInit = AccountState;
 /// account_frozen$01 state_hash:bits256 = AccountState;
 /// ```
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 pub enum AccountState {
+    #[tlb(tag = "$00")]
     Uninit,
-    Active,
-    Frozen,
-}
-
-impl<'de> BitUnpack<'de> for AccountState {
-    type Args = ();
-
-    fn unpack<R>(reader: &mut R, _args: Self::Args) -> Result<Self, R::Error>
-    where
-        R: BitReader<'de> + ?Sized,
-    {
-        let tag = reader.unpack_as::<_, NBits<2>>(())?;
-        match tag {
-            0b00 => Ok(AccountState::Uninit),
-            0b10 => Ok(AccountState::Active),
-            0b01 => Ok(AccountState::Frozen),
-            _ => Err(R::Error::custom("Invalid AccountState value")),
-        }
-    }
+    #[tlb(tag = "$1")]
+    Active { state_init: StateInit },
+    #[tlb(tag = "$01")]
+    Frozen {
+        #[tlb(bits)]
+        state_hash: [u8; 32],
+    },
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::tlb::account_state::AccountState;
-    use toner::tlb::bits::bitvec::bits;
-    use toner::tlb::bits::bitvec::order::Msb0;
-    use toner::tlb::bits::de::unpack_fully;
+    use super::*;
+    use toner::tlb::bits::ser::BitWriterExt;
+    use toner::tlb::ser::{CellBuilder, CellBuilderError, CellSerialize, CellSerializeExt};
 
     #[test]
-    fn unpack_uninit() {
-        let bits = bits![u8, Msb0; 0, 0];
+    fn parses_uninit() {
+        struct Wrapper;
+        impl CellSerialize for Wrapper {
+            type Args = ();
+            fn store(&self, b: &mut CellBuilder, _: ()) -> Result<(), CellBuilderError> {
+                b.pack(false, ())?.pack(false, ())?;
+                Ok(())
+            }
+        }
+        let cell = Wrapper.to_cell(()).unwrap();
 
-        let actual: AccountState = unpack_fully(&bits, ()).unwrap();
+        let actual: AccountState = cell.parse_fully(()).unwrap();
 
         assert_eq!(actual, AccountState::Uninit);
     }
 
     #[test]
-    fn unpack_active() {
-        let bits = bits![u8, Msb0; 1, 0];
+    fn parses_frozen() {
+        struct Wrapper;
+        impl CellSerialize for Wrapper {
+            type Args = ();
+            fn store(&self, b: &mut CellBuilder, _: ()) -> Result<(), CellBuilderError> {
+                b.pack(false, ())?;
+                b.pack(true, ())?;
+                let hash: [u8; 32] = [0xab; 32];
+                b.pack(hash, ())?;
+                Ok(())
+            }
+        }
+        let cell = Wrapper.to_cell(()).unwrap();
 
-        let actual: AccountState = unpack_fully(&bits, ()).unwrap();
+        let actual: AccountState = cell.parse_fully(()).unwrap();
 
-        assert_eq!(actual, AccountState::Active);
+        assert_eq!(
+            actual,
+            AccountState::Frozen {
+                state_hash: [0xab; 32]
+            }
+        );
     }
+
     #[test]
-    fn unpack_frozen() {
-        let bits = bits![u8, Msb0; 0, 1];
+    fn parses_active_with_empty_state_init() {
+        let state_init = StateInit::<toner::tlb::Cell, toner::tlb::Cell>::default();
+        struct Wrapper(StateInit);
+        impl CellSerialize for Wrapper {
+            type Args = ();
+            fn store(&self, b: &mut CellBuilder, _: ()) -> Result<(), CellBuilderError> {
+                b.pack(true, ())?.store(&self.0, ())?;
+                Ok(())
+            }
+        }
+        let cell = Wrapper(state_init.clone()).to_cell(()).unwrap();
 
-        let actual: AccountState = unpack_fully(&bits, ()).unwrap();
+        let actual: AccountState = cell.parse_fully(()).unwrap();
 
-        assert_eq!(actual, AccountState::Frozen);
+        assert_eq!(actual, AccountState::Active { state_init });
     }
 }
