@@ -74,8 +74,12 @@ impl TagValue {
             [b'#', ..] => (&s[1..], TagFormat::Hex),
             _ => return Err(syn::Error::new(span, "tag must start with 0b, 0x, # or $")),
         };
-        let bits = match format {
-            TagFormat::Binary => rest
+        let (digits, trailing_underscore) = match rest.strip_suffix('_') {
+            Some(d) => (d, true),
+            None => (rest, false),
+        };
+        let mut bits: Vec<bool> = match format {
+            TagFormat::Binary => digits
                 .chars()
                 .map(|c| match c {
                     '0' => Ok(false),
@@ -87,14 +91,28 @@ impl TagValue {
                 })
                 .collect::<Result<Vec<bool>>>()?,
             TagFormat::Hex => {
-                let val = u64::from_str_radix(rest, 16)
-                    .map_err(|e| syn::Error::new(span, format!("invalid hex: {e}")))?;
-                (0..rest.len() * 4)
-                    .rev()
-                    .map(|i| (val >> i) & 1 == 1)
-                    .collect()
+                if digits.is_empty() {
+                    Vec::new()
+                } else {
+                    let val = u64::from_str_radix(digits, 16)
+                        .map_err(|e| syn::Error::new(span, format!("invalid hex: {e}")))?;
+                    (0..digits.len() * 4)
+                        .rev()
+                        .map(|i| (val >> i) & 1 == 1)
+                        .collect()
+                }
             }
         };
+        if trailing_underscore {
+            // TL/B `_`-suffix: drop trailing zeros, then drop the final 1 bit.
+            // See ton-blockchain/ton crypto/tl/tlbc.cpp:148-158.
+            while matches!(bits.last(), Some(false)) {
+                bits.pop();
+            }
+            if matches!(bits.last(), Some(true)) {
+                bits.pop();
+            }
+        }
         Ok(Self { bits, format, span })
     }
 

@@ -36,3 +36,4 @@ pub mod storage_used;
 pub(crate) mod tests;
 pub mod transaction;
 pub mod transaction_descr;
+pub mod vm_stack;

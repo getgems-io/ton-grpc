@@ -18,6 +18,7 @@ struct FieldEntry {
     context: String,
     separate_cell: SeparateCellMarker,
     span: Span,
+    is_binding: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -90,6 +91,7 @@ fn build_entry<B: Backend>(
         context,
         separate_cell: marker,
         span,
+        is_binding: matches!(access, AccessKind::Binding),
     })
 }
 
@@ -166,17 +168,23 @@ fn gen_field_call(writer: &Ident, entry: &FieldEntry) -> TokenStream {
         access,
         mode,
         context,
+        is_binding,
         ..
     } = entry;
     let args = match &mode.args {
         Some(expr) => quote! { #expr },
         None => quote! { () },
     };
+    let value = if *is_binding {
+        quote! { #access }
+    } else {
+        quote! { &#access }
+    };
     let call = match (mode.layer, &mode.as_ty) {
-        (FieldLayer::Cell, None) => quote! { #writer.store(&#access, #args) },
-        (FieldLayer::Cell, Some(ty)) => quote! { #writer.store_as::<_, &#ty>(&#access, #args) },
-        (FieldLayer::Bits, None) => quote! { #writer.pack(&#access, #args) },
-        (FieldLayer::Bits, Some(ty)) => quote! { #writer.pack_as::<_, &#ty>(&#access, #args) },
+        (FieldLayer::Cell, None) => quote! { #writer.store(#value, #args) },
+        (FieldLayer::Cell, Some(ty)) => quote! { #writer.store_as::<_, &#ty>(#value, #args) },
+        (FieldLayer::Bits, None) => quote! { #writer.pack(#value, #args) },
+        (FieldLayer::Bits, Some(ty)) => quote! { #writer.pack_as::<_, &#ty>(#value, #args) },
     };
     quote! { #call.context(#context)?; }
 }
