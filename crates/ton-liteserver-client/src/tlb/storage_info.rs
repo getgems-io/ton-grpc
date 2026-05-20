@@ -13,6 +13,6 @@ pub struct StorageInfo {
     used: StorageUsed,
     storage_extra: StorageExtraInfo,
     last_paid: u32,
-    #[tlb(unpack_as = "Option<Grams>")]
+    #[tlb(bits, as = "Option<Grams>")]
     due_payment: Option<BigUint>,
 }

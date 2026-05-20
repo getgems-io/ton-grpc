@@ -7,8 +7,8 @@ use toner_tlb_macros::BitUnpack;
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq, BitUnpack)]
 pub struct StorageUsed {
-    #[tlb(unpack_as = "VarInt<3>")]
+    #[tlb(bits, as = "VarInt<3>")]
     cells: BigUint,
-    #[tlb(unpack_as = "VarInt<3>")]
+    #[tlb(bits, as = "VarInt<3>")]
     bits: BigUint,
 }

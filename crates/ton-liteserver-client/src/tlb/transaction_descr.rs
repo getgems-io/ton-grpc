@@ -1,6 +1,7 @@
 use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::storage_used::StorageUsed;
 use crate::tlb::transaction::Transaction;
+
 use num_bigint::BigUint;
 use toner::tlb::bits::{NBits, VarInt};
 use toner::tlb::{Data, ParseFully, Ref};
@@ -20,19 +21,19 @@ pub enum TransactionDescr {
     /// ```
     #[tlb(tag = "$0000")]
     Ordinary {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         credit_first: bool,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         storage_ph: Option<TrStoragePhase>,
         credit_ph: Option<TrCreditPhase>,
         compute_ph: TrComputePhase,
-        #[tlb(parse_as = "Option<Ref<ParseFully<Data>>>")]
+        #[tlb(cell, as = "Option<Ref<ParseFully<Data>>>")]
         action: Option<TrActionPhase>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         aborted: bool,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         bounce: Option<TrBouncePhase>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         destroyed: bool,
     },
     /// ```tlb
@@ -41,7 +42,7 @@ pub enum TransactionDescr {
     /// ```
     #[tlb(tag = "$0001")]
     Storage {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         storage_ph: TrStoragePhase,
     },
     /// ```tlb
@@ -51,16 +52,16 @@ pub enum TransactionDescr {
     /// ```
     #[tlb(tag = "$001")]
     TickTock {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         is_tock: bool,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         storage_ph: TrStoragePhase,
         compute_ph: TrComputePhase,
-        #[tlb(parse_as = "Option<Ref<ParseFully<Data>>>")]
+        #[tlb(cell, as = "Option<Ref<ParseFully<Data>>>")]
         action: Option<TrActionPhase>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         aborted: bool,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         destroyed: bool,
     },
     /// ```tlb
@@ -72,16 +73,16 @@ pub enum TransactionDescr {
     /// ```
     #[tlb(tag = "$0100")]
     SplitPrepare {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         split_info: SplitMergeInfo,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         storage_ph: Option<TrStoragePhase>,
         compute_ph: TrComputePhase,
-        #[tlb(parse_as = "Option<Ref<ParseFully<Data>>>")]
+        #[tlb(cell, as = "Option<Ref<ParseFully<Data>>>")]
         action: Option<TrActionPhase>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         aborted: bool,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         destroyed: bool,
     },
     /// ```tlb
@@ -91,11 +92,11 @@ pub enum TransactionDescr {
     /// ```
     #[tlb(tag = "$0101")]
     SplitInstall {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         split_info: SplitMergeInfo,
-        #[tlb(parse_as = "Ref")]
+        #[tlb(cell, as = "Ref")]
         prepare_transaction: Box<Transaction>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         installed: bool,
     },
     /// ```tlb
@@ -105,11 +106,11 @@ pub enum TransactionDescr {
     /// ```
     #[tlb(tag = "$0110")]
     MergePrepare {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         split_info: SplitMergeInfo,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         storage_ph: TrStoragePhase,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         aborted: bool,
     },
     /// ```tlb
@@ -123,19 +124,19 @@ pub enum TransactionDescr {
     /// ```
     #[tlb(tag = "$0111")]
     MergeInstall {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         split_info: SplitMergeInfo,
-        #[tlb(parse_as = "Ref")]
+        #[tlb(cell, as = "Ref")]
         prepare_transaction: Box<Transaction>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         storage_ph: Option<TrStoragePhase>,
         credit_ph: Option<TrCreditPhase>,
         compute_ph: TrComputePhase,
-        #[tlb(parse_as = "Option<Ref<ParseFully<Data>>>")]
+        #[tlb(cell, as = "Option<Ref<ParseFully<Data>>>")]
         action: Option<TrActionPhase>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         aborted: bool,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         destroyed: bool,
     },
 }
@@ -148,9 +149,9 @@ pub enum TransactionDescr {
 ///
 #[derive(Debug, Clone, PartialEq, Eq, BitUnpack)]
 pub struct TrStoragePhase {
-    #[tlb(unpack_as = "Grams")]
+    #[tlb(bits, as = "Grams")]
     storage_fees_collected: BigUint,
-    #[tlb(unpack_as = "Option<Grams>")]
+    #[tlb(bits, as = "Option<Grams>")]
     storage_fees_due: Option<BigUint>,
     status_change: AccStatusChange,
 }
@@ -161,7 +162,7 @@ pub struct TrStoragePhase {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Default, CellDeserialize)]
 pub struct TrCreditPhase {
-    #[tlb(unpack_as = "Option<Grams>")]
+    #[tlb(bits, as = "Option<Grams>")]
     due_fees_collected: Option<BigUint>,
     credit: CurrencyCollection,
 }
@@ -215,36 +216,36 @@ pub enum ComputeSkipReason {
 pub enum TrComputePhase {
     #[tlb(tag = "$0")]
     Skipped {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         reason: ComputeSkipReason,
     },
     #[tlb(tag = "$1")]
     Vm {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         success: bool,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         msg_state_used: bool,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         account_activated: bool,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         gas_fees: BigUint,
-        #[tlb(separate_cell_start, unpack_as = "VarInt<3>")]
+        #[tlb(separate_cell_start, bits, as = "VarInt<3>")]
         gas_used: BigUint,
-        #[tlb(unpack_as = "VarInt<3>")]
+        #[tlb(bits, as = "VarInt<3>")]
         gas_limit: BigUint,
-        #[tlb(unpack_as = "Option<VarInt<2>>")]
+        #[tlb(bits, as = "Option<VarInt<2>>")]
         gas_credit: Option<BigUint>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         mode: i8,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         exit_code: i32,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         exit_arg: Option<i32>,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         vm_steps: u32,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         vm_init_state_hash: [u8; 32],
-        #[tlb(separate_cell_end, unpack)]
+        #[tlb(separate_cell_end, bits)]
         vm_final_state_hash: [u8; 32],
     },
 }
@@ -264,9 +265,9 @@ pub struct TrActionPhase {
     valid: bool,
     no_funds: bool,
     status_change: AccStatusChange,
-    #[tlb(unpack_as = "Option<Grams>")]
+    #[tlb(bits, as = "Option<Grams>")]
     total_fwd_fees: Option<BigUint>,
-    #[tlb(unpack_as = "Option<Grams>")]
+    #[tlb(bits, as = "Option<Grams>")]
     total_action_fees: Option<BigUint>,
     result_code: i32,
     result_arg: Option<i32>,
@@ -292,15 +293,15 @@ pub enum TrBouncePhase {
     #[tlb(tag = "$01")]
     NoFunds {
         msg_size: StorageUsed,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         req_fwd_fees: BigUint,
     },
     #[tlb(tag = "$1")]
     Ok {
         msg_size: StorageUsed,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         msg_fees: BigUint,
-        #[tlb(unpack_as = "Grams")]
+        #[tlb(bits, as = "Grams")]
         fwd_fees: BigUint,
     },
 }
@@ -312,9 +313,9 @@ pub enum TrBouncePhase {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, BitUnpack)]
 pub struct SplitMergeInfo {
-    #[tlb(unpack_as = "NBits<6>")]
+    #[tlb(bits, as = "NBits<6>")]
     cur_shard_pfx_len: u8,
-    #[tlb(unpack_as = "NBits<6>")]
+    #[tlb(bits, as = "NBits<6>")]
     acc_split_depth: u8,
     this_addr: [u8; 32],
     sibling_addr: [u8; 32],

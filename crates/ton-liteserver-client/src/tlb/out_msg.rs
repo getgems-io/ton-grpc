@@ -16,9 +16,9 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b000")]
     ExportExt {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         msg: Message,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
     },
     /// ```tlb
@@ -27,11 +27,11 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b010")]
     ExportImm {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         reimport: InMsg,
     },
     /// ```tlb
@@ -40,9 +40,9 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b001")]
     ExportNew {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
     },
     /// ```tlb
@@ -51,9 +51,9 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b011")]
     ExportTr {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         imported: InMsg,
     },
     /// ```tlb
@@ -62,9 +62,9 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b1100")]
     ExportDeq {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(unpack_as = "NBits<63>")]
+        #[tlb(bits, as = "NBits<63>")]
         import_block_lt: u64,
     },
 
@@ -75,13 +75,13 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b1101")]
     ExportDeqShort {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         msg_env_hash: [u8; 32],
-        #[tlb(unpack)]
+        #[tlb(bits)]
         next_workchain: i32,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         next_addr_pfx: u64,
-        #[tlb(unpack)]
+        #[tlb(bits)]
         import_block_lt: u64,
     },
     /// ```tlb
@@ -90,9 +90,9 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b111")]
     ExportTrReq {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         imported: InMsg,
     },
     /// ```tlb
@@ -101,9 +101,9 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b100")]
     ExportDeqImm {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         reimport: InMsg,
     },
     /// ```tlb
@@ -112,9 +112,9 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b10100")]
     ExportNewDefer {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         transaction: Transaction,
     },
     /// ```tlb
@@ -123,9 +123,9 @@ pub enum OutMsg {
     /// ```
     #[tlb(tag = "0b10101")]
     ExportDeferredTr {
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         out_msg: MsgEnvelope,
-        #[tlb(parse_as = "Ref<ParseFully>")]
+        #[tlb(cell, as = "Ref<ParseFully>")]
         imported: InMsg,
     },
 }

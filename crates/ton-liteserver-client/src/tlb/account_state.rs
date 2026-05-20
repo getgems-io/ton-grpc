@@ -14,7 +14,7 @@ pub enum AccountState {
     Active { state_init: StateInit },
     #[tlb(tag = "$01")]
     Frozen {
-        #[tlb(unpack)]
+        #[tlb(bits)]
         state_hash: [u8; 32],
     },
 }

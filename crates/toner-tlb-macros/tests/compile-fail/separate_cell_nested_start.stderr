@@ -1,5 +1,5 @@
 error: nested `separate_cell_start` is not allowed; close the previous block with `separate_cell_end` first
  --> tests/compile-fail/separate_cell_nested_start.rs:7:5
   |
-7 |     #[tlb(separate_cell_start, unpack)]
+7 |     #[tlb(separate_cell_start, bits)]
   |     ^

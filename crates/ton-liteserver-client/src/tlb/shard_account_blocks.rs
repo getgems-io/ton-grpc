@@ -9,6 +9,6 @@ use toner_tlb_macros::CellDeserialize;
 /// ```
 #[derive(Debug, Clone, CellDeserialize)]
 pub struct ShardAccountBlocks(
-    #[tlb(parse_as = "HashmapAugE<Same, Same>", args = "(256, (), ())")]
+    #[tlb(cell, as = "HashmapAugE<Same, Same>", args = "(256, (), ())")]
     pub  HashmapAugE<AccountBlock, CurrencyCollection>,
 );

@@ -4,3 +4,6 @@ members = ["crates/*"]
 
 [workspace.package]
 rust-version = "1.85"
+
+[workspace.dependencies]
+toner = { git = "https://github.com/akostylev0/toner.git", branch = "hasher" }

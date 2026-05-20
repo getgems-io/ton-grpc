@@ -23,33 +23,33 @@ use toner_tlb_macros::CellDeserialize;
 #[derive(Debug, Clone, CellDeserialize)]
 #[tlb(tag = "0x9023afe2")]
 pub struct ShardStateUnsplit {
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub global_id: i32,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub shard_id: ShardIdent,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub seq_no: u32,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub vert_seq_no: u32,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub gen_utime: u32,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub gen_lt: u64,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub min_ref_mc_seqno: u32,
     // TODO[akostylev0]: typed struct for OutMsgQueueInfo
-    #[tlb(parse_as = "Ref")]
+    #[tlb(cell, as = "Ref")]
     pub out_msg_queue_info: Cell,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub before_split: bool,
     // TODO[akostylev0]: typed struct for ShardAccounts (HashmapAugE 256 ShardAccount DepthBalanceInfo)
-    #[tlb(parse_as = "Ref")]
+    #[tlb(cell, as = "Ref")]
     pub accounts: Cell,
     // TODO[akostylev0]: typed struct for the inline tuple
     //   (overload_history, underload_history, total_balance, total_validator_fees, libraries, master_ref)
-    #[tlb(parse_as = "Ref")]
+    #[tlb(cell, as = "Ref")]
     pub stats: Cell,
     // TODO[akostylev0]: typed struct for McStateExtra
-    #[tlb(parse_as = "Option<Ref>")]
+    #[tlb(cell, as = "Option<Ref>")]
     pub custom: Option<Cell>,
 }

@@ -1,7 +1,7 @@
 use toner::tlb::Cell;
 use toner::tlb::bits::bitvec::order::Msb0;
 use toner::tlb::bits::bitvec::vec::BitVec;
-use toner_tlb_macros::{BitUnpack, CellDeserialize};
+use toner_tlb_macros::{BitPack, BitUnpack, CellDeserialize, CellSerialize};
 
 fn make_cell(data_bits: &[bool], refs: Vec<Cell>) -> Cell {
     let mut bv = BitVec::<u8, Msb0>::new();
@@ -32,9 +32,9 @@ mod tests {
     fn struct_parse_fields() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct Simple {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             a: u8,
-            #[tlb(unpack)]
+            #[tlb(bits)]
             b: u16,
         }
 
@@ -54,7 +54,7 @@ mod tests {
         #[derive(Debug, PartialEq, CellDeserialize)]
         #[tlb(tag = "0b0111")]
         struct Tagged {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             val: u8,
         }
 
@@ -75,7 +75,7 @@ mod tests {
         #[derive(Debug, PartialEq, CellDeserialize)]
         #[tlb(tag = "0b0111")]
         struct Tagged {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             val: u8,
         }
 
@@ -90,9 +90,9 @@ mod tests {
     #[test]
     fn struct_with_hex_tag() {
         #[derive(Debug, PartialEq, CellDeserialize)]
-        #[tlb(tag = "0xff", ensure_empty)]
+        #[tlb(tag = "0xff")]
         struct HexTagged {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             val: u8,
         }
 
@@ -151,7 +151,7 @@ mod tests {
             Empty,
             #[tlb(tag = "0b01")]
             WithVal {
-                #[tlb(unpack)]
+                #[tlb(bits)]
                 val: u8,
             },
         }
@@ -196,17 +196,17 @@ mod tests {
         enum InMsgLike {
             #[tlb(tag = "0b000")]
             ImportExt {
-                #[tlb(unpack)]
+                #[tlb(bits)]
                 val: u8,
             },
             #[tlb(tag = "0b00100")]
             DeferredFin {
-                #[tlb(unpack)]
+                #[tlb(bits)]
                 x: u8,
             },
             #[tlb(tag = "0b00101")]
             DeferredTr {
-                #[tlb(unpack)]
+                #[tlb(bits)]
                 y: u8,
             },
         }
@@ -242,7 +242,7 @@ mod tests {
 
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct WithNBits {
-            #[tlb(unpack_as = "NBits<4>")]
+            #[tlb(bits, as = "NBits<4>")]
             nibble: u8,
         }
 
@@ -257,7 +257,7 @@ mod tests {
     #[test]
     fn tuple_struct_single_field() {
         #[derive(Debug, PartialEq, CellDeserialize)]
-        struct Wrapper(#[tlb(unpack)] u8);
+        struct Wrapper(#[tlb(bits)] u8);
 
         let mut bits = vec![false; 8];
         bits[7] = true;
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn tuple_struct_multiple_fields() {
         #[derive(Debug, PartialEq, CellDeserialize)]
-        struct Pair(#[tlb(unpack)] u8, #[tlb(unpack)] u16);
+        struct Pair(#[tlb(bits)] u8, #[tlb(bits)] u16);
 
         let mut bits = vec![false; 8 + 16];
         bits[7] = true;
@@ -288,7 +288,7 @@ mod tests {
     fn tuple_struct_with_tag() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         #[tlb(tag = "0b11")]
-        struct Tagged(#[tlb(unpack)] u8);
+        struct Tagged(#[tlb(bits)] u8);
 
         let bits = vec![
             true, true, false, false, false, false, false, false, false, true,
@@ -301,40 +301,11 @@ mod tests {
     }
 
     #[test]
-    fn tuple_struct_ensure_empty_ok() {
-        #[derive(Debug, PartialEq, CellDeserialize)]
-        #[tlb(ensure_empty)]
-        struct Wrapper(#[tlb(unpack)] u8);
-
-        let mut bits = vec![false; 8];
-        bits[7] = true;
-        let cell = make_leaf_cell(&bits);
-
-        let result: Wrapper = cell.parse_fully(()).unwrap();
-
-        assert_eq!(result, Wrapper(1));
-    }
-
-    #[test]
-    fn tuple_struct_ensure_empty_fails_on_trailing_bits() {
-        #[derive(Debug, PartialEq, CellDeserialize)]
-        #[tlb(ensure_empty)]
-        struct Wrapper(#[tlb(unpack)] u8);
-
-        let bits = vec![false; 8 + 1];
-        let cell = make_leaf_cell(&bits);
-
-        let result: Result<Wrapper, _> = cell.parse_fully(());
-
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn struct_with_short_hex_tag() {
         #[derive(Debug, PartialEq, CellDeserialize)]
-        #[tlb(tag = "0xab", ensure_empty)]
+        #[tlb(tag = "0xab")]
         struct ShortHex {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             val: u8,
         }
 
@@ -353,9 +324,9 @@ mod tests {
     #[test]
     fn struct_with_12bit_hex_tag() {
         #[derive(Debug, PartialEq, CellDeserialize)]
-        #[tlb(tag = "0xabc", ensure_empty)]
+        #[tlb(tag = "0xabc")]
         struct Hex12 {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             val: u8,
         }
 
@@ -381,11 +352,11 @@ mod tests {
     fn separate_cell_block_loads_fields_from_child_cell() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct WithBlock {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             head: u8,
-            #[tlb(separate_cell_start, unpack)]
+            #[tlb(separate_cell_start, bits)]
             inner_a: u8,
-            #[tlb(separate_cell_end, unpack)]
+            #[tlb(separate_cell_end, bits)]
             inner_b: u16,
         }
 
@@ -413,9 +384,9 @@ mod tests {
     fn separate_cell_block_fails_when_child_has_trailing_bits() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct WithBlock {
-            #[tlb(separate_cell_start, unpack)]
+            #[tlb(separate_cell_start, bits)]
             inner_a: u8,
-            #[tlb(separate_cell_end, unpack)]
+            #[tlb(separate_cell_end, bits)]
             inner_b: u8,
         }
 
@@ -432,9 +403,9 @@ mod tests {
     fn separate_cell_block_fails_when_no_reference_left() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct WithBlock {
-            #[tlb(separate_cell_start, unpack)]
+            #[tlb(separate_cell_start, bits)]
             inner_a: u8,
-            #[tlb(separate_cell_end, unpack)]
+            #[tlb(separate_cell_end, bits)]
             inner_b: u8,
         }
 
@@ -449,9 +420,9 @@ mod tests {
     fn separate_cell_single_field_block() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct WithBlock {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             head: u8,
-            #[tlb(separate_cell_start, separate_cell_end, unpack)]
+            #[tlb(separate_cell_start, separate_cell_end, bits)]
             tail: u16,
         }
 
@@ -472,9 +443,9 @@ mod tests {
     fn separate_cell_two_blocks_in_a_row() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct TwoBlocks {
-            #[tlb(separate_cell_start, separate_cell_end, unpack)]
+            #[tlb(separate_cell_start, separate_cell_end, bits)]
             first: u8,
-            #[tlb(separate_cell_start, separate_cell_end, unpack)]
+            #[tlb(separate_cell_start, separate_cell_end, bits)]
             second: u8,
         }
 
@@ -504,16 +475,16 @@ mod tests {
         enum Msg {
             #[tlb(tag = "0b0")]
             Skipped {
-                #[tlb(unpack)]
+                #[tlb(bits)]
                 reason: u8,
             },
             #[tlb(tag = "0b1")]
             Vm {
-                #[tlb(unpack)]
+                #[tlb(bits)]
                 head: u8,
-                #[tlb(separate_cell_start, unpack)]
+                #[tlb(separate_cell_start, bits)]
                 tail_a: u8,
-                #[tlb(separate_cell_end, unpack)]
+                #[tlb(separate_cell_end, bits)]
                 tail_b: u16,
             },
         }
@@ -543,9 +514,9 @@ mod tests {
     fn separate_cell_in_tuple_struct() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct Pair(
-            #[tlb(unpack)] u8,
-            #[tlb(separate_cell_start, unpack)] u8,
-            #[tlb(separate_cell_end, unpack)] u8,
+            #[tlb(bits)] u8,
+            #[tlb(separate_cell_start, bits)] u8,
+            #[tlb(separate_cell_end, bits)] u8,
         );
 
         let mut head_bits = vec![false; 8];
@@ -562,53 +533,22 @@ mod tests {
     }
 
     #[test]
-    fn enum_with_ensure_empty_validates_full_consumption() {
-        #[derive(Debug, PartialEq, CellDeserialize)]
-        #[tlb(ensure_empty)]
-        enum Msg {
-            #[tlb(tag = "0b0")]
-            A {
-                #[tlb(unpack)]
-                val: u8,
-            },
-            #[tlb(tag = "0b1")]
-            B {
-                #[tlb(unpack)]
-                val: u16,
-            },
-        }
-
-        let mut a_bits = vec![false];
-        a_bits.extend(byte_bits(0x42));
-        let cell = make_leaf_cell(&a_bits);
-        let result: Msg = cell.parse_fully(()).unwrap();
-        assert_eq!(result, Msg::A { val: 0x42 });
-
-        let mut trailing_bits = vec![false];
-        trailing_bits.extend(byte_bits(0x42));
-        trailing_bits.push(true);
-        let bad_cell = make_leaf_cell(&trailing_bits);
-        let bad: Result<Msg, _> = bad_cell.parse_fully(());
-        assert!(bad.is_err());
-    }
-
-    #[test]
     fn separate_cell_nested_via_composition() {
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct Inner {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             inner_head: u8,
-            #[tlb(separate_cell_start, unpack)]
+            #[tlb(separate_cell_start, bits)]
             a: u8,
-            #[tlb(separate_cell_end, unpack)]
+            #[tlb(separate_cell_end, bits)]
             b: u8,
         }
 
         #[derive(Debug, PartialEq, CellDeserialize)]
         struct Outer {
-            #[tlb(unpack)]
+            #[tlb(bits)]
             head: u8,
-            #[tlb(separate_cell_start, unpack)]
+            #[tlb(separate_cell_start, bits)]
             mid: u8,
             #[tlb(separate_cell_end)]
             inner: Inner,
@@ -766,7 +706,7 @@ mod tests {
 
         #[derive(Debug, PartialEq, BitUnpack)]
         struct Nibble {
-            #[tlb(unpack_as = "NBits<4>")]
+            #[tlb(bits, as = "NBits<4>")]
             val: u8,
         }
 
@@ -798,7 +738,7 @@ mod tests {
             Ping,
             #[tlb(tag = "0b1")]
             WithVal {
-                #[tlb(unpack_as = "NBits<4>")]
+                #[tlb(bits, as = "NBits<4>")]
                 val: u8,
             },
         }
@@ -856,8 +796,339 @@ mod tests {
     }
 
     #[test]
-    fn bit_unpack_rejects_ensure_empty_attr() {
-        let t = trybuild::TestCases::new();
-        t.compile_fail("tests/compile-fail/bit_unpack_ensure_empty.rs");
+    fn bit_pack_struct_named_fields() {
+        use toner::tlb::bits::de::unpack_fully;
+        use toner::tlb::bits::ser::pack;
+
+        #[derive(Debug, PartialEq, BitPack, BitUnpack)]
+        struct ExtBlkRefLike {
+            end_lt: u64,
+            seq_no: u32,
+        }
+
+        let value = ExtBlkRefLike {
+            end_lt: 0x1234_5678_9abc_def0,
+            seq_no: 0x0a0b_0c0d,
+        };
+
+        let bits = pack(&value, ()).unwrap();
+        let decoded: ExtBlkRefLike = unpack_fully(bits.as_bitslice(), ()).unwrap();
+
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn bit_pack_struct_with_tag_writes_tag_bits() {
+        use toner::tlb::bits::bitvec::bits;
+        use toner::tlb::bits::ser::pack;
+
+        #[derive(Debug, PartialEq, BitPack)]
+        #[tlb(tag = "0b0111")]
+        struct Tagged {
+            val: bool,
+        }
+
+        let bits_out = pack(&Tagged { val: true }, ()).unwrap();
+
+        assert_eq!(bits_out, bits![u8, Msb0; 0, 1, 1, 1, 1]);
+    }
+
+    #[test]
+    fn bit_pack_struct_with_unpack_as_roundtrip() {
+        use toner::tlb::bits::NBits;
+        use toner::tlb::bits::de::unpack_fully;
+        use toner::tlb::bits::ser::pack;
+
+        #[derive(Debug, PartialEq, BitPack, BitUnpack)]
+        struct Nibble {
+            #[tlb(bits, as = "NBits<4>")]
+            val: u8,
+        }
+
+        let value = Nibble { val: 0b1010 };
+        let bits_out = pack(&value, ()).unwrap();
+        assert_eq!(bits_out.len(), 4);
+
+        let decoded: Nibble = unpack_fully(bits_out.as_bitslice(), ()).unwrap();
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn bit_pack_tuple_struct_roundtrip() {
+        use toner::tlb::bits::de::unpack_fully;
+        use toner::tlb::bits::ser::pack;
+
+        #[derive(Debug, PartialEq, BitPack, BitUnpack)]
+        struct Pair(bool, bool);
+
+        let value = Pair(true, false);
+        let bits_out = pack(&value, ()).unwrap();
+        let decoded: Pair = unpack_fully(bits_out.as_bitslice(), ()).unwrap();
+
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn bit_pack_enum_flat_tags_roundtrip() {
+        use toner::tlb::bits::de::unpack_fully;
+        use toner::tlb::bits::ser::pack;
+
+        #[derive(Debug, PartialEq, BitPack, BitUnpack)]
+        enum AccountStatusLike {
+            #[tlb(tag = "0b00")]
+            Uninit,
+            #[tlb(tag = "0b01")]
+            Frozen,
+            #[tlb(tag = "0b10")]
+            Active,
+            #[tlb(tag = "0b11")]
+            Nonexist,
+        }
+
+        for value in [
+            AccountStatusLike::Uninit,
+            AccountStatusLike::Frozen,
+            AccountStatusLike::Active,
+            AccountStatusLike::Nonexist,
+        ] {
+            let bits_out = pack(&value, ()).unwrap();
+            assert_eq!(bits_out.len(), 2);
+            let decoded: AccountStatusLike = unpack_fully(bits_out.as_bitslice(), ()).unwrap();
+            assert_eq!(decoded, value);
+        }
+    }
+
+    #[test]
+    fn bit_pack_enum_tree_tags_roundtrip() {
+        use toner::tlb::bits::de::unpack_fully;
+        use toner::tlb::bits::ser::pack;
+
+        #[derive(Debug, PartialEq, BitPack, BitUnpack)]
+        enum InMsgLike {
+            #[tlb(tag = "0b000")]
+            ImportExt { val: u8 },
+            #[tlb(tag = "0b00100")]
+            DeferredFin { x: u8 },
+            #[tlb(tag = "0b00101")]
+            DeferredTr { y: u8 },
+        }
+
+        for value in [
+            InMsgLike::ImportExt { val: 0x42 },
+            InMsgLike::DeferredFin { x: 0x10 },
+            InMsgLike::DeferredTr { y: 0xff },
+        ] {
+            let bits_out = pack(&value, ()).unwrap();
+            let decoded: InMsgLike = unpack_fully(bits_out.as_bitslice(), ()).unwrap();
+            assert_eq!(decoded, value);
+        }
+    }
+
+    #[test]
+    fn bit_pack_nested_struct_roundtrip() {
+        use toner::tlb::bits::de::unpack_fully;
+        use toner::tlb::bits::ser::pack;
+
+        #[derive(Debug, PartialEq, BitPack, BitUnpack)]
+        struct Inner {
+            a: bool,
+            b: bool,
+        }
+
+        #[derive(Debug, PartialEq, BitPack, BitUnpack)]
+        struct Outer {
+            head: bool,
+            inner: Inner,
+        }
+
+        let value = Outer {
+            head: true,
+            inner: Inner { a: false, b: true },
+        };
+        let bits_out = pack(&value, ()).unwrap();
+        let decoded: Outer = unpack_fully(bits_out.as_bitslice(), ()).unwrap();
+
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn cell_serialize_struct_named_fields_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        struct Simple {
+            #[tlb(bits)]
+            a: u8,
+            #[tlb(bits)]
+            b: u16,
+        }
+
+        let value = Simple { a: 0x42, b: 0xbeef };
+        let cell = value.to_cell(()).unwrap();
+        let decoded: Simple = cell.parse_fully(()).unwrap();
+
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn cell_serialize_struct_with_tag_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        #[tlb(tag = "0xff")]
+        struct HexTagged {
+            #[tlb(bits)]
+            val: u8,
+        }
+
+        let value = HexTagged { val: 0x2a };
+        let cell = value.to_cell(()).unwrap();
+        let decoded: HexTagged = cell.parse_fully(()).unwrap();
+
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn cell_serialize_tuple_struct_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        struct Pair(#[tlb(bits)] u8, #[tlb(bits)] u16);
+
+        let value = Pair(1, 0xc0de);
+        let cell = value.to_cell(()).unwrap();
+        let decoded: Pair = cell.parse_fully(()).unwrap();
+
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn cell_serialize_enum_with_fields_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        enum Msg {
+            #[tlb(tag = "0b00")]
+            Empty,
+            #[tlb(tag = "0b01")]
+            WithVal {
+                #[tlb(bits)]
+                val: u8,
+            },
+        }
+
+        for value in [Msg::Empty, Msg::WithVal { val: 0x77 }] {
+            let cell = value.to_cell(()).unwrap();
+            let decoded: Msg = cell.parse_fully(()).unwrap();
+            assert_eq!(decoded, value);
+        }
+    }
+
+    #[test]
+    fn cell_serialize_enum_tree_tags_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        enum InMsgLike {
+            #[tlb(tag = "0b000")]
+            ImportExt {
+                #[tlb(bits)]
+                val: u8,
+            },
+            #[tlb(tag = "0b00100")]
+            DeferredFin {
+                #[tlb(bits)]
+                x: u8,
+            },
+            #[tlb(tag = "0b00101")]
+            DeferredTr {
+                #[tlb(bits)]
+                y: u8,
+            },
+        }
+
+        for value in [
+            InMsgLike::ImportExt { val: 0x11 },
+            InMsgLike::DeferredFin { x: 0x22 },
+            InMsgLike::DeferredTr { y: 0x33 },
+        ] {
+            let cell = value.to_cell(()).unwrap();
+            let decoded: InMsgLike = cell.parse_fully(()).unwrap();
+            assert_eq!(decoded, value);
+        }
+    }
+
+    #[test]
+    fn cell_serialize_separate_cell_block_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        struct WithBlock {
+            #[tlb(bits)]
+            head: u8,
+            #[tlb(separate_cell_start, bits)]
+            inner_a: u8,
+            #[tlb(separate_cell_end, bits)]
+            inner_b: u16,
+        }
+
+        let value = WithBlock {
+            head: 0x11,
+            inner_a: 0x22,
+            inner_b: 0x3344,
+        };
+        let cell = value.to_cell(()).unwrap();
+
+        assert_eq!(cell.references.len(), 1);
+
+        let decoded: WithBlock = cell.parse_fully(()).unwrap();
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn cell_serialize_separate_cell_two_blocks_roundtrip() {
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        struct TwoBlocks {
+            #[tlb(separate_cell_start, separate_cell_end, bits)]
+            first: u8,
+            #[tlb(separate_cell_start, separate_cell_end, bits)]
+            second: u8,
+        }
+
+        let value = TwoBlocks {
+            first: 0x55,
+            second: 0xaa,
+        };
+        let cell = value.to_cell(()).unwrap();
+
+        assert_eq!(cell.references.len(), 2);
+
+        let decoded: TwoBlocks = cell.parse_fully(()).unwrap();
+        assert_eq!(decoded, value);
+    }
+
+    #[test]
+    fn cell_serialize_unpack_as_field_roundtrip() {
+        use toner::tlb::bits::NBits;
+        use toner::tlb::ser::CellSerializeExt;
+
+        #[derive(Debug, PartialEq, CellSerialize, CellDeserialize)]
+        struct WithNibble {
+            #[tlb(bits, as = "NBits<4>")]
+            nibble: u8,
+            #[tlb(bits)]
+            full: u8,
+        }
+
+        let value = WithNibble {
+            nibble: 0b1010,
+            full: 0xc4,
+        };
+        let cell = value.to_cell(()).unwrap();
+        let decoded: WithNibble = cell.parse_fully(()).unwrap();
+
+        assert_eq!(decoded, value);
     }
 }

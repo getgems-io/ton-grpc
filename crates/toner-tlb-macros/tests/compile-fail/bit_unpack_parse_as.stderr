@@ -1,5 +1,5 @@
-error: `parse_as` cannot be used with derive(BitUnpack); use `unpack_as` instead
+error: `cell` cannot be used with derive(BitUnpack); BitUnpack operates on bits only — use `bits`
  --> tests/compile-fail/bit_unpack_parse_as.rs:5:5
   |
-5 |     #[tlb(parse_as = "u8")]
+5 |     #[tlb(cell, as = "u8")]
   |     ^
