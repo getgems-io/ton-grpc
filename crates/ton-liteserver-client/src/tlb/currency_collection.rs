@@ -9,7 +9,7 @@ use toner_tlb_macros::CellDeserialize;
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Default, CellDeserialize)]
 pub struct CurrencyCollection {
-    #[tlb(unpack_as = "Grams")]
+    #[tlb(bits, as = "Grams")]
     pub grams: BigUint,
     pub other: ExtraCurrencyCollection,
 }

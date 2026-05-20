@@ -9,8 +9,7 @@ use toner_tlb_macros::CellDeserialize;
 /// ```
 /// #TODO[akostylev0]: use std Hashmap
 #[derive(Debug, Clone, CellDeserialize)]
-#[tlb(ensure_empty)]
 pub struct OutMsgDescr(
-    #[tlb(parse_as = "HashmapAugE<Same, Same>", args = "(256, (), ())")]
+    #[tlb(cell, as = "HashmapAugE<Same, Same>", args = "(256, (), ())")]
     pub  HashmapAugE<OutMsg, CurrencyCollection>,
 );

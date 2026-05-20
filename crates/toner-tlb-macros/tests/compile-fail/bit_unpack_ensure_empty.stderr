@@ -1,5 +1,0 @@
-error: `ensure_empty` cannot be used with derive(BitUnpack); BitReader has no notion of trailing data
- --> tests/compile-fail/bit_unpack_ensure_empty.rs:4:7
-  |
-4 | #[tlb(ensure_empty)]
-  |       ^^^^^^^^^^^^
