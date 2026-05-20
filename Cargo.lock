@@ -3291,21 +3291,6 @@ dependencies = [
 [[package]]
 name = "tlb"
 version = "0.7.4"
-dependencies = [
- "array-util",
- "base64 0.21.7",
- "bitvec",
- "crc",
- "digest 0.10.7",
- "hex",
- "impl-tools",
- "sha2 0.10.9",
- "tlbits 0.7.4",
-]
-
-[[package]]
-name = "tlb"
-version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8956a1e3d689878bc255ca5c04f49704c199310081b6926bb75264df150e2e27"
 dependencies = [
@@ -3321,21 +3306,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "tlb-ton"
+name = "tlb"
 version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
 dependencies = [
+ "array-util",
  "base64 0.21.7",
- "chrono",
+ "bitvec",
  "crc",
  "digest 0.10.7",
  "hex",
  "impl-tools",
- "lazy_static",
- "num-bigint",
- "num-traits",
  "sha2 0.10.9",
- "strum",
- "tlb 0.7.4",
+ "tlbits 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
 ]
 
 [[package]]
@@ -3359,8 +3342,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "tlb-ton"
+version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+dependencies = [
+ "base64 0.21.7",
+ "chrono",
+ "crc",
+ "digest 0.10.7",
+ "hex",
+ "impl-tools",
+ "lazy_static",
+ "num-bigint",
+ "num-traits",
+ "sha2 0.10.9",
+ "strum",
+ "tlb 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
+]
+
+[[package]]
 name = "tlbits"
 version = "0.7.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "407aa226734ab69443a6cdf13c89bd27899c74976f467f3cd9f541d03bcb9b84"
 dependencies = [
  "array-util",
  "bitvec",
@@ -3375,8 +3379,7 @@ dependencies = [
 [[package]]
 name = "tlbits"
 version = "0.7.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "407aa226734ab69443a6cdf13c89bd27899c74976f467f3cd9f541d03bcb9b84"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
 dependencies = [
  "array-util",
  "bitvec",
@@ -3581,22 +3584,6 @@ dependencies = [
 [[package]]
 name = "ton-contracts"
 version = "0.7.4"
-dependencies = [
- "anyhow",
- "bitvec",
- "chrono",
- "hmac",
- "lazy_static",
- "nacl",
- "num-bigint",
- "pbkdf2",
- "sha2 0.10.9",
- "tlb-ton 0.7.4",
-]
-
-[[package]]
-name = "ton-contracts"
-version = "0.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "18a3bbbb14813403abab255e6496982ddf1995951b27334d133c819e902546b7"
 dependencies = [
@@ -3610,6 +3597,23 @@ dependencies = [
  "pbkdf2",
  "sha2 0.10.9",
  "tlb-ton 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "ton-contracts"
+version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+dependencies = [
+ "anyhow",
+ "bitvec",
+ "chrono",
+ "hmac",
+ "lazy_static",
+ "nacl",
+ "num-bigint",
+ "pbkdf2",
+ "sha2 0.10.9",
+ "tlb-ton 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
 ]
 
 [[package]]
@@ -3674,21 +3678,12 @@ dependencies = [
  "ton-address",
  "ton-client",
  "ton-client-util",
- "toner 0.7.4",
+ "toner 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
  "toner-tlb-macros",
  "tower",
  "tracing",
  "tracing-subscriber",
  "tracing-test",
-]
-
-[[package]]
-name = "toner"
-version = "0.7.4"
-dependencies = [
- "tlb 0.7.4",
- "tlb-ton 0.7.4",
- "ton-contracts 0.7.4",
 ]
 
 [[package]]
@@ -3700,6 +3695,16 @@ dependencies = [
  "tlb 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "tlb-ton 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "ton-contracts 0.7.4 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "toner"
+version = "0.7.4"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+dependencies = [
+ "tlb 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
+ "tlb-ton 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
+ "ton-contracts 0.7.4 (git+https://github.com/akostylev0/toner.git?branch=hasher)",
 ]
 
 [[package]]

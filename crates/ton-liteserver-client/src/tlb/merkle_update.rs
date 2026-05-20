@@ -45,11 +45,7 @@ where
         let old_cell: Cell = parser.parse_as::<_, Ref>(())?;
         let new_cell: Cell = parser.parse_as::<_, Ref>(())?;
 
-        let Some((actual_old_depth, actual_old_hash)) = old_cell.level_hash(0) else {
-            return Err(Error::custom(
-                "MerkleUpdate old_cell has no level hash".to_string(),
-            ));
-        };
+        let (actual_old_depth, actual_old_hash) = old_cell.level_hash(0);
         if actual_old_hash != expected_old_hash {
             return Err(Error::custom(format!(
                 "MerkleUpdate old_hash mismatch: expected {}, actual {}",
@@ -64,11 +60,7 @@ where
             )));
         }
 
-        let Some((actual_new_depth, actual_new_hash)) = new_cell.level_hash(0) else {
-            return Err(Error::custom(
-                "MerkleUpdate new_cell has no level hash".to_string(),
-            ));
-        };
+        let (actual_new_depth, actual_new_hash) = new_cell.level_hash(0);
         if actual_new_hash != expected_new_hash {
             return Err(Error::custom(format!(
                 "MerkleUpdate new_hash mismatch: expected {}, actual {}",
