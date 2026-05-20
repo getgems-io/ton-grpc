@@ -1,6 +1,9 @@
+use crate::tlb::blk_master_info::BlkMasterInfo;
+use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::shard_ident::ShardIdent;
 use toner::tlb::Cell;
 use toner::tlb::Ref;
+use toner::tlb::hashmap::HashmapE;
 use toner_tlb_macros::CellDeserialize;
 
 /// ```tlb
@@ -45,10 +48,17 @@ pub struct ShardStateUnsplit {
     // TODO[akostylev0]: typed struct for ShardAccounts (HashmapAugE 256 ShardAccount DepthBalanceInfo)
     #[tlb(cell, as = "Ref")]
     pub accounts: Cell,
-    // TODO[akostylev0]: typed struct for the inline tuple
-    //   (overload_history, underload_history, total_balance, total_validator_fees, libraries, master_ref)
-    #[tlb(cell, as = "Ref")]
-    pub stats: Cell,
+    #[tlb(separate_cell_start, bits)]
+    pub overload_history: u64,
+    #[tlb(bits)]
+    pub underload_history: u64,
+    pub total_balance: CurrencyCollection,
+    pub total_validator_fees: CurrencyCollection,
+    // TODO[akostylev0]: typed struct for LibDescr (shared_lib_descr$00 lib:^Cell publishers:(Hashmap 256 True))
+    #[tlb(args = "(256, ())")]
+    pub libraries: HashmapE<Cell>,
+    #[tlb(separate_cell_end, bits)]
+    pub master_ref: Option<BlkMasterInfo>,
     // TODO[akostylev0]: typed struct for McStateExtra
     #[tlb(cell, as = "Option<Ref>")]
     pub custom: Option<Cell>,
