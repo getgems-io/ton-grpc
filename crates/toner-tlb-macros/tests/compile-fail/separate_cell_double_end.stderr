@@ -1,5 +1,5 @@
 error: `separate_cell_end` without a preceding `separate_cell_start`
  --> tests/compile-fail/separate_cell_double_end.rs:9:5
   |
-9 |     #[tlb(separate_cell_end, unpack)]
+9 |     #[tlb(separate_cell_end, bits)]
   |     ^

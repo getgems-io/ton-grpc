@@ -2,9 +2,9 @@ use toner_tlb_macros::CellDeserialize;
 
 #[derive(CellDeserialize)]
 struct OrphanStart {
-    #[tlb(separate_cell_start, unpack)]
+    #[tlb(separate_cell_start, bits)]
     a: u8,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     b: u8,
 }
 

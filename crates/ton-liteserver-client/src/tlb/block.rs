@@ -1,7 +1,7 @@
 use crate::tlb::block_extra::BlockExtra;
 use crate::tlb::block_info::BlockInfo;
 use crate::tlb::merkle_update::MerkleUpdate;
-use toner::tlb::{Cell, Ref};
+use toner::tlb::{Cell, ParseFully, Ref};
 use toner_tlb_macros::CellDeserialize;
 
 /// ```tlb
@@ -12,17 +12,16 @@ use toner_tlb_macros::CellDeserialize;
 /// ```
 #[derive(Debug, Clone, CellDeserialize)]
 #[tlb(tag = "0x11ef55aa")]
-#[tlb(ensure_empty)]
 pub struct Block {
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub global_id: i32,
-    #[tlb(parse_as = "Ref")]
+    #[tlb(cell, as = "Ref<ParseFully>")]
     pub info: BlockInfo,
-    #[tlb(parse_as = "Ref")]
+    #[tlb(cell, as = "Ref<ParseFully>")]
     pub value_flow: Cell,
-    #[tlb(parse_as = "Ref")]
+    #[tlb(cell, as = "Ref<ParseFully>")]
     pub state_update: MerkleUpdate<Cell>,
-    #[tlb(parse_as = "Ref")]
+    #[tlb(cell, as = "Ref<ParseFully>")]
     pub extra: BlockExtra,
 }
 

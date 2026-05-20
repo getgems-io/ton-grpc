@@ -14,18 +14,17 @@ use toner_tlb_macros::CellDeserialize;
 /// ```
 #[derive(Debug, Clone, CellDeserialize)]
 #[tlb(tag = "0x4a33f6fd")]
-#[tlb(ensure_empty)]
 pub struct BlockExtra {
-    #[tlb(parse_as = "Ref<ParseFully>")]
+    #[tlb(cell, as = "Ref<ParseFully>")]
     pub in_msg_descr: InMsgDescr,
-    #[tlb(parse_as = "Ref<ParseFully>")]
+    #[tlb(cell, as = "Ref<ParseFully>")]
     pub out_msg_descr: OutMsgDescr,
-    #[tlb(parse_as = "Ref<ParseFully>")]
+    #[tlb(cell, as = "Ref<ParseFully>")]
     pub account_blocks: ShardAccountBlocks,
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub rand_seed: [u8; 32],
-    #[tlb(unpack)]
+    #[tlb(bits)]
     pub created_by: [u8; 32],
-    #[tlb(parse_as = "Option<Ref<ParseFully>>")]
+    #[tlb(cell, as = "Option<Ref<ParseFully>>")]
     pub custom: Option<Cell>, // TODO[akostylev0]
 }

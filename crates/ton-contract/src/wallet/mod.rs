@@ -1,3 +1,8 @@
+pub mod v3r2;
+
+#[cfg(test)]
+mod integration;
+
 use async_trait::async_trait;
 use ton_client::TonClient;
 
