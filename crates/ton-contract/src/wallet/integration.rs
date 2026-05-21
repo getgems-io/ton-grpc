@@ -114,6 +114,80 @@ async fn should_send_ton_between_wallets() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn should_send_ton_between_wallets_via_liteserver_client() -> anyhow::Result<()> {
+    let server = testcontainers_ton::LocalLiteServer::new().await?;
+    let client = ton_liteserver_client::client::LiteServerClient::connect(
+        server.addr(),
+        server.server_key(),
+    )
+    .await?;
+    let sender_wallet = wallet_from_mnemonic(GENESIS_MNEMONIC, -1, 42);
+    let receiver_wallet = wallet_from_mnemonic(VALIDATOR1_MNEMONIC, -1, 42);
+    let sender_smc_address = SmartContractAddress::from_str(&sender_wallet.address().to_hex())?;
+    let receiver_smc_address = SmartContractAddress::from_str(&receiver_wallet.address().to_hex())?;
+    let sender_msg_address = MsgAddress::from_str(&sender_wallet.address().to_hex())?;
+    let contract = TonContract::new(client.clone(), sender_msg_address);
+    let seqno = contract.seqno().await?;
+    let sender_balance_before = client
+        .get_account_state(&sender_smc_address)
+        .await?
+        .balance
+        .unwrap_or(0);
+    let receiver_balance_before = client
+        .get_account_state(&receiver_smc_address)
+        .await?
+        .balance
+        .unwrap_or(0);
+
+    let one_ton: i64 = 1_000_000_000;
+    let expire_at = Utc::now() + chrono::Duration::minutes(3);
+    let internal_msg = Message::<()>::transfer(
+        receiver_wallet.address(),
+        toner::ton::currency::ONE_TON.clone(),
+        true,
+    )
+    .normalize()?;
+    let external_msg = sender_wallet.create_external_message(
+        expire_at,
+        seqno,
+        [SendMsgAction {
+            mode: 3,
+            message: internal_msg,
+        }],
+        false,
+    )?;
+    client
+        .send_message(&message_to_boc_base64(&external_msg))
+        .await?;
+    tokio::time::sleep(Duration::from_secs(5)).await;
+
+    let sender_balance_after = client
+        .get_account_state(&sender_smc_address)
+        .await?
+        .balance
+        .unwrap_or(0);
+    let receiver_balance_after = client
+        .get_account_state(&receiver_smc_address)
+        .await?
+        .balance
+        .unwrap_or(0);
+    let sender_spent = sender_balance_before - sender_balance_after;
+    let receiver_gained = receiver_balance_after - receiver_balance_before;
+    assert!(
+        sender_spent >= one_ton,
+        "sender should spend at least 1 TON: spent={sender_spent}"
+    );
+    assert!(
+        receiver_gained >= one_ton * 9 / 10,
+        "receiver should gain at least 0.9 TON (1 TON minus fees): gained={receiver_gained}"
+    );
+    let new_seqno = contract.seqno().await?;
+    assert_eq!(new_seqno, seqno + 1);
+
+    Ok(())
+}
+
 const GENESIS_MNEMONIC: &str = "quantum input cannon actress public limit case torch manage pig wrestle sunny riot midnight mouse romance guitar chat race famous jacket donor empty sad";
 
 const VALIDATOR1_MNEMONIC: &str = "dentist melt vault invest alcohol argue sausage embrace afford verify control credit waste file hope vocal air ahead gesture wage innocent today party salad";
