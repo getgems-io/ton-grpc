@@ -1,3 +1,4 @@
+use crate::tlb::vm_cont::VmCont;
 use num_bigint::BigUint;
 use toner::tlb::Cell;
 use toner::tlb::bits::NBits;
@@ -39,9 +40,6 @@ pub struct VmCellSlice {
 /// vm_stk_cont#06 cont:VmCont = VmStackValue;
 /// vm_stk_tuple#07 len:(## 16) data:(VmTuple len) = VmStackValue;
 /// ```
-///
-/// `Cont` is intentionally kept opaque: we capture the remainder of the parser as a `Cell` to
-/// round-trip without implementing the full `VmCont` schema.
 #[derive(Debug, Clone, PartialEq, Eq, CellDeserializeDerive, CellSerializeDerive)]
 pub enum VmStackValue {
     #[tlb(tag = "#00")]
@@ -73,7 +71,7 @@ pub enum VmStackValue {
         cell: Cell,
     },
     #[tlb(tag = "#06")]
-    Cont { rest: Cell },
+    Cont { cont: Box<VmCont> },
     #[tlb(tag = "#07")]
     Tuple { tuple: VmStkTuple },
 }
