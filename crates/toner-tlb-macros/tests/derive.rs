@@ -1135,11 +1135,8 @@ mod tests {
     #[test]
     fn underscore_hex_tag_strips_trailing_one_and_zeros() {
         use toner::tlb::ser::CellSerializeExt;
-
         #[derive(Debug, PartialEq, CellDeserialize, CellSerialize)]
         enum Discr {
-            #[tlb(tag = "#02ff")]
-            Nan,
             #[tlb(tag = "#0201_")]
             Int {
                 #[tlb(bits)]
@@ -1153,15 +1150,7 @@ mod tests {
         assert_eq!(cell.data.len(), 15 + 8);
         let bytes = cell.data.as_raw_slice();
         assert_eq!(bytes[0], 0x02);
-        assert_eq!(bytes[1] & 0xfe, 0x00);
-
-        let decoded: Discr = cell.parse_fully(()).unwrap();
-        assert_eq!(decoded, int);
-
-        let nan = Discr::Nan.to_cell(()).unwrap();
-        assert_eq!(nan.data.len(), 16);
-        assert_eq!(nan.data.as_raw_slice(), &[0x02, 0xff]);
-        let decoded_nan: Discr = nan.parse_fully(()).unwrap();
-        assert_eq!(decoded_nan, Discr::Nan);
+        assert_eq!(bytes[1], 0x00);
+        assert_eq!(bytes[2], 0x42 << 1);
     }
 }

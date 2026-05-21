@@ -103,9 +103,8 @@ impl TagValue {
                 }
             }
         };
+        /// https://docs.ton.org/blockchain-basics/languages/tl-b/syntax-and-semantics#constructors
         if trailing_underscore {
-            // TL/B `_`-suffix: drop trailing zeros, then drop the final 1 bit.
-            // See ton-blockchain/ton crypto/tl/tlbc.cpp:148-158.
             while matches!(bits.last(), Some(false)) {
                 bits.pop();
             }
