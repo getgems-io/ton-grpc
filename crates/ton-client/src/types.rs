@@ -127,7 +127,7 @@ pub struct SmcRunResult {
     pub stack: Vec<StackEntry>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StackEntry {
     Slice { bytes: String },
     Cell { bytes: String },

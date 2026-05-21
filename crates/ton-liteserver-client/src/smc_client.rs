@@ -382,34 +382,30 @@ mod integration {
     use ton_client::SmcClient;
     use tracing_test::traced_test;
 
-    // Faucet wallet from testcontainers-ton image — same address used in account_client.rs
-    // integration tests; we know it has code/data and accepts the standard `seqno` method.
     const FAUCET_WALLET_ADDR: &str =
         "-1:22f53b7d9aba2cef44755f7078b01614cd4dde2388a1729c2c386cf8f9898afe";
 
     #[tokio::test]
     #[traced_test]
-    async fn run_get_method_seqno_on_faucet_wallet_returns_number() -> anyhow::Result<()> {
+    async fn run_get_method_seqno_on_faucet_wallet_returns_number() -> Result<()> {
         let (client, _server) = setup().await?;
         let address = SmartContractAddress::from_str(FAUCET_WALLET_ADDR)?;
 
         let result = client.run_get_method(&address, "seqno", vec![]).await?;
 
-        assert_eq!(result.exit_code, 0, "seqno must succeed");
-        assert_eq!(result.stack.len(), 1, "seqno returns one stack entry");
-        match &result.stack[0] {
-            StackEntry::Number { number } => {
-                let n: i64 = number.parse()?;
-                assert!(n >= 0, "seqno must be non-negative, got {n}");
-            }
-            other => panic!("expected Number, got {other:?}"),
-        }
+        assert_eq!(result.exit_code, 0);
+        assert_eq!(
+            result.stack,
+            vec![StackEntry::Number {
+                number: "0".to_string()
+            }]
+        );
         Ok(())
     }
 
     #[tokio::test]
     #[traced_test]
-    async fn run_get_method_unknown_method_returns_nonzero_exit_code() -> anyhow::Result<()> {
+    async fn run_get_method_unknown_method_returns_nonzero_exit_code() -> Result<()> {
         let (client, _server) = setup().await?;
         let address = SmartContractAddress::from_str(FAUCET_WALLET_ADDR)?;
 
@@ -417,14 +413,35 @@ mod integration {
             .run_get_method(&address, "definitely_not_a_method_xyz", vec![])
             .await?;
 
-        assert_ne!(
-            result.exit_code, 0,
-            "missing method must produce nonzero exit code, got 0"
+        assert_eq!(result.exit_code, 32);
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[traced_test]
+    async fn run_get_method_wallet_v3r2_get_public_key() -> Result<()> {
+        let (client, _server) = setup().await?;
+        let address = SmartContractAddress::from_str(FAUCET_WALLET_ADDR)?;
+        let public_key =
+            hex::decode("880db994b01ecd06fccc6099bf094997e94f5ada0f31f5604148f098ca037402")
+                .unwrap();
+        let expected_public_key = BigUint::from_bytes_be(public_key.as_slice()).to_string();
+
+        let result = client
+            .run_get_method(&address, "get_public_key", vec![])
+            .await?;
+
+        assert_eq!(result.exit_code, 0);
+        assert_eq!(
+            result.stack,
+            vec![StackEntry::Number {
+                number: expected_public_key
+            }]
         );
         Ok(())
     }
 
-    async fn setup() -> anyhow::Result<(LiteServerClient, LocalLiteServer)> {
+    async fn setup() -> Result<(LiteServerClient, LocalLiteServer)> {
         let server = LocalLiteServer::new().await?;
         let client = LiteServerClient::connect(server.addr(), server.server_key()).await?;
         Ok((client, server))

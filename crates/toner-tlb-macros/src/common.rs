@@ -103,7 +103,7 @@ impl TagValue {
                 }
             }
         };
-        /// https://docs.ton.org/blockchain-basics/languages/tl-b/syntax-and-semantics#constructors
+        // https://docs.ton.org/blockchain-basics/languages/tl-b/syntax-and-semantics#constructors
         if trailing_underscore {
             while matches!(bits.last(), Some(false)) {
                 bits.pop();
