@@ -120,7 +120,7 @@ pub struct Cell {
     pub bytes: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SmcRunResult {
     pub gas_used: i64,
     pub exit_code: i32,

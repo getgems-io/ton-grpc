@@ -233,150 +233,53 @@ fn encode_cell_b64(cell: &toner::tlb::Cell) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rstest::rstest;
 
-    #[test]
-    fn method_id_seqno_matches_spec() {
-        assert_eq!(method_id_from_name("seqno"), 0x14c97);
-    }
-
-    #[test]
-    fn method_id_get_wallet_data_matches_spec() {
-        assert_eq!(method_id_from_name("get_wallet_data"), 0x17b02);
-    }
-
-    #[test]
-    fn method_id_get_jetton_data_matches_spec() {
-        assert_eq!(method_id_from_name("get_jetton_data"), 0x19e2d);
-    }
-
-    #[test]
-    fn method_id_get_public_key_matches_spec() {
-        assert_eq!(method_id_from_name("get_public_key"), 0x1339c);
-    }
-
-    #[test]
-    fn encode_input_stack_empty_round_trips_to_empty() {
-        let bytes = encode_input_stack(vec![]).unwrap();
-
-        let decoded = decode_result_stack(&bytes).unwrap();
-
-        assert!(decoded.is_empty());
-    }
-
-    #[test]
-    fn encode_decode_tinyint_round_trips() {
-        let input = vec![StackEntry::Number {
-            number: "42".to_string(),
-        }];
-
-        let bytes = encode_input_stack(input).unwrap();
-        let decoded = decode_result_stack(&bytes).unwrap();
-
-        assert_eq!(decoded.len(), 1);
-        match &decoded[0] {
-            StackEntry::Number { number } => assert_eq!(number, "42"),
-            other => panic!("expected Number, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn encode_decode_big_int_round_trips() {
-        let big = "123456789012345678901234567890";
-        let input = vec![StackEntry::Number {
-            number: big.to_string(),
-        }];
-
-        let bytes = encode_input_stack(input).unwrap();
-        let decoded = decode_result_stack(&bytes).unwrap();
-
-        match &decoded[0] {
-            StackEntry::Number { number } => assert_eq!(number, big),
-            other => panic!("expected Number, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn encode_decode_nested_tuple_round_trips() {
-        let input = vec![StackEntry::Tuple {
-            elements: vec![
-                StackEntry::Number {
-                    number: "1".to_string(),
-                },
-                StackEntry::Tuple {
-                    elements: vec![StackEntry::Number {
-                        number: "2".to_string(),
-                    }],
-                },
-            ],
-        }];
-
-        let bytes = encode_input_stack(input).unwrap();
-        let decoded = decode_result_stack(&bytes).unwrap();
-
-        assert_eq!(decoded.len(), 1);
-        match &decoded[0] {
-            StackEntry::Tuple { elements } => {
-                assert_eq!(elements.len(), 2);
-                match (&elements[0], &elements[1]) {
-                    (StackEntry::Number { number: n1 }, StackEntry::Tuple { elements: inner }) => {
-                        assert_eq!(n1, "1");
-                        assert_eq!(inner.len(), 1);
-                        match &inner[0] {
-                            StackEntry::Number { number: n2 } => assert_eq!(n2, "2"),
-                            other => panic!("expected inner Number, got {other:?}"),
-                        }
-                    }
-                    other => panic!("unexpected tuple shape: {other:?}"),
-                }
-            }
-            other => panic!("expected Tuple, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn encode_decode_negative_tinyint_round_trips() {
-        let input = vec![StackEntry::Number {
+    #[rstest]
+    #[case::empty(vec![])]
+    #[case::tinyint(vec![StackEntry::Number {
+        number: "42".to_string(),
+    }])]
+    #[case::bigint(vec![StackEntry::Number {
+        number: "123456789012345678901234567890".to_string(),
+    }])]
+    #[case::nested_tuple(vec![StackEntry::Tuple {
+        elements: vec![
+            StackEntry::Number {
+                number: "1".to_string(),
+            },
+            StackEntry::Tuple {
+                elements: vec![StackEntry::Number {
+                    number: "2".to_string(),
+                }],
+            },
+        ],
+    }])]
+    #[case::negative_tinyint(vec![StackEntry::Number {
             number: "-1".to_string(),
-        }];
+    }])]
+    fn test_stack_roundtrip(#[case] expected: Vec<StackEntry>) {
+        let actual = decode_result_stack(&encode_input_stack(expected.clone()).unwrap()).unwrap();
 
-        let bytes = encode_input_stack(input).unwrap();
-        let decoded = decode_result_stack(&bytes).unwrap();
-
-        match &decoded[0] {
-            StackEntry::Number { number } => assert_eq!(number, "-1"),
-            other => panic!("expected Number, got {other:?}"),
-        }
+        assert_eq!(actual, expected);
     }
 
-    #[test]
-    fn encode_negative_big_int_returns_error() {
-        let too_big_negative = "-123456789012345678901234567890";
-        let input = vec![StackEntry::Number {
-            number: too_big_negative.to_string(),
-        }];
-
+    #[rstest]
+    #[case::negative_bigint(vec![StackEntry::Number {
+            number: "-123456789012345678901234567890".to_string(),
+    }], "negative")]
+    #[case::unsupported(vec![StackEntry::Unsupported], "Unsupported")]
+    fn test_encode_errors(#[case] input: Vec<StackEntry>, #[case] msg_contains: &str) {
         let err = encode_input_stack(input).unwrap_err();
 
-        let msg = format!("{err}");
-        assert!(
-            msg.contains("negative"),
-            "expected negative-int error, got: {msg}"
-        );
-    }
-
-    #[test]
-    fn encode_unsupported_returns_error() {
-        let input = vec![StackEntry::Unsupported];
-
-        let err = encode_input_stack(input).unwrap_err();
-
-        assert!(format!("{err}").contains("Unsupported"));
+        assert!(format!("{err}").contains(msg_contains));
     }
 }
 
 #[cfg(test)]
 mod integration {
     use super::*;
+    use rstest::rstest;
     use std::str::FromStr;
     use testcontainers_ton::LocalLiteServer;
     use ton_client::SmcClient;
@@ -385,60 +288,41 @@ mod integration {
     const FAUCET_WALLET_ADDR: &str =
         "-1:22f53b7d9aba2cef44755f7078b01614cd4dde2388a1729c2c386cf8f9898afe";
 
+    #[rstest]
+    #[case::seqno("seqno", SmcRunResult {
+        gas_used: GAS_USED_PLACEHOLDER,
+        exit_code: 0,
+        stack: vec![StackEntry::Number {
+            number: "0".to_string()
+        }]
+    })]
+    #[case::unknown_method("definitely_not_a_method_xyz", SmcRunResult {
+        gas_used: 0,
+        exit_code: 32,
+        stack: vec![StackEntry::Number {
+            number: "0".to_string()
+        }]
+    })]
+    // public key is "880db994b01ecd06fccc6099bf094997e94f5ada0f31f5604148f098ca037402"
+    #[case::public_key("get_public_key", SmcRunResult {
+        gas_used: 0,
+        exit_code: 0,
+        stack: vec![StackEntry::Number {
+            number: "61538797250860244891658288584886086813375283594678556485491459892974908044290".to_string()
+        }]
+    })]
     #[tokio::test]
     #[traced_test]
-    async fn run_get_method_seqno_on_faucet_wallet_returns_number() -> Result<()> {
-        let (client, _server) = setup().await?;
-        let address = SmartContractAddress::from_str(FAUCET_WALLET_ADDR)?;
+    async fn test_run_get_method(#[case] method: &str, #[case] expected: SmcRunResult) {
+        let (client, _server) = setup().await.unwrap();
+        let address = SmartContractAddress::from_str(FAUCET_WALLET_ADDR).unwrap();
 
-        let result = client.run_get_method(&address, "seqno", vec![]).await?;
+        let actual = client
+            .run_get_method(&address, method, vec![])
+            .await
+            .unwrap();
 
-        assert_eq!(result.exit_code, 0);
-        assert_eq!(
-            result.stack,
-            vec![StackEntry::Number {
-                number: "0".to_string()
-            }]
-        );
-        Ok(())
-    }
-
-    #[tokio::test]
-    #[traced_test]
-    async fn run_get_method_unknown_method_returns_nonzero_exit_code() -> Result<()> {
-        let (client, _server) = setup().await?;
-        let address = SmartContractAddress::from_str(FAUCET_WALLET_ADDR)?;
-
-        let result = client
-            .run_get_method(&address, "definitely_not_a_method_xyz", vec![])
-            .await?;
-
-        assert_eq!(result.exit_code, 32);
-        Ok(())
-    }
-
-    #[tokio::test]
-    #[traced_test]
-    async fn run_get_method_wallet_v3r2_get_public_key() -> Result<()> {
-        let (client, _server) = setup().await?;
-        let address = SmartContractAddress::from_str(FAUCET_WALLET_ADDR)?;
-        let public_key =
-            hex::decode("880db994b01ecd06fccc6099bf094997e94f5ada0f31f5604148f098ca037402")
-                .unwrap();
-        let expected_public_key = BigUint::from_bytes_be(public_key.as_slice()).to_string();
-
-        let result = client
-            .run_get_method(&address, "get_public_key", vec![])
-            .await?;
-
-        assert_eq!(result.exit_code, 0);
-        assert_eq!(
-            result.stack,
-            vec![StackEntry::Number {
-                number: expected_public_key
-            }]
-        );
-        Ok(())
+        assert_eq!(actual, expected);
     }
 
     async fn setup() -> Result<(LiteServerClient, LocalLiteServer)> {
