@@ -98,6 +98,12 @@ mod integration {
 - Keep tests minimal and focused: no debug logging (`info!`, `debug!`), no artificial timeouts (`tokio::time::timeout`), no verbose comments.
 - Place tests close to the code they test — in the same source file (`mod tests` / `mod integration`), not in `tests/` directory, unless there is a specific reason.
 
+### What to Test
+
+- Test only the **public API**: `pub` and `pub(crate)` items.
+- Do NOT test private functions — they are an implementation detail and should be covered indirectly through the public API.
+- If a private function feels like it needs its own test, that's a signal to either extract it into a separate `pub(crate)` unit, or to cover the behavior via the public surface.
+
 ### Running Tests
 
 Run tests via moon:

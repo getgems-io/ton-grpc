@@ -24,4 +24,5 @@ toner-tlb-macros = { path = "../toner-tlb-macros" }
 [dev-dependencies]
 testcontainers-ton = { path = "../testcontainers-ton" }
 tonlibjson-client = { path = "../tonlibjson-client" }
+ton-liteserver-client = { path = "../ton-liteserver-client" }
 tokio = { version = "1.50.0", features = ["full"] }

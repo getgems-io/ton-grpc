@@ -35,12 +35,14 @@ tokio-retry = "0.3.0"
 hex = "0.4.3"
 num-bigint = "0.4.6"
 base64 = "0.22.1"
+crc = "3.4.0"
 
 [dev-dependencies]
 tracing-test = "0.2.6"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 testcontainers = "0.27.1"
 testcontainers-ton = { path = "../testcontainers-ton" }
+rstest = "0.26.1"
 
 [features]
 testnet = []

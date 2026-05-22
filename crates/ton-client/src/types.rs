@@ -120,14 +120,14 @@ pub struct Cell {
     pub bytes: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct SmcRunResult {
     pub gas_used: i64,
     pub exit_code: i32,
     pub stack: Vec<StackEntry>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum StackEntry {
     Slice { bytes: String },
     Cell { bytes: String },

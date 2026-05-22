@@ -1131,4 +1131,26 @@ mod tests {
 
         assert_eq!(decoded, value);
     }
+
+    #[test]
+    fn underscore_hex_tag_strips_trailing_one_and_zeros() {
+        use toner::tlb::ser::CellSerializeExt;
+        #[derive(Debug, PartialEq, CellDeserialize, CellSerialize)]
+        enum Discr {
+            #[tlb(tag = "#0201_")]
+            Int {
+                #[tlb(bits)]
+                payload: u8,
+            },
+        }
+
+        let int = Discr::Int { payload: 0x42 };
+        let cell = int.to_cell(()).unwrap();
+
+        assert_eq!(cell.data.len(), 15 + 8);
+        let bytes = cell.data.as_raw_slice();
+        assert_eq!(bytes[0], 0x02);
+        assert_eq!(bytes[1], 0x00);
+        assert_eq!(bytes[2], 0x42 << 1);
+    }
 }

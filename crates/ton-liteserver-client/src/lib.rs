@@ -5,6 +5,7 @@ mod convert;
 pub mod make;
 pub mod message_client;
 pub mod request;
+pub mod smc_client;
 pub mod tl;
 pub mod tlb;
 pub mod tracked_client;
