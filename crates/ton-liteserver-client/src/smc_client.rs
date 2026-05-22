@@ -168,10 +168,7 @@ fn parse_number_to_vm(number: &str) -> Result<VmStackValue> {
 }
 
 fn decode_single_root_cell(b64: &str) -> Result<toner::tlb::Cell> {
-    let raw = base64_standard
-        .decode(b64)
-        .map_err(|e| anyhow!("StackEntry bytes: invalid base64: {e}"))?;
-    let boc = BoC::deserialize(&raw).map_err(|e| anyhow!("StackEntry bytes: invalid BoC: {e}"))?;
+    let boc = BoC::parse_base64(&b64).map_err(|e| anyhow!("StackEntry bytes: invalid BoC: {e}"))?;
     let cell = boc
         .single_root()
         .ok_or_else(|| anyhow!("StackEntry bytes: BoC must have exactly one root cell"))?;
