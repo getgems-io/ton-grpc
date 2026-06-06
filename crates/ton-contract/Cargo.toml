@@ -25,4 +25,4 @@ toner-tlb-macros = { path = "../toner-tlb-macros" }
 testcontainers-ton = { path = "../testcontainers-ton" }
 tonlibjson-client = { path = "../tonlibjson-client" }
 ton-liteserver-client = { path = "../ton-liteserver-client" }
-tokio = { version = "1.50.0", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
