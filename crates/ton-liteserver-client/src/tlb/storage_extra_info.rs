@@ -24,7 +24,7 @@ mod tests {
     fn unpack_none() {
         let bits = bits![u8, Msb0; 0, 0, 0];
 
-        let actual: StorageExtraInfo = unpack_fully(&bits, ()).unwrap();
+        let actual: StorageExtraInfo = unpack_fully(bits, ()).unwrap();
 
         assert_eq!(actual, StorageExtraInfo::None);
     }

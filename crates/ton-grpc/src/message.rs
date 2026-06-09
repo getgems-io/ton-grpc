@@ -1,18 +1,16 @@
-#![allow(clippy::blocks_in_conditions)]
-
 use crate::ton::message_service_server::MessageService as BaseMessageService;
 use crate::ton::{SendRequest, SendResponse};
 use derive_new::new;
-use ton_client::TonClient;
+use ton_client::{Client, TonService};
 use tonic::{Request, Response, Status, async_trait};
 
 #[derive(new)]
-pub struct MessageService<T: TonClient> {
-    client: T,
+pub struct MessageService<S: TonService> {
+    client: Client<S>,
 }
 
 #[async_trait]
-impl<T: TonClient> BaseMessageService for MessageService<T> {
+impl<S: TonService> BaseMessageService for MessageService<S> {
     #[tracing::instrument(skip_all, err)]
     async fn send_message(
         &self,
@@ -20,8 +18,8 @@ impl<T: TonClient> BaseMessageService for MessageService<T> {
     ) -> Result<Response<SendResponse>, Status> {
         let msg = request.into_inner();
 
-        let hash = self
-            .client
+        let mut client = self.client.clone();
+        let hash = client
             .send_message_returning_hash(&msg.body)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
@@ -38,8 +36,9 @@ mod integration {
     use crate::ton::message_service_server::MessageServiceServer;
     use testcontainers_ton::LocalLiteServer;
     use tokio::net::TcpListener;
+    use ton_client::TonClientBuilder;
     use tonic::transport::Channel;
-    use tonlibjson_client::ton::TonClientBuilder;
+    use tonlibjson_client::MakeTonlibjsonAdapter;
 
     // TODO[akostylev0]: add test for success send message
     #[tokio::test]
@@ -59,10 +58,10 @@ mod integration {
 
     async fn setup() -> (LocalLiteServer, MessageServiceClient<Channel>) {
         let server = LocalLiteServer::new().await.unwrap();
-        let mut client = TonClientBuilder::from_config(server.config())
+        let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config(server.config())
             .build()
             .unwrap();
-        client.ready().await.unwrap();
+        client.wait_ready().await.unwrap();
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();

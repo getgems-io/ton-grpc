@@ -8,7 +8,7 @@ fn make_cell(data_bits: &[bool], refs: Vec<Cell>) -> Cell {
     for &b in data_bits {
         bv.push(b);
     }
-    let references = refs.into_iter().map(|c| std::sync::Arc::new(c)).collect();
+    let references = refs.into_iter().map(std::sync::Arc::new).collect();
     Cell {
         is_exotic: false,
         data: bv,

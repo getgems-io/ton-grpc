@@ -176,6 +176,14 @@ impl SmartContractAddress {
         }
     }
 
+    pub fn data_as_bytes(&self) -> [u8; 32] {
+        match self {
+            SmartContractAddress::Raw { data, .. }
+            | SmartContractAddress::UserFriendly { data, .. } => *data,
+        }
+        .0
+    }
+
     pub fn to_bounceable(&self) -> Self {
         match self {
             SmartContractAddress::Raw { workchain_id, data }

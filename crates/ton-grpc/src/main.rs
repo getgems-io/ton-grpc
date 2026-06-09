@@ -1,20 +1,61 @@
 use clap::Parser;
+use clap::ValueEnum;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::time::Duration;
+use ton_client::PoolTransport;
+use ton_client::TonClientBuilder;
 use ton_config::default_ton_config_url;
 use ton_grpc::AccountService;
 use ton_grpc::BlockService;
+use ton_grpc::ComparingAdapter;
+use ton_grpc::MakeComparingAdapter;
 use ton_grpc::MessageService;
 use ton_grpc::account_service_server::AccountServiceServer;
 use ton_grpc::block_service_server::BlockServiceServer;
 use ton_grpc::message_service_server::MessageServiceServer;
+use ton_liteserver_client::{LiteServerAdapter, MakeLiteServerAdapter};
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
-use tonlibjson_client::ton::TonClientBuilder;
+use tonlibjson_client::{MakeTonlibjsonAdapter, TonlibjsonAdapter};
+use tower::ServiceExt;
+use tower::util::{Either, MapResponse};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use url::Url;
+
+type ComparingTonlibAdapter = ComparingAdapter<TonlibjsonAdapter, LiteServerAdapter>;
+type ComparingAdnlAdapter = ComparingAdapter<LiteServerAdapter, TonlibjsonAdapter>;
+
+type SingleAdapter = Either<TonlibjsonAdapter, LiteServerAdapter>;
+type ComparingPair = Either<ComparingTonlibAdapter, ComparingAdnlAdapter>;
+
+type Adapter = Either<SingleAdapter, ComparingPair>;
+type Client = PoolTransport<Adapter>;
+
+type MakeTonlibjsonSingle = MapResponse<MakeTonlibjsonAdapter, fn(TonlibjsonAdapter) -> Adapter>;
+type MakeLiteServerSingle = MapResponse<MakeLiteServerAdapter, fn(LiteServerAdapter) -> Adapter>;
+type MakeComparingTonlib = MapResponse<
+    MakeComparingAdapter<MakeTonlibjsonAdapter, MakeLiteServerAdapter>,
+    fn(ComparingTonlibAdapter) -> Adapter,
+>;
+type MakeComparingAdnl = MapResponse<
+    MakeComparingAdapter<MakeLiteServerAdapter, MakeTonlibjsonAdapter>,
+    fn(ComparingAdnlAdapter) -> Adapter,
+>;
+
+type SingleFactory = Either<MakeTonlibjsonSingle, MakeLiteServerSingle>;
+type ComparingFactory = Either<MakeComparingTonlib, MakeComparingAdnl>;
+
+type AdapterFactory = Either<SingleFactory, ComparingFactory>;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ValueEnum)]
+enum ClientImpl {
+    Tonlibjson,
+    AdnlTcp,
+    ComparingTonlib,
+    ComparingAdnl,
+}
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -38,6 +79,9 @@ struct Args {
     enable_metrics: bool,
     #[clap(long, default_value = "0.0.0.0:9000")]
     metrics_listen: SocketAddr,
+
+    #[clap(long, value_enum, default_value_t = ClientImpl::Tonlibjson)]
+    client: ClientImpl,
 
     #[clap(long, value_parser = Url::parse, default_value_t = default_ton_config_url())]
     ton_config_url: Url,
@@ -79,20 +123,49 @@ async fn main() -> anyhow::Result<()> {
     }
 
     tracing::info!("TON Config URL: {}", &args.ton_config_url);
+    tracing::info!("Client implementation: {:?}", &args.client);
 
-    let mut client =
-        TonClientBuilder::from_config_url(args.ton_config_url, Duration::from_secs(60))
-            .set_timeout(args.ton_timeout)
-            .set_retry_budget_ttl(args.retry_budget_ttl)
-            .set_retry_min_per_sec(args.retry_min_rps)
-            .set_retry_percent(args.retry_withdraw_percent)
-            .set_retry_first_delay(args.retry_first_delay)
-            .set_retry_max_delay(args.retry_max_delay)
-            .set_ewma_default_rtt(args.ewma_default_rtt)
-            .set_ewma_decay(args.ewma_decay)
-            .build()?;
+    let factory: AdapterFactory = match args.client {
+        ClientImpl::Tonlibjson => {
+            let f: MakeTonlibjsonSingle =
+                MakeTonlibjsonAdapter.map_response((|a| Either::Left(Either::Left(a))) as _);
+            Either::Left(Either::Left(f))
+        }
+        ClientImpl::AdnlTcp => {
+            let f: MakeLiteServerSingle =
+                MakeLiteServerAdapter.map_response((|a| Either::Left(Either::Right(a))) as _);
+            Either::Left(Either::Right(f))
+        }
+        ClientImpl::ComparingTonlib => {
+            let f: MakeComparingTonlib =
+                MakeComparingAdapter::new(MakeTonlibjsonAdapter, MakeLiteServerAdapter)
+                    .map_response((|a| Either::Right(Either::Left(a))) as _);
+            Either::Right(Either::Left(f))
+        }
+        ClientImpl::ComparingAdnl => {
+            let f: MakeComparingAdnl =
+                MakeComparingAdapter::new(MakeLiteServerAdapter, MakeTonlibjsonAdapter)
+                    .map_response((|a| Either::Right(Either::Right(a))) as _);
+            Either::Right(Either::Right(f))
+        }
+    };
 
-    client.ready().await?;
+    let mut client = TonClientBuilder::<AdapterFactory>::with_factory_and_config_url(
+        factory,
+        args.ton_config_url,
+        Duration::from_secs(60),
+    )
+    .set_timeout(args.ton_timeout)
+    .set_retry_budget_ttl(args.retry_budget_ttl)
+    .set_retry_min_per_sec(args.retry_min_rps)
+    .set_retry_percent(args.retry_withdraw_percent)
+    .set_retry_first_delay(args.retry_first_delay)
+    .set_retry_max_delay(args.retry_max_delay)
+    .set_ewma_default_rtt(args.ewma_default_rtt)
+    .set_ewma_decay(args.ewma_decay)
+    .build()?;
+
+    client.wait_ready().await?;
     tracing::info!("Ton Client is ready");
 
     let reflection = tonic_reflection::server::Builder::configure()
@@ -109,8 +182,6 @@ async fn main() -> anyhow::Result<()> {
     let message_service = MessageServiceServer::new(MessageService::new(client))
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
-
-    type Client = tonlibjson_client::ton::TonClient;
 
     let (health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter

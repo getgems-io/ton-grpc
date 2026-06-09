@@ -1,24 +1,17 @@
-use crate::block::BlocksGetMasterchainInfo;
-use crate::client::Client;
-use crate::cursor::client::CursorClient;
-use crate::error::ErrorLayer;
+use crate::client::TonlibjsonClient;
+use crate::tl::BlocksGetMasterchainInfo;
 use serde_json::{Value, json};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
-use ton_client_util::service::shared::SharedLayer;
-use ton_client_util::service::timeout::TimeoutLayer;
-use ton_config::{LiteServerId, TonConfig};
-use tower::limit::ConcurrencyLimitLayer;
-use tower::load::PeakEwma;
-use tower::{Service, ServiceBuilder, ServiceExt};
+use ton_config::TonConfig;
+use tower::{Service, ServiceExt};
 
-#[derive(Default, Debug)]
-pub(crate) struct ClientFactory;
+#[derive(Default, Debug, Clone)]
+pub struct MakeTonlibjsonClient;
 
-impl Service<TonConfig> for ClientFactory {
-    type Response = Client;
+impl Service<TonConfig> for MakeTonlibjsonClient {
+    type Response = TonlibjsonClient;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -28,7 +21,7 @@ impl Service<TonConfig> for ClientFactory {
 
     fn call(&mut self, req: TonConfig) -> Self::Future {
         Box::pin(async move {
-            let mut client = ClientBuilder::from_config(&req.to_string())
+            let mut client = ClientBuilder::from_config(&req)
                 .disable_logging()
                 .build()
                 .await?;
@@ -42,35 +35,20 @@ impl Service<TonConfig> for ClientFactory {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
-pub(crate) struct CursorClientFactory;
-
-impl CursorClientFactory {
-    pub(crate) fn create(id: LiteServerId, client: PeakEwma<Client>) -> CursorClient {
-        ServiceBuilder::new()
-            .layer_fn(|s| CursorClient::new(id.to_string(), s))
-            .layer(ConcurrencyLimitLayer::new(256))
-            .layer(SharedLayer)
-            .layer(ErrorLayer)
-            .layer(TimeoutLayer::new(Duration::from_secs(5)))
-            .service(client)
-    }
-}
-
 struct ClientBuilder {
     config: Value,
     logging: Option<i32>,
 }
 
 impl ClientBuilder {
-    fn from_config(config: &str) -> Self {
+    fn from_config(config: &TonConfig) -> Self {
         let full_config = json!({
             "@type": "init",
             "options": {
                 "@type": "options",
                 "config": {
                     "@type": "config",
-                    "config": config,
+                    "config": config.to_string(),
                     "use_callbacks_for_network": false,
                     "blockchain_name": "",
                     "ignore_cache": true
@@ -93,12 +71,12 @@ impl ClientBuilder {
         self
     }
 
-    async fn build(self) -> anyhow::Result<Client> {
+    async fn build(self) -> anyhow::Result<TonlibjsonClient> {
         if let Some(level) = self.logging {
-            Client::set_logging(level);
+            TonlibjsonClient::set_logging(level);
         }
 
-        let mut client = Client::new();
+        let mut client = TonlibjsonClient::new();
         let _ = (&mut client).oneshot(self.config).await?;
 
         Ok(client)

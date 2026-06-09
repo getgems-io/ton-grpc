@@ -1,4 +1,4 @@
-use crate::request::Requestable;
+use crate::tl::Requestable;
 use crate::tl::{
     AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery,
 };

@@ -15,16 +15,16 @@ use futures::{Stream, StreamExt, TryFutureExt, TryStreamExt, try_join};
 use std::pin::Pin;
 use std::str::FromStr;
 use ton_address::SmartContractAddress;
-use ton_client::{AccountClientExt as _, TonClient};
+use ton_client::{Client, TonPoolService};
 use tonic::{Request, Response, Status, async_trait};
 
 #[derive(new)]
-pub struct AccountService<T: TonClient> {
-    client: T,
+pub struct AccountService<S: TonPoolService> {
+    client: Client<S>,
 }
 
 #[async_trait]
-impl<T: TonClient> BaseAccountService for AccountService<T> {
+impl<S: TonPoolService> BaseAccountService for AccountService<S> {
     #[tracing::instrument(skip_all, err)]
     async fn get_account_state(
         &self,
@@ -92,11 +92,12 @@ impl<T: TonClient> BaseAccountService for AccountService<T> {
         let account_address = SmartContractAddress::from_str(&msg.account_address)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
 
-        let client = self.client.clone();
+        let mut client = self.client.clone();
+        let mut client_to = client.clone();
 
         let (from_tx, to_tx) = try_join!(
-            extend_from_tx_id(&client, &account_address, msg.from.clone()),
-            extend_to_tx_id(&client, &account_address, msg.to.clone())
+            extend_from_tx_id(&mut client, &account_address, msg.from.clone()),
+            extend_to_tx_id(&mut client_to, &account_address, msg.to.clone())
         )
         .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
@@ -121,38 +122,40 @@ impl<T: TonClient> BaseAccountService for AccountService<T> {
     }
 }
 
-impl<T: TonClient> AccountService<T> {
+impl<S: TonPoolService> AccountService<S> {
     async fn fetch_account_state(
         &self,
         msg: &GetAccountStateRequest,
-    ) -> Result<ton_client::AccountState> {
+    ) -> Result<ton_tower::response::AccountState> {
         let account_address = SmartContractAddress::from_str(&msg.account_address)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
 
+        let mut client = self.client.clone();
+
         let state = match &msg.criteria {
             None => {
-                let block_id = self.client.get_masterchain_info().await?.last;
+                let block_id = client.get_masterchain_info().await?.last;
 
-                self.client
+                client
                     .get_account_state_at_least_block(&account_address, &block_id)
                     .await?
             }
             Some(get_account_state_request::Criteria::BlockId(block_id)) => {
-                let block_id = extend_block_id(&self.client, block_id).await?;
+                let block_id = extend_block_id(&mut client, block_id).await?;
 
-                self.client
+                client
                     .get_account_state_on_block(&account_address, block_id)
                     .await?
             }
             Some(get_account_state_request::Criteria::AtLeastBlockId(block_id)) => {
-                let block_id = extend_block_id(&self.client, block_id).await?;
+                let block_id = extend_block_id(&mut client, block_id).await?;
 
-                self.client
+                client
                     .get_account_state_at_least_block(&account_address, &block_id)
                     .await?
             }
             Some(get_account_state_request::Criteria::TransactionId(tx_id)) => {
-                self.client
+                client
                     .get_account_state_by_transaction(&account_address, tx_id.clone().into())
                     .await?
             }
@@ -163,49 +166,45 @@ impl<T: TonClient> AccountService<T> {
     async fn fetch_shard_account_cell(
         &self,
         msg: &GetShardAccountCellRequest,
-    ) -> Result<(ton_client::BlockIdExt, ton_client::Cell)> {
+    ) -> Result<(ton_tower::response::BlockIdExt, ton_tower::response::Cell)> {
         let account_address = SmartContractAddress::from_str(&msg.account_address)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
 
+        let mut client = self.client.clone();
+
         let (block_id, cell) = match &msg.criteria {
             None => {
-                let block_id = self.client.get_masterchain_info().await?.last;
-                let cell = self
-                    .client
+                let block_id = client.get_masterchain_info().await?.last;
+                let cell = client
                     .get_shard_account_cell_at_least_block(&account_address, &block_id)
                     .await?;
 
                 (block_id, cell)
             }
             Some(get_shard_account_cell_request::Criteria::BlockId(block_id)) => {
-                let block_id = extend_block_id(&self.client, block_id).await?;
-                let cell = self
-                    .client
+                let block_id = extend_block_id(&mut client, block_id).await?;
+                let cell = client
                     .get_shard_account_cell_on_block(&account_address, block_id.clone())
                     .await?;
 
                 (block_id, cell)
             }
             Some(get_shard_account_cell_request::Criteria::TransactionId(tx_id)) => {
-                let state = self
-                    .client
+                let state = client
                     .get_account_state_by_transaction(&account_address, tx_id.clone().into())
                     .await?;
-                let cell = self
-                    .client
+                let cell = client
                     .get_shard_account_cell_on_block(&account_address, state.block_id.clone())
                     .await?;
 
                 (state.block_id, cell)
             }
             Some(get_shard_account_cell_request::Criteria::AtLeastBlockId(block_id)) => {
-                let block_id = extend_block_id(&self.client, block_id).await?;
-                let state = self
-                    .client
+                let block_id = extend_block_id(&mut client, block_id).await?;
+                let state = client
                     .get_account_state_at_least_block(&account_address, &block_id)
                     .await?;
-                let cell = self
-                    .client
+                let cell = client
                     .get_shard_account_cell_on_block(&account_address, state.block_id.clone())
                     .await?;
 
@@ -229,8 +228,9 @@ mod integration {
     use futures::StreamExt;
     use testcontainers_ton::LocalLiteServer;
     use tokio::net::TcpListener;
+    use ton_client::TonClientBuilder;
     use tonic::transport::Channel;
-    use tonlibjson_client::ton::TonClientBuilder;
+    use tonlibjson_client::MakeTonlibjsonAdapter;
 
     const ACCOUNT_ADDRESS: &str =
         "-1:5555555555555555555555555555555555555555555555555555555555555555";
@@ -423,10 +423,10 @@ mod integration {
 
     async fn setup() -> (LocalLiteServer, AccountServiceClient<Channel>) {
         let server = LocalLiteServer::new().await.unwrap();
-        let mut client = TonClientBuilder::from_config(server.config())
+        let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config(server.config())
             .build()
             .unwrap();
-        client.ready().await.unwrap();
+        client.wait_ready().await.unwrap();
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();

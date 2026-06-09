@@ -7,7 +7,7 @@ use std::path::Path;
 use std::str::FromStr;
 use url::Url;
 
-#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone, Default)]
 #[serde(tag = "@type")]
 #[serde(rename = "config.global")]
 pub struct TonConfig {

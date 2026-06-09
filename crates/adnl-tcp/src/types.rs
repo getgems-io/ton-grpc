@@ -1,10 +1,6 @@
 use crate::deserializer::{Deserialize, DeserializeBoxed, Deserializer, DeserializerBoxedError};
 use crate::serializer::{Serialize, Serializer};
 
-pub trait Functional {
-    type Result;
-}
-
 // TODO[akostylev0] review
 pub type Double = f64;
 pub type Int31 = i32; // "#" / nat type

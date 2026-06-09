@@ -399,6 +399,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bstr"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63044e1ae8e69f3b5a92c736ca6269b8d12fa7efe39bf34ddb06d102cf0e2cab"
+dependencies = [
+ "memchr",
+ "serde",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3017,6 +3027,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "703d5c7ef118737c72f1af64ad2f6f8c5e1921f818cdcb97b8fe6fc69bf66214"
 
 [[package]]
+name = "similar"
+version = "3.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6505efef05804732ed8a3f2d4f279429eb485bd69d5b0cc6b19cc02005cda16"
+dependencies = [
+ "bstr",
+]
+
+[[package]]
 name = "sketches-ddsketch"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3059,6 +3078,12 @@ name = "stable_deref_trait"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6ce2be8dc25455e1f91df71bfa12ad37d7af1092ae736f3a6cd0e37bc7810596"
+
+[[package]]
+name = "static_assertions"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 
 [[package]]
 name = "strsim"
@@ -3458,6 +3483,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]
@@ -3531,30 +3557,28 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-stream",
- "async-trait",
- "futures",
- "itertools",
- "ton-address",
- "tracing",
-]
-
-[[package]]
-name = "ton-client-util"
-version = "0.2.1"
-dependencies = [
- "anyhow",
  "bitvec",
+ "dashmap",
  "futures",
  "itertools",
  "metrics",
  "pin-project",
+ "rstest",
+ "testcontainers-ton",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-retry",
  "tokio-stream",
  "tokio-util",
+ "ton-address",
  "ton-config",
+ "ton-liteserver-client",
+ "ton-tower",
+ "tonlibjson-client",
  "tower",
  "tracing",
+ "tracing-subscriber",
+ "tracing-test",
  "url",
 ]
 
@@ -3586,9 +3610,11 @@ dependencies = [
  "ton-address",
  "ton-client",
  "ton-liteserver-client",
+ "ton-tower",
  "toner",
  "toner-tlb-macros",
  "tonlibjson-client",
+ "tower",
 ]
 
 [[package]]
@@ -3615,13 +3641,12 @@ dependencies = [
  "anyhow",
  "clap",
  "derive-new",
- "either",
  "futures",
  "humantime",
  "metrics-exporter-prometheus",
  "prost",
- "serde",
- "serde_json",
+ "similar",
+ "static_assertions",
  "testcontainers-ton",
  "tokio",
  "tokio-stream",
@@ -3629,12 +3654,14 @@ dependencies = [
  "ton-client",
  "ton-config",
  "ton-liteserver-client",
+ "ton-tower",
  "tonic",
  "tonic-health",
  "tonic-prost",
  "tonic-prost-build",
  "tonic-reflection",
  "tonlibjson-client",
+ "tower",
  "tracing",
  "tracing-subscriber",
  "tracing-test",
@@ -3647,11 +3674,9 @@ version = "0.5.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
- "async-trait",
  "base64 0.22.1",
  "convert_case",
  "crc",
- "dashmap",
  "futures",
  "hex",
  "num-bigint",
@@ -3670,14 +3695,21 @@ dependencies = [
  "tokio-stream",
  "tokio-util",
  "ton-address",
- "ton-client",
- "ton-client-util",
+ "ton-config",
+ "ton-tower",
  "toner",
  "toner-tlb-macros",
  "tower",
  "tracing",
  "tracing-subscriber",
  "tracing-test",
+]
+
+[[package]]
+name = "ton-tower"
+version = "0.1.0"
+dependencies = [
+ "ton-address",
 ]
 
 [[package]]
@@ -3803,13 +3835,12 @@ name = "tonlibjson-client"
 version = "0.22.1"
 dependencies = [
  "anyhow",
- "async-trait",
  "base64 0.22.1",
  "convert_case",
  "dashmap",
  "derive-new",
  "futures",
- "metrics",
+ "hex",
  "pin-project",
  "prettyplease",
  "quote",
@@ -3817,15 +3848,12 @@ dependencies = [
  "serde_json",
  "syn",
  "testcontainers-ton",
- "thiserror 2.0.18",
  "tl-parser",
  "tokio",
- "tokio-retry",
  "tokio-util",
  "ton-address",
- "ton-client",
- "ton-client-util",
  "ton-config",
+ "ton-tower",
  "tonlibjson-sys",
  "tower",
  "tracing",

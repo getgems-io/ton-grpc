@@ -5,15 +5,15 @@ use anyhow::{Result, anyhow};
 use std::ops::Bound;
 use std::ops::Bound::{Excluded, Included};
 use ton_address::SmartContractAddress;
-use ton_client::TonClient;
+use ton_client::{Client, TonService};
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_block_id(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     block_id: &ton::BlockId,
-) -> Result<ton_client::BlockIdExt> {
+) -> Result<ton_tower::response::BlockIdExt> {
     if let (Some(root_hash), Some(file_hash)) = (&block_id.root_hash, &block_id.file_hash) {
-        Ok(ton_client::BlockIdExt {
+        Ok(ton_tower::response::BlockIdExt {
             workchain: block_id.workchain,
             shard: block_id.shard,
             seqno: block_id.seqno,
@@ -29,18 +29,18 @@ pub async fn extend_block_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_get_block_header(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     block_id: &ton::BlockId,
-) -> Result<ton_client::BlockHeader> {
+) -> Result<ton_tower::response::BlockHeader> {
     let block_id = extend_block_id(client, block_id).await?;
     client.get_block_header(block_id).await
 }
 
 #[tracing::instrument(skip_all, err)]
 pub async fn prev_block_id(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     block_id: &ton::BlockId,
-) -> Result<ton_client::BlockIdExt> {
+) -> Result<ton_tower::response::BlockIdExt> {
     client
         .look_up_block_by_seqno(block_id.workchain, block_id.shard, block_id.seqno - 1)
         .await
@@ -48,10 +48,10 @@ pub async fn prev_block_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_from_tx_id(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     address: &SmartContractAddress,
     from: Option<ton::get_account_transactions_request::Bound>,
-) -> Result<Bound<ton_client::TransactionId>> {
+) -> Result<Bound<ton_tower::response::TransactionId>> {
     Ok(match from {
         None => Bound::Unbounded,
         Some(b) => {
@@ -91,10 +91,10 @@ pub async fn extend_from_tx_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_to_tx_id(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     address: &SmartContractAddress,
     to: Option<ton::get_account_transactions_request::Bound>,
-) -> Result<Bound<ton_client::TransactionId>> {
+) -> Result<Bound<ton_tower::response::TransactionId>> {
     Ok(match to {
         None => Bound::Unbounded,
         Some(b) => {
