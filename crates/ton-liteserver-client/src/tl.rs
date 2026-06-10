@@ -4,9 +4,28 @@
 use adnl_tcp::deserializer::{Deserialize, DeserializeBoxed, Deserializer, DeserializerBoxedError};
 use adnl_tcp::serializer::{Serialize, SerializeBoxed, Serializer};
 pub use adnl_tcp::types::*;
+use private::Functional;
 use std::fmt::{Debug, Display, Formatter};
 use ton_client_util::router::route::{BlockCriteria, Route, ToRoute};
 use ton_client_util::service::timeout::ToTimeout;
+
+mod private {
+    pub trait Functional {
+        type Result;
+    }
+}
+
+pub trait Requestable: SerializeBoxed + Send {
+    type Response: DeserializeBoxed + Send + 'static;
+}
+
+impl<T> Requestable for T
+where
+    T: Functional + SerializeBoxed + Send,
+    T::Result: DeserializeBoxed + Send + 'static,
+{
+    type Response = T::Result;
+}
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
 

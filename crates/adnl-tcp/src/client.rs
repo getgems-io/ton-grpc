@@ -77,7 +77,7 @@ mod integration {
     async fn client_connect_wrong_key() -> anyhow::Result<()> {
         let server = LocalLiteServer::new().await?;
         let mut invalid_key: ServerKey = server.server_key();
-        invalid_key[0] = invalid_key[0] ^ 1;
+        invalid_key[0] ^= 1;
 
         let client = Client::connect(server.addr(), invalid_key).await;
 
