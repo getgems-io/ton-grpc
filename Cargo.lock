@@ -3651,7 +3651,6 @@ dependencies = [
  "base64 0.22.1",
  "convert_case",
  "crc",
- "dashmap",
  "futures",
  "hex",
  "num-bigint",
