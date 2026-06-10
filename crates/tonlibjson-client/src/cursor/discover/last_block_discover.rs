@@ -1,10 +1,10 @@
-use crate::block::{
-    BlocksGetBlockHeader, BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader,
-    BlocksLookupBlock, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt,
-};
 use crate::cursor::ShardId;
 use crate::cursor::client::InnerClient;
 use crate::cursor::registry::Registry;
+use crate::tl::{
+    BlocksGetBlockHeader, BlocksGetMasterchainInfo, BlocksGetShards, BlocksHeader,
+    BlocksLookupBlock, BlocksMasterchainInfo, Sync, TonBlockId, TonBlockIdExt,
+};
 use anyhow::Result;
 use futures::never::Never;
 use std::borrow::Cow;

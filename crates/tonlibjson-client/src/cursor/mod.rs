@@ -1,4 +1,4 @@
-use crate::block::TonBlockIdExt;
+use crate::tl::TonBlockIdExt;
 
 pub mod client;
 pub mod discover;

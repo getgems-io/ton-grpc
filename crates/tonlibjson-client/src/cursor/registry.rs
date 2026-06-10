@@ -1,6 +1,6 @@
-use crate::block::{BlocksHeader, TonBlockIdExt};
 use crate::cursor::shard_bounds::ShardBounds;
 use crate::cursor::{ChainId, Seqno, ShardId};
+use crate::tl::{BlocksHeader, TonBlockIdExt};
 use dashmap::{DashMap, DashSet};
 use ton_client_util::router::route::BlockCriteria;
 use ton_client_util::router::shard_prefix::ShardPrefix;

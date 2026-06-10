@@ -1,5 +1,4 @@
-use crate::block::{BlocksGetMasterchainInfo, BlocksMasterchainInfo};
-use crate::client::Client;
+use crate::client::TonlibjsonClient;
 use crate::cursor::discover::first_block_discover::FirstBlockDiscover;
 use crate::cursor::discover::last_block_discover::LastBlockDiscover;
 use crate::cursor::registry::Registry;
@@ -7,6 +6,7 @@ use crate::cursor::{ChainId, Seqno};
 use crate::error::ErrorService;
 use crate::metric::ConcurrencyMetric;
 use crate::request::Specialized;
+use crate::tl::{BlocksGetMasterchainInfo, BlocksMasterchainInfo};
 use anyhow::Result;
 use futures::FutureExt;
 use futures::future::ready;
@@ -27,8 +27,9 @@ use tower::load::Load;
 use tower::load::PeakEwma;
 use tower::load::peak_ewma::Cost;
 
-pub type InnerClient =
-    ConcurrencyMetric<ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<Client>>>>>>;
+pub type InnerClient = ConcurrencyMetric<
+    ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<TonlibjsonClient>>>>>,
+>;
 
 #[derive(Clone)]
 pub(crate) struct CursorClient {
@@ -62,7 +63,7 @@ impl Routed for CursorClient {
 impl CursorClient {
     pub(crate) fn new(
         id: String,
-        client: ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<Client>>>>>,
+        client: ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<TonlibjsonClient>>>>>,
     ) -> Self {
         metrics::describe_counter!(
             "ton_liteserver_last_seqno",

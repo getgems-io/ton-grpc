@@ -1,7 +1,7 @@
-use crate::block::BlocksGetMasterchainInfo;
-use crate::client::Client;
+use crate::client::TonlibjsonClient;
 use crate::cursor::client::CursorClient;
 use crate::error::ErrorLayer;
+use crate::tl::BlocksGetMasterchainInfo;
 use serde_json::{Value, json};
 use std::future::Future;
 use std::pin::Pin;
@@ -15,10 +15,10 @@ use tower::load::PeakEwma;
 use tower::{Service, ServiceBuilder, ServiceExt};
 
 #[derive(Default, Debug)]
-pub(crate) struct ClientFactory;
+pub struct MakeTonlibjsonClient;
 
-impl Service<TonConfig> for ClientFactory {
-    type Response = Client;
+impl Service<TonConfig> for MakeTonlibjsonClient {
+    type Response = TonlibjsonClient;
     type Error = anyhow::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
@@ -46,7 +46,7 @@ impl Service<TonConfig> for ClientFactory {
 pub(crate) struct CursorClientFactory;
 
 impl CursorClientFactory {
-    pub(crate) fn create(id: LiteServerId, client: PeakEwma<Client>) -> CursorClient {
+    pub(crate) fn create(id: LiteServerId, client: PeakEwma<TonlibjsonClient>) -> CursorClient {
         ServiceBuilder::new()
             .layer_fn(|s| CursorClient::new(id.to_string(), s))
             .layer(ConcurrencyLimitLayer::new(256))
@@ -93,12 +93,12 @@ impl ClientBuilder {
         self
     }
 
-    async fn build(self) -> anyhow::Result<Client> {
+    async fn build(self) -> anyhow::Result<TonlibjsonClient> {
         if let Some(level) = self.logging {
-            Client::set_logging(level);
+            TonlibjsonClient::set_logging(level);
         }
 
-        let mut client = Client::new();
+        let mut client = TonlibjsonClient::new();
         let _ = (&mut client).oneshot(self.config).await?;
 
         Ok(client)
