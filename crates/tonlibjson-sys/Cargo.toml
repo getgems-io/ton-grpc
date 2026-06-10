@@ -10,7 +10,7 @@ description = "Rust binding for tonlibjson from https://github.com/ton-blockchai
 repository = "https://github.com/getgems-io/ton-grpc"
 
 [dependencies]
-libc = "0.2.184"
+libc = "0.2.186"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 tracing = "0.1.44"
 
