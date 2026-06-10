@@ -3558,26 +3558,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ton-client-util"
-version = "0.2.1"
-dependencies = [
- "anyhow",
- "bitvec",
- "futures",
- "itertools",
- "metrics",
- "pin-project",
- "thiserror 2.0.18",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "ton-config",
- "tower",
- "tracing",
- "url",
-]
-
-[[package]]
 name = "ton-config"
 version = "0.1.1"
 dependencies = [
