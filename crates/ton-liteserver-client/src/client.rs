@@ -1,6 +1,6 @@
-use crate::tl::Requestable;
 use crate::tl::{
     AdnlMessageAnswer, AdnlMessageQuery, Bytes, Int256, LiteServerError, LiteServerQuery,
+    Requestable,
 };
 use adnl_tcp::client::{Client, ServerKey};
 use adnl_tcp::connection::Connection;

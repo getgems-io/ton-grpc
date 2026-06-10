@@ -1,5 +1,4 @@
-use crate::tl::LiteServerWaitMasterchainSeqno;
-use crate::tl::Requestable;
+use crate::tl::{LiteServerWaitMasterchainSeqno, Requestable};
 use adnl_tcp::serializer::{SerializeBoxed, Serializer};
 use std::time::Duration;
 
