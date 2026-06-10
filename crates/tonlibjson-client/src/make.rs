@@ -1,20 +1,13 @@
 use crate::client::TonlibjsonClient;
-use crate::cursor::client::CursorClient;
-use crate::error::ErrorLayer;
 use crate::tl::BlocksGetMasterchainInfo;
 use serde_json::{Value, json};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::time::Duration;
-use ton_client_util::service::shared::SharedLayer;
-use ton_client_util::service::timeout::TimeoutLayer;
-use ton_config::{LiteServerId, TonConfig};
-use tower::limit::ConcurrencyLimitLayer;
-use tower::load::PeakEwma;
-use tower::{Service, ServiceBuilder, ServiceExt};
+use ton_config::TonConfig;
+use tower::{Service, ServiceExt};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 pub struct MakeTonlibjsonClient;
 
 impl Service<TonConfig> for MakeTonlibjsonClient {
@@ -28,7 +21,7 @@ impl Service<TonConfig> for MakeTonlibjsonClient {
 
     fn call(&mut self, req: TonConfig) -> Self::Future {
         Box::pin(async move {
-            let mut client = ClientBuilder::from_config(&req.to_string())
+            let mut client = ClientBuilder::from_config(&req)
                 .disable_logging()
                 .build()
                 .await?;
@@ -42,35 +35,20 @@ impl Service<TonConfig> for MakeTonlibjsonClient {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone)]
-pub(crate) struct CursorClientFactory;
-
-impl CursorClientFactory {
-    pub(crate) fn create(id: LiteServerId, client: PeakEwma<TonlibjsonClient>) -> CursorClient {
-        ServiceBuilder::new()
-            .layer_fn(|s| CursorClient::new(id.to_string(), s))
-            .layer(ConcurrencyLimitLayer::new(256))
-            .layer(SharedLayer)
-            .layer(ErrorLayer)
-            .layer(TimeoutLayer::new(Duration::from_secs(5)))
-            .service(client)
-    }
-}
-
 struct ClientBuilder {
     config: Value,
     logging: Option<i32>,
 }
 
 impl ClientBuilder {
-    fn from_config(config: &str) -> Self {
+    fn from_config(config: &TonConfig) -> Self {
         let full_config = json!({
             "@type": "init",
             "options": {
                 "@type": "options",
                 "config": {
                     "@type": "config",
-                    "config": config,
+                    "config": config.to_string(),
                     "use_callbacks_for_network": false,
                     "blockchain_name": "",
                     "ignore_cache": true

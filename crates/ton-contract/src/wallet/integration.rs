@@ -1,9 +1,11 @@
 use std::str::FromStr;
 use std::time::Duration;
 
+use crate::TonContract;
+use crate::wallet::WalletContract;
+use crate::wallet::v3r2::V3R2;
 use chrono::Utc;
 use ton_address::SmartContractAddress;
-use ton_client::{AccountClient, MessageClient};
 use toner::contracts::wallet::{Wallet, mnemonic::Mnemonic};
 use toner::ton::action::SendMsgAction;
 use toner::ton::bits::ser::pack;
@@ -11,13 +13,9 @@ use toner::ton::message::Message;
 use toner::ton::ser::{CellSerialize, CellSerializeExt};
 use toner::ton::{BagOfCellsArgs, BoC, MsgAddress};
 
-use crate::TonContract;
-use crate::wallet::WalletContract;
-use crate::wallet::v3r2::V3R2;
-
 #[tokio::test]
 async fn should_get_balance_of_preinstalled_wallet() -> anyhow::Result<()> {
-    let (_server, client) = setup().await?;
+    let (_server, mut client) = setup().await?;
     let wallet = wallet_from_mnemonic(GENESIS_MNEMONIC, -1, 42);
     let expected_address = SmartContractAddress::from_str(
         "-1:6744e92c6f71c776fbbcef299e31bf76f39c245cd56f2075b89c6a22026b4131",
@@ -47,7 +45,7 @@ async fn should_get_seqno() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn should_send_ton_between_wallets() -> anyhow::Result<()> {
-    let (_server, client) = setup().await?;
+    let (_server, mut client) = setup().await?;
     let sender_wallet = wallet_from_mnemonic(GENESIS_MNEMONIC, -1, 42);
     let receiver_wallet = wallet_from_mnemonic(VALIDATOR1_MNEMONIC, -1, 42);
     let sender_smc_address = SmartContractAddress::from_str(&sender_wallet.address().to_hex())?;
@@ -117,11 +115,12 @@ async fn should_send_ton_between_wallets() -> anyhow::Result<()> {
 #[tokio::test]
 async fn should_send_ton_between_wallets_via_liteserver_client() -> anyhow::Result<()> {
     let server = testcontainers_ton::LocalLiteServer::new().await?;
-    let client = ton_liteserver_client::client::LiteServerClient::connect(
+    let inner = ton_liteserver_client::client::LiteServerClient::connect(
         server.addr(),
         server.server_key(),
     )
     .await?;
+    let mut client = ton_client::Client::new(ton_liteserver_client::LiteServerAdapter::new(inner));
     let sender_wallet = wallet_from_mnemonic(GENESIS_MNEMONIC, -1, 42);
     let receiver_wallet = wallet_from_mnemonic(VALIDATOR1_MNEMONIC, -1, 42);
     let sender_smc_address = SmartContractAddress::from_str(&sender_wallet.address().to_hex())?;
@@ -223,11 +222,15 @@ where
 
 async fn setup() -> anyhow::Result<(
     testcontainers_ton::LocalLiteServer,
-    tonlibjson_client::ton::TonClient,
+    ton_client::Client<tonlibjson_client::TonlibjsonAdapter>,
 )> {
+    use tower::ServiceExt;
+
     let server = testcontainers_ton::LocalLiteServer::new().await?;
-    let mut client =
-        tonlibjson_client::ton::TonClientBuilder::from_config(server.config()).build()?;
-    client.ready().await?;
+    let adapter = tonlibjson_client::MakeTonlibjsonAdapter
+        .oneshot(server.config().clone())
+        .await?;
+    let mut client = ton_client::Client::new(adapter);
+    client.wait_ready().await?;
     Ok((server, client))
 }

@@ -1,17 +1,18 @@
 use crate::TonContractError;
 use std::str::FromStr;
 use ton_address::SmartContractAddress;
-use ton_client::TonClient;
+use ton_client::Client;
+use ton_client::TonService;
 use ton_tower::response::StackEntry;
 use toner::ton::MsgAddress;
 
-pub struct TonContract<T> {
+pub struct TonContract<S> {
     address: MsgAddress,
-    client: T,
+    client: Client<S>,
 }
 
-impl<T: TonClient> TonContract<T> {
-    pub fn new(client: T, address: MsgAddress) -> Self {
+impl<S: TonService> TonContract<S> {
+    pub fn new(client: Client<S>, address: MsgAddress) -> Self {
         Self { client, address }
     }
 
@@ -19,7 +20,7 @@ impl<T: TonClient> TonContract<T> {
         self.address
     }
 
-    pub fn client(&self) -> T {
+    pub fn client(&self) -> Client<S> {
         self.client.clone()
     }
 
@@ -28,8 +29,8 @@ impl<T: TonClient> TonContract<T> {
         method: impl AsRef<str>,
         stack: Vec<StackEntry>,
     ) -> Result<Vec<StackEntry>, TonContractError> {
-        let result = self
-            .client
+        let mut client = self.client.clone();
+        let result = client
             .run_get_method(
                 &SmartContractAddress::from_str(&self.address().to_hex())?,
                 method.as_ref(),

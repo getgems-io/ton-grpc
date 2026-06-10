@@ -11,23 +11,23 @@ use anyhow::Context;
 use derive_new::new;
 use futures::stream::BoxStream;
 use futures::{StreamExt, TryStreamExt};
-use ton_client::{BlockClientExt as _, TonClient};
+use ton_client::{Client, TonService};
 use tonic::{Request, Response, Status, async_trait};
 
 #[derive(new)]
-pub struct BlockService<T: TonClient> {
-    client: T,
+pub struct BlockService<S: TonService> {
+    client: Client<S>,
 }
 
 #[async_trait]
-impl<T: TonClient> BaseBlockService for BlockService<T> {
+impl<S: TonService> BaseBlockService for BlockService<S> {
     #[tracing::instrument(skip_all, err)]
     async fn get_last_block(
         &self,
         _request: Request<GetLastBlockRequest>,
     ) -> Result<Response<BlockIdExt>, Status> {
-        let block = self
-            .client
+        let mut client = self.client.clone();
+        let block = client
             .get_masterchain_info()
             .await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?
@@ -38,7 +38,8 @@ impl<T: TonClient> BaseBlockService for BlockService<T> {
 
     #[tracing::instrument(skip_all, err)]
     async fn get_block(&self, request: Request<BlockId>) -> Result<Response<BlockIdExt>, Status> {
-        let block_id = extend_block_id(&self.client, &request.into_inner())
+        let mut client = self.client.clone();
+        let block_id = extend_block_id(&mut client, &request.into_inner())
             .await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
@@ -50,7 +51,8 @@ impl<T: TonClient> BaseBlockService for BlockService<T> {
         &self,
         request: Request<BlockId>,
     ) -> Result<Response<BlocksHeader>, Status> {
-        let block_header = extend_get_block_header(&self.client, &request.into_inner())
+        let mut client = self.client.clone();
+        let block_header = extend_get_block_header(&mut client, &request.into_inner())
             .await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
@@ -62,12 +64,12 @@ impl<T: TonClient> BaseBlockService for BlockService<T> {
         &self,
         request: Request<BlockId>,
     ) -> Result<Response<GetShardsResponse>, Status> {
-        let block_id = extend_block_id(&self.client, &request.into_inner())
+        let mut client = self.client.clone();
+        let block_id = extend_block_id(&mut client, &request.into_inner())
             .await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
-        let shards = self
-            .client
+        let shards = client
             .get_shards_by_block_id(block_id)
             .await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
@@ -92,14 +94,15 @@ impl<T: TonClient> BaseBlockService for BlockService<T> {
             .context("block id is required")
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let block_id = extend_block_id(&self.client, &block_id)
+        let mut client = self.client.clone();
+        let block_id = extend_block_id(&mut client, &block_id)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let stream = match order {
-            Order::Unordered => self.client.get_block_tx_stream_unordered(&block_id).boxed(),
-            Order::Asc => self.client.get_block_tx_id_stream(&block_id, false).boxed(),
-            Order::Desc => self.client.get_block_tx_id_stream(&block_id, true).boxed(),
+            Order::Unordered => client.get_block_tx_stream_unordered(&block_id).boxed(),
+            Order::Asc => client.get_block_tx_id_stream(&block_id, false).boxed(),
+            Order::Desc => client.get_block_tx_id_stream(&block_id, true).boxed(),
         };
 
         let stream = stream
@@ -118,12 +121,12 @@ impl<T: TonClient> BaseBlockService for BlockService<T> {
         request: Request<BlockId>,
     ) -> Result<Response<Self::GetAccountAddressesStream>, Status> {
         let msg = request.into_inner();
-        let block_id = extend_block_id(&self.client, &msg)
+        let mut client = self.client.clone();
+        let block_id = extend_block_id(&mut client, &msg)
             .await
             .map_err(|e: anyhow::Error| Status::internal(e.to_string()))?;
 
-        let stream = self
-            .client
+        let stream = client
             .get_accounts_in_block_stream(&block_id)
             .map_ok(|a| AccountAddress {
                 address: a.to_string(),
@@ -149,12 +152,12 @@ impl<T: TonClient> BaseBlockService for BlockService<T> {
             .context("block id is required")
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let block_id = extend_block_id(&self.client, &block_id)
+        let mut client = self.client.clone();
+        let block_id = extend_block_id(&mut client, &block_id)
             .await
             .map_err(|e| Status::internal(e.to_string()))?;
 
-        let stream = self
-            .client
+        let stream = client
             .get_block_tx_stream(&block_id, false)
             .map_ok(|tx| tx.into())
             .map_err(|e| Status::internal(e.to_string()))
@@ -175,8 +178,9 @@ mod integration {
     use futures::StreamExt;
     use testcontainers_ton::LocalLiteServer;
     use tokio::net::TcpListener;
+    use ton_client::TonClientBuilder;
     use tonic::transport::Channel;
-    use tonlibjson_client::ton::TonClientBuilder;
+    use tonlibjson_client::MakeTonlibjsonAdapter;
 
     #[tokio::test]
     async fn should_get_last_block() {
@@ -462,10 +466,10 @@ mod integration {
 
     async fn setup() -> (LocalLiteServer, BlockServiceClient<Channel>) {
         let server = LocalLiteServer::new().await.unwrap();
-        let mut client = TonClientBuilder::from_config(server.config())
+        let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config(server.config())
             .build()
             .unwrap();
-        client.ready().await.unwrap();
+        client.wait_ready().await.unwrap();
 
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
