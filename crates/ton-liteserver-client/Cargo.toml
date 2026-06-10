@@ -29,7 +29,7 @@ rand = "0.10.0"
 thiserror = "2.0.17"
 futures = "0.3.32"
 tokio-stream = { version = "0.1.18", features = ["sync"] }
-tokio-retry = "0.3.0"
+tokio-retry = "0.3.2"
 hex = "0.4.3"
 num-bigint = "0.4.6"
 base64 = "0.22.1"
