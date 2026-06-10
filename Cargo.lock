@@ -3657,6 +3657,7 @@ dependencies = [
  "tonic-prost-build",
  "tonic-reflection",
  "tonlibjson-client",
+ "tower",
  "tracing",
  "tracing-subscriber",
  "tracing-test",

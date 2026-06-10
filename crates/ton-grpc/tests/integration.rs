@@ -1,6 +1,7 @@
 use futures::StreamExt;
 use testcontainers_ton::LocalLiteServer;
 use tokio::net::TcpListener;
+use ton_client::TonClientBuilder;
 use ton_grpc::account_service_server::AccountServiceServer;
 use ton_grpc::block_service_server::BlockServiceServer;
 use ton_grpc::ton::account_service_client::AccountServiceClient;
@@ -12,7 +13,7 @@ use ton_grpc::ton::{
 };
 use ton_grpc::{AccountService, BlockService};
 use tonic::transport::Channel;
-use tonlibjson_client::ton::TonClientBuilder;
+use tonlibjson_client::MakeTonlibjsonAdapter;
 use tracing_test::traced_test;
 
 #[tokio::test]
@@ -224,10 +225,10 @@ async fn setup() -> (
     AccountServiceClient<Channel>,
 ) {
     let server = LocalLiteServer::new().await.unwrap();
-    let mut client = TonClientBuilder::from_config(server.config())
+    let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config(server.config())
         .build()
         .unwrap();
-    client.ready().await.unwrap();
+    client.wait_ready().await.unwrap();
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
