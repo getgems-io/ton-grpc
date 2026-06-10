@@ -9,7 +9,7 @@ use crate::pool::Forward;
 use ton_tower::{Request, request::*};
 use tower::Service;
 
-pub use builder::{PoolTransport, TonClientBuilder};
+pub use builder::{ConfigSource, PoolTransport, TonClientBuilder};
 pub use client::*;
 pub use route::*;
 

@@ -40,7 +40,7 @@ pub type SharedBalance<T> = SharedService<Balance<WrappedCursor<T>, BoxCursorCli
 pub type PoolTransport<T> =
     ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance<T>>, SharedBalance<T>>>>;
 
-enum ConfigSource {
+pub enum ConfigSource {
     File { path: PathBuf },
     Url { url: Url, interval: Duration },
     Config { config: TonConfig },
@@ -62,15 +62,15 @@ pub struct TonClientBuilder<F> {
 
 impl<F: Default> TonClientBuilder<F> {
     pub fn from_config_path(path: PathBuf) -> Self {
-        Self::with_factory(F::default(), ConfigSource::File { path })
+        Self::with_factory_and_source(F::default(), ConfigSource::File { path })
     }
 
     pub fn from_config_url(url: Url, interval: Duration) -> Self {
-        Self::with_factory(F::default(), ConfigSource::Url { url, interval })
+        Self::with_factory_and_source(F::default(), ConfigSource::Url { url, interval })
     }
 
     pub fn from_config(config: &TonConfig) -> Self {
-        Self::with_factory(
+        Self::with_factory_and_source(
             F::default(),
             ConfigSource::Config {
                 config: config.clone(),
@@ -79,7 +79,7 @@ impl<F: Default> TonClientBuilder<F> {
     }
 
     pub fn default_config() -> Self {
-        Self::with_factory(
+        Self::with_factory_and_source(
             F::default(),
             ConfigSource::Url {
                 url: default_ton_config_url(),
@@ -90,7 +90,7 @@ impl<F: Default> TonClientBuilder<F> {
 }
 
 impl<F> TonClientBuilder<F> {
-    fn with_factory(factory: F, config_source: ConfigSource) -> Self {
+    pub fn with_factory_and_source(factory: F, config_source: ConfigSource) -> Self {
         Self {
             factory,
             config_source,
@@ -104,23 +104,6 @@ impl<F> TonClientBuilder<F> {
             retry_first_delay: Duration::from_millis(128),
             retry_max_delay: Duration::from_millis(4096),
         }
-    }
-
-    pub fn with_factory_and_config_path(factory: F, path: PathBuf) -> Self {
-        Self::with_factory(factory, ConfigSource::File { path })
-    }
-
-    pub fn with_factory_and_config_url(factory: F, url: Url, interval: Duration) -> Self {
-        Self::with_factory(factory, ConfigSource::Url { url, interval })
-    }
-
-    pub fn with_factory_and_config(factory: F, config: &TonConfig) -> Self {
-        Self::with_factory(
-            factory,
-            ConfigSource::Config {
-                config: config.clone(),
-            },
-        )
     }
 
     pub fn set_ewma_default_rtt(mut self, default_rtt: Duration) -> Self {
@@ -226,7 +209,7 @@ impl<F> TonClientBuilder<F> {
             .boxed();
 
         let svc = ServiceBuilder::new()
-            .layer_fn(|svc| Client::new(svc))
+            .layer_fn(Client::new)
             .layer(ErrorLayer)
             .layer(TimeoutLayer::new(self.timeout))
             .option_layer(self.retry_enabled.then(|| {
