@@ -15,7 +15,7 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as base64_standard;
 use num_bigint::BigUint;
 use ton_address::SmartContractAddress;
-use ton_client::{AccountState, Cell as TonCell, TransactionId, Transactions};
+use ton_tower::response::{AccountState, Cell as TonCell, TransactionId, Transactions};
 use toner::tlb::{BagOfCellsArgs, BoC, Cell};
 use tower::ServiceExt;
 
@@ -39,7 +39,7 @@ impl ton_client::AccountClient for LiteServerClient {
     async fn get_account_state_on_block(
         &self,
         address: &SmartContractAddress,
-        block_id: ton_client::BlockIdExt,
+        block_id: ton_tower::response::BlockIdExt,
     ) -> anyhow::Result<AccountState> {
         let id: TonNodeBlockIdExt = block_id.into();
         self.get_account_state_inner(address, id).await
@@ -48,7 +48,7 @@ impl ton_client::AccountClient for LiteServerClient {
     async fn get_account_state_at_least_block(
         &self,
         address: &SmartContractAddress,
-        block_id: &ton_client::BlockIdExt,
+        block_id: &ton_tower::response::BlockIdExt,
     ) -> anyhow::Result<AccountState> {
         let mc = self
             .clone()
@@ -94,7 +94,7 @@ impl ton_client::AccountClient for LiteServerClient {
             .await
             .map_err(|e| anyhow!(e))?;
 
-        let mut transactions: Vec<ton_client::Transaction> = Vec::new();
+        let mut transactions: Vec<ton_tower::response::Transaction> = Vec::new();
         let mut previous_transaction_id: Option<TransactionId> = None;
 
         if !response.transactions.is_empty() {
@@ -141,7 +141,7 @@ impl ton_client::AccountClient for LiteServerClient {
     async fn get_shard_account_cell_on_block(
         &self,
         address: &SmartContractAddress,
-        block: ton_client::BlockIdExt,
+        block: ton_tower::response::BlockIdExt,
     ) -> anyhow::Result<TonCell> {
         let id: TonNodeBlockIdExt = block.into();
         self.get_shard_account_cell_inner(address, id).await
@@ -150,7 +150,7 @@ impl ton_client::AccountClient for LiteServerClient {
     async fn get_shard_account_cell_at_least_block(
         &self,
         address: &SmartContractAddress,
-        block_id: &ton_client::BlockIdExt,
+        block_id: &ton_tower::response::BlockIdExt,
     ) -> anyhow::Result<TonCell> {
         let mc = self
             .clone()
@@ -185,7 +185,7 @@ impl LiteServerClient {
         // TODO verify ShardAccount inclusion via ShardAccounts dict traversal (needs MaybePruned)
         verify_account_proofs(&response)?;
 
-        let block_id_out: ton_client::BlockIdExt = response.shardblk.clone().into();
+        let block_id_out: ton_tower::response::BlockIdExt = response.shardblk.clone().into();
         let sync_utime = extract_gen_utime_from_proof(&response.proof)?;
 
         if response.state.is_empty() {
@@ -509,7 +509,7 @@ mod integration {
             .oneshot(LiteServerGetMasterchainInfo::default())
             .await
             .map_err(|e| anyhow!(e))?;
-        let mc_block: ton_client::BlockIdExt = mc.last.into();
+        let mc_block: ton_tower::response::BlockIdExt = mc.last.into();
 
         let state = client
             .get_account_state_on_block(&address, mc_block.clone())
@@ -530,7 +530,7 @@ mod integration {
             .oneshot(LiteServerGetMasterchainInfo::default())
             .await
             .map_err(|e| anyhow!(e))?;
-        let future_block: ton_client::BlockIdExt = ton_client::BlockIdExt {
+        let future_block: ton_tower::response::BlockIdExt = ton_tower::response::BlockIdExt {
             workchain: mc.last.workchain,
             shard: mc.last.shard,
             seqno: mc.last.seqno + 1,

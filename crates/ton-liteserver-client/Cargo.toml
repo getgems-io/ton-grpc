@@ -19,6 +19,7 @@ ton-client-util = { path = "../ton-client-util" }
 toner = { workspace = true }
 toner-tlb-macros = { path = "../toner-tlb-macros" }
 ton-address = { path = "../ton-address" }
+ton-tower = { path = "../ton-tower" }
 async-trait = "0.1"
 anyhow = { version = "1.0.102", features = ["backtrace"] }
 tokio = { version = "1.52.3", features = ["full"] }

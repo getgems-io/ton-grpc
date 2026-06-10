@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::{
+use ton_tower::response::{
     BlockHeader, BlockIdExt, BlockTransactions, BlockTransactionsExt, MasterchainInfo, ShortTxId,
 };
 

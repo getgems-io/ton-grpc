@@ -11,6 +11,7 @@ ton-address = { path = "../ton-address" }
 ton-config = { path = "../ton-config" }
 ton-client-util = { path = "../ton-client-util" }
 ton-client = { path = "../ton-client" }
+ton-tower = { path = "../ton-tower" }
 async-trait = "0.1"
 tower = { version = "0.5.3", features = ["full"] }
 tokio = { version = "1.52.3", features = ["full"] }

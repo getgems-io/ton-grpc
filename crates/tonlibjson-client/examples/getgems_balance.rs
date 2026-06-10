@@ -3,7 +3,8 @@ use std::ops::Bound;
 use std::str::FromStr;
 use tokio::time::Instant;
 use ton_address::SmartContractAddress;
-use ton_client::{AccountClientExt as _, Transaction};
+use ton_client::AccountClientExt as _;
+use ton_tower::response::Transaction;
 use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]

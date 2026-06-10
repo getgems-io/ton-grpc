@@ -13,6 +13,7 @@ testnet = ["tonlibjson-client/testnet", "ton-config/testnet"]
 ton-address = { path = "../ton-address" }
 ton-client = { path = "../ton-client" }
 ton-config = { path = "../ton-config" }
+ton-tower = { path = "../ton-tower" }
 tonlibjson-client = { path = "../tonlibjson-client" }
 tokio = { version = "1.52.3", features = ["full"] }
 futures = "0.3.32"

@@ -13,7 +13,7 @@ use crate::tlb::shard_descr::ShardDescr;
 use crate::tlb::shard_hashes::ShardHashes;
 use crate::tlb::transaction::Transaction;
 use anyhow::anyhow;
-use ton_client::{BlockTransactions, BlockTransactionsExt, MasterchainInfo, ShortTxId};
+use ton_tower::response::{BlockTransactions, BlockTransactionsExt, MasterchainInfo, ShortTxId};
 use toner::tlb::bits::de::{unpack_bytes, unpack_bytes_fully};
 use toner::tlb::{BoC, Cell};
 use tower::ServiceExt;
@@ -33,7 +33,7 @@ impl ton_client::BlockClient for LiteServerClient {
         chain: i32,
         shard: i64,
         seqno: i32,
-    ) -> anyhow::Result<ton_client::BlockIdExt> {
+    ) -> anyhow::Result<ton_tower::response::BlockIdExt> {
         if seqno <= 0 {
             return Err(anyhow!("seqno must be greater than 0"));
         }
@@ -48,7 +48,7 @@ impl ton_client::BlockClient for LiteServerClient {
 
         verify_header_proof(&response.header_proof, &response.id.root_hash)?;
 
-        Ok(ton_client::BlockIdExt::from(response.id))
+        Ok(ton_tower::response::BlockIdExt::from(response.id))
     }
 
     async fn look_up_block_by_lt(
@@ -56,7 +56,7 @@ impl ton_client::BlockClient for LiteServerClient {
         chain: i32,
         shard: i64,
         lt: i64,
-    ) -> anyhow::Result<ton_client::BlockIdExt> {
+    ) -> anyhow::Result<ton_tower::response::BlockIdExt> {
         if lt <= 0 {
             return Err(anyhow!("lt must be greater than 0"));
         }
@@ -74,13 +74,13 @@ impl ton_client::BlockClient for LiteServerClient {
 
         verify_header_proof(&response.header_proof, &response.id.root_hash)?;
 
-        Ok(ton_client::BlockIdExt::from(response.id))
+        Ok(ton_tower::response::BlockIdExt::from(response.id))
     }
 
     async fn get_shards_by_block_id(
         &self,
-        block_id: ton_client::BlockIdExt,
-    ) -> anyhow::Result<Vec<ton_client::BlockIdExt>> {
+        block_id: ton_tower::response::BlockIdExt,
+    ) -> anyhow::Result<Vec<ton_tower::response::BlockIdExt>> {
         let id: TonNodeBlockIdExt = block_id.into();
         if id.workchain != -1 {
             return Err(anyhow!("workchain must be -1"));
@@ -107,7 +107,7 @@ impl ton_client::BlockClient for LiteServerClient {
             .flat_map(|(workchain_id, shards)| {
                 shards
                     .iter()
-                    .map(move |shard: &ShardDescr| ton_client::BlockIdExt {
+                    .map(move |shard: &ShardDescr| ton_tower::response::BlockIdExt {
                         workchain: *workchain_id as i32,
                         shard: shard.next_validator_shard as i64,
                         seqno: shard.seq_no as i32,
@@ -122,8 +122,8 @@ impl ton_client::BlockClient for LiteServerClient {
 
     async fn get_block_header(
         &self,
-        id: ton_client::BlockIdExt,
-    ) -> anyhow::Result<ton_client::BlockHeader> {
+        id: ton_tower::response::BlockIdExt,
+    ) -> anyhow::Result<ton_tower::response::BlockHeader> {
         let block_id: TonNodeBlockIdExt = id.clone().into();
         let expected_root_hash = block_id.root_hash;
 
@@ -152,7 +152,7 @@ impl ton_client::BlockClient for LiteServerClient {
 
     async fn blocks_get_transactions(
         &self,
-        block: &ton_client::BlockIdExt,
+        block: &ton_tower::response::BlockIdExt,
         after: Option<ShortTxId>,
         reverse: bool,
         count: i32,
@@ -181,7 +181,7 @@ impl ton_client::BlockClient for LiteServerClient {
 
     async fn blocks_get_transactions_ext(
         &self,
-        block: &ton_client::BlockIdExt,
+        block: &ton_tower::response::BlockIdExt,
         after: Option<ShortTxId>,
         reverse: bool,
         count: i32,

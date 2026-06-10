@@ -5,8 +5,8 @@ tonic::include_proto!("ton");
 
 pub const FILE_DESCRIPTOR_SET: &[u8] = tonic::include_file_descriptor_set!("ton_descriptor");
 
-impl From<ton_client::BlockIdExt> for BlockIdExt {
-    fn from(value: ton_client::BlockIdExt) -> Self {
+impl From<ton_tower::response::BlockIdExt> for BlockIdExt {
+    fn from(value: ton_tower::response::BlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
             shard: value.shard,
@@ -17,7 +17,7 @@ impl From<ton_client::BlockIdExt> for BlockIdExt {
     }
 }
 
-impl From<BlockIdExt> for ton_client::BlockIdExt {
+impl From<BlockIdExt> for ton_tower::response::BlockIdExt {
     fn from(value: BlockIdExt) -> Self {
         Self {
             workchain: value.workchain,
@@ -29,8 +29,8 @@ impl From<BlockIdExt> for ton_client::BlockIdExt {
     }
 }
 
-impl From<ton_client::ShortTxId> for TransactionId {
-    fn from(value: ton_client::ShortTxId) -> Self {
+impl From<ton_tower::response::ShortTxId> for TransactionId {
+    fn from(value: ton_tower::response::ShortTxId) -> Self {
         Self {
             account_address: value.account.to_raw().to_string(),
             lt: value.lt,
@@ -39,8 +39,8 @@ impl From<ton_client::ShortTxId> for TransactionId {
     }
 }
 
-impl From<ton_client::BlockHeader> for BlocksHeader {
-    fn from(value: ton_client::BlockHeader) -> Self {
+impl From<ton_tower::response::BlockHeader> for BlocksHeader {
+    fn from(value: ton_tower::response::BlockHeader) -> Self {
         Self {
             id: Some(value.id.into()),
             global_id: value.global_id,
@@ -65,7 +65,7 @@ impl From<ton_client::BlockHeader> for BlocksHeader {
     }
 }
 
-impl From<TransactionId> for ton_client::TransactionId {
+impl From<TransactionId> for ton_tower::response::TransactionId {
     fn from(value: TransactionId) -> Self {
         Self {
             hash: value.hash,
@@ -74,7 +74,7 @@ impl From<TransactionId> for ton_client::TransactionId {
     }
 }
 
-impl From<PartialTransactionId> for ton_client::TransactionId {
+impl From<PartialTransactionId> for ton_tower::response::TransactionId {
     fn from(value: PartialTransactionId) -> Self {
         Self {
             hash: value.hash,
@@ -83,8 +83,8 @@ impl From<PartialTransactionId> for ton_client::TransactionId {
     }
 }
 
-impl From<ton_client::AccountState> for AccountState {
-    fn from(value: ton_client::AccountState) -> Self {
+impl From<ton_tower::response::AccountState> for AccountState {
+    fn from(value: ton_tower::response::AccountState) -> Self {
         if !value.code.is_empty() {
             AccountState::Active(ActiveAccountState {
                 code: value.code,
@@ -100,31 +100,31 @@ impl From<ton_client::AccountState> for AccountState {
     }
 }
 
-impl From<ton_client::Cell> for TvmCell {
-    fn from(value: ton_client::Cell) -> Self {
+impl From<ton_tower::response::Cell> for TvmCell {
+    fn from(value: ton_tower::response::Cell) -> Self {
         Self { bytes: value.bytes }
     }
 }
 
-impl From<ton_client::MessageData> for MsgData {
-    fn from(value: ton_client::MessageData) -> Self {
+impl From<ton_tower::response::MessageData> for MsgData {
+    fn from(value: ton_tower::response::MessageData) -> Self {
         match value {
-            ton_client::MessageData::Raw { body, init_state } => {
+            ton_tower::response::MessageData::Raw { body, init_state } => {
                 Self::Raw(MessageDataRaw { body, init_state })
             }
-            ton_client::MessageData::Text { text } => Self::Text(MessageDataText { text }),
-            ton_client::MessageData::DecryptedText { text } => {
+            ton_tower::response::MessageData::Text { text } => Self::Text(MessageDataText { text }),
+            ton_tower::response::MessageData::DecryptedText { text } => {
                 Self::DecryptedText(MessageDataDecryptedText { text })
             }
-            ton_client::MessageData::EncryptedText { text } => {
+            ton_tower::response::MessageData::EncryptedText { text } => {
                 Self::EncryptedText(MessageDataEncryptedText { text })
             }
         }
     }
 }
 
-impl From<ton_client::Message> for Message {
-    fn from(value: ton_client::Message) -> Self {
+impl From<ton_tower::response::Message> for Message {
+    fn from(value: ton_tower::response::Message) -> Self {
         Self {
             source: value.source.map(|a| a.to_raw().to_string()),
             destination: value.destination.map(|a| a.to_raw().to_string()),
@@ -138,8 +138,8 @@ impl From<ton_client::Message> for Message {
     }
 }
 
-impl From<ton_client::Transaction> for Transaction {
-    fn from(value: ton_client::Transaction) -> Self {
+impl From<ton_tower::response::Transaction> for Transaction {
+    fn from(value: ton_tower::response::Transaction) -> Self {
         Self {
             id: Some(TransactionId {
                 account_address: value.address.to_raw().to_string(),

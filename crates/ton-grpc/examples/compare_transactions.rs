@@ -1,7 +1,8 @@
 use futures::TryStreamExt;
 use testcontainers_ton::LocalLiteServer;
-use ton_client::{BlockClient, BlockClientExt as _, BlockIdExt, Transaction};
+use ton_client::{BlockClient, BlockClientExt as _};
 use ton_liteserver_client::client::LiteServerClient;
+use ton_tower::response::{BlockIdExt, Transaction};
 use tonlibjson_client::ton::TonClientBuilder;
 
 #[tokio::main]

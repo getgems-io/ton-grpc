@@ -12,11 +12,11 @@ use base64::Engine;
 use base64::engine::general_purpose::STANDARD as base64_standard;
 use std::sync::Arc;
 use ton_address::SmartContractAddress;
-use ton_client::ShortTxId;
+use ton_tower::response::ShortTxId;
 use toner::tlb::{BagOfCellsArgs, BoC, Cell};
 use toner::ton::message::{CommonMsgInfo, InternalMsgInfo, Message};
 
-impl From<TonNodeBlockIdExt> for ton_client::BlockIdExt {
+impl From<TonNodeBlockIdExt> for ton_tower::response::BlockIdExt {
     fn from(v: TonNodeBlockIdExt) -> Self {
         Self {
             workchain: v.workchain,
@@ -28,8 +28,8 @@ impl From<TonNodeBlockIdExt> for ton_client::BlockIdExt {
     }
 }
 
-impl From<ton_client::BlockIdExt> for TonNodeBlockIdExt {
-    fn from(v: ton_client::BlockIdExt) -> Self {
+impl From<ton_tower::response::BlockIdExt> for TonNodeBlockIdExt {
+    fn from(v: ton_tower::response::BlockIdExt) -> Self {
         Self {
             workchain: v.workchain,
             shard: v.shard,
@@ -48,8 +48,8 @@ impl From<ton_client::BlockIdExt> for TonNodeBlockIdExt {
     }
 }
 
-impl From<ton_client::BlockIdExt> for TonNodeBlockId {
-    fn from(v: ton_client::BlockIdExt) -> Self {
+impl From<ton_tower::response::BlockIdExt> for TonNodeBlockId {
+    fn from(v: ton_tower::response::BlockIdExt) -> Self {
         Self {
             workchain: v.workchain,
             shard: v.shard,
@@ -58,12 +58,12 @@ impl From<ton_client::BlockIdExt> for TonNodeBlockId {
     }
 }
 
-impl From<LiteServerMasterchainInfo> for ton_client::MasterchainInfo {
+impl From<LiteServerMasterchainInfo> for ton_tower::response::MasterchainInfo {
     fn from(v: LiteServerMasterchainInfo) -> Self {
         Self {
             last: v.last.into(),
             state_root_hash: base64_standard.encode(v.state_root_hash),
-            init: ton_client::BlockIdExt {
+            init: ton_tower::response::BlockIdExt {
                 workchain: v.init.workchain,
                 shard: 0,
                 seqno: 0,
@@ -74,8 +74,11 @@ impl From<LiteServerMasterchainInfo> for ton_client::MasterchainInfo {
     }
 }
 
-fn ext_blk_ref_to_block_id_ext(shard: &ShardIdent, r: &ExtBlkRef) -> ton_client::BlockIdExt {
-    ton_client::BlockIdExt {
+fn ext_blk_ref_to_block_id_ext(
+    shard: &ShardIdent,
+    r: &ExtBlkRef,
+) -> ton_tower::response::BlockIdExt {
+    ton_tower::response::BlockIdExt {
         workchain: shard.workchain_id,
         shard: shard.shard_prefix as i64,
         seqno: r.seq_no as i32,
@@ -87,7 +90,7 @@ fn ext_blk_ref_to_block_id_ext(shard: &ShardIdent, r: &ExtBlkRef) -> ton_client:
 fn blk_prev_info_to_block_ids(
     shard: &ShardIdent,
     prev: &BlkPrevInfo,
-) -> Vec<ton_client::BlockIdExt> {
+) -> Vec<ton_tower::response::BlockIdExt> {
     match prev {
         BlkPrevInfo::Ref(r) => vec![ext_blk_ref_to_block_id_ext(shard, r)],
         BlkPrevInfo::RefPair(a, b) => vec![
@@ -98,13 +101,13 @@ fn blk_prev_info_to_block_ids(
 }
 
 pub fn block_header_to_ton_client(
-    id: ton_client::BlockIdExt,
+    id: ton_tower::response::BlockIdExt,
     header: BlockHeader,
-) -> ton_client::BlockHeader {
+) -> ton_tower::response::BlockHeader {
     let info = &header.info;
     let flags = info.flags;
 
-    ton_client::BlockHeader {
+    ton_tower::response::BlockHeader {
         id,
         global_id: header.global_id,
         version: info.version as i32,
@@ -129,7 +132,7 @@ pub fn block_header_to_ton_client(
 
 pub fn block_transactions_to_ton_client(
     v: LiteServerBlockTransactions,
-) -> anyhow::Result<ton_client::BlockTransactions> {
+) -> anyhow::Result<ton_tower::response::BlockTransactions> {
     let workchain = v.id.workchain;
     let incomplete = matches!(v.incomplete, BoxedBool::BoolTrue(_));
 
@@ -154,14 +157,14 @@ pub fn block_transactions_to_ton_client(
         })
         .collect::<anyhow::Result<Vec<ShortTxId>>>()?;
 
-    Ok(ton_client::BlockTransactions {
+    Ok(ton_tower::response::BlockTransactions {
         incomplete,
         transactions,
     })
 }
 
-impl From<ton_client::ShortTxId> for LiteServerTransactionId3 {
-    fn from(v: ton_client::ShortTxId) -> Self {
+impl From<ton_tower::response::ShortTxId> for LiteServerTransactionId3 {
+    fn from(v: ton_tower::response::ShortTxId) -> Self {
         Self {
             account: *v.account.to_internal(),
             lt: v.lt,
@@ -169,7 +172,7 @@ impl From<ton_client::ShortTxId> for LiteServerTransactionId3 {
     }
 }
 
-fn tlb_message_to_ton_client(msg: &Message) -> ton_client::Message {
+fn tlb_message_to_ton_client(msg: &Message) -> ton_tower::response::Message {
     let (source, destination, value, fwd_fee, ihr_fee, created_lt) = match &msg.info {
         CommonMsgInfo::Internal(InternalMsgInfo {
             src,
@@ -197,7 +200,7 @@ fn tlb_message_to_ton_client(msg: &Message) -> ton_client::Message {
         }
     };
 
-    ton_client::Message {
+    ton_tower::response::Message {
         hash: String::new(),
         source,
         destination,
@@ -206,7 +209,7 @@ fn tlb_message_to_ton_client(msg: &Message) -> ton_client::Message {
         ihr_fee,
         created_lt,
         body_hash: String::new(),
-        msg_data: ton_client::MessageData::Raw {
+        msg_data: ton_tower::response::MessageData::Raw {
             body: String::new(),
             init_state: String::new(),
         },
@@ -232,7 +235,7 @@ pub fn transaction_to_ton_client(
     workchain: i32,
     root: &Arc<Cell>,
     tx: Transaction,
-) -> anyhow::Result<ton_client::Transaction> {
+) -> anyhow::Result<ton_tower::response::Transaction> {
     let data = {
         let boc = BoC::from_root(root.clone());
         let bytes = boc
@@ -251,16 +254,16 @@ pub fn transaction_to_ton_client(
 
     let mut out_msgs: Vec<_> = tx.out_msgs.iter().collect();
     out_msgs.sort_by_key(|(k, _)| *k);
-    let out_msgs: Vec<ton_client::Message> = out_msgs
+    let out_msgs: Vec<ton_tower::response::Message> = out_msgs
         .into_iter()
         .map(|(_, msg)| tlb_message_to_ton_client(msg))
         .collect();
 
-    Ok(ton_client::Transaction {
+    Ok(ton_tower::response::Transaction {
         address,
         utime: tx.now as i64,
         data,
-        transaction_id: ton_client::TransactionId {
+        transaction_id: ton_tower::response::TransactionId {
             lt: tx.lt as i64,
             hash: base64_standard.encode(root.hash()),
         },
