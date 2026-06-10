@@ -33,8 +33,6 @@ type SingleAdapter = Either<TonlibjsonAdapter, LiteServerAdapter>;
 type ComparingPair = Either<ComparingTonlibAdapter, ComparingAdnlAdapter>;
 
 type Adapter = Either<SingleAdapter, ComparingPair>;
-type Client = PoolTransport<Adapter>;
-
 type MakeTonlibjsonSingle = MapResponse<MakeTonlibjsonAdapter, fn(TonlibjsonAdapter) -> Adapter>;
 type MakeLiteServerSingle = MapResponse<MakeLiteServerAdapter, fn(LiteServerAdapter) -> Adapter>;
 type MakeComparingTonlib = MapResponse<
@@ -208,6 +206,8 @@ async fn main() -> anyhow::Result<()> {
     let message_service = MessageServiceServer::new(MessageService::new(client))
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
+
+    type Client = PoolTransport<TonlibjsonAdapter>;
 
     let (health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter

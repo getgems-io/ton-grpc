@@ -69,7 +69,13 @@ impl ToRoute for GetAccountStateByTransaction {
 
 impl ToRoute for GetAccountTransactions {
     fn to_route(&self) -> Route {
-        Route::Latest
+        Route::Block {
+            chain: self.address.workchain_id(),
+            criteria: BlockCriteria::LogicalTime {
+                address: self.address.data_as_bytes(),
+                lt: self.from.lt,
+            },
+        }
     }
 }
 
