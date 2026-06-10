@@ -4,6 +4,7 @@ use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::hash_update::HashUpdate;
 use crate::tlb::transaction_descr::TransactionDescr;
 use std::collections::HashMap;
+use std::sync::Arc;
 use toner::tlb::bits::NBits;
 use toner::tlb::bits::bitvec::field::BitField;
 use toner::tlb::bits::bitvec::order::Msb0;
@@ -11,8 +12,7 @@ use toner::tlb::bits::bitvec::vec::BitVec;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
 use toner::tlb::hashmap::HashmapE;
-use toner::tlb::{Context, Data, Error, ParseFully, Ref};
-use toner::ton::message::Message;
+use toner::tlb::{Cell, Context, Data, Error, ParseFully, Ref};
 
 /// ```tlb
 /// transaction$0111 account_addr:bits256 lt:uint64
@@ -33,8 +33,8 @@ pub struct Transaction {
     pub outmsg_cnt: u16,
     pub orig_status: AccountStatus,
     pub end_status: AccountStatus,
-    pub in_msg: Option<Message>,
-    pub out_msgs: HashMap<u16, Message>,
+    pub in_msg: Option<Arc<Cell>>,
+    pub out_msgs: HashMap<u16, Arc<Cell>>,
     pub total_fees: CurrencyCollection,
     pub state_update: HashUpdate<Account>,
     pub description: TransactionDescr,
@@ -61,8 +61,7 @@ impl<'de> CellDeserialize<'de> for Transaction {
         let orig_status = parser.unpack(()).context("orig_status")?;
         let end_status = parser.unpack(()).context("end_status")?;
 
-        // TODO[akostylev0]: parse as Key
-        let (in_msg, out_msgs): (_, HashMap<BitVec<u8, Msb0>, _>) = parser
+        let (in_msg, out_msgs): (_, HashMap<_, _>) = parser
             .parse_as::<_, Ref<ParseFully<(Option<Ref>, HashmapE<Ref>)>>>(((), (15, ())))
             .context("(in_msg, out_msgs)")?;
 

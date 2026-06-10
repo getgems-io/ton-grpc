@@ -33,7 +33,15 @@ use toner::tlb::{Data, Ref, Same};
 #[derive(Debug, Clone)]
 pub struct BlockInfo {
     pub version: u32,
-    pub flags: u16,
+    pub not_master: bool,
+    pub after_merge: bool,
+    pub before_split: bool,
+    pub after_split: bool,
+    pub want_split: bool,
+    pub want_merge: bool,
+    pub key_block: bool,
+    pub vert_seqno_incr: bool,
+    pub flags: u8,
     pub seq_no: u32,
     pub vert_seq_no: u32,
     pub shard: ShardIdent,
@@ -63,7 +71,15 @@ impl<'de> CellDeserialize<'de> for BlockInfo {
         };
 
         let version = parser.unpack(())?;
-        let flags = parser.unpack(())?;
+        let not_master: bool = parser.unpack(())?;
+        let after_merge: bool = parser.unpack(())?;
+        let before_split: bool = parser.unpack(())?;
+        let after_split: bool = parser.unpack(())?;
+        let want_split: bool = parser.unpack(())?;
+        let want_merge: bool = parser.unpack(())?;
+        let key_block: bool = parser.unpack(())?;
+        let vert_seqno_incr: bool = parser.unpack(())?;
+        let flags: u8 = parser.unpack(())?;
         let seq_no = parser.unpack(())?;
         let vert_seq_no = parser.unpack(())?;
         let shard = parser.unpack(())?;
@@ -75,18 +91,18 @@ impl<'de> CellDeserialize<'de> for BlockInfo {
         let min_ref_mc_seqno = parser.unpack(())?;
         let prev_key_block_seqno = parser.unpack(())?;
 
-        let gen_software = if flags & (1 << 0) != 0 {
+        let gen_software = if flags & 1 != 0 {
             Some(parser.unpack(())?)
         } else {
             None
         };
-        let master_ref = if flags & (1 << 15) != 0 {
+        let master_ref = if not_master {
             Some(parser.parse_as::<_, Ref<Data<Same>>>(())?)
         } else {
             None
         };
-        let prev_ref = parser.parse_as::<_, Ref<Same>>(flags & (1 << 14) != 0)?;
-        let prev_vert_ref = if flags & (1 << 8) != 0 {
+        let prev_ref = parser.parse_as::<_, Ref<Same>>(after_merge)?;
+        let prev_vert_ref = if vert_seqno_incr {
             Some(parser.parse_as::<_, Ref<Same>>(false)?)
         } else {
             None
@@ -94,6 +110,14 @@ impl<'de> CellDeserialize<'de> for BlockInfo {
 
         Ok(Self {
             version,
+            not_master,
+            after_merge,
+            before_split,
+            after_split,
+            want_split,
+            want_merge,
+            key_block,
+            vert_seqno_incr,
             flags,
             seq_no,
             vert_seq_no,

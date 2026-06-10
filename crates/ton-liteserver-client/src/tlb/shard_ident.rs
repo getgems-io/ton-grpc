@@ -16,6 +16,18 @@ pub struct ShardIdent {
     pub shard_prefix: u64,
 }
 
+impl ShardIdent {
+    /// Computes the canonical shard ID by adding the sentinel bit to the raw prefix.
+    ///
+    /// In TON, a `ShardId` is encoded as `prefix_bits | sentinel_bit | zeros`.
+    /// The sentinel bit position is `63 - shard_pfx_bits`.
+    /// Reference: `ton/crypto/block/block-parse.cpp` `ShardIdent::unpack`.
+    pub fn shard_id(&self) -> u64 {
+        let sentinel = 1u64 << (63 - self.shard_pfx_bits);
+        self.shard_prefix | sentinel
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -49,5 +61,28 @@ mod tests {
         assert_eq!(bits.len(), 2 + 6 + 32 + 64);
         assert!(!bits[0]);
         assert!(!bits[1]);
+    }
+
+    #[test]
+    fn should_compute_shard_id_for_masterchain() {
+        let shard = ShardIdent {
+            shard_pfx_bits: 0,
+            workchain_id: -1,
+            shard_prefix: 0,
+        };
+
+        assert_eq!(shard.shard_id(), 0x8000_0000_0000_0000);
+        assert_eq!(shard.shard_id() as i64, i64::MIN);
+    }
+
+    #[test]
+    fn should_compute_shard_id_with_prefix_bits() {
+        let shard = ShardIdent {
+            shard_pfx_bits: 1,
+            workchain_id: 0,
+            shard_prefix: 0x8000_0000_0000_0000,
+        };
+
+        assert_eq!(shard.shard_id(), 0xC000_0000_0000_0000);
     }
 }

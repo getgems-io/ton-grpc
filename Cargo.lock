@@ -3650,7 +3650,6 @@ version = "0.5.0"
 dependencies = [
  "adnl-tcp",
  "anyhow",
- "async-trait",
  "base64 0.22.1",
  "convert_case",
  "crc",
@@ -3672,8 +3671,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util",
  "ton-address",
- "ton-client",
- "ton-client-util",
+ "ton-config",
  "ton-tower",
  "toner",
  "toner-tlb-macros",

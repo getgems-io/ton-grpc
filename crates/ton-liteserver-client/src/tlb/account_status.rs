@@ -29,7 +29,7 @@ mod tests {
     fn unpack_uninit() {
         let bits = bits![u8, Msb0; 0, 0];
 
-        let result: AccountStatus = unpack_fully(&bits, ()).unwrap();
+        let result: AccountStatus = unpack_fully(bits, ()).unwrap();
 
         assert_eq!(result, AccountStatus::Uninit);
     }
@@ -38,7 +38,7 @@ mod tests {
     fn unpack_frozen() {
         let bits = bits![u8, Msb0; 0, 1];
 
-        let result: AccountStatus = unpack_fully(&bits, ()).unwrap();
+        let result: AccountStatus = unpack_fully(bits, ()).unwrap();
 
         assert_eq!(result, AccountStatus::Frozen);
     }
@@ -47,7 +47,7 @@ mod tests {
     fn unpack_active() {
         let bits = bits![u8, Msb0; 1, 0];
 
-        let result: AccountStatus = unpack_fully(&bits, ()).unwrap();
+        let result: AccountStatus = unpack_fully(bits, ()).unwrap();
 
         assert_eq!(result, AccountStatus::Active);
     }
@@ -56,7 +56,7 @@ mod tests {
     fn unpack_nonexist() {
         let bits = bits![u8, Msb0; 1, 1];
 
-        let result: AccountStatus = unpack_fully(&bits, ()).unwrap();
+        let result: AccountStatus = unpack_fully(bits, ()).unwrap();
 
         assert_eq!(result, AccountStatus::Nonexist);
     }
