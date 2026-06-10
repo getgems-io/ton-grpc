@@ -125,7 +125,7 @@ impl<T: TonClient> AccountService<T> {
     async fn fetch_account_state(
         &self,
         msg: &GetAccountStateRequest,
-    ) -> Result<ton_client::AccountState> {
+    ) -> Result<ton_tower::response::AccountState> {
         let account_address = SmartContractAddress::from_str(&msg.account_address)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
 
@@ -163,7 +163,7 @@ impl<T: TonClient> AccountService<T> {
     async fn fetch_shard_account_cell(
         &self,
         msg: &GetShardAccountCellRequest,
-    ) -> Result<(ton_client::BlockIdExt, ton_client::Cell)> {
+    ) -> Result<(ton_tower::response::BlockIdExt, ton_tower::response::Cell)> {
         let account_address = SmartContractAddress::from_str(&msg.account_address)
             .map_err(|e| Status::invalid_argument(e.to_string()))?;
 

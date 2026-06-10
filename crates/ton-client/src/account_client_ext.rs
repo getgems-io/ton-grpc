@@ -1,4 +1,4 @@
-use crate::{AccountClient, AccountState, BlockClient, Transaction, TransactionId};
+use crate::{AccountClient, BlockClient};
 use anyhow::anyhow;
 use async_stream::try_stream;
 use futures::stream::BoxStream;
@@ -7,6 +7,7 @@ use itertools::Itertools;
 use std::cmp::min;
 use std::ops::{Bound, RangeBounds};
 use ton_address::SmartContractAddress;
+use ton_tower::response::{AccountState, Transaction, TransactionId};
 use tracing::{debug, trace};
 
 pub trait AccountClientExt: BlockClient + AccountClient {

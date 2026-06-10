@@ -1,6 +1,6 @@
-use crate::{AccountState, BlockIdExt, Cell, TransactionId, Transactions};
 use async_trait::async_trait;
 use ton_address::SmartContractAddress;
+use ton_tower::response::{AccountState, BlockIdExt, Cell, TransactionId, Transactions};
 
 #[async_trait]
 pub trait AccountClient: Clone + Send + Sync + 'static {

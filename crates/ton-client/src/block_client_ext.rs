@@ -1,10 +1,11 @@
-use crate::{BlockClient, BlockIdExt, Shards, ShortTxId, Transaction};
+use crate::BlockClient;
 use async_stream::try_stream;
 use futures::stream_select;
 use futures::{Stream, StreamExt, TryStreamExt};
 use std::cmp::min;
 use std::collections::HashMap;
 use ton_address::SmartContractAddress;
+use ton_tower::response::{BlockIdExt, Shards, ShortTxId, Transaction};
 
 pub trait BlockClientExt: BlockClient {
     fn get_shards(

@@ -29,12 +29,12 @@ pub struct MasterchainInfo {
     pub init: BlockIdExt,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shards {
     pub shards: Vec<BlockIdExt>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockHeader {
     pub id: BlockIdExt,
     pub global_id: i32,
@@ -57,14 +57,14 @@ pub struct BlockHeader {
     pub prev_blocks: Vec<BlockIdExt>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShortTxId {
     pub account: SmartContractAddress,
     pub lt: i64,
     pub hash: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AccountState {
     pub balance: Option<i64>,
     pub code: String,
@@ -88,7 +88,7 @@ pub struct Transaction {
     pub out_msgs: Vec<Message>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transactions {
     pub transactions: Vec<Transaction>,
     pub previous_transaction_id: Option<TransactionId>,
@@ -115,7 +115,7 @@ pub enum MessageData {
     EncryptedText { text: String },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cell {
     pub bytes: String,
 }
@@ -137,19 +137,19 @@ pub enum StackEntry {
     Unsupported,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockTransactions {
     pub incomplete: bool,
     pub transactions: Vec<ShortTxId>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BlockTransactionsExt {
     pub incomplete: bool,
     pub transactions: Vec<Transaction>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExtMessageInfo {
     pub hash: String,
 }

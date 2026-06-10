@@ -1,5 +1,5 @@
 use thiserror::Error as ThisError;
-use ton_client::StackEntry;
+use ton_tower::response::StackEntry;
 use toner::tlb::StringError as TlbError;
 
 #[derive(Debug, ThisError)]

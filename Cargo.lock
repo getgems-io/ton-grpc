@@ -3535,6 +3535,7 @@ dependencies = [
  "futures",
  "itertools",
  "ton-address",
+ "ton-tower",
  "tracing",
 ]
 
@@ -3586,6 +3587,7 @@ dependencies = [
  "ton-address",
  "ton-client",
  "ton-liteserver-client",
+ "ton-tower",
  "toner",
  "toner-tlb-macros",
  "tonlibjson-client",
@@ -3629,6 +3631,7 @@ dependencies = [
  "ton-client",
  "ton-config",
  "ton-liteserver-client",
+ "ton-tower",
  "tonic",
  "tonic-health",
  "tonic-prost",
@@ -3671,12 +3674,20 @@ dependencies = [
  "ton-address",
  "ton-client",
  "ton-client-util",
+ "ton-tower",
  "toner",
  "toner-tlb-macros",
  "tower",
  "tracing",
  "tracing-subscriber",
  "tracing-test",
+]
+
+[[package]]
+name = "ton-tower"
+version = "0.1.0"
+dependencies = [
+ "ton-address",
 ]
 
 [[package]]
@@ -3825,6 +3836,7 @@ dependencies = [
  "ton-client",
  "ton-client-util",
  "ton-config",
+ "ton-tower",
  "tonlibjson-sys",
  "tower",
  "tracing",

@@ -1,7 +1,8 @@
 use crate::TonContractError;
 use std::str::FromStr;
 use ton_address::SmartContractAddress;
-use ton_client::{StackEntry, TonClient};
+use ton_client::TonClient;
+use ton_tower::response::StackEntry;
 use toner::ton::MsgAddress;
 
 pub struct TonContract<T> {

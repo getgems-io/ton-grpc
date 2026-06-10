@@ -11,7 +11,7 @@ use crc::Crc;
 use num_bigint::BigUint;
 use std::str::FromStr;
 use ton_address::SmartContractAddress;
-use ton_client::{SmcRunResult, StackEntry};
+use ton_tower::response::{SmcRunResult, StackEntry};
 use toner::tlb::ser::CellSerializeExt;
 use toner::tlb::{BagOfCellsArgs, BoC};
 use tower::ServiceExt;

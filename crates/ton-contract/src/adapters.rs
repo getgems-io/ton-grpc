@@ -1,7 +1,7 @@
 use base64::{Engine, engine::general_purpose::STANDARD};
 use core::{fmt::Display, str::FromStr};
 use std::{error::Error as StdError, sync::Arc};
-use ton_client::StackEntry;
+use ton_tower::response::StackEntry;
 use toner::{
     tlb::bits::de::unpack_bytes,
     tlb::bits::ser::pack,

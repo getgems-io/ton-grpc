@@ -1,6 +1,7 @@
 use futures::stream::StreamExt;
 use std::time::Duration;
-use ton_client::{BlockClient as _, BlockClientExt as _, Transaction};
+use ton_client::{BlockClient as _, BlockClientExt as _};
+use ton_tower::response::Transaction;
 use tonlibjson_client::ton::{TonClient, TonClientBuilder};
 use url::Url;
 
