@@ -24,7 +24,7 @@ tokio = { version = "1.52.3", features = ["full"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }
 tower = { version = "0.5.3", features = ["full"] }
 tracing = "0.1.44"
-pin-project = "1.1.10"
+pin-project = "1.1.13"
 rand = "0.10.0"
 thiserror = "2.0.17"
 futures = "0.3.32"
