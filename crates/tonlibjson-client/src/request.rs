@@ -1,21 +1,9 @@
+use crate::tl::Requestable;
 use derive_new::new;
-use serde::de::DeserializeOwned;
 use serde::{Serialize, Serializer};
-use serde_json::Value;
 use std::time::Duration;
 use ton_client_util::router::route::{Route, ToRoute};
 use ton_client_util::service::timeout::ToTimeout;
-
-pub(crate) trait Requestable
-where
-    Self: Serialize,
-{
-    type Response: DeserializeOwned;
-}
-
-impl Requestable for Value {
-    type Response = Value;
-}
 
 #[derive(Clone, Debug)]
 pub(crate) struct Forward<T> {

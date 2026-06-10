@@ -1,5 +1,5 @@
-use crate::block::{RawSendMessage, RawSendMessageReturnHash};
 use crate::error::Error;
+use crate::tl::{RawSendMessage, RawSendMessageReturnHash};
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use std::sync::Arc;

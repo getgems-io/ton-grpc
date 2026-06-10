@@ -1,8 +1,7 @@
-use crate::block::{
-    AccountAddress, SmcBoxedMethodId, SmcLoad, SmcRunGetMethod, TvmBoxedStackEntry,
+use crate::client::TonlibjsonClient;
+use crate::tl::{
+    AccountAddress, Requestable, SmcBoxedMethodId, SmcLoad, SmcRunGetMethod, TvmBoxedStackEntry,
 };
-use crate::client::Client;
-use crate::request::Requestable;
 use derive_new::new;
 use futures::FutureExt;
 use futures::TryFutureExt;
@@ -19,7 +18,7 @@ pub struct RunGetMethod {
     stack: Vec<TvmBoxedStackEntry>,
 }
 
-impl Service<RunGetMethod> for Client {
+impl Service<RunGetMethod> for TonlibjsonClient {
     type Response = <SmcRunGetMethod as Requestable>::Response;
     type Error = anyhow::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;

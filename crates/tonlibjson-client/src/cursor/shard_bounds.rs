@@ -1,5 +1,5 @@
-use crate::block::BlocksHeader;
 use crate::cursor::Seqno;
+use crate::tl::BlocksHeader;
 
 #[derive(Debug, Clone, Default)]
 pub struct ShardBounds {

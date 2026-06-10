@@ -1,5 +1,5 @@
-use crate::block;
-use crate::block::{
+use crate::tl;
+use crate::tl::{
     BlocksTransactions, BlocksTransactionsExt, RawMessage, RawTransaction, RawTransactions,
 };
 use anyhow::{Context, anyhow};
@@ -9,8 +9,8 @@ use std::str::FromStr;
 use ton_address::SmartContractAddress;
 use ton_tower::response::ShortTxId;
 
-impl From<block::TonBlockIdExt> for ton_tower::response::BlockIdExt {
-    fn from(v: block::TonBlockIdExt) -> Self {
+impl From<tl::TonBlockIdExt> for ton_tower::response::BlockIdExt {
+    fn from(v: tl::TonBlockIdExt) -> Self {
         Self {
             workchain: v.workchain,
             shard: v.shard,
@@ -21,7 +21,7 @@ impl From<block::TonBlockIdExt> for ton_tower::response::BlockIdExt {
     }
 }
 
-impl From<ton_tower::response::BlockIdExt> for block::TonBlockIdExt {
+impl From<ton_tower::response::BlockIdExt> for tl::TonBlockIdExt {
     fn from(v: ton_tower::response::BlockIdExt) -> Self {
         Self {
             workchain: v.workchain,
@@ -33,8 +33,8 @@ impl From<ton_tower::response::BlockIdExt> for block::TonBlockIdExt {
     }
 }
 
-impl From<block::InternalTransactionId> for ton_tower::response::TransactionId {
-    fn from(v: block::InternalTransactionId) -> Self {
+impl From<tl::InternalTransactionId> for ton_tower::response::TransactionId {
+    fn from(v: tl::InternalTransactionId) -> Self {
         Self {
             lt: v.lt,
             hash: v.hash,
@@ -42,7 +42,7 @@ impl From<block::InternalTransactionId> for ton_tower::response::TransactionId {
     }
 }
 
-impl From<ton_tower::response::TransactionId> for block::InternalTransactionId {
+impl From<ton_tower::response::TransactionId> for tl::InternalTransactionId {
     fn from(v: ton_tower::response::TransactionId) -> Self {
         Self {
             lt: v.lt,
@@ -51,8 +51,8 @@ impl From<ton_tower::response::TransactionId> for block::InternalTransactionId {
     }
 }
 
-impl From<block::BlocksMasterchainInfo> for ton_tower::response::MasterchainInfo {
-    fn from(v: block::BlocksMasterchainInfo) -> Self {
+impl From<tl::BlocksMasterchainInfo> for ton_tower::response::MasterchainInfo {
+    fn from(v: tl::BlocksMasterchainInfo) -> Self {
         Self {
             last: v.last.into(),
             state_root_hash: v.state_root_hash,
@@ -61,16 +61,16 @@ impl From<block::BlocksMasterchainInfo> for ton_tower::response::MasterchainInfo
     }
 }
 
-impl From<block::BlocksShards> for ton_tower::response::Shards {
-    fn from(v: block::BlocksShards) -> Self {
+impl From<tl::BlocksShards> for ton_tower::response::Shards {
+    fn from(v: tl::BlocksShards) -> Self {
         Self {
             shards: v.shards.into_iter().map(Into::into).collect(),
         }
     }
 }
 
-impl From<block::BlocksHeader> for ton_tower::response::BlockHeader {
-    fn from(v: block::BlocksHeader) -> Self {
+impl From<tl::BlocksHeader> for ton_tower::response::BlockHeader {
+    fn from(v: tl::BlocksHeader) -> Self {
         Self {
             id: v.id.into(),
             global_id: v.global_id,
@@ -95,7 +95,7 @@ impl From<block::BlocksHeader> for ton_tower::response::BlockHeader {
     }
 }
 
-impl From<ton_tower::response::ShortTxId> for block::BlocksAccountTransactionId {
+impl From<ton_tower::response::ShortTxId> for tl::BlocksAccountTransactionId {
     fn from(value: ShortTxId) -> Self {
         Self {
             account: base64.encode(value.account.to_internal()),
@@ -104,7 +104,7 @@ impl From<ton_tower::response::ShortTxId> for block::BlocksAccountTransactionId 
     }
 }
 
-impl TryFrom<block::BlocksTransactions> for ton_tower::response::BlockTransactions {
+impl TryFrom<tl::BlocksTransactions> for ton_tower::response::BlockTransactions {
     type Error = anyhow::Error;
 
     fn try_from(v: BlocksTransactions) -> Result<Self, Self::Error> {
@@ -132,7 +132,7 @@ impl TryFrom<block::BlocksTransactions> for ton_tower::response::BlockTransactio
     }
 }
 
-impl TryFrom<block::BlocksTransactionsExt> for ton_tower::response::BlockTransactionsExt {
+impl TryFrom<tl::BlocksTransactionsExt> for ton_tower::response::BlockTransactionsExt {
     type Error = anyhow::Error;
 
     fn try_from(v: BlocksTransactionsExt) -> Result<Self, Self::Error> {
@@ -147,8 +147,8 @@ impl TryFrom<block::BlocksTransactionsExt> for ton_tower::response::BlockTransac
     }
 }
 
-impl From<block::RawFullAccountState> for ton_tower::response::AccountState {
-    fn from(v: block::RawFullAccountState) -> Self {
+impl From<tl::RawFullAccountState> for ton_tower::response::AccountState {
+    fn from(v: tl::RawFullAccountState) -> Self {
         Self {
             balance: v.balance,
             code: v.code,
@@ -161,7 +161,7 @@ impl From<block::RawFullAccountState> for ton_tower::response::AccountState {
     }
 }
 
-impl TryFrom<block::RawTransaction> for ton_tower::response::Transaction {
+impl TryFrom<tl::RawTransaction> for ton_tower::response::Transaction {
     type Error = anyhow::Error;
 
     fn try_from(v: RawTransaction) -> Result<Self, Self::Error> {
@@ -190,7 +190,7 @@ impl TryFrom<block::RawTransaction> for ton_tower::response::Transaction {
     }
 }
 
-impl TryFrom<block::RawTransactions> for ton_tower::response::Transactions {
+impl TryFrom<tl::RawTransactions> for ton_tower::response::Transactions {
     type Error = anyhow::Error;
 
     fn try_from(v: RawTransactions) -> Result<Self, Self::Error> {
@@ -207,7 +207,7 @@ impl TryFrom<block::RawTransactions> for ton_tower::response::Transactions {
     }
 }
 
-impl TryFrom<block::RawMessage> for ton_tower::response::Message {
+impl TryFrom<tl::RawMessage> for ton_tower::response::Message {
     type Error = anyhow::Error;
 
     fn try_from(v: RawMessage) -> Result<Self, Self::Error> {
@@ -235,34 +235,34 @@ impl TryFrom<block::RawMessage> for ton_tower::response::Message {
     }
 }
 
-impl From<block::MsgBoxedData> for ton_tower::response::MessageData {
-    fn from(v: block::MsgBoxedData) -> Self {
+impl From<tl::MsgBoxedData> for ton_tower::response::MessageData {
+    fn from(v: tl::MsgBoxedData) -> Self {
         match v {
-            block::MsgBoxedData::MsgDataRaw(d) => ton_tower::response::MessageData::Raw {
+            tl::MsgBoxedData::MsgDataRaw(d) => ton_tower::response::MessageData::Raw {
                 body: d.body,
                 init_state: d.init_state,
             },
-            block::MsgBoxedData::MsgDataText(d) => {
+            tl::MsgBoxedData::MsgDataText(d) => {
                 ton_tower::response::MessageData::Text { text: d.text }
             }
-            block::MsgBoxedData::MsgDataDecryptedText(d) => {
+            tl::MsgBoxedData::MsgDataDecryptedText(d) => {
                 ton_tower::response::MessageData::DecryptedText { text: d.text }
             }
-            block::MsgBoxedData::MsgDataEncryptedText(d) => {
+            tl::MsgBoxedData::MsgDataEncryptedText(d) => {
                 ton_tower::response::MessageData::EncryptedText { text: d.text }
             }
         }
     }
 }
 
-impl From<block::TvmCell> for ton_tower::response::Cell {
-    fn from(v: block::TvmCell) -> Self {
+impl From<tl::TvmCell> for ton_tower::response::Cell {
+    fn from(v: tl::TvmCell) -> Self {
         Self { bytes: v.bytes }
     }
 }
 
-impl From<block::SmcRunResult> for ton_tower::response::SmcRunResult {
-    fn from(v: block::SmcRunResult) -> Self {
+impl From<tl::SmcRunResult> for ton_tower::response::SmcRunResult {
+    fn from(v: tl::SmcRunResult) -> Self {
         Self {
             gas_used: v.gas_used,
             exit_code: v.exit_code,
@@ -271,84 +271,78 @@ impl From<block::SmcRunResult> for ton_tower::response::SmcRunResult {
     }
 }
 
-impl From<block::TvmBoxedStackEntry> for ton_tower::response::StackEntry {
-    fn from(v: block::TvmBoxedStackEntry) -> Self {
+impl From<tl::TvmBoxedStackEntry> for ton_tower::response::StackEntry {
+    fn from(v: tl::TvmBoxedStackEntry) -> Self {
         match v {
-            block::TvmBoxedStackEntry::TvmStackEntrySlice(s) => {
+            tl::TvmBoxedStackEntry::TvmStackEntrySlice(s) => {
                 ton_tower::response::StackEntry::Slice {
                     bytes: s.slice.bytes,
                 }
             }
-            block::TvmBoxedStackEntry::TvmStackEntryCell(c) => {
-                ton_tower::response::StackEntry::Cell {
-                    bytes: c.cell.bytes,
-                }
-            }
-            block::TvmBoxedStackEntry::TvmStackEntryNumber(n) => {
+            tl::TvmBoxedStackEntry::TvmStackEntryCell(c) => ton_tower::response::StackEntry::Cell {
+                bytes: c.cell.bytes,
+            },
+            tl::TvmBoxedStackEntry::TvmStackEntryNumber(n) => {
                 ton_tower::response::StackEntry::Number {
                     number: n.number.number,
                 }
             }
-            block::TvmBoxedStackEntry::TvmStackEntryTuple(t) => {
+            tl::TvmBoxedStackEntry::TvmStackEntryTuple(t) => {
                 ton_tower::response::StackEntry::Tuple {
                     elements: t.tuple.elements.into_iter().map(Into::into).collect(),
                 }
             }
-            block::TvmBoxedStackEntry::TvmStackEntryList(l) => {
-                ton_tower::response::StackEntry::List {
-                    elements: l.list.elements.into_iter().map(Into::into).collect(),
-                }
-            }
-            block::TvmBoxedStackEntry::TvmStackEntryUnsupported(_) => {
+            tl::TvmBoxedStackEntry::TvmStackEntryList(l) => ton_tower::response::StackEntry::List {
+                elements: l.list.elements.into_iter().map(Into::into).collect(),
+            },
+            tl::TvmBoxedStackEntry::TvmStackEntryUnsupported(_) => {
                 ton_tower::response::StackEntry::Unsupported
             }
         }
     }
 }
 
-impl From<ton_tower::response::StackEntry> for block::TvmBoxedStackEntry {
+impl From<ton_tower::response::StackEntry> for tl::TvmBoxedStackEntry {
     fn from(v: ton_tower::response::StackEntry) -> Self {
         match v {
             ton_tower::response::StackEntry::Slice { bytes } => {
-                block::TvmBoxedStackEntry::TvmStackEntrySlice(block::TvmStackEntrySlice {
-                    slice: block::TvmSlice { bytes },
+                tl::TvmBoxedStackEntry::TvmStackEntrySlice(tl::TvmStackEntrySlice {
+                    slice: tl::TvmSlice { bytes },
                 })
             }
             ton_tower::response::StackEntry::Cell { bytes } => {
-                block::TvmBoxedStackEntry::TvmStackEntryCell(block::TvmStackEntryCell {
-                    cell: block::TvmCell { bytes },
+                tl::TvmBoxedStackEntry::TvmStackEntryCell(tl::TvmStackEntryCell {
+                    cell: tl::TvmCell { bytes },
                 })
             }
             ton_tower::response::StackEntry::Number { number } => {
-                block::TvmBoxedStackEntry::TvmStackEntryNumber(block::TvmStackEntryNumber {
-                    number: block::TvmNumberDecimal { number },
+                tl::TvmBoxedStackEntry::TvmStackEntryNumber(tl::TvmStackEntryNumber {
+                    number: tl::TvmNumberDecimal { number },
                 })
             }
             ton_tower::response::StackEntry::Tuple { elements } => {
-                block::TvmBoxedStackEntry::TvmStackEntryTuple(block::TvmStackEntryTuple {
-                    tuple: block::TvmTuple {
+                tl::TvmBoxedStackEntry::TvmStackEntryTuple(tl::TvmStackEntryTuple {
+                    tuple: tl::TvmTuple {
                         elements: elements.into_iter().map(Into::into).collect(),
                     },
                 })
             }
             ton_tower::response::StackEntry::List { elements } => {
-                block::TvmBoxedStackEntry::TvmStackEntryList(block::TvmStackEntryList {
-                    list: block::TvmList {
+                tl::TvmBoxedStackEntry::TvmStackEntryList(tl::TvmStackEntryList {
+                    list: tl::TvmList {
                         elements: elements.into_iter().map(Into::into).collect(),
                     },
                 })
             }
             ton_tower::response::StackEntry::Unsupported => {
-                block::TvmBoxedStackEntry::TvmStackEntryUnsupported(
-                    block::TvmStackEntryUnsupported {},
-                )
+                tl::TvmBoxedStackEntry::TvmStackEntryUnsupported(tl::TvmStackEntryUnsupported {})
             }
         }
     }
 }
 
-impl From<block::RawExtMessageInfo> for ton_tower::response::ExtMessageInfo {
-    fn from(v: block::RawExtMessageInfo) -> Self {
+impl From<tl::RawExtMessageInfo> for ton_tower::response::ExtMessageInfo {
+    fn from(v: tl::RawExtMessageInfo) -> Self {
         Self { hash: v.hash }
     }
 }

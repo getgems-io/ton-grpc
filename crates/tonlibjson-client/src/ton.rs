@@ -1,4 +1,10 @@
-use crate::block::{
+use crate::cursor::client::CursorClient;
+use crate::error::ErrorService;
+use crate::make::{CursorClientFactory, MakeTonlibjsonClient};
+use crate::request::{Forward, Specialized};
+use crate::retry::RetryPolicy;
+use crate::session::RunGetMethod;
+use crate::tl::{
     AccountAddress, BlocksAccountTransactionId, BlocksGetBlockHeader, BlocksGetMasterchainInfo,
     BlocksGetShards, BlocksGetTransactions, BlocksGetTransactionsExt, BlocksLookupBlock,
     GetShardAccountCell, GetShardAccountCellByTransaction, InternalTransactionId,
@@ -6,12 +12,6 @@ use crate::block::{
     RawSendMessageReturnHash, SmcBoxedMethodId, TonBlockId, TonBlockIdExt, TvmBoxedStackEntry,
     WithBlock,
 };
-use crate::cursor::client::CursorClient;
-use crate::error::ErrorService;
-use crate::make::{ClientFactory, CursorClientFactory};
-use crate::request::{Forward, Specialized};
-use crate::retry::RetryPolicy;
-use crate::session::RunGetMethod;
 use anyhow::anyhow;
 use futures::{Stream, StreamExt, TryFutureExt, stream};
 use serde_json::Value;
@@ -184,9 +184,10 @@ impl TonClientBuilder {
         let lite_server_discover = LiteServerDiscover::new(stream);
         let client_discover = lite_server_discover.then(|s| async {
             match s {
-                Ok(Change::Insert(k, v)) => {
-                    ClientFactory.oneshot(v).await.map(|v| Change::Insert(k, v))
-                }
+                Ok(Change::Insert(k, v)) => MakeTonlibjsonClient
+                    .oneshot(v)
+                    .await
+                    .map(|v| Change::Insert(k, v)),
                 Ok(Change::Remove(k)) => Ok(Change::Remove(k)),
                 Err(_) => unreachable!(),
             }

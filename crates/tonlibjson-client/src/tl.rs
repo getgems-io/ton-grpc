@@ -2,10 +2,11 @@ use crate::deserialize::{
     deserialize_default_as_none, deserialize_empty_as_none, deserialize_number_from_string,
     deserialize_ton_account_balance, serialize_none_as_empty,
 };
-use crate::request::Requestable;
 use derive_new::new;
+use private::Functional;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::cmp::Ordering;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
@@ -15,8 +16,10 @@ use ton_address::SmartContractAddress;
 use ton_client_util::router::route::{BlockCriteria, Route, ToRoute};
 use ton_client_util::service::timeout::ToTimeout;
 
-pub trait Functional {
-    type Result;
+mod private {
+    pub trait Functional {
+        type Result;
+    }
 }
 
 type Double = f64;
@@ -32,6 +35,17 @@ type SecureBytes = String;
 type Vector<T> = Vec<T>;
 
 include!(concat!(env!("OUT_DIR"), "/generated.rs"));
+
+pub trait Requestable
+where
+    Self: Serialize,
+{
+    type Response: DeserializeOwned;
+}
+
+impl Requestable for Value {
+    type Response = Value;
+}
 
 impl ToRoute for BlocksGetBlockHeader {
     fn to_route(&self) -> Route {

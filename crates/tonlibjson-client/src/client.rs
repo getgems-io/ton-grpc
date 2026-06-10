@@ -1,5 +1,4 @@
-use crate::block::TonError;
-use crate::request::Requestable;
+use crate::tl::{Requestable, TonError};
 use anyhow::anyhow;
 use dashmap::DashMap;
 use futures::ready;
@@ -21,13 +20,13 @@ use uuid::Uuid;
 type RequestStorage = DashMap<RequestId, oneshot::Sender<Response>>;
 
 #[derive(Debug, Clone)]
-pub(crate) struct Client {
+pub struct TonlibjsonClient {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<RequestStorage>,
     drop_guard: Arc<DropGuard>,
 }
 
-impl Client {
+impl TonlibjsonClient {
     pub(crate) fn set_logging(level: i32) {
         tonlibjson_sys::Client::set_verbosity_level(level);
     }
@@ -64,7 +63,7 @@ impl Client {
             tracing::trace!("Client dropped");
         });
 
-        Client {
+        TonlibjsonClient {
             client,
             responses,
             drop_guard: Arc::new(cancel_token.drop_guard()),
@@ -72,13 +71,13 @@ impl Client {
     }
 }
 
-impl Default for Client {
+impl Default for TonlibjsonClient {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<R> Service<R> for Client
+impl<R> Service<R> for TonlibjsonClient
 where
     R: Requestable,
 {
@@ -238,8 +237,8 @@ struct Response {
 
 #[cfg(test)]
 mod tests {
-    use crate::block::BlocksGetMasterchainInfo;
-    use crate::client::{Client, Request};
+    use crate::client::{Request, TonlibjsonClient};
+    use crate::tl::BlocksGetMasterchainInfo;
     use serde_json::json;
     use std::str::FromStr;
     use tower::ServiceExt;
@@ -250,7 +249,7 @@ mod tests {
     #[traced_test]
     #[ignore]
     async fn not_initialized_call() {
-        let mut client = Client::default();
+        let mut client = TonlibjsonClient::default();
 
         let resp = (&mut client)
             .oneshot(BlocksGetMasterchainInfo::default())
