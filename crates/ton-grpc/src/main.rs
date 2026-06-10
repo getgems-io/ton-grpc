@@ -1,4 +1,5 @@
 use clap::Parser;
+use humantime::parse_duration;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -22,13 +23,13 @@ use url::Url;
 struct Args {
     #[clap(long, default_value = "0.0.0.0:50052")]
     listen: SocketAddr,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "30s")]
+    #[clap(long, value_parser = parse_duration, default_value = "30s")]
     timeout: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "300s")]
+    #[clap(long, value_parser = parse_duration, default_value = "300s")]
     tcp_keepalive: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "120s")]
+    #[clap(long, value_parser = parse_duration, default_value = "120s")]
     http2_keepalive_interval: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "20s")]
+    #[clap(long, value_parser = parse_duration, default_value = "20s")]
     http2_keepalive_timeout: Duration,
     #[clap(long, default_value = "65535")]
     initial_connection_window_size: u32,
@@ -42,22 +43,22 @@ struct Args {
 
     #[clap(long, value_parser = Url::parse, default_value_t = default_ton_config_url())]
     ton_config_url: Url,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
+    #[clap(long, value_parser = parse_duration, default_value = "10s")]
     ton_timeout: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
+    #[clap(long, value_parser = parse_duration, default_value = "10s")]
     retry_budget_ttl: Duration,
     #[clap(long, default_value_t = 1)]
     retry_min_rps: u32,
     #[clap(long, default_value_t = 0.1)]
     retry_withdraw_percent: f32,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "128ms")]
+    #[clap(long, value_parser = parse_duration, default_value = "128ms")]
     retry_first_delay: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "4096ms")]
+    #[clap(long, value_parser = parse_duration, default_value = "4096ms")]
     retry_max_delay: Duration,
 
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "70ms")]
+    #[clap(long, value_parser = parse_duration, default_value = "70ms")]
     ewma_default_rtt: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "1ms")]
+    #[clap(long, value_parser = parse_duration, default_value = "1ms")]
     ewma_decay: Duration,
 }
 
