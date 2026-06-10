@@ -1,7 +1,6 @@
 use crate::tl::{LiteServerWaitMasterchainSeqno, Requestable};
 use adnl_tcp::serializer::{SerializeBoxed, Serializer};
 use std::time::Duration;
-use ton_client_util::service::timeout::ToTimeout;
 
 pub struct WaitSeqno<R> {
     prefix: LiteServerWaitMasterchainSeqno,
@@ -42,10 +41,4 @@ where
     R: Requestable,
 {
     type Response = R::Response;
-}
-
-impl<R> ToTimeout for WaitSeqno<R> {
-    fn to_timeout(&self) -> Option<Duration> {
-        Some(Duration::from_secs(10))
-    }
 }

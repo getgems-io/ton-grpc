@@ -11,14 +11,14 @@ use tokio::time::{Sleep, sleep};
 use tokio_retry::strategy::{ExponentialBackoff, jitter};
 use tower::Service;
 
-pub struct MakeClient {
+pub struct MakeLiteServerClient {
     addr: SocketAddrV4,
     key: ServerKey,
     retry_strategy: Box<dyn Iterator<Item = Duration> + Send>,
     sleep: Option<Pin<Box<Sleep>>>,
 }
 
-impl MakeClient {
+impl MakeLiteServerClient {
     pub fn new(addr: SocketAddrV4, key: ServerKey) -> Self {
         let retry_strategy = Box::new(
             ExponentialBackoff::from_millis(100)
@@ -35,7 +35,7 @@ impl MakeClient {
     }
 }
 
-impl Service<()> for MakeClient {
+impl Service<()> for MakeLiteServerClient {
     type Response = LiteServerClient;
     type Error = anyhow::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
