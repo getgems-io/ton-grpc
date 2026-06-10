@@ -1,0 +1,66 @@
+use crate::route::Error as RouteError;
+use futures::TryFutureExt;
+use futures::future::MapErr;
+use std::task::{Context, Poll};
+use tower::load::Load;
+use tower::{Layer, Service};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error(transparent)]
+    Route(#[from] RouteError),
+    #[error(transparent)]
+    Custom(#[from] anyhow::Error),
+    #[error(transparent)]
+    Tower(#[from] tower::BoxError),
+}
+
+#[derive(Default)]
+pub struct ErrorLayer;
+
+impl<S> Layer<S> for ErrorLayer {
+    type Service = ErrorService<S>;
+
+    fn layer(&self, inner: S) -> Self::Service {
+        ErrorService::new(inner)
+    }
+}
+
+#[derive(Clone)]
+pub struct ErrorService<S> {
+    inner: S,
+}
+
+impl<S> ErrorService<S> {
+    pub fn new(inner: S) -> Self {
+        Self { inner }
+    }
+}
+
+impl<S, Req, E: Into<Error>> Service<Req> for ErrorService<S>
+where
+    S: Service<Req, Error = E>,
+{
+    type Response = S::Response;
+    type Error = anyhow::Error;
+    type Future = MapErr<S::Future, fn(S::Error) -> Self::Error>;
+
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        self.inner.poll_ready(cx).map_err(|e| e.into().into())
+    }
+
+    fn call(&mut self, req: Req) -> Self::Future {
+        self.inner.call(req).map_err(|e| e.into().into())
+    }
+}
+
+impl<T> Load for ErrorService<T>
+where
+    T: Load,
+{
+    type Metric = T::Metric;
+
+    fn load(&self) -> Self::Metric {
+        self.inner.load()
+    }
+}

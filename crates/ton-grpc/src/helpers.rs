@@ -5,11 +5,11 @@ use anyhow::{Result, anyhow};
 use std::ops::Bound;
 use std::ops::Bound::{Excluded, Included};
 use ton_address::SmartContractAddress;
-use ton_client::TonClient;
+use ton_client::{Client, TonService};
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_block_id(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     block_id: &ton::BlockId,
 ) -> Result<ton_tower::response::BlockIdExt> {
     if let (Some(root_hash), Some(file_hash)) = (&block_id.root_hash, &block_id.file_hash) {
@@ -29,7 +29,7 @@ pub async fn extend_block_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_get_block_header(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     block_id: &ton::BlockId,
 ) -> Result<ton_tower::response::BlockHeader> {
     let block_id = extend_block_id(client, block_id).await?;
@@ -38,7 +38,7 @@ pub async fn extend_get_block_header(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn prev_block_id(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     block_id: &ton::BlockId,
 ) -> Result<ton_tower::response::BlockIdExt> {
     client
@@ -48,7 +48,7 @@ pub async fn prev_block_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_from_tx_id(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     address: &SmartContractAddress,
     from: Option<ton::get_account_transactions_request::Bound>,
 ) -> Result<Bound<ton_tower::response::TransactionId>> {
@@ -91,7 +91,7 @@ pub async fn extend_from_tx_id(
 
 #[tracing::instrument(skip_all, err)]
 pub async fn extend_to_tx_id(
-    client: &impl TonClient,
+    client: &mut Client<impl TonService>,
     address: &SmartContractAddress,
     to: Option<ton::get_account_transactions_request::Bound>,
 ) -> Result<Bound<ton_tower::response::TransactionId>> {

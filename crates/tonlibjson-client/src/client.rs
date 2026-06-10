@@ -27,11 +27,11 @@ pub struct TonlibjsonClient {
 }
 
 impl TonlibjsonClient {
-    pub(crate) fn set_logging(level: i32) {
+    pub fn set_logging(level: i32) {
         tonlibjson_sys::Client::set_verbosity_level(level);
     }
 
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let client = Arc::new(tonlibjson_sys::Client::new());
         let client_recv = client.clone();
 

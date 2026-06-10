@@ -1,21 +1,27 @@
 use futures::TryStreamExt;
 use testcontainers_ton::LocalLiteServer;
-use ton_client::{BlockClient, BlockClientExt as _};
+use ton_client::Client;
+use ton_liteserver_client::LiteServerAdapter;
 use ton_liteserver_client::client::LiteServerClient;
-use ton_tower::response::{BlockIdExt, Transaction};
-use tonlibjson_client::ton::TonClientBuilder;
+use ton_tower::request::GetTransactions;
+use ton_tower::response::{BlockIdExt, BlockTransactionsExt, Transaction};
+use tonlibjson_client::MakeTonlibjsonAdapter;
+use tower::{Service, ServiceExt};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::init();
 
     let server = LocalLiteServer::new().await?;
-
-    let mut tonlib = TonClientBuilder::from_config(server.config()).build()?;
-    tonlib.ready().await?;
+    let adapter = MakeTonlibjsonAdapter
+        .oneshot(server.config().clone())
+        .await?;
+    let mut tonlib = Client::new(adapter);
+    tonlib.wait_ready().await?;
     tracing::info!("tonlib client ready");
 
-    let liteserver = LiteServerClient::connect(server.addr(), server.server_key()).await?;
+    let liteserver_inner = LiteServerClient::connect(server.addr(), server.server_key()).await?;
+    let mut liteserver = Client::new(LiteServerAdapter::new(liteserver_inner));
     tracing::info!("liteserver client ready");
 
     let master2 = liteserver.get_masterchain_info().await?;
@@ -47,11 +53,25 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn compare_block_transactions(
-    tonlib: &impl BlockClient,
-    liteserver: &impl BlockClient,
+async fn compare_block_transactions<A, B>(
+    tonlib: &Client<A>,
+    liteserver: &Client<B>,
     block: &BlockIdExt,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<()>
+where
+    A: Service<GetTransactions, Response = BlockTransactionsExt, Error = anyhow::Error>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    A::Future: Send,
+    B: Service<GetTransactions, Response = BlockTransactionsExt, Error = anyhow::Error>
+        + Clone
+        + Send
+        + Sync
+        + 'static,
+    B::Future: Send,
+{
     let tonlib_txs: Vec<Transaction> = tonlib
         .get_block_tx_stream(block, false)
         .try_collect()
@@ -81,91 +101,23 @@ async fn compare_block_transactions(
     );
 
     for (t, l) in tonlib_txs.iter().zip(liteserver_txs.iter()) {
-        assert_eq!(
-            t.transaction_id, l.transaction_id,
-            "transaction_id mismatch: tonlib={:?} liteserver={:?}",
-            t.transaction_id, l.transaction_id
-        );
-
-        assert_eq!(
-            t.address, l.address,
-            "address mismatch for tx lt={}",
-            t.transaction_id.lt
-        );
-
-        assert_eq!(
-            t.utime, l.utime,
-            "utime mismatch for tx lt={}",
-            t.transaction_id.lt
-        );
-
-        assert_eq!(
-            t.fee, l.fee,
-            "fee mismatch for tx lt={}",
-            t.transaction_id.lt
-        );
-
-        assert_eq!(
-            t.data, l.data,
-            "data mismatch for tx lt={}",
-            t.transaction_id.lt
-        );
-
-        assert_eq!(
-            t.in_msg.is_some(),
-            l.in_msg.is_some(),
-            "in_msg presence mismatch for tx lt={}",
-            t.transaction_id.lt
-        );
-
+        assert_eq!(t.transaction_id, l.transaction_id);
+        assert_eq!(t.address, l.address);
+        assert_eq!(t.utime, l.utime);
+        assert_eq!(t.fee, l.fee);
+        assert_eq!(t.data, l.data);
+        assert_eq!(t.in_msg.is_some(), l.in_msg.is_some());
         if let (Some(tm), Some(lm)) = (&t.in_msg, &l.in_msg) {
-            assert_eq!(
-                tm.source, lm.source,
-                "in_msg source mismatch for tx lt={}",
-                t.transaction_id.lt
-            );
-            assert_eq!(
-                tm.destination, lm.destination,
-                "in_msg destination mismatch for tx lt={}",
-                t.transaction_id.lt
-            );
-            assert_eq!(
-                tm.value, lm.value,
-                "in_msg value mismatch for tx lt={}",
-                t.transaction_id.lt
-            );
+            assert_eq!(tm.source, lm.source);
+            assert_eq!(tm.destination, lm.destination);
+            assert_eq!(tm.value, lm.value);
         }
-
-        assert_eq!(
-            t.out_msgs.len(),
-            l.out_msgs.len(),
-            "out_msgs count mismatch for tx lt={}",
-            t.transaction_id.lt
-        );
-
-        for (i, (tm, lm)) in t.out_msgs.iter().zip(l.out_msgs.iter()).enumerate() {
-            assert_eq!(
-                tm.source, lm.source,
-                "out_msg[{i}] source mismatch for tx lt={}",
-                t.transaction_id.lt
-            );
-            assert_eq!(
-                tm.destination, lm.destination,
-                "out_msg[{i}] destination mismatch for tx lt={}",
-                t.transaction_id.lt
-            );
-            assert_eq!(
-                tm.value, lm.value,
-                "out_msg[{i}] value mismatch for tx lt={}",
-                t.transaction_id.lt
-            );
+        assert_eq!(t.out_msgs.len(), l.out_msgs.len());
+        for (tm, lm) in t.out_msgs.iter().zip(l.out_msgs.iter()) {
+            assert_eq!(tm.source, lm.source);
+            assert_eq!(tm.destination, lm.destination);
+            assert_eq!(tm.value, lm.value);
         }
-
-        tracing::info!(
-            lt = t.transaction_id.lt,
-            address = %t.address,
-            "tx matched"
-        );
     }
 
     Ok(())

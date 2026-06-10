@@ -35,6 +35,7 @@ derive-new = "0.7.0"
 metrics-exporter-prometheus = { version = "0.18.1", features = ["http-listener"], default-features = false }
 
 [dev-dependencies]
+tower = "0.5.3"
 tracing-test = "0.2.6"
 testcontainers-ton = { path = "../testcontainers-ton" }
 tokio-stream = { version = "0.1", features = ["net"] }

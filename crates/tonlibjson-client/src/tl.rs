@@ -1,20 +1,13 @@
-use crate::deserialize::{
-    deserialize_default_as_none, deserialize_empty_as_none, deserialize_number_from_string,
-    deserialize_ton_account_balance, serialize_none_as_empty,
-};
 use derive_new::new;
 use private::Functional;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 use serde_json::Value;
 use std::cmp::Ordering;
 use std::error::Error as StdError;
 use std::fmt::{Display, Formatter};
 use std::str::FromStr;
-use std::time::Duration;
 use ton_address::SmartContractAddress;
-use ton_client_util::router::route::{BlockCriteria, Route, ToRoute};
-use ton_client_util::service::timeout::ToTimeout;
 
 mod private {
     pub trait Functional {
@@ -46,20 +39,6 @@ where
 impl Requestable for Value {
     type Response = Value;
 }
-
-impl ToRoute for BlocksGetBlockHeader {
-    fn to_route(&self) -> Route {
-        Route::Block {
-            chain: self.id.workchain,
-            criteria: BlockCriteria::Seqno {
-                shard: self.id.shard,
-                seqno: self.id.seqno,
-            },
-        }
-    }
-}
-
-impl ToTimeout for BlocksGetBlockHeader {}
 
 impl From<TonBlockIdExt> for TonBlockId {
     fn from(block: TonBlockIdExt) -> Self {
@@ -131,103 +110,6 @@ impl AccountAddress {
     }
 }
 
-impl ToRoute for GetShardAccountCell {
-    fn to_route(&self) -> Route {
-        Route::Latest
-    }
-}
-
-impl ToTimeout for GetShardAccountCell {}
-
-impl ToRoute for GetShardAccountCellByTransaction {
-    fn to_route(&self) -> Route {
-        let data = self
-            .account_address
-            .to_data()
-            .expect("invalid account address");
-
-        Route::Block {
-            chain: data.workchain_id(),
-            criteria: BlockCriteria::LogicalTime {
-                address: data.into(),
-                lt: self.transaction_id.lt,
-            },
-        }
-    }
-}
-
-impl ToTimeout for GetShardAccountCellByTransaction {}
-
-impl ToRoute for RawGetAccountState {
-    fn to_route(&self) -> Route {
-        Route::Latest
-    }
-}
-
-impl ToTimeout for RawGetAccountState {}
-
-impl ToRoute for RawGetAccountStateByTransaction {
-    fn to_route(&self) -> Route {
-        let data = self
-            .account_address
-            .to_data()
-            .expect("invalid account address");
-
-        Route::Block {
-            chain: data.workchain_id(),
-            criteria: BlockCriteria::LogicalTime {
-                address: data.into(),
-                lt: self.transaction_id.lt,
-            },
-        }
-    }
-}
-
-impl ToTimeout for RawGetAccountStateByTransaction {}
-
-impl ToRoute for GetAccountState {
-    fn to_route(&self) -> Route {
-        Route::Latest
-    }
-}
-
-impl ToTimeout for GetAccountState {}
-
-impl ToRoute for BlocksGetMasterchainInfo {
-    fn to_route(&self) -> Route {
-        Route::Latest
-    }
-}
-
-impl ToTimeout for BlocksGetMasterchainInfo {}
-
-impl ToRoute for BlocksLookupBlock {
-    fn to_route(&self) -> Route {
-        let criteria = match self.mode {
-            2 => {
-                let mut address = [0_u8; 32];
-                address[0..8].copy_from_slice(&self.id.shard.to_be_bytes());
-
-                BlockCriteria::LogicalTime {
-                    address,
-                    lt: self.lt,
-                }
-            }
-            _ => BlockCriteria::Seqno {
-                shard: self.id.shard,
-                seqno: self.id.seqno,
-            },
-        };
-
-        Route::Block {
-            chain: self.id.workchain,
-            criteria,
-        }
-    }
-}
-
-impl ToTimeout for BlocksLookupBlock {}
-
 impl BlocksLookupBlock {
     pub fn seqno(id: TonBlockId) -> Self {
         Self {
@@ -247,20 +129,6 @@ impl BlocksLookupBlock {
         }
     }
 }
-
-impl ToRoute for BlocksGetShards {
-    fn to_route(&self) -> Route {
-        Route::Block {
-            chain: self.id.workchain,
-            criteria: BlockCriteria::Seqno {
-                shard: self.id.shard,
-                seqno: self.id.seqno,
-            },
-        }
-    }
-}
-
-impl ToTimeout for BlocksGetShards {}
 
 impl BlocksGetTransactionsExt {
     pub fn unverified(
@@ -299,20 +167,6 @@ impl BlocksGetTransactionsExt {
     }
 }
 
-impl ToRoute for BlocksGetTransactionsExt {
-    fn to_route(&self) -> Route {
-        Route::Block {
-            chain: self.id.workchain,
-            criteria: BlockCriteria::Seqno {
-                shard: self.id.shard,
-                seqno: self.id.seqno,
-            },
-        }
-    }
-}
-
-impl ToTimeout for BlocksGetTransactionsExt {}
-
 impl BlocksGetTransactions {
     pub fn unverified(
         block_id: TonBlockIdExt,
@@ -350,20 +204,6 @@ impl BlocksGetTransactions {
     }
 }
 
-impl ToRoute for BlocksGetTransactions {
-    fn to_route(&self) -> Route {
-        Route::Block {
-            chain: self.id.workchain,
-            criteria: BlockCriteria::Seqno {
-                shard: self.id.shard,
-                seqno: self.id.seqno,
-            },
-        }
-    }
-}
-
-impl ToTimeout for BlocksGetTransactions {}
-
 impl Default for BlocksAccountTransactionId {
     fn default() -> Self {
         Self {
@@ -382,30 +222,6 @@ impl From<&BlocksShortTxId> for BlocksAccountTransactionId {
     }
 }
 
-impl ToRoute for RawSendMessage {
-    fn to_route(&self) -> Route {
-        Route::Latest
-    }
-}
-
-impl ToTimeout for RawSendMessage {}
-
-impl ToRoute for RawSendMessageReturnHash {
-    fn to_route(&self) -> Route {
-        Route::Latest
-    }
-}
-
-impl ToTimeout for RawSendMessageReturnHash {}
-
-impl ToRoute for SmcLoad {
-    fn to_route(&self) -> Route {
-        Route::Latest
-    }
-}
-
-impl ToTimeout for SmcLoad {}
-
 impl SmcBoxedMethodId {
     pub fn by_name(name: &str) -> Self {
         Self::SmcMethodIdName(SmcMethodIdName {
@@ -414,39 +230,12 @@ impl SmcBoxedMethodId {
     }
 }
 
-impl ToTimeout for SmcBoxedMethodId {}
-
 impl<T> Requestable for T
 where
     T: Functional + Serialize,
     T::Result: DeserializeOwned,
 {
     type Response = T::Result;
-}
-
-impl ToRoute for RawGetTransactionsV2 {
-    fn to_route(&self) -> Route {
-        let data = self
-            .account_address
-            .to_data()
-            .expect("invalid account address");
-
-        Route::Block {
-            chain: data.workchain_id(),
-            criteria: BlockCriteria::LogicalTime {
-                address: data.into(),
-                lt: self.from_transaction_id.lt,
-            },
-        }
-    }
-}
-
-impl ToTimeout for RawGetTransactionsV2 {}
-
-impl ToTimeout for Sync {
-    fn to_timeout(&self) -> Option<Duration> {
-        Some(Duration::from_secs(5 * 60))
-    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -471,7 +260,7 @@ impl StdError for TonError {
     }
 }
 
-#[derive(new, Serialize, Clone)]
+#[derive(new, Debug, Serialize, Clone)]
 #[serde(tag = "@type", rename = "withBlock")]
 pub struct WithBlock<T> {
     pub id: TonBlockIdExt,
@@ -485,24 +274,67 @@ where
     type Response = T::Response;
 }
 
-impl<T> ToTimeout for WithBlock<T>
+fn deserialize_number_from_string<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
-    T: ToTimeout,
+    D: Deserializer<'de>,
+    T: FromStr + serde::Deserialize<'de>,
+    <T as FromStr>::Err: Display,
 {
-    fn to_timeout(&self) -> Option<Duration> {
-        self.function.to_timeout()
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrInt<T> {
+        String(String),
+        Number(T),
+    }
+
+    match StringOrInt::<T>::deserialize(deserializer)? {
+        StringOrInt::String(s) => s.parse::<T>().map_err(serde::de::Error::custom),
+        StringOrInt::Number(i) => Ok(i),
     }
 }
 
-impl<T: Functional> ToRoute for WithBlock<T> {
-    fn to_route(&self) -> Route {
-        Route::Block {
-            chain: self.id.workchain,
-            criteria: BlockCriteria::Seqno {
-                shard: self.id.shard,
-                seqno: self.id.seqno,
-            },
-        }
+fn deserialize_default_as_none<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Default + serde::Deserialize<'de> + PartialEq,
+{
+    let v = T::deserialize(deserializer)?;
+
+    Ok(if v == T::default() { None } else { Some(v) })
+}
+
+fn deserialize_empty_as_none<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: FromStr + serde::Deserialize<'de>,
+    <T as FromStr>::Err: Display,
+{
+    let v = String::deserialize(deserializer)?;
+
+    if v.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(T::from_str(&v).map_err(de::Error::custom)?))
+    }
+}
+
+fn deserialize_ton_account_balance<'de, D>(deserializer: D) -> Result<Option<i64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let v: i64 = deserialize_number_from_string(deserializer)?;
+
+    Ok(if v == -1 { None } else { Some(v) })
+}
+
+fn serialize_none_as_empty<S, T>(v: &Option<T>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+    T: Serialize,
+{
+    match v {
+        None => serializer.serialize_str(""),
+        Some(v) => v.serialize(serializer),
     }
 }
 

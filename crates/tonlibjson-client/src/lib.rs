@@ -1,15 +1,7 @@
-pub mod adapter;
+mod adapter;
 mod client;
-mod cursor;
-mod deserialize;
-mod error;
 mod make;
-mod metric;
-mod request;
-mod retry;
-mod session;
 pub mod tl;
-pub mod ton;
 
 pub use crate::adapter::{TonlibjsonAdapter, make::MakeTonlibjsonAdapter};
 pub use crate::{client::TonlibjsonClient, make::MakeTonlibjsonClient};

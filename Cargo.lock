@@ -3458,6 +3458,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]
@@ -3531,31 +3532,28 @@ version = "0.2.0"
 dependencies = [
  "anyhow",
  "async-stream",
- "async-trait",
- "futures",
- "itertools",
- "ton-address",
- "ton-tower",
- "tracing",
-]
-
-[[package]]
-name = "ton-client-util"
-version = "0.2.1"
-dependencies = [
- "anyhow",
  "bitvec",
+ "dashmap",
  "futures",
  "itertools",
  "metrics",
  "pin-project",
+ "rstest",
+ "testcontainers-ton",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-retry",
  "tokio-stream",
  "tokio-util",
+ "ton-address",
  "ton-config",
+ "ton-liteserver-client",
+ "ton-tower",
+ "tonlibjson-client",
  "tower",
  "tracing",
+ "tracing-subscriber",
+ "tracing-test",
  "url",
 ]
 
@@ -3591,6 +3589,7 @@ dependencies = [
  "toner",
  "toner-tlb-macros",
  "tonlibjson-client",
+ "tower",
 ]
 
 [[package]]
@@ -3638,6 +3637,7 @@ dependencies = [
  "tonic-prost-build",
  "tonic-reflection",
  "tonlibjson-client",
+ "tower",
  "tracing",
  "tracing-subscriber",
  "tracing-test",
@@ -3811,13 +3811,12 @@ name = "tonlibjson-client"
 version = "0.22.1"
 dependencies = [
  "anyhow",
- "async-trait",
  "base64 0.22.1",
  "convert_case",
  "dashmap",
  "derive-new",
  "futures",
- "metrics",
+ "hex",
  "pin-project",
  "prettyplease",
  "quote",
@@ -3825,14 +3824,10 @@ dependencies = [
  "serde_json",
  "syn",
  "testcontainers-ton",
- "thiserror 2.0.18",
  "tl-parser",
  "tokio",
- "tokio-retry",
  "tokio-util",
  "ton-address",
- "ton-client",
- "ton-client-util",
  "ton-config",
  "ton-tower",
  "tonlibjson-sys",

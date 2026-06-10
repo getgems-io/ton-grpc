@@ -2,6 +2,7 @@ use clap::Parser;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::time::Duration;
+use ton_client::{PoolTransport, TonClientBuilder};
 use ton_config::default_ton_config_url;
 use ton_grpc::AccountService;
 use ton_grpc::BlockService;
@@ -11,7 +12,7 @@ use ton_grpc::block_service_server::BlockServiceServer;
 use ton_grpc::message_service_server::MessageServiceServer;
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
-use tonlibjson_client::ton::TonClientBuilder;
+use tonlibjson_client::{MakeTonlibjsonAdapter, TonlibjsonAdapter};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use url::Url;
@@ -80,19 +81,21 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("TON Config URL: {}", &args.ton_config_url);
 
-    let mut client =
-        TonClientBuilder::from_config_url(args.ton_config_url, Duration::from_secs(60))
-            .set_timeout(args.ton_timeout)
-            .set_retry_budget_ttl(args.retry_budget_ttl)
-            .set_retry_min_per_sec(args.retry_min_rps)
-            .set_retry_percent(args.retry_withdraw_percent)
-            .set_retry_first_delay(args.retry_first_delay)
-            .set_retry_max_delay(args.retry_max_delay)
-            .set_ewma_default_rtt(args.ewma_default_rtt)
-            .set_ewma_decay(args.ewma_decay)
-            .build()?;
+    let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config_url(
+        args.ton_config_url,
+        Duration::from_secs(60),
+    )
+    .set_timeout(args.ton_timeout)
+    .set_retry_budget_ttl(args.retry_budget_ttl)
+    .set_retry_min_per_sec(args.retry_min_rps)
+    .set_retry_percent(args.retry_withdraw_percent)
+    .set_retry_first_delay(args.retry_first_delay)
+    .set_retry_max_delay(args.retry_max_delay)
+    .set_ewma_default_rtt(args.ewma_default_rtt)
+    .set_ewma_decay(args.ewma_decay)
+    .build()?;
 
-    client.ready().await?;
+    client.wait_ready().await?;
     tracing::info!("Ton Client is ready");
 
     let reflection = tonic_reflection::server::Builder::configure()
@@ -110,7 +113,7 @@ async fn main() -> anyhow::Result<()> {
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
 
-    type Client = tonlibjson_client::ton::TonClient;
+    type Client = PoolTransport<TonlibjsonAdapter>;
 
     let (health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter
