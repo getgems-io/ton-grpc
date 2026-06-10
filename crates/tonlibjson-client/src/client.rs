@@ -1,5 +1,4 @@
-use crate::tl::Requestable;
-use crate::tl::TonError;
+use crate::tl::{Requestable, TonError};
 use anyhow::anyhow;
 use dashmap::DashMap;
 use futures::ready;
