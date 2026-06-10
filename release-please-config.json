@@ -54,6 +54,9 @@
         },
         "crates/ton-config": {
             "release-type": "rust"
+        },
+        "crates/ton-tower": {
+            "release-type": "rust"
         }
     }
 }
