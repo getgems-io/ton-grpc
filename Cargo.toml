@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*"]
 
 [workspace.package]
-rust-version = "1.94"
+rust-version = "1.96"
 
 [workspace.dependencies]
 toner = { git = "https://github.com/akostylev0/toner.git", branch = "hasher" }
