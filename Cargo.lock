@@ -3539,7 +3539,7 @@ dependencies = [
 
 [[package]]
 name = "ton-client"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3582,7 +3582,7 @@ dependencies = [
 
 [[package]]
 name = "ton-contract"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3622,7 +3622,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.15.0"
+version = "0.15.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -3654,7 +3654,7 @@ dependencies = [
 
 [[package]]
 name = "ton-liteserver-client"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "adnl-tcp",
  "anyhow",
@@ -3691,7 +3691,7 @@ dependencies = [
 
 [[package]]
 name = "ton-tower"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ton-address",
 ]
@@ -3816,7 +3816,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.23.0"
+version = "0.23.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
