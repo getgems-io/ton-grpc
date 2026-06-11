@@ -60,7 +60,7 @@ where
     async fn run(mut self) -> Self::Output {
         while let Some(block_id) = self.rx.recv().await {
             let retry_strategy = FibonacciBackoff::from_millis(32).map(jitter).take(16);
-            match Retry::spawn(retry_strategy, || {
+            match Retry::start(retry_strategy, || {
                 let client = self.client.clone();
                 let block_id = block_id.clone();
                 client.oneshot(GetBlockHeader { id: block_id })

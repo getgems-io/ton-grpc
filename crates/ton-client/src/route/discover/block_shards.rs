@@ -62,7 +62,7 @@ where
         let mut channels: HashMap<ShardId, ShardHeaderActorHandle> = Default::default();
         while let Some(block_id) = self.rx.recv().await {
             let retry_strategy = FibonacciBackoff::from_millis(32).map(jitter).take(8);
-            let shards = Retry::spawn(retry_strategy, || {
+            let shards = Retry::start(retry_strategy, || {
                 let client = self.client.clone();
                 let block_id = block_id.clone();
                 client.oneshot(GetShards { block_id })
