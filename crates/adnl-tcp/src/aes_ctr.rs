@@ -77,9 +77,6 @@ impl AesCtr {
             x[29], x[30], x[31],
         ];
 
-        Aes256Ctr128::new(
-            (&key).into(),
-            (&ctr).into(),
-        )
+        Aes256Ctr128::new((&key).into(), (&ctr).into())
     }
 }

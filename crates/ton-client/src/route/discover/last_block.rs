@@ -184,7 +184,7 @@ where
         .map(jitter)
         .take(16);
 
-    Retry::spawn(retry, || {
+    Retry::start(retry, || {
         let block_id = block_id.clone();
         let client = client.clone();
 
