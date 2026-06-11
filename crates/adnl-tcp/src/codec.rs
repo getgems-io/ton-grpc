@@ -1,6 +1,5 @@
 use crate::aes_ctr::{Aes256Ctr128, AesCtr};
 use crate::packet::Packet;
-use aes::cipher::generic_array::GenericArray;
 use anyhow::bail;
 use ctr::cipher::KeyIvInit;
 use ctr::cipher::StreamCipher;
@@ -97,14 +96,10 @@ impl PacketCodec {
     }
 
     fn from_bytes_as_client(bytes: &[u8; 160]) -> Self {
-        let cipher_recv = Aes256Ctr128::new(
-            GenericArray::from_slice(&bytes[0..32]),
-            GenericArray::from_slice(&bytes[64..80]),
-        );
-        let cipher_send = Aes256Ctr128::new(
-            GenericArray::from_slice(&bytes[32..64]),
-            GenericArray::from_slice(&bytes[80..96]),
-        );
+        let cipher_recv = Aes256Ctr128::new_from_slices(&bytes[0..32], &bytes[64..80])
+            .expect("invalid key/iv length");
+        let cipher_send = Aes256Ctr128::new_from_slices(&bytes[32..64], &bytes[80..96])
+            .expect("invalid key/iv length");
 
         Self {
             cipher_recv,
@@ -114,14 +109,10 @@ impl PacketCodec {
     }
 
     fn from_bytes_as_server(bytes: &[u8; 160]) -> Self {
-        let cipher_recv = Aes256Ctr128::new(
-            GenericArray::from_slice(&bytes[32..64]),
-            GenericArray::from_slice(&bytes[80..96]),
-        );
-        let cipher_send = Aes256Ctr128::new(
-            GenericArray::from_slice(&bytes[0..32]),
-            GenericArray::from_slice(&bytes[64..80]),
-        );
+        let cipher_recv = Aes256Ctr128::new_from_slices(&bytes[32..64], &bytes[80..96])
+            .expect("invalid key/iv length");
+        let cipher_send = Aes256Ctr128::new_from_slices(&bytes[0..32], &bytes[64..80])
+            .expect("invalid key/iv length");
 
         Self {
             cipher_recv,
