@@ -1,4 +1,5 @@
 mod actor;
+pub mod algo;
 mod builder;
 pub mod client;
 pub mod pool;
