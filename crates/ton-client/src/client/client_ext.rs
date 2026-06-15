@@ -1,4 +1,5 @@
 use crate::RequestHandler;
+use crate::algo::binary_search::{AccountTxAvailability, BinarySearch};
 use crate::client::Client;
 use anyhow::anyhow;
 use async_stream::try_stream;
@@ -27,72 +28,6 @@ impl<S> Client<S> {
             .await?;
         let shards = self.get_shards_by_block_id(block).await?;
         Ok(Shards { shards })
-    }
-
-    async fn get_last_transaction_id(
-        &mut self,
-        address: &SmartContractAddress,
-        chain: i32,
-        shard: i64,
-        seqno: i32,
-    ) -> anyhow::Result<TransactionId>
-    where
-        S: RequestHandler<LookUpBlockBySeqno> + RequestHandler<GetAccountStateOnBlock>,
-    {
-        let address = address.to_owned();
-        let block = self.look_up_block_by_seqno(chain, shard, seqno).await?;
-        let state = self.get_account_state_on_block(&address, block).await?;
-
-        state
-            .last_transaction_id
-            .ok_or_else(|| anyhow::anyhow!("tx not found"))
-    }
-
-    async fn find_first_tx(
-        &mut self,
-        address: &SmartContractAddress,
-    ) -> anyhow::Result<TransactionId>
-    where
-        S: RequestHandler<GetMasterchainInfo>
-            + RequestHandler<LookUpBlockBySeqno>
-            + RequestHandler<GetAccountStateOnBlock>,
-    {
-        let address = address.to_owned();
-        let start = self.get_masterchain_info().await?.last;
-
-        let length = start.seqno;
-        let mut rhs = length;
-        let mut lhs = 1;
-        let mut cur = (lhs + rhs) / 2;
-
-        let workchain = start.workchain;
-        let shard = start.shard;
-
-        let mut tx = self
-            .get_last_transaction_id(&address, workchain, shard, cur)
-            .await;
-
-        while lhs < rhs {
-            if tx.is_err() {
-                lhs = cur + 1;
-            } else {
-                rhs = cur;
-            }
-
-            cur = (lhs + rhs) / 2;
-
-            if cur == 0 {
-                break;
-            }
-
-            tx = self
-                .get_last_transaction_id(&address, workchain, shard, cur)
-                .await;
-        }
-
-        let tx = tx?;
-
-        Ok(tx)
     }
 }
 
@@ -386,7 +321,11 @@ where
             async {
                 let first_tx = match range.end_bound().cloned() {
                     Bound::Included(tx) | Bound::Excluded(tx) => tx,
-                    Bound::Unbounded => client_first.find_first_tx(&address_first).await?,
+                    Bound::Unbounded => {
+                        AccountTxAvailability::new(&mut client_first, &address_first)
+                            .find()
+                            .await?
+                    }
                 };
                 anyhow::Ok(first_tx)
             }
