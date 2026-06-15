@@ -29,25 +29,6 @@ impl<S> Client<S> {
         let shards = self.get_shards_by_block_id(block).await?;
         Ok(Shards { shards })
     }
-
-    async fn find_first_tx(
-        &mut self,
-        address: &SmartContractAddress,
-    ) -> anyhow::Result<TransactionId>
-    where
-        S: RequestHandler<GetMasterchainInfo>
-            + RequestHandler<LookUpBlockBySeqno>
-            + RequestHandler<GetAccountStateOnBlock>
-            + 'static,
-    {
-        let start = self.get_masterchain_info().await?.last;
-
-        let tx = AccountTxAvailability::new(self, address, start.workchain, start.shard)
-            .find_first(1..=start.seqno)
-            .await?;
-
-        Ok(tx)
-    }
 }
 
 impl<S> Client<S>
@@ -340,7 +321,11 @@ where
             async {
                 let first_tx = match range.end_bound().cloned() {
                     Bound::Included(tx) | Bound::Excluded(tx) => tx,
-                    Bound::Unbounded => client_first.find_first_tx(&address_first).await?,
+                    Bound::Unbounded => {
+                        AccountTxAvailability::new(&mut client_first, &address_first)
+                            .find()
+                            .await?
+                    }
                 };
                 anyhow::Ok(first_tx)
             }

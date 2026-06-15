@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::{MissedTickBehavior, interval};
 use tokio_util::task::AbortOnDropHandle;
-use ton_tower::request::{GetBlockHeader, GetShards, LookUpBlockBySeqno};
+use ton_tower::request::{GetBlockHeader, GetMasterchainInfo, GetShards, LookUpBlockBySeqno};
 use ton_tower::response::{BlockHeader, BlockIdExt};
 use tower::ServiceExt;
 
@@ -26,7 +26,8 @@ impl FirstBlockDiscoverActorHandle {
         rx: LastBlockDiscoverActorHandle,
     ) -> Self
     where
-        S: RequestHandler<GetShards>
+        S: RequestHandler<GetMasterchainInfo>
+            + RequestHandler<GetShards>
             + RequestHandler<LookUpBlockBySeqno>
             + RequestHandler<GetBlockHeader>
             + Send
@@ -50,7 +51,8 @@ struct FirstBlockDiscover<S> {
 
 impl<S> Actor for FirstBlockDiscover<S>
 where
-    S: RequestHandler<GetShards>
+    S: RequestHandler<GetMasterchainInfo>
+        + RequestHandler<GetShards>
         + RequestHandler<LookUpBlockBySeqno>
         + RequestHandler<GetBlockHeader>
         + Send
@@ -83,7 +85,8 @@ where
 
 impl<S> FirstBlockDiscover<S>
 where
-    S: RequestHandler<GetShards>
+    S: RequestHandler<GetMasterchainInfo>
+        + RequestHandler<GetShards>
         + RequestHandler<LookUpBlockBySeqno>
         + RequestHandler<GetBlockHeader>
         + Send
@@ -122,12 +125,14 @@ where
             }
         }
 
-        let lhs = self.current.as_ref().map(|n| n.id.seqno + 1);
+        let lhs = self.current.as_ref().map(|n| n.id.seqno);
         let cur = self.current.as_ref().map(|n| n.id.seqno + 32);
-        let headers = BlockAvailability::new(&mut self.client, start.workchain, start.shard)
+        let headers = BlockAvailability::new(&mut self.client)
             .starting_at(cur.unwrap_or(start.seqno - 200000))
             .with_tolerance(4)
-            .find_first(lhs.unwrap_or(1)..=start.seqno)
+            .from(lhs)
+            .to(Some(start.into()))
+            .find()
             .await?;
 
         for header in &headers {

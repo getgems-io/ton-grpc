@@ -16,6 +16,16 @@ pub struct BlockIdExt {
     pub file_hash: String,
 }
 
+impl From<BlockIdExt> for BlockId {
+    fn from(value: BlockIdExt) -> Self {
+        Self {
+            workchain: value.workchain,
+            shard: value.shard,
+            seqno: value.seqno,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TransactionId {
     pub lt: i64,

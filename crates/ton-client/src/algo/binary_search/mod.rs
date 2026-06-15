@@ -1,8 +1,9 @@
 mod account;
 mod block;
 
-use core::range::RangeInclusive;
+use futures::TryFutureExt;
 use std::future::Future;
+use ton_tower::response::BlockId;
 
 pub use account::AccountTxAvailability;
 pub use block::BlockAvailability;
@@ -13,19 +14,32 @@ pub enum BinarySearchError {
     EmptyRange,
     #[error("first point not found")]
     NotFound(#[source] anyhow::Error),
+    #[error("failed to resolve search bounds")]
+    Bounds(#[source] anyhow::Error),
 }
 
-/// Binary search for the first point in a range where an async probe succeeds.
+/// Binary search for the first chain block where an async probe succeeds.
 ///
-/// Assumes the probe is monotonic: once it succeeds at some point, it succeeds for
-/// every greater point. A non-zero [`tolerance`](BinarySearch::tolerance) allows
+/// The workchain and shard are taken from the upper
+/// bound ([`upper_bound`](BinarySearch::upper_bound),
+/// a full [`BlockId`]), while the lower bound is a bare seqno
+/// ([`lower_bound`](BinarySearch::lower_bound)).
+///
+/// Assumes the probe is monotonic: once it succeeds at some seqno, it succeeds for
+/// every greater seqno. A non-zero [`tolerance`](BinarySearch::tolerance) allows
 /// returning the last successful result when the final probe fails but the success
 /// is within `tolerance` of the convergence point.
 #[async_trait::async_trait]
 pub trait BinarySearch {
     type Item;
 
-    fn probe(&mut self, point: i32) -> impl Future<Output = anyhow::Result<Self::Item>> + Send;
+    fn probe(&mut self, point: BlockId) -> impl Future<Output = anyhow::Result<Self::Item>> + Send;
+
+    fn lower_bound(&mut self) -> impl Future<Output = anyhow::Result<i32>> + Send {
+        async { Ok(1) }
+    }
+
+    fn upper_bound(&mut self) -> impl Future<Output = anyhow::Result<BlockId>> + Send;
 
     fn starting_point(&self, lhs: i32, rhs: i32) -> i32 {
         (lhs + rhs) / 2
@@ -52,22 +66,41 @@ pub trait BinarySearch {
         }
     }
 
-    async fn find_first<'a>(
-        mut self,
-        range: impl Into<RangeInclusive<i32>> + Send,
-    ) -> Result<Self::Item, BinarySearchError>
+    fn from(self, seqno: Option<i32>) -> From<Self>
+    where
+        Self: Sized,
+    {
+        From { inner: self, seqno }
+    }
+
+    fn to(self, block: Option<BlockId>) -> To<Self>
+    where
+        Self: Sized,
+    {
+        To { inner: self, block }
+    }
+
+    async fn find<'a>(mut self) -> Result<Self::Item, BinarySearchError>
     where
         Self: Sized + Send + 'a,
         Self::Item: Send,
     {
-        let RangeInclusive {
-            start: mut lhs,
-            last: mut rhs,
-        } = range.into();
+        let upper = self
+            .upper_bound()
+            .map_err(BinarySearchError::Bounds)
+            .await?;
+        let mut lhs = self
+            .lower_bound()
+            .map_err(BinarySearchError::Bounds)
+            .await?;
+        let mut rhs = upper.seqno;
 
         if lhs > rhs {
             return Err(BinarySearchError::EmptyRange);
         }
+
+        let workchain = upper.workchain;
+        let shard = upper.shard;
 
         let tolerance = self.tolerance();
         let mut cur = self.starting_point(lhs, rhs).clamp(lhs, rhs);
@@ -76,7 +109,12 @@ pub trait BinarySearch {
         let mut hops = 0;
 
         let last = loop {
-            let last = self.probe(cur).await.map(|value| (cur, value));
+            let point = BlockId {
+                workchain,
+                shard,
+                seqno: cur,
+            };
+            let last = self.probe(point).map_ok(|value| (cur, value)).await;
             hops += 1;
 
             if lhs >= rhs {
@@ -125,8 +163,16 @@ pub struct StartingAt<B> {
 impl<B: BinarySearch> BinarySearch for StartingAt<B> {
     type Item = B::Item;
 
-    fn probe(&mut self, point: i32) -> impl Future<Output = anyhow::Result<Self::Item>> + Send {
+    fn probe(&mut self, point: BlockId) -> impl Future<Output = anyhow::Result<Self::Item>> + Send {
         self.inner.probe(point)
+    }
+
+    fn lower_bound(&mut self) -> impl Future<Output = anyhow::Result<i32>> + Send {
+        self.inner.lower_bound()
+    }
+
+    fn upper_bound(&mut self) -> impl Future<Output = anyhow::Result<BlockId>> + Send {
+        self.inner.upper_bound()
     }
 
     fn starting_point(&self, _lhs: i32, _rhs: i32) -> i32 {
@@ -146,8 +192,16 @@ pub struct WithTolerance<B> {
 impl<B: BinarySearch> BinarySearch for WithTolerance<B> {
     type Item = B::Item;
 
-    fn probe(&mut self, point: i32) -> impl Future<Output = anyhow::Result<Self::Item>> + Send {
+    fn probe(&mut self, point: BlockId) -> impl Future<Output = anyhow::Result<Self::Item>> + Send {
         self.inner.probe(point)
+    }
+
+    fn lower_bound(&mut self) -> impl Future<Output = anyhow::Result<i32>> + Send {
+        self.inner.lower_bound()
+    }
+
+    fn upper_bound(&mut self) -> impl Future<Output = anyhow::Result<BlockId>> + Send {
+        self.inner.upper_bound()
     }
 
     fn starting_point(&self, lhs: i32, rhs: i32) -> i32 {
@@ -156,6 +210,70 @@ impl<B: BinarySearch> BinarySearch for WithTolerance<B> {
 
     fn tolerance(&self) -> i32 {
         self.tolerance
+    }
+}
+
+pub struct From<B> {
+    inner: B,
+    seqno: Option<i32>,
+}
+
+impl<B: BinarySearch + Send> BinarySearch for From<B> {
+    type Item = B::Item;
+
+    fn probe(&mut self, point: BlockId) -> impl Future<Output = anyhow::Result<Self::Item>> + Send {
+        self.inner.probe(point)
+    }
+
+    async fn lower_bound(&mut self) -> anyhow::Result<i32> {
+        match self.seqno {
+            Some(seqno) => Ok(seqno),
+            None => self.inner.lower_bound().await,
+        }
+    }
+
+    fn upper_bound(&mut self) -> impl Future<Output = anyhow::Result<BlockId>> + Send {
+        self.inner.upper_bound()
+    }
+
+    fn starting_point(&self, lhs: i32, rhs: i32) -> i32 {
+        self.inner.starting_point(lhs, rhs)
+    }
+
+    fn tolerance(&self) -> i32 {
+        self.inner.tolerance()
+    }
+}
+
+pub struct To<B> {
+    inner: B,
+    block: Option<BlockId>,
+}
+
+impl<B: BinarySearch + Send> BinarySearch for To<B> {
+    type Item = B::Item;
+
+    fn probe(&mut self, point: BlockId) -> impl Future<Output = anyhow::Result<Self::Item>> + Send {
+        self.inner.probe(point)
+    }
+
+    fn lower_bound(&mut self) -> impl Future<Output = anyhow::Result<i32>> + Send {
+        self.inner.lower_bound()
+    }
+
+    async fn upper_bound(&mut self) -> anyhow::Result<BlockId> {
+        match &self.block {
+            Some(block) => Ok(block.clone()),
+            None => self.inner.upper_bound().await,
+        }
+    }
+
+    fn starting_point(&self, lhs: i32, rhs: i32) -> i32 {
+        self.inner.starting_point(lhs, rhs)
+    }
+
+    fn tolerance(&self) -> i32 {
+        self.inner.tolerance()
     }
 }
 
@@ -168,7 +286,8 @@ mod tests {
     #[tokio::test]
     async fn should_find_first_successful_point() {
         let result = from_fn(|point| async move { available_from(700, point) })
-            .find_first(1..=1000)
+            .to(Some(masterchain(1000)))
+            .find()
             .await;
 
         assert_eq!(result.unwrap(), 700);
@@ -177,7 +296,8 @@ mod tests {
     #[tokio::test]
     async fn should_find_lower_bound_when_probe_always_succeeds() {
         let result = from_fn(|point| async move { anyhow::Ok(point) })
-            .find_first(1..=1000)
+            .to(Some(masterchain(1000)))
+            .find()
             .await;
 
         assert_eq!(result.unwrap(), 1);
@@ -186,7 +306,8 @@ mod tests {
     #[tokio::test]
     async fn should_return_error_when_probe_never_succeeds() {
         let result: Result<i32, _> = from_fn(|_| async { Err(anyhow!("unavailable")) })
-            .find_first(1..=1000)
+            .to(Some(masterchain(1000)))
+            .find()
             .await;
 
         let err = result.unwrap_err();
@@ -197,7 +318,9 @@ mod tests {
     #[tokio::test]
     async fn should_fail_on_empty_range() {
         let result = from_fn(|point| async move { anyhow::Ok(point) })
-            .find_first(1000..=1)
+            .from(Some(1000))
+            .to(Some(masterchain(1)))
+            .find()
             .await;
 
         assert!(matches!(result.unwrap_err(), BinarySearchError::EmptyRange));
@@ -207,7 +330,8 @@ mod tests {
     async fn should_clamp_starting_point_into_bounds() {
         let result = from_fn(|point| async move { available_from(700, point) })
             .starting_at(-200000)
-            .find_first(1..=1000)
+            .to(Some(masterchain(1000)))
+            .find()
             .await;
 
         assert_eq!(result.unwrap(), 700);
@@ -229,7 +353,8 @@ mod tests {
             }
         })
         .with_tolerance(4)
-        .find_first(1..=1000)
+        .to(Some(masterchain(1000)))
+        .find()
         .await;
 
         assert_eq!(result.unwrap(), 500);
@@ -250,10 +375,19 @@ mod tests {
                 }
             }
         })
-        .find_first(1..=1000)
+        .to(Some(masterchain(1000)))
+        .find()
         .await;
 
         assert_eq!(result.unwrap(), 500);
+    }
+
+    fn masterchain(seqno: i32) -> BlockId {
+        BlockId {
+            workchain: -1,
+            shard: i64::MIN,
+            seqno,
+        }
     }
 
     fn available_from(first: i32, point: i32) -> anyhow::Result<i32> {
@@ -281,8 +415,12 @@ mod tests {
     {
         type Item = T;
 
-        fn probe(&mut self, point: i32) -> impl Future<Output = anyhow::Result<T>> + Send {
-            (self.0)(point)
+        fn probe(&mut self, point: BlockId) -> impl Future<Output = anyhow::Result<T>> + Send {
+            (self.0)(point.seqno)
+        }
+
+        fn upper_bound(&mut self) -> impl Future<Output = anyhow::Result<BlockId>> + Send {
+            async { Err(anyhow!("upper bound must be provided via .to(..)")) }
         }
     }
 }
