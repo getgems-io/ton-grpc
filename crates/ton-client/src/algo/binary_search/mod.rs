@@ -29,7 +29,6 @@ pub enum BinarySearchError {
 /// every greater seqno. A non-zero [`tolerance`](BinarySearch::tolerance) allows
 /// returning the last successful result when the final probe fails but the success
 /// is within `tolerance` of the convergence point.
-#[async_trait::async_trait]
 pub trait BinarySearch {
     type Item;
 
@@ -42,7 +41,7 @@ pub trait BinarySearch {
     fn upper_bound(&mut self) -> impl Future<Output = anyhow::Result<BlockId>> + Send;
 
     fn starting_point(&self, lhs: i32, rhs: i32) -> i32 {
-        (lhs + rhs) / 2
+        lhs.midpoint(rhs)
     }
 
     fn tolerance(&self) -> i32 {
@@ -127,7 +126,7 @@ pub trait BinarySearch {
                 lhs = cur + 1;
             }
 
-            cur = (lhs + rhs) / 2;
+            cur = lhs.midpoint(rhs);
             if cur == 0 {
                 break last;
             }
