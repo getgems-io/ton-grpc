@@ -40,6 +40,7 @@ pub type SharedBalance<T> = SharedService<Balance<WrappedCursor<T>, BoxCursorCli
 pub type PoolTransport<T> =
     ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance<T>>, SharedBalance<T>>>>;
 
+#[derive(Debug)]
 pub enum ConfigSource {
     File { path: PathBuf },
     Url { url: Url, interval: Duration },
@@ -60,6 +61,12 @@ pub struct TonClientBuilder<F> {
     retry_max_delay: Duration,
 }
 
+impl<F: Default> Default for TonClientBuilder<F> {
+    fn default() -> Self {
+        Self::from_config_url(default_ton_config_url(), Duration::from_secs(60))
+    }
+}
+
 impl<F: Default> TonClientBuilder<F> {
     pub fn from_config_path(path: PathBuf) -> Self {
         Self::with_factory_and_source(F::default(), ConfigSource::File { path })
@@ -78,14 +85,8 @@ impl<F: Default> TonClientBuilder<F> {
         )
     }
 
-    pub fn default_config() -> Self {
-        Self::with_factory_and_source(
-            F::default(),
-            ConfigSource::Url {
-                url: default_ton_config_url(),
-                interval: Duration::from_secs(60),
-            },
-        )
+    pub fn from_config_source(config_source: impl Into<ConfigSource>) -> Self {
+        Self::with_factory_and_source(F::default(), config_source.into())
     }
 }
 
@@ -157,6 +158,7 @@ impl<F> TonClientBuilder<F> {
         F::Future: Send,
         T: TonService,
     {
+        tracing::debug!(config_source = ?self.config_source);
         let stream: Pin<Box<dyn Stream<Item = Result<TonConfig, anyhow::Error>> + Send>> =
             match self.config_source {
                 ConfigSource::File { path } => {
