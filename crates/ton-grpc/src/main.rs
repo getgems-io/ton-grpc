@@ -1,9 +1,10 @@
-use clap::Parser;
+use clap::{Args, Parser};
 use humantime::parse_duration;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
-use ton_client::{PoolTransport, TonClientBuilder};
+use ton_client::{ConfigSource, PoolTransport, TonClientBuilder};
 use ton_config::default_ton_config_url;
 use ton_grpc::AccountService;
 use ton_grpc::BlockService;
@@ -18,9 +19,31 @@ use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use url::Url;
 
+#[derive(Args, Debug)]
+#[group(multiple = false)]
+struct TonConfigArgs {
+    #[clap(long, value_parser = Url::parse)]
+    ton_config_url: Option<Url>,
+    #[clap(long)]
+    ton_config_path: Option<PathBuf>,
+}
+
+impl From<TonConfigArgs> for ConfigSource {
+    fn from(value: TonConfigArgs) -> Self {
+        if let Some(path) = value.ton_config_path {
+            return Self::File { path };
+        }
+
+        Self::Url {
+            url: value.ton_config_url.unwrap_or(default_ton_config_url()),
+            interval: Duration::from_secs(60),
+        }
+    }
+}
+
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+struct AppArgs {
     #[clap(long, default_value = "0.0.0.0:50052")]
     listen: SocketAddr,
     #[clap(long, value_parser = parse_duration, default_value = "30s")]
@@ -41,8 +64,8 @@ struct Args {
     #[clap(long, default_value = "0.0.0.0:9000")]
     metrics_listen: SocketAddr,
 
-    #[clap(long, value_parser = Url::parse, default_value_t = default_ton_config_url())]
-    ton_config_url: Url,
+    #[clap(flatten)]
+    ton_config_args: TonConfigArgs,
     #[clap(long, value_parser = parse_duration, default_value = "10s")]
     ton_timeout: Duration,
     #[clap(long, value_parser = parse_duration, default_value = "10s")]
@@ -64,7 +87,7 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    let args = AppArgs::parse();
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
@@ -80,21 +103,17 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Listening metrics on {:?}", &args.metrics_listen);
     }
 
-    tracing::info!("TON Config URL: {}", &args.ton_config_url);
-
-    let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config_url(
-        args.ton_config_url,
-        Duration::from_secs(60),
-    )
-    .set_timeout(args.ton_timeout)
-    .set_retry_budget_ttl(args.retry_budget_ttl)
-    .set_retry_min_per_sec(args.retry_min_rps)
-    .set_retry_percent(args.retry_withdraw_percent)
-    .set_retry_first_delay(args.retry_first_delay)
-    .set_retry_max_delay(args.retry_max_delay)
-    .set_ewma_default_rtt(args.ewma_default_rtt)
-    .set_ewma_decay(args.ewma_decay)
-    .build()?;
+    let mut client =
+        TonClientBuilder::<MakeTonlibjsonAdapter>::from_config_source(args.ton_config_args)
+            .set_timeout(args.ton_timeout)
+            .set_retry_budget_ttl(args.retry_budget_ttl)
+            .set_retry_min_per_sec(args.retry_min_rps)
+            .set_retry_percent(args.retry_withdraw_percent)
+            .set_retry_first_delay(args.retry_first_delay)
+            .set_retry_max_delay(args.retry_max_delay)
+            .set_ewma_default_rtt(args.ewma_default_rtt)
+            .set_ewma_decay(args.ewma_decay)
+            .build()?;
 
     client.wait_ready().await?;
     tracing::info!("Ton Client is ready");
