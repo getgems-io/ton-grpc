@@ -1,9 +1,10 @@
 use crate::{
     Client, RoutedClient, TonService,
-    pool::{Balance, LiteServerDiscoverHandle},
+    pool::{Balance, ConfigError, LiteServerDiscoverHandle},
     service::{
         error::{ErrorLayer, ErrorService},
         metric::ConcurrencyMetric,
+        reconnect::Reconnect,
         retry::RetryPolicy,
         shared::{SharedLayer, SharedService},
         timeout::{Timeout, TimeoutLayer},
@@ -18,7 +19,7 @@ use ton_config::{
 };
 use ton_tower::request::GetMasterchainInfo;
 use tower::{
-    Service, ServiceBuilder, ServiceExt,
+    Service, ServiceBuilder,
     discover::Change,
     limit::{ConcurrencyLimit, ConcurrencyLimitLayer},
     load::{CompleteOnResponse, PeakEwma, PeakEwmaDiscover},
@@ -27,18 +28,21 @@ use tower::{
 };
 use url::Url;
 
-pub type WrappedCursor<T> = RoutedClient<
-    ConcurrencyMetric<ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<T>>>>>>,
+pub type ReconnectingClient<F> = Reconnect<F, TonConfig>;
+
+pub type WrappedCursor<F> = RoutedClient<
+    ConcurrencyMetric<
+        ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<ReconnectingClient<F>>>>>>,
+    >,
 >;
 
-pub type BoxCursorClientDiscover<T> = Pin<
-    Box<dyn Stream<Item = Result<Change<LiteServerId, WrappedCursor<T>>, anyhow::Error>> + Send>,
->;
+pub type BoxClientDiscover<F> =
+    Pin<Box<dyn Stream<Item = Result<Change<LiteServerId, WrappedCursor<F>>, ConfigError>> + Send>>;
 
-pub type SharedBalance<T> = SharedService<Balance<WrappedCursor<T>, BoxCursorClientDiscover<T>>>;
+pub type SharedBalance<F> = SharedService<Balance<WrappedCursor<F>, BoxClientDiscover<F>>>;
 
-pub type PoolTransport<T> =
-    ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance<T>>, SharedBalance<T>>>>;
+pub type PoolTransport<F> =
+    ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance<F>>, SharedBalance<F>>>>;
 
 #[derive(Debug)]
 pub enum ConfigSource {
@@ -152,11 +156,13 @@ impl<F> TonClientBuilder<F> {
         self
     }
 
-    pub fn build<T>(self) -> anyhow::Result<Client<PoolTransport<T>>>
+    pub fn build(self) -> anyhow::Result<Client<PoolTransport<F>>>
     where
-        F: Service<TonConfig, Response = T, Error = anyhow::Error> + Clone + Send + 'static,
-        F::Future: Send,
-        T: TonService,
+        F: Service<TonConfig, Response: TonService, Error: Send + Sync, Future: Send + Unpin>
+            + Clone
+            + Send
+            + 'static,
+        anyhow::Error: From<F::Error>,
     {
         tracing::debug!(config_source = ?self.config_source);
         let stream: Pin<Box<dyn Stream<Item = Result<TonConfig, anyhow::Error>> + Send>> =
@@ -173,16 +179,11 @@ impl<F> TonClientBuilder<F> {
                 }
                 ConfigSource::Config { config } => stream::once(ready(Ok(config))).boxed(),
             };
-        let lite_server_discover = LiteServerDiscoverHandle::new(TonConfig::default(), stream);
+        let lite_server_discover = LiteServerDiscoverHandle::new(stream);
         let factory = self.factory;
-        let client_discover = lite_server_discover.then(move |s| {
-            let factory = factory.clone();
-            async move {
-                match s {
-                    Change::Insert(k, v) => factory.oneshot(v).await.map(|v| Change::Insert(k, v)),
-                    Change::Remove(k) => Ok(Change::Remove(k)),
-                }
-            }
+        let client_discover = lite_server_discover.map_ok(move |change| match change {
+            Change::Insert(k, config) => Change::Insert(k, Reconnect::new(factory.clone(), config)),
+            Change::Remove(k) => Change::Remove(k),
         });
 
         let ewma_discover = PeakEwmaDiscover::new::<GetMasterchainInfo>(

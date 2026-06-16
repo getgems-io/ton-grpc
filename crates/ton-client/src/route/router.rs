@@ -2,8 +2,6 @@ use crate::ToRoute;
 use crate::route::Route;
 use crate::route::{Error, Routed, choose};
 use std::collections::HashMap;
-use std::convert::Infallible;
-use std::fmt::Debug;
 use std::future::{Ready, ready};
 use std::hash::Hash;
 use std::pin::Pin;
@@ -26,7 +24,7 @@ impl<S, D> Router<S, D>
 where
     D: Discover<Service = S> + Unpin,
     D::Key: Hash,
-    D::Error: Debug,
+    D::Error: Into<BoxError>,
 {
     pub fn new(discover: D) -> Self {
         metrics::describe_counter!("ton_router_miss_count", "Count of misses in router");
@@ -56,7 +54,7 @@ where
     fn update_pending_from_discover(
         &mut self,
         cx: &mut Context<'_>,
-    ) -> Poll<Option<Result<(), Infallible>>> {
+    ) -> Poll<Option<Result<(), D::Error>>> {
         loop {
             match ready!(Pin::new(&mut self.discover).poll_discover(cx)).transpose() {
                 Ok(None) => return Poll::Ready(None),
@@ -66,9 +64,7 @@ where
                 Ok(Some(Change::Insert(key, svc))) => {
                     self.services.insert(key, svc);
                 }
-                Err(error) => {
-                    tracing::warn!(?error, "discover error");
-                }
+                Err(error) => return Poll::Ready(Some(Err(error))),
             }
         }
     }
@@ -78,7 +74,7 @@ impl<S, D, R> Service<&R> for Router<S, D>
 where
     R: ToRoute + IntoRequest,
     S: Service<R::Request, Error: Into<BoxError>> + Routed + Clone,
-    D: Discover<Service = S, Error: Debug> + Unpin,
+    D: Discover<Service = S, Error: Into<BoxError>> + Unpin,
     D::Key: Hash,
 {
     type Response = P2cBalance<ServiceList<Vec<S>>, R::Request>;
@@ -86,7 +82,9 @@ where
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        let _ = self.update_pending_from_discover(cx);
+        if let Poll::Ready(Some(Err(error))) = self.update_pending_from_discover(cx) {
+            return Poll::Ready(Err(error.into()));
+        }
 
         for s in self.services.values_mut() {
             if let Poll::Ready(Ok(())) = s.poll_ready(cx) {

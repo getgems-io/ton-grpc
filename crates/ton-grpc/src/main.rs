@@ -14,7 +14,7 @@ use ton_grpc::block_service_server::BlockServiceServer;
 use ton_grpc::message_service_server::MessageServiceServer;
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
-use tonlibjson_client::{MakeTonlibjsonAdapter, TonlibjsonAdapter};
+use tonlibjson_client::MakeTonlibjsonAdapter;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 use url::Url;
@@ -133,7 +133,7 @@ async fn main() -> anyhow::Result<()> {
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
 
-    type Client = PoolTransport<TonlibjsonAdapter>;
+    type Client = PoolTransport<MakeTonlibjsonAdapter>;
 
     let (health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter
