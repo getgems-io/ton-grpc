@@ -1,6 +1,6 @@
 use crate::{
     Client, RoutedClient, TonService,
-    pool::{Balance, ConfigError, LiteServerDiscoverHandle},
+    pool::{Balance, LiteServerDiscoverError, LiteServerDiscoverHandle},
     service::{
         error::{ErrorLayer, ErrorService},
         metric::ConcurrencyMetric,
@@ -36,8 +36,12 @@ pub type WrappedCursor<F> = RoutedClient<
     >,
 >;
 
-pub type BoxClientDiscover<F> =
-    Pin<Box<dyn Stream<Item = Result<Change<LiteServerId, WrappedCursor<F>>, ConfigError>> + Send>>;
+pub type BoxClientDiscover<F> = Pin<
+    Box<
+        dyn Stream<Item = Result<Change<LiteServerId, WrappedCursor<F>>, LiteServerDiscoverError>>
+            + Send,
+    >,
+>;
 
 pub type SharedBalance<F> = SharedService<Balance<WrappedCursor<F>, BoxClientDiscover<F>>>;
 

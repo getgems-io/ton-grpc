@@ -1,6 +1,5 @@
 use crate::actor::Actor;
-use anyhow::anyhow;
-use futures::Stream;
+use futures::{FutureExt, Stream};
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::pin::Pin;
@@ -12,18 +11,25 @@ use ton_config::{LiteServer, LiteServerId, TonConfig};
 use tower::discover::Change;
 
 #[derive(Debug, thiserror::Error)]
-#[error("failed to load config: {0}")]
-pub struct ConfigError(#[source] anyhow::Error);
+pub enum LiteServerDiscoverError {
+    #[error("failed to load initial config: {0}")]
+    InitialConfig(#[source] anyhow::Error),
+    #[error("discover channel closed: {0}")]
+    ChannelClosed(#[from] mpsc::error::SendError<Change<LiteServerId, TonConfig>>),
+    #[error("discover actor join failed: {0}")]
+    ActorJoin(#[from] tokio::task::JoinError),
+}
 
 pub struct LiteServerDiscoverHandle {
-    receiver: mpsc::Receiver<Result<Change<LiteServerId, TonConfig>, ConfigError>>,
-    _join_handle: AbortOnDropHandle<anyhow::Result<()>>,
+    receiver: mpsc::Receiver<Change<LiteServerId, TonConfig>>,
+    join_handle: AbortOnDropHandle<Result<(), LiteServerDiscoverError>>,
+    finished: bool,
 }
 
 impl LiteServerDiscoverHandle {
     pub fn new<S, E>(stream: S) -> Self
     where
-        E: Debug + Send + 'static,
+        E: Into<anyhow::Error> + Debug + Send + 'static,
         S: Stream<Item = Result<TonConfig, E>> + Unpin + Send + 'static,
     {
         let (tx, rx) = mpsc::channel(100);
@@ -36,50 +42,55 @@ impl LiteServerDiscoverHandle {
 
         Self {
             receiver: rx,
-            _join_handle: join_handle,
+            join_handle,
+            finished: false,
         }
     }
 }
 
 impl Stream for LiteServerDiscoverHandle {
-    type Item = Result<Change<LiteServerId, TonConfig>, ConfigError>;
+    type Item = Result<Change<LiteServerId, TonConfig>, LiteServerDiscoverError>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        if let Some(change) = ready!(self.receiver.poll_recv(cx)) {
-            return Poll::Ready(Some(change));
+        if self.finished {
+            return Poll::Ready(None);
         }
 
-        Poll::Ready(None)
+        if let Some(change) = ready!(self.receiver.poll_recv(cx)) {
+            return Poll::Ready(Some(Ok(change)));
+        }
+
+        let result = ready!(self.join_handle.poll_unpin(cx));
+        self.finished = true;
+        match result {
+            Ok(Ok(())) => Poll::Ready(None),
+            Ok(Err(config_error)) => Poll::Ready(Some(Err(config_error))),
+            Err(join_error) => {
+                Poll::Ready(Some(Err(LiteServerDiscoverError::ActorJoin(join_error))))
+            }
+        }
     }
 }
 
 struct LiteServerDiscoverActor<S> {
     state: Option<HashSet<LiteServer>>,
     stream: S,
-    tx: mpsc::Sender<Result<Change<LiteServerId, TonConfig>, ConfigError>>,
+    tx: mpsc::Sender<Change<LiteServerId, TonConfig>>,
 }
 
 impl<S, E> Actor for LiteServerDiscoverActor<S>
 where
-    E: Debug + Send,
+    E: Into<anyhow::Error> + Debug + Send,
     S: Stream<Item = Result<TonConfig, E>> + Unpin + Send + 'static,
 {
-    type Output = anyhow::Result<()>;
+    type Output = Result<(), LiteServerDiscoverError>;
 
     async fn run(mut self) -> <Self as Actor>::Output {
         while let Some(item) = self.stream.next().await {
             let config = match item {
                 Ok(config) => config,
                 Err(e) if self.state.is_none() => {
-                    let _ = self
-                        .tx
-                        .send(Err(ConfigError(anyhow!(
-                            "discover initial config error: {:?}",
-                            e
-                        ))))
-                        .await;
-
-                    return Ok(());
+                    return Err(LiteServerDiscoverError::InitialConfig(e.into()));
                 }
                 Err(e) => {
                     tracing::error!("discover new config error: {:?}", e);
@@ -95,17 +106,17 @@ where
             tracing::info!("discovered {} liteservers", liteserver_new.len());
             for ls in state.difference(&liteserver_new) {
                 tracing::info!("remove {:?}", ls.id());
-                self.tx.send(Ok(Change::Remove(ls.id.clone()))).await?;
+                self.tx.send(Change::Remove(ls.id.clone())).await?;
             }
 
             for ls in liteserver_new.difference(&state) {
                 tracing::info!("insert {:?}", ls.id());
 
                 self.tx
-                    .send(Ok(Change::Insert(
+                    .send(Change::Insert(
                         ls.id.clone(),
                         config.with_liteserver(ls.clone()),
-                    )))
+                    ))
                     .await?;
             }
 
@@ -119,6 +130,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::anyhow;
     use futures::StreamExt;
     use futures::stream;
     use std::convert::Infallible;
@@ -191,7 +203,7 @@ mod tests {
     async fn ignores_error_after_first_success() {
         let discover = LiteServerDiscoverHandle::new(stream::iter(vec![
             Ok(config_with(&["a"])),
-            Err("update failed"),
+            Err(anyhow!("update failed")),
             Ok(config_with(&["a", "b"])),
         ]));
 
@@ -205,7 +217,7 @@ mod tests {
     #[tokio::test]
     async fn errors_when_first_poll_errors() {
         let discover = LiteServerDiscoverHandle::new(stream::iter(vec![
-            Err("initial load failed"),
+            Err(anyhow!("initial load failed")),
             Ok(config_with(&["a"])),
         ]));
 
