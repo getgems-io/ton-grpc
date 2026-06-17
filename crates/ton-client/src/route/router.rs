@@ -115,3 +115,69 @@ where
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::route::BlockCriteria;
+    use futures::stream;
+    use mockall::mock;
+    use std::time::Duration;
+    use tokio::time::timeout;
+    use ton_tower::request::GetMasterchainInfo;
+    use tower::ServiceExt;
+    use tower::discover::Change;
+
+    mock! {
+        Service {}
+
+        impl Clone for Service {
+            fn clone(&self) -> Self;
+        }
+
+        impl Service<GetMasterchainInfo> for Service {
+            type Response = ();
+            type Error = BoxError;
+            type Future = Ready<Result<(), BoxError>>;
+
+            fn poll_ready<'a>(&mut self, _cx: &mut Context<'a>) -> Poll<Result<(), BoxError>>;
+            fn call(&mut self, _req: GetMasterchainInfo) -> Ready<Result<(), BoxError>>;
+        }
+
+        impl Routed for Service {
+            fn contains(&self, _chain: &i32, _criteria: &BlockCriteria) -> bool;
+            fn contains_not_available(&self, _chain: &i32, _criteria: &BlockCriteria) -> bool;
+            fn last_seqno(&self) -> Option<i32>;
+        }
+    }
+
+    #[tokio::test]
+    async fn returns_error_when_discover_errors_and_no_services() {
+        let discover = stream::iter(vec![Err::<Change<i32, MockService>, BoxError>(
+            "discover failed".into(),
+        )]);
+        let mut router: Router<MockService, _> = Router::new(discover);
+
+        let error = ServiceExt::<&GetMasterchainInfo>::ready(&mut router)
+            .await
+            .err()
+            .unwrap();
+
+        assert!(error.to_string().contains("discover failed"));
+    }
+
+    #[tokio::test]
+    async fn returns_pending_when_no_services_and_discover_still_active() {
+        let discover = futures::stream::pending::<Result<Change<i32, MockService>, BoxError>>();
+        let mut router: Router<MockService, _> = Router::new(discover);
+        let deadline = Duration::from_millis(50);
+
+        let future = ServiceExt::<&GetMasterchainInfo>::ready(&mut router);
+        let error = timeout(deadline, future)
+            .await
+            .err()
+            .expect("expected discover error");
+
+        assert!(error.to_string().contains("deadline has elapsed"));
+    }
+}

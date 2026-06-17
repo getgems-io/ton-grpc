@@ -189,3 +189,117 @@ where
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockall::Sequence;
+    use mockall::mock;
+    use std::future::{Ready, ready};
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn connects_and_serves_request() {
+        let svc = Reconnect::new(maker_returning(vec![service_ready()]), "target".to_string());
+
+        let result = svc.oneshot(Request).await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn returns_error_when_make_service_fails() {
+        let maker = maker_failing("failed to create svc");
+        let mut reconnect = Reconnect::new(maker, "target".to_string());
+
+        let result = (&mut reconnect).oneshot(Request).await;
+
+        assert_eq!(result.err().unwrap().to_string(), "failed to create svc");
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn skips_failing_svc() {
+        let maker = maker_returning(vec![service_failing("fail"), service_ready()]);
+        let mut reconnect = Reconnect::new(maker, "target".to_string());
+
+        let first = (&mut reconnect).oneshot(Request).await;
+
+        assert!(first.is_ok());
+    }
+
+    #[derive(Debug)]
+    struct Request;
+
+    mock! {
+        Service {}
+
+        impl Service<Request> for Service {
+            type Response = ();
+            type Error = anyhow::Error;
+            type Future = Ready<Result<(), anyhow::Error>>;
+
+            fn poll_ready<'a>(&mut self, _cx: &mut Context<'a>) -> Poll<Result<(), anyhow::Error>>;
+            fn call(&mut self, _req: Request) -> Ready<Result<(), anyhow::Error>>;
+        }
+    }
+
+    mock! {
+        Maker {}
+
+        impl Service<String> for Maker {
+            type Response = MockService;
+            type Error = anyhow::Error;
+            type Future = Ready<Result<MockService, anyhow::Error>>;
+
+            fn poll_ready<'a>(&mut self, _cx: &mut Context<'a>) -> Poll<Result<(), anyhow::Error>>;
+            fn call(&mut self, _target: String) -> Ready<Result<MockService, anyhow::Error>>;
+        }
+    }
+
+    fn service_ready() -> MockService {
+        let mut svc = MockService::new();
+        svc.expect_poll_ready().returning(|_| Poll::Ready(Ok(())));
+        svc.expect_call().returning(|_| ready(Ok(())));
+        svc
+    }
+
+    fn service_failing(msg: &str) -> MockService {
+        let mut svc = MockService::new();
+        let msg = msg.to_string();
+        svc.expect_poll_ready()
+            .returning(move |_| Poll::Ready(Err(anyhow::anyhow!(msg.clone()))));
+        svc.expect_call().never();
+        svc
+    }
+
+    fn maker_ready() -> MockMaker {
+        let mut maker = MockMaker::new();
+        maker.expect_poll_ready().returning(|_| Poll::Ready(Ok(())));
+        maker
+    }
+
+    fn maker_returning(svc: impl IntoIterator<Item = MockService>) -> MockMaker {
+        let mut maker = maker_ready();
+        let mut seq = Sequence::new();
+        for svc in svc {
+            maker
+                .expect_call()
+                .once()
+                .in_sequence(&mut seq)
+                .return_once(move |_| ready(Ok(svc)));
+        }
+        maker
+    }
+
+    fn maker_failing(msg: &str) -> MockMaker {
+        let mut maker = maker_ready();
+        let msg = msg.to_string();
+        maker
+            .expect_call()
+            .returning(move |_| ready(Err(anyhow::anyhow!(msg.clone()))));
+        maker
+    }
+}
