@@ -1,26 +1,35 @@
-use crate::tl::{Requestable, TonError};
+use crate::tl::{BlocksGetMasterchainInfo, Requestable, TonError};
 use anyhow::anyhow;
 use dashmap::DashMap;
 use futures::ready;
 use pin_project::{pin_project, pinned_drop};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, watch};
 use tokio_util::sync::{CancellationToken, DropGuard};
+use ton_config::TonConfig;
 use tower::Service;
 use uuid::Uuid;
 
 type RequestStorage = DashMap<RequestId, oneshot::Sender<Response>>;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
+enum ConnectionState {
+    Connecting,
+    Connected,
+    Disconnected,
+}
+
+#[derive(Clone)]
 pub struct TonlibjsonClient {
+    state: watch::Receiver<ConnectionState>,
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<RequestStorage>,
     drop_guard: Arc<DropGuard>,
@@ -31,8 +40,16 @@ impl TonlibjsonClient {
         tonlibjson_sys::Client::set_verbosity_level(level);
     }
 
-    pub fn new() -> Self {
+    pub fn new(config: TonConfig) -> anyhow::Result<Self> {
         let client = Arc::new(tonlibjson_sys::Client::new());
+        let ping_query_id = RequestId::new_v4();
+        let ping_query = Request {
+            id: ping_query_id,
+            body: BlocksGetMasterchainInfo::default(),
+        };
+        client.send(Self::config(config)?.as_ref())?;
+        client.send(&serde_json::to_string(&ping_query)?)?;
+
         let client_recv = client.clone();
 
         let responses: Arc<RequestStorage> = Default::default();
@@ -41,11 +58,21 @@ impl TonlibjsonClient {
         let cancel_token = CancellationToken::new();
         let child_token = cancel_token.child_token();
 
-        std::thread::spawn(move || {
-            let timeout = Duration::from_secs(1);
+        let (state_tx, state_rx) = watch::channel(ConnectionState::Connecting);
+        tokio::task::spawn(async move {
             while !child_token.is_cancelled() {
-                if let Ok(packet) = client_recv.receive(timeout) {
+                while let Ok(packet) = client_recv.receive(Duration::from_secs(0)) {
                     if let Ok(response) = serde_json::from_str::<Response>(packet) {
+                        if response.data["@type"] == "error" {
+                            let error =
+                                serde_json::from_value::<TonError>(response.data.clone()).unwrap();
+                            if error.code() == 500 && error.message() == "LITE_SERVER_NETWORK" {
+                                let _ = state_tx.send(ConnectionState::Disconnected);
+                            }
+                        } else if response.id == ping_query_id {
+                            let _ = state_tx.send(ConnectionState::Connected);
+                        }
+
                         if let Some((_, sender)) = responses_rcv.remove(&response.id) {
                             let _ = sender.send(response);
                         }
@@ -58,22 +85,40 @@ impl TonlibjsonClient {
                         tracing::warn!("Unexpected response {:?}", packet.to_string())
                     }
                 }
+
+                tokio::time::sleep(Duration::from_millis(10)).await;
             }
 
             tracing::trace!("Client dropped");
         });
 
-        TonlibjsonClient {
+        Ok(TonlibjsonClient {
+            state: state_rx,
             client,
             responses,
             drop_guard: Arc::new(cancel_token.drop_guard()),
-        }
+        })
     }
-}
 
-impl Default for TonlibjsonClient {
-    fn default() -> Self {
-        Self::new()
+    fn config(config: TonConfig) -> anyhow::Result<String> {
+        let full_config = json!({
+            "@type": "init",
+            "options": {
+                "@type": "options",
+                "config": {
+                    "@type": "config",
+                    "config": config.to_string(),
+                    "use_callbacks_for_network": false,
+                    "blockchain_name": "",
+                    "ignore_cache": true
+                },
+                "keystore_type": {
+                    "@type": "keyStoreTypeInMemory"
+                }
+            }
+        });
+
+        serde_json::to_string(&full_config).map_err(Into::into)
     }
 }
 
@@ -85,8 +130,17 @@ where
     type Error = anyhow::Error;
     type Future = ResponseFuture<R::Response>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        match *self.state.borrow_and_update() {
+            ConnectionState::Connected => Poll::Ready(Ok(())),
+            ConnectionState::Disconnected => Poll::Ready(Err(anyhow!(
+                "client is disconnected: lite server network failure"
+            ))),
+            ConnectionState::Connecting => {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
+        }
     }
 
     fn call(&mut self, req: R) -> Self::Future {
@@ -110,7 +164,7 @@ where
                     Err(e) => ResponseFuture::failed(e),
                 }
             }
-            Err(e) => ResponseFuture::failed(anyhow!(e)),
+            Err(e) => ResponseFuture::failed(e.into()),
         }
     }
 }
@@ -237,29 +291,10 @@ struct Response {
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{Request, TonlibjsonClient};
-    use crate::tl::BlocksGetMasterchainInfo;
+    use crate::client::Request;
     use serde_json::json;
     use std::str::FromStr;
-    use tower::ServiceExt;
-    use tracing_test::traced_test;
     use uuid::Uuid;
-
-    #[tokio::test]
-    #[traced_test]
-    #[ignore]
-    async fn not_initialized_call() {
-        let mut client = TonlibjsonClient::default();
-
-        let resp = (&mut client)
-            .oneshot(BlocksGetMasterchainInfo::default())
-            .await;
-
-        assert_eq!(
-            "Ton error occurred with code 400, message library is not inited",
-            resp.unwrap_err().to_string()
-        )
-    }
 
     #[test]
     fn data_is_flatten() {

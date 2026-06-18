@@ -244,6 +244,16 @@ pub struct TonError {
     message: String,
 }
 
+impl TonError {
+    pub fn code(&self) -> i32 {
+        self.code
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+}
+
 impl Display for TonError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(

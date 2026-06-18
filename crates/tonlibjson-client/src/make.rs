@@ -1,11 +1,11 @@
 use crate::client::TonlibjsonClient;
-use crate::tl::BlocksGetMasterchainInfo;
-use serde_json::{Value, json};
+use anyhow::Context as ErrorContext;
+use futures::FutureExt;
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use ton_config::TonConfig;
-use tower::{Service, ServiceExt};
+use tower::Service;
 
 #[derive(Default, Debug, Clone)]
 pub struct MakeTonlibjsonClient;
@@ -20,47 +20,22 @@ impl Service<TonConfig> for MakeTonlibjsonClient {
     }
 
     fn call(&mut self, req: TonConfig) -> Self::Future {
-        Box::pin(async move {
-            let mut client = ClientBuilder::from_config(&req)
-                .disable_logging()
-                .build()
-                .await?;
-
-            let _ = (&mut client)
-                .oneshot(BlocksGetMasterchainInfo::default())
-                .await?;
-
-            Ok(client)
-        })
+        ClientBuilder::from_config(req)
+            .disable_logging()
+            .build()
+            .boxed()
     }
 }
 
 struct ClientBuilder {
-    config: Value,
+    config: TonConfig,
     logging: Option<i32>,
 }
 
 impl ClientBuilder {
-    fn from_config(config: &TonConfig) -> Self {
-        let full_config = json!({
-            "@type": "init",
-            "options": {
-                "@type": "options",
-                "config": {
-                    "@type": "config",
-                    "config": config.to_string(),
-                    "use_callbacks_for_network": false,
-                    "blockchain_name": "",
-                    "ignore_cache": true
-                },
-                "keystore_type": {
-                    "@type": "keyStoreTypeInMemory"
-                }
-            }
-        });
-
+    fn from_config(config: TonConfig) -> Self {
         Self {
-            config: full_config,
+            config,
             logging: None,
         }
     }
@@ -76,9 +51,6 @@ impl ClientBuilder {
             TonlibjsonClient::set_logging(level);
         }
 
-        let mut client = TonlibjsonClient::new();
-        let _ = (&mut client).oneshot(self.config).await?;
-
-        Ok(client)
+        TonlibjsonClient::new(self.config).context("build TonlibjsonClient")
     }
 }

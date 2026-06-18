@@ -62,4 +62,16 @@ impl LocalLiteServer {
     pub fn config(&self) -> &TonConfig {
         &self.config
     }
+
+    pub async fn stop(&self) -> Result<()> {
+        self.liteserver.stop_with_timeout(Some(0)).await?;
+
+        Ok(())
+    }
+
+    pub async fn pause(&self) -> Result<()> {
+        self.liteserver.pause().await?;
+
+        Ok(())
+    }
 }
