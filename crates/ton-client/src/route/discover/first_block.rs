@@ -1,5 +1,4 @@
 use crate::RequestHandler;
-use crate::actor::Actor;
 use crate::algo::binary_search::{BinarySearch, BlockAvailability};
 use crate::route::discover::last_block::LastBlockDiscoverActorHandle;
 use crate::route::registry::Registry;
@@ -8,7 +7,7 @@ use std::borrow::BorrowMut;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::{MissedTickBehavior, interval};
-use tokio_util::task::AbortOnDropHandle;
+use ton_tower::actor::{AbortOnDropHandle, Actor};
 use ton_tower::request::{GetBlockHeader, GetMasterchainInfo, GetShards, LookUpBlockBySeqno};
 use ton_tower::response::{BlockHeader, BlockIdExt};
 use tower::ServiceExt;

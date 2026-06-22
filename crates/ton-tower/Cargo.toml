@@ -14,3 +14,4 @@ thiserror = "2.0.18"
 metrics = "0.24.6"
 tokio = "1.52.3"
 tokio-retry = "0.3.2"
+tokio-util = { version = "0.7", features = ["rt"] }

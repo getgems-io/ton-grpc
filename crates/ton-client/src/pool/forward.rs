@@ -1,9 +1,9 @@
-use crate::route::Route;
 use crate::ToRoute;
+use crate::route::Route;
 use std::time::Duration;
 use ton_tower::{
-    service::{retry::Retryable, timeout::ToTimeout}, IntoRequest,
-    Request,
+    IntoRequest, Request,
+    service::{retry::Retryable, timeout::ToTimeout},
 };
 
 #[derive(Clone, Debug)]

@@ -1,4 +1,3 @@
-mod actor;
 pub(crate) mod algo;
 mod builder;
 pub mod client;
