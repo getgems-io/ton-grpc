@@ -1,13 +1,6 @@
 use crate::{
     Client, RoutedClient, TonService,
     pool::{Balance, LiteServerDiscoverHandle},
-    service::{
-        error::{ErrorLayer, ErrorService},
-        metric::ConcurrencyMetric,
-        retry::RetryPolicy,
-        shared::{SharedLayer, SharedService},
-        timeout::{Timeout, TimeoutLayer},
-    },
 };
 use futures::{Stream, StreamExt, TryStreamExt, stream};
 use std::{future::ready, path::PathBuf, pin::Pin, time::Duration};
@@ -16,7 +9,16 @@ use tokio_stream::wrappers::IntervalStream;
 use ton_config::{
     LiteServerId, TonConfig, default_ton_config_url, load_ton_config, read_ton_config,
 };
-use ton_tower::request::GetMasterchainInfo;
+use ton_tower::{
+    request::GetMasterchainInfo,
+    service::{
+        error::{ErrorLayer, ErrorService},
+        metric::ConcurrencyMetric,
+        retry::RetryPolicy,
+        shared::{SharedLayer, SharedService},
+        timeout::{Timeout, TimeoutLayer},
+    },
+};
 use tower::{
     Service, ServiceBuilder, ServiceExt,
     discover::Change,

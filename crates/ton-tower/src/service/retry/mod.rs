@@ -1,6 +1,5 @@
 mod request;
 
-use crate::route::Error as RouteError;
 use futures::FutureExt;
 use futures::future::BoxFuture;
 use std::sync::Arc;
@@ -15,7 +14,7 @@ pub struct RetryPolicy {
     backoff: FibonacciBackoff,
 }
 
-pub(crate) trait Retryable {
+pub trait Retryable {
     const IS_RETRYABLE: bool;
 }
 
@@ -60,11 +59,7 @@ where
 
                 None
             }
-            Err(e) => {
-                if let Some(RouteError::RouteUnknown) = e.downcast_ref::<RouteError>() {
-                    return None;
-                }
-
+            Err(_) => {
                 let request_type: &str = std::any::type_name::<T>();
 
                 if self.budget.withdraw() {

@@ -4,7 +4,6 @@ mod builder;
 pub mod client;
 pub mod pool;
 pub mod route;
-pub mod service;
 
 use crate::pool::Forward;
 use ton_tower::{Request, request::*};

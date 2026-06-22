@@ -1,9 +1,10 @@
-use crate::ToRoute;
 use crate::route::Route;
-use crate::service::retry::Retryable;
-use crate::service::timeout::ToTimeout;
+use crate::ToRoute;
 use std::time::Duration;
-use ton_tower::{IntoRequest, Request};
+use ton_tower::{
+    service::{retry::Retryable, timeout::ToTimeout}, IntoRequest,
+    Request,
+};
 
 #[derive(Clone, Debug)]
 pub struct Forward<T> {

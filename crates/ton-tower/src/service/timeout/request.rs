@@ -1,5 +1,5 @@
+use crate::request::*;
 use crate::service::timeout::ToTimeout;
-use ton_tower::request::*;
 
 impl ToTimeout for GetMasterchainInfo {}
 impl ToTimeout for Sync {}

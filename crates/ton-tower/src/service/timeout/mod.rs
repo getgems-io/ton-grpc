@@ -14,7 +14,7 @@ pub struct TimeoutLayer {
     default_timeout: Duration,
 }
 
-pub(crate) trait ToTimeout {
+pub trait ToTimeout {
     fn to_timeout(&self) -> Option<Duration> {
         None
     }
