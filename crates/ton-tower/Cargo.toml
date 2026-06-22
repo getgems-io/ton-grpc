@@ -7,7 +7,7 @@ rust-version.workspace = true
 [dependencies]
 ton-address = { path = "../ton-address" }
 pin-project = "1.1.13"
-tower = { version = "0.5.3" }
+tower = { version = "0.5.3", features = ["full"] }
 anyhow = "1.0.102"
 futures = "0.3.32"
 thiserror = "2.0.18"
