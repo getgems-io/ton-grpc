@@ -1,5 +1,4 @@
 use crate::RequestHandler;
-use crate::actor::Actor;
 use crate::route::discover::block_shards::BlockShardsActorHandle;
 use crate::route::registry::Registry;
 use crate::route::shard_id_of;
@@ -12,7 +11,7 @@ use tokio::sync::watch::{Receiver, Ref, Sender, error};
 use tokio::time::{MissedTickBehavior, interval};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
-use tokio_util::task::AbortOnDropHandle;
+use ton_tower::actor::{AbortOnDropHandle, Actor};
 use ton_tower::request::{GetBlockHeader, GetMasterchainInfo, GetShards, LookUpBlockBySeqno, Sync};
 use ton_tower::response::{BlockHeader, BlockIdExt, MasterchainInfo};
 use tower::ServiceExt;

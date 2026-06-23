@@ -22,9 +22,7 @@ bitvec = "1.0"
 metrics = "0.24"
 thiserror = "2.0"
 tokio-stream = { version = "0.1", features = ["sync"] }
-tokio-util = { version = "0.7", features = ["rt"] }
 url = { version = "2.5", features = ["serde"] }
-pin-project = "1.1"
 
 [dev-dependencies]
 ton-liteserver-client = { path = "../ton-liteserver-client"}

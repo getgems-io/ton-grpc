@@ -1,4 +1,3 @@
-use crate::actor::Actor;
 use futures::{Stream, stream};
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -6,8 +5,8 @@ use std::pin::Pin;
 use std::task::{Context, Poll, ready};
 use tokio::sync::mpsc;
 use tokio_stream::StreamExt;
-use tokio_util::task::AbortOnDropHandle;
 use ton_config::{LiteServer, LiteServerId, TonConfig};
+use ton_tower::actor::{AbortOnDropHandle, Actor};
 use tower::discover::Change;
 
 pub struct LiteServerDiscoverHandle {
