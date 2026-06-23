@@ -1,11 +1,10 @@
 use crate::RequestHandler;
-use crate::actor::Actor;
 use crate::route::registry::Registry;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
-use tokio_util::task::AbortOnDropHandle;
+use ton_tower::actor::{AbortOnDropHandle, Actor};
 use ton_tower::request::GetBlockHeader;
 use ton_tower::response::BlockIdExt;
 use tower::ServiceExt;

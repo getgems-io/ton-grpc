@@ -1,5 +1,5 @@
+use crate::request::*;
 use crate::service::retry::Retryable;
-use ton_tower::request::*;
 
 macro_rules! impl_retryable {
     ($value:expr; $($ty:ty),+ $(,)?) => {

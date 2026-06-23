@@ -1,5 +1,5 @@
 use tokio::task::JoinHandle;
-use tokio_util::task::AbortOnDropHandle;
+pub use tokio_util::task::AbortOnDropHandle;
 
 pub trait Actor: Sized + Send + 'static {
     type Output: Send;
