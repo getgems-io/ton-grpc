@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use libc::{c_char, c_double, c_int};
 use std::{
     ffi::{CStr, CString, c_void},
@@ -85,26 +85,26 @@ impl Client {
         Ok(())
     }
 
-    pub fn receive(&self, timeout: Duration) -> Result<&str> {
+    pub fn receive(&self, timeout: Duration) -> Result<Option<&str>> {
         let response = unsafe {
             let ptr = tonlib_client_json_receive(self.pointer.as_ptr(), timeout.as_secs_f64());
             if ptr.is_null() {
-                return Err(anyhow!("null received"));
+                return Ok(None);
             }
 
             CStr::from_ptr(ptr)
         };
 
-        Ok(response.to_str()?)
+        Ok(Some(response.to_str()?))
     }
 
-    pub fn execute(&self, request: &str) -> Result<&str> {
+    pub fn execute(&self, request: &str) -> Result<Option<&str>> {
         let req = CString::new(request)?;
 
         let response = unsafe {
             let ptr = tonlib_client_json_execute(self.pointer.as_ptr(), req.into_raw());
             if ptr.is_null() {
-                return Err(anyhow!("null received"));
+                return Ok(None);
             }
 
             CStr::from_ptr(ptr)
@@ -112,7 +112,7 @@ impl Client {
 
         let str = response.to_str()?;
 
-        Ok(str)
+        Ok(Some(str))
     }
 }
 

@@ -44,7 +44,7 @@ impl TonlibjsonClient {
         std::thread::spawn(move || {
             let timeout = Duration::from_secs(1);
             while !child_token.is_cancelled() {
-                if let Ok(packet) = client_recv.receive(timeout) {
+                if let Ok(Some(packet)) = client_recv.receive(timeout) {
                     if let Ok(response) = serde_json::from_str::<Response>(packet) {
                         if let Some((_, sender)) = responses_rcv.remove(&response.id) {
                             let _ = sender.send(response);
