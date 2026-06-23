@@ -3,7 +3,7 @@ use anyhow::anyhow;
 use dashmap::DashMap;
 use futures::ready;
 use pin_project::{pin_project, pinned_drop};
-use serde::de::DeserializeOwned;
+use serde::de::{DeserializeOwned, Deserializer, Error as DeError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::future::Future;
@@ -45,17 +45,21 @@ impl TonlibjsonClient {
             let timeout = Duration::from_secs(1);
             while !child_token.is_cancelled() {
                 if let Ok(Some(packet)) = client_recv.receive(timeout) {
-                    if let Ok(response) = serde_json::from_str::<Response>(packet) {
-                        if let Some((_, sender)) = responses_rcv.remove(&response.id) {
-                            let _ = sender.send(response);
+                    match serde_json::from_str::<Message>(packet) {
+                        Ok(Message::Response(response)) => {
+                            if let Some((_, sender)) = responses_rcv.remove(&response.id) {
+                                let _ = sender.send(response);
+                            }
                         }
-                    } else if packet.contains("syncState") {
-                        tracing::trace!("Sync state: {}", packet.to_string());
-                        if packet.contains("syncStateDone") {
-                            tracing::trace!("syncState: {:#?}", packet);
+                        Ok(Message::Notification(Ok(value))) => {
+                            tracing::trace!("Notification: {:?}", value);
                         }
-                    } else {
-                        tracing::warn!("Unexpected response {:?}", packet.to_string())
+                        Ok(Message::Notification(Err(error))) => {
+                            tracing::warn!("Unsolicited error: {:?}", error);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to parse packet: {:?}, packet: {:?}", e, packet);
+                        }
                     }
                 }
             }
@@ -189,28 +193,18 @@ where
             ResponseStateProj::Failed { error } => {
                 Poll::Ready(Err(error.take().expect("polled after error")))
             }
-            ResponseStateProj::Rx { rx, .. } => {
-                match ready!(rx.poll(cx)) {
-                    Ok(response) => {
-                        // TODO[akostylev0] refac!!
-                        if response.data["@type"] == "error" {
-                            tracing::trace!("Error occurred: {:?}", &response.data);
-                            let error = serde_json::from_value::<TonError>(response.data)?;
-
-                            Poll::Ready(Err(error.into()))
-                        } else {
-                            let data = response.data.clone();
-                            let response =
-                                serde_json::from_value::<R>(response.data).map_err(|e| {
-                                    anyhow!("deserialization error: {:?}, data: {:?}", e, data)
-                                })?;
-
-                            Poll::Ready(Ok(response))
-                        }
-                    }
-                    Err(_) => Poll::Ready(Err(anyhow!("oneshot closed"))),
-                }
-            }
+            ResponseStateProj::Rx { rx, .. } => match ready!(rx.poll(cx)) {
+                Ok(response) => Poll::Ready(
+                    response
+                        .data
+                        .inspect_err(|error| tracing::trace!("Error occurred: {:?}", error))
+                        .map_err(anyhow::Error::from)
+                        .and_then(|data| {
+                            serde_json::from_value::<R>(data).map_err(anyhow::Error::from)
+                        }),
+                ),
+                Err(_) => Poll::Ready(Err(anyhow!("oneshot closed"))),
+            },
         }
     }
 }
@@ -226,18 +220,58 @@ struct Request<T: Serialize> {
     body: T,
 }
 
-#[derive(Deserialize, Debug)]
-struct Response {
-    #[serde(rename = "@extra")]
-    id: RequestId,
+#[derive(Debug)]
+enum Message {
+    Response(Response),
+    Notification(Result<Value, TonError>),
+}
 
-    #[serde(flatten)]
-    data: Value,
+impl<'de> Deserialize<'de> for Message {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let mut value = Value::deserialize(deserializer)?;
+
+        let id = value
+            .as_object_mut()
+            .and_then(|obj| obj.remove("@extra"))
+            .map(serde_json::from_value::<RequestId>)
+            .transpose()
+            .map_err(D::Error::custom)?;
+
+        let data = classify_data(value).map_err(D::Error::custom)?;
+
+        Ok(match id {
+            Some(id) => Message::Response(Response { id, data }),
+            None => Message::Notification(data),
+        })
+    }
+}
+
+#[derive(Debug)]
+struct Response {
+    id: RequestId,
+    data: Result<Value, TonError>,
+}
+
+fn classify_data(value: Value) -> Result<Result<Value, TonError>, serde_json::Error> {
+    let is_error = value
+        .get("@type")
+        .and_then(Value::as_str)
+        .is_some_and(|t| t == "error");
+
+    if is_error {
+        let err = serde_json::from_value::<TonError>(value)?;
+        Ok(Err(err))
+    } else {
+        Ok(Ok(value))
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{Request, TonlibjsonClient};
+    use crate::client::{Message, Request, TonlibjsonClient};
     use crate::tl::BlocksGetMasterchainInfo;
     use serde_json::json;
     use std::str::FromStr;
@@ -274,5 +308,80 @@ mod tests {
             serde_json::to_string(&request).unwrap(),
             "{\"@extra\":\"7431f198-7514-40ff-876c-3e8ee0a311ba\",\"data\":\"is flatten\"}"
         )
+    }
+
+    #[test]
+    fn message_with_extra_ok_is_response() {
+        let payload = json!({
+            "@extra": "7431f198-7514-40ff-876c-3e8ee0a311ba",
+            "@type": "ok",
+            "value": 42
+        });
+
+        let message: Message = serde_json::from_value(payload).unwrap();
+
+        let Message::Response(response) = message else {
+            panic!("expected Response variant, got {:?}", message);
+        };
+        let data = response.data.expect("expected Ok data");
+        assert_eq!(data["@type"], "ok");
+        assert_eq!(data["value"], 42);
+    }
+
+    #[test]
+    fn message_with_extra_error_is_response_err() {
+        let payload = json!({
+            "@extra": "7431f198-7514-40ff-876c-3e8ee0a311ba",
+            "@type": "error",
+            "code": 400,
+            "message": "library is not inited"
+        });
+
+        let message: Message = serde_json::from_value(payload).unwrap();
+
+        let Message::Response(response) = message else {
+            panic!("expected Response variant, got {:?}", message);
+        };
+        let err = response.data.expect_err("expected Err data");
+        assert_eq!(
+            err.to_string(),
+            "Ton error occurred with code 400, message library is not inited"
+        );
+    }
+
+    #[test]
+    fn message_without_extra_ok_is_notification() {
+        let payload = json!({
+            "@type": "updateSyncState",
+            "sync_state": { "@type": "syncStateDone" }
+        });
+
+        let message: Message = serde_json::from_value(payload).unwrap();
+
+        let Message::Notification(data) = message else {
+            panic!("expected Notification variant, got {:?}", message);
+        };
+        let value = data.expect("expected Ok data");
+        assert_eq!(value["@type"], "updateSyncState");
+    }
+
+    #[test]
+    fn message_without_extra_error_is_notification_err() {
+        let payload = json!({
+            "@type": "error",
+            "code": 500,
+            "message": "internal"
+        });
+
+        let message: Message = serde_json::from_value(payload).unwrap();
+
+        let Message::Notification(data) = message else {
+            panic!("expected Notification variant, got {:?}", message);
+        };
+        let err = data.expect_err("expected Err data");
+        assert_eq!(
+            err.to_string(),
+            "Ton error occurred with code 500, message internal"
+        );
     }
 }
