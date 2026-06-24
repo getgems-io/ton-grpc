@@ -418,6 +418,7 @@ mod tests {
             (self.0)(point.seqno)
         }
 
+        #[allow(clippy::manual_async_fn)]
         fn upper_bound(&mut self) -> impl Future<Output = anyhow::Result<BlockId>> + Send {
             async { Err(anyhow!("upper bound must be provided via .to(..)")) }
         }

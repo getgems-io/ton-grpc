@@ -21,13 +21,15 @@ use uuid::Uuid;
 
 type RequestStorage = DashMap<RequestId, oneshot::Sender<Response>>;
 
+type ReadyFuture = Pin<Box<dyn Future<Output = Result<(), watch::error::RecvError>> + Send + Sync>>;
+
 pub struct TonlibjsonClient {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<RequestStorage>,
     drop_guard: Arc<DropGuard>,
 
     state: watch::Receiver<State>,
-    ready: Option<Pin<Box<dyn Future<Output = Result<(), watch::error::RecvError>> + Send + Sync>>>,
+    ready: Option<ReadyFuture>,
 }
 
 impl Debug for TonlibjsonClient {
