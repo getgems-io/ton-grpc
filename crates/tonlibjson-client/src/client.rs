@@ -75,12 +75,6 @@ impl TonlibjsonClient {
     }
 }
 
-impl Default for TonlibjsonClient {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<R> Service<R> for TonlibjsonClient
 where
     R: Requestable,
@@ -271,29 +265,10 @@ fn classify_data(value: Value) -> Result<Result<Value, TonError>, serde_json::Er
 
 #[cfg(test)]
 mod tests {
-    use crate::client::{Message, Request, TonlibjsonClient};
-    use crate::tl::BlocksGetMasterchainInfo;
+    use crate::client::{Message, Request};
     use serde_json::json;
     use std::str::FromStr;
-    use tower::ServiceExt;
-    use tracing_test::traced_test;
     use uuid::Uuid;
-
-    #[tokio::test]
-    #[traced_test]
-    #[ignore]
-    async fn not_initialized_call() {
-        let mut client = TonlibjsonClient::default();
-
-        let resp = (&mut client)
-            .oneshot(BlocksGetMasterchainInfo::default())
-            .await;
-
-        assert_eq!(
-            "Ton error occurred with code 400, message library is not inited",
-            resp.unwrap_err().to_string()
-        )
-    }
 
     #[test]
     fn data_is_flatten() {
