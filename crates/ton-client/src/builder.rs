@@ -23,14 +23,14 @@ use ton_tower::{
 use tower::{
     Service, ServiceBuilder,
     discover::Change,
-    limit::{ConcurrencyLimit, ConcurrencyLimitLayer},
+    limit::{ConcurrencyLimit, ConcurrencyLimitLayer, RateLimit},
     load::{CompleteOnResponse, PeakEwma, PeakEwmaDiscover},
     retry::{Retry, RetryLayer, budget::TpsBudget},
     util::Either,
 };
 use url::Url;
 
-pub type ReconnectingClient<F> = Reconnect<F, TonConfig>;
+pub type ReconnectingClient<F> = Reconnect<RateLimit<F>, TonConfig>;
 
 pub type WrappedCursor<F> = RoutedClient<
     ConcurrencyMetric<
@@ -187,9 +187,15 @@ impl<F> TonClientBuilder<F> {
             };
         let lite_server_discover = LiteServerDiscoverHandle::new(stream);
         let factory = self.factory;
-        let client_discover = lite_server_discover.map_ok(move |change| match change {
-            Change::Insert(k, config) => Change::Insert(k, Reconnect::new(factory.clone(), config)),
-            Change::Remove(k) => Change::Remove(k),
+        let client_discover = lite_server_discover.map_ok(move |change| {
+            let mk = ServiceBuilder::new()
+                .rate_limit(1, Duration::from_secs(60))
+                .service(factory.clone());
+
+            match change {
+                Change::Insert(k, config) => Change::Insert(k, Reconnect::new(mk, config)),
+                Change::Remove(k) => Change::Remove(k),
+            }
         });
 
         let ewma_discover = PeakEwmaDiscover::new::<GetMasterchainInfo>(
