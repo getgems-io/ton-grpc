@@ -1,29 +1,60 @@
 use crate::tl::{Requestable, TonError};
 use anyhow::anyhow;
 use dashmap::DashMap;
-use futures::ready;
+use futures::{FutureExt, ready};
 use pin_project::{pin_project, pinned_drop};
 use serde::de::{DeserializeOwned, Deserializer, Error as DeError};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::sync::oneshot;
+use tokio::sync::{OwnedRwLockReadGuard, RwLock, oneshot};
 use tokio_util::sync::{CancellationToken, DropGuard};
 use tower::Service;
 use uuid::Uuid;
 
 type RequestStorage = DashMap<RequestId, oneshot::Sender<Response>>;
 
-#[derive(Debug, Clone)]
 pub struct TonlibjsonClient {
     client: Arc<tonlibjson_sys::Client>,
     responses: Arc<RequestStorage>,
     drop_guard: Arc<DropGuard>,
+
+    state: Arc<RwLock<State>>,
+    lock: Option<Pin<Box<dyn Future<Output = OwnedRwLockReadGuard<State>> + Send + Sync>>>,
+}
+
+impl Debug for TonlibjsonClient {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TonlibjsonClient")
+            .field("client", &self.client)
+            .field("responses", &self.responses)
+            .field("drop_guard", &self.drop_guard)
+            .field("state", &self.state)
+            .finish()
+    }
+}
+
+impl Clone for TonlibjsonClient {
+    fn clone(&self) -> Self {
+        Self {
+            client: self.client.clone(),
+            responses: self.responses.clone(),
+            drop_guard: self.drop_guard.clone(),
+            state: self.state.clone(),
+            lock: None,
+        }
+    }
+}
+
+#[derive(Debug)]
+enum State {
+    Connected,
 }
 
 impl TonlibjsonClient {
@@ -71,6 +102,8 @@ impl TonlibjsonClient {
             client,
             responses,
             drop_guard: Arc::new(cancel_token.drop_guard()),
+            state: Arc::new(RwLock::new(State::Connected)),
+            lock: None,
         }
     }
 }
@@ -83,8 +116,17 @@ where
     type Error = anyhow::Error;
     type Future = ResponseFuture<R::Response>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
+    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+        if self.lock.is_none() {
+            self.lock = Some(Box::pin(self.state.clone().read_owned()));
+        }
+
+        let guard = ready!(self.lock.as_mut().unwrap().poll_unpin(cx));
+
+        self.lock = None;
+        match *guard {
+            State::Connected => Poll::Ready(Ok(())),
+        }
     }
 
     fn call(&mut self, req: R) -> Self::Future {
