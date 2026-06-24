@@ -55,6 +55,7 @@ impl Clone for TonlibjsonClient {
 #[derive(Debug)]
 enum State {
     Connected,
+    Disconnected,
 }
 
 impl TonlibjsonClient {
@@ -72,11 +73,25 @@ impl TonlibjsonClient {
         let cancel_token = CancellationToken::new();
         let child_token = cancel_token.child_token();
 
+        let state_read = Arc::new(RwLock::new(State::Connected));
+        let state_write = Arc::clone(&state_read);
+
         std::thread::spawn(move || {
             let timeout = Duration::from_secs(1);
-            while !child_token.is_cancelled() {
+            let mut should_continue = true;
+            while should_continue && !child_token.is_cancelled() {
                 if let Ok(Some(packet)) = client_recv.receive(timeout) {
-                    match serde_json::from_str::<Message>(packet) {
+                    let msg = serde_json::from_str::<Message>(packet);
+                    if let Ok(ref msg) = msg
+                        && msg.is_disconnected_error()
+                    {
+                        tracing::error!("disconnected");
+                        let mut guard = state_write.blocking_write();
+                        *guard = State::Disconnected;
+                        should_continue = false;
+                    }
+
+                    match msg {
                         Ok(Message::Response(response)) => {
                             if let Some((_, sender)) = responses_rcv.remove(&response.id) {
                                 let _ = sender.send(response);
@@ -95,14 +110,14 @@ impl TonlibjsonClient {
                 }
             }
 
-            tracing::trace!("Client dropped");
+            tracing::trace!("recv thread exited");
         });
 
         TonlibjsonClient {
             client,
             responses,
             drop_guard: Arc::new(cancel_token.drop_guard()),
-            state: Arc::new(RwLock::new(State::Connected)),
+            state: state_read,
             lock: None,
         }
     }
@@ -126,6 +141,7 @@ where
         self.lock = None;
         match *guard {
             State::Connected => Poll::Ready(Ok(())),
+            State::Disconnected => Poll::Ready(Err(anyhow::anyhow!("connection is closed"))),
         }
     }
 
@@ -260,6 +276,18 @@ struct Request<T: Serialize> {
 enum Message {
     Response(Response),
     Notification(Result<Value, TonError>),
+}
+
+impl Message {
+    pub fn is_disconnected_error(&self) -> bool {
+        match self {
+            Message::Response(Response {
+                data: Err(error), ..
+            }) => error.is_disconnected(),
+            Message::Notification(Err(error)) => error.is_disconnected(),
+            _ => false,
+        }
+    }
 }
 
 impl<'de> Deserialize<'de> for Message {

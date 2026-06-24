@@ -51,6 +51,18 @@ impl LocalLiteServer {
         })
     }
 
+    pub async fn liteserver_stop(&self) -> Result<()> {
+        self.liteserver.stop_with_timeout(Some(0)).await?;
+
+        Ok(())
+    }
+
+    pub async fn liteserver_pause(&self) -> Result<()> {
+        self.liteserver.pause().await?;
+
+        Ok(())
+    }
+
     pub fn server_key(&self) -> ServerKey {
         self.server_key
     }

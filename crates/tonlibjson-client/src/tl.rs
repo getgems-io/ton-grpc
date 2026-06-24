@@ -244,6 +244,12 @@ pub struct TonError {
     message: String,
 }
 
+impl TonError {
+    pub fn is_disconnected(&self) -> bool {
+        self.code == 500 && self.message == "LITE_SERVER_NETWORK"
+    }
+}
+
 impl Display for TonError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
