@@ -13,7 +13,7 @@ use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::sync::{OwnedRwLockReadGuard, RwLock, oneshot};
+use tokio::sync::{oneshot, watch};
 use tokio_util::sync::{CancellationToken, DropGuard};
 use ton_config::TonConfig;
 use tower::Service;
@@ -26,8 +26,8 @@ pub struct TonlibjsonClient {
     responses: Arc<RequestStorage>,
     drop_guard: Arc<DropGuard>,
 
-    state: Arc<RwLock<State>>,
-    lock: Option<Pin<Box<dyn Future<Output = OwnedRwLockReadGuard<State>> + Send + Sync>>>,
+    state: watch::Receiver<State>,
+    ready: Option<Pin<Box<dyn Future<Output = Result<(), watch::error::RecvError>> + Send + Sync>>>,
 }
 
 impl Debug for TonlibjsonClient {
@@ -48,12 +48,12 @@ impl Clone for TonlibjsonClient {
             responses: self.responses.clone(),
             drop_guard: self.drop_guard.clone(),
             state: self.state.clone(),
-            lock: None,
+            ready: None,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum State {
     Connecting,
     Connected,
@@ -75,8 +75,7 @@ impl TonlibjsonClient {
         let cancel_token = CancellationToken::new();
         let child_token = cancel_token.child_token();
 
-        let state_read = Arc::new(RwLock::new(State::Connecting));
-        let state_write = Arc::clone(&state_read);
+        let (tx, rx) = watch::channel(State::Connecting);
 
         std::thread::spawn(move || {
             let ping_id = Uuid::new_v4();
@@ -99,8 +98,7 @@ impl TonlibjsonClient {
                     if let Ok(ref msg) = msg {
                         if msg.is_disconnected_error() {
                             tracing::error!(?msg, "disconnected");
-                            let mut guard = state_write.blocking_write();
-                            *guard = State::Disconnected;
+                            tx.send_replace(State::Disconnected);
                             should_continue = false;
                         } else if msg.is_connected_notification() {
                             tracing::info!("inner client initialized");
@@ -112,9 +110,7 @@ impl TonlibjsonClient {
                             tracing::trace!("ping response: {:?}", response);
                             if response.data.is_ok() {
                                 tracing::info!("client connected");
-
-                                let mut guard = state_write.blocking_write();
-                                *guard = State::Connected;
+                                tx.send_replace(State::Connected);
                             }
                         }
                         Ok(Message::Response(response)) => {
@@ -142,8 +138,8 @@ impl TonlibjsonClient {
             client,
             responses,
             drop_guard: Arc::new(cancel_token.drop_guard()),
-            state: state_read,
-            lock: None,
+            state: rx,
+            ready: None,
         }
     }
 }
@@ -157,20 +153,27 @@ where
     type Future = ResponseFuture<R::Response>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.lock.is_none() {
-            self.lock = Some(Box::pin(self.state.clone().read_owned()));
-        }
+        loop {
+            if let Some(ref mut fut) = self.ready {
+                let changed = ready!(fut.poll_unpin(cx));
+                self.ready = None;
 
-        let guard = ready!(self.lock.as_mut().unwrap().poll_unpin(cx));
-
-        self.lock = None;
-        match *guard {
-            State::Connecting => {
-                cx.waker().wake_by_ref();
-                Poll::Pending
+                if let Err(e) = changed {
+                    return Poll::Ready(Err(e.into())); // TODO[akostylev0]: typed error
+                }
             }
-            State::Connected => Poll::Ready(Ok(())),
-            State::Disconnected => Poll::Ready(Err(anyhow::anyhow!("connection is closed"))),
+
+            let state = *self.state.borrow_and_update();
+            match state {
+                State::Connected => return Poll::Ready(Ok(())),
+                State::Connecting => {
+                    let mut rx = self.state.clone();
+                    self.ready = Some(Box::pin(async move { rx.changed().await }));
+                }
+                State::Disconnected => {
+                    return Poll::Ready(Err(anyhow::anyhow!("connection is closed")));
+                } // TODO[akostylev0]: typed error
+            }
         }
     }
 
