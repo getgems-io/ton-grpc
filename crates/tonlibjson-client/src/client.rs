@@ -1,11 +1,11 @@
-use crate::tl::{Requestable, TonError};
+use crate::tl::{BlocksGetMasterchainInfo, Requestable, TonError};
 use anyhow::anyhow;
 use dashmap::DashMap;
 use futures::{FutureExt, ready};
 use pin_project::{pin_project, pinned_drop};
 use serde::de::{DeserializeOwned, Deserializer, Error as DeError};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use std::fmt::Debug;
 use std::future::Future;
 use std::marker::PhantomData;
@@ -15,6 +15,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::sync::{OwnedRwLockReadGuard, RwLock, oneshot};
 use tokio_util::sync::{CancellationToken, DropGuard};
+use ton_config::TonConfig;
 use tower::Service;
 use uuid::Uuid;
 
@@ -54,6 +55,7 @@ impl Clone for TonlibjsonClient {
 
 #[derive(Debug)]
 enum State {
+    Connecting,
     Connected,
     Disconnected,
 }
@@ -63,7 +65,7 @@ impl TonlibjsonClient {
         tonlibjson_sys::Client::set_verbosity_level(level);
     }
 
-    pub fn new() -> Self {
+    pub fn new(config: TonConfig) -> Self {
         let client = Arc::new(tonlibjson_sys::Client::new());
         let client_recv = client.clone();
 
@@ -73,25 +75,48 @@ impl TonlibjsonClient {
         let cancel_token = CancellationToken::new();
         let child_token = cancel_token.child_token();
 
-        let state_read = Arc::new(RwLock::new(State::Connected));
+        let state_read = Arc::new(RwLock::new(State::Connecting));
         let state_write = Arc::clone(&state_read);
 
         std::thread::spawn(move || {
+            let ping_id = Uuid::new_v4();
             let timeout = Duration::from_secs(1);
             let mut should_continue = true;
+
+            {
+                let ping = Request::with_id(ping_id, BlocksGetMasterchainInfo::default());
+                client_recv
+                    .send(init_config(config).to_string().as_str())
+                    .unwrap();
+                client_recv
+                    .send(serde_json::to_string(&ping).unwrap().as_str())
+                    .unwrap();
+            }
+
             while should_continue && !child_token.is_cancelled() {
                 if let Ok(Some(packet)) = client_recv.receive(timeout) {
                     let msg = serde_json::from_str::<Message>(packet);
-                    if let Ok(ref msg) = msg
-                        && msg.is_disconnected_error()
-                    {
-                        tracing::error!("disconnected");
-                        let mut guard = state_write.blocking_write();
-                        *guard = State::Disconnected;
-                        should_continue = false;
+                    if let Ok(ref msg) = msg {
+                        if msg.is_disconnected_error() {
+                            tracing::error!(?msg, "disconnected");
+                            let mut guard = state_write.blocking_write();
+                            *guard = State::Disconnected;
+                            should_continue = false;
+                        } else if msg.is_connected_notification() {
+                            tracing::info!("inner client initialized");
+                        }
                     }
 
                     match msg {
+                        Ok(Message::Response(response)) if response.id == ping_id => {
+                            tracing::trace!("ping response: {:?}", response);
+                            if response.data.is_ok() {
+                                tracing::info!("client connected");
+
+                                let mut guard = state_write.blocking_write();
+                                *guard = State::Connected;
+                            }
+                        }
                         Ok(Message::Response(response)) => {
                             if let Some((_, sender)) = responses_rcv.remove(&response.id) {
                                 let _ = sender.send(response);
@@ -140,16 +165,17 @@ where
 
         self.lock = None;
         match *guard {
+            State::Connecting => {
+                cx.waker().wake_by_ref();
+                Poll::Pending
+            }
             State::Connected => Poll::Ready(Ok(())),
             State::Disconnected => Poll::Ready(Err(anyhow::anyhow!("connection is closed"))),
         }
     }
 
     fn call(&mut self, req: R) -> Self::Future {
-        let req = Request {
-            id: RequestId::new_v4(),
-            body: req,
-        };
+        let req = Request::new(req);
 
         match serde_json::to_string(&req) {
             Ok(json) => {
@@ -272,6 +298,22 @@ struct Request<T: Serialize> {
     body: T,
 }
 
+impl<T> Request<T>
+where
+    T: Serialize,
+{
+    pub fn new(body: T) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            body,
+        }
+    }
+
+    pub fn with_id(id: RequestId, body: T) -> Self {
+        Self { id, body }
+    }
+}
+
 #[derive(Debug)]
 enum Message {
     Response(Response),
@@ -287,6 +329,14 @@ impl Message {
             Message::Notification(Err(error)) => error.is_disconnected(),
             _ => false,
         }
+    }
+
+    pub fn is_connected_notification(&self) -> bool {
+        if let Message::Notification(Ok(value)) = self {
+            return value["@type"] == "options.info";
+        }
+
+        false
     }
 }
 
@@ -331,6 +381,25 @@ fn classify_data(value: Value) -> Result<Result<Value, TonError>, serde_json::Er
     } else {
         Ok(Ok(value))
     }
+}
+
+fn init_config(config: TonConfig) -> Value {
+    json!({
+        "@type": "init",
+        "options": {
+            "@type": "options",
+            "config": {
+                "@type": "config",
+                "config": config.to_string(),
+                "use_callbacks_for_network": false,
+                "blockchain_name": "",
+                "ignore_cache": true
+            },
+            "keystore_type": {
+                "@type": "keyStoreTypeInMemory"
+            }
+        }
+    })
 }
 
 #[cfg(test)]
