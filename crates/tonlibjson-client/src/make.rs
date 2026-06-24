@@ -1,5 +1,4 @@
 use crate::client::TonlibjsonClient;
-use std::convert::Infallible;
 use std::future::{Ready, ready};
 use std::task::{Context, Poll};
 use ton_config::TonConfig;
@@ -10,7 +9,7 @@ pub struct MakeTonlibjsonClient;
 
 impl Service<TonConfig> for MakeTonlibjsonClient {
     type Response = TonlibjsonClient;
-    type Error = Infallible;
+    type Error = anyhow::Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -20,7 +19,7 @@ impl Service<TonConfig> for MakeTonlibjsonClient {
     fn call(&mut self, req: TonConfig) -> Self::Future {
         let client = ClientBuilder::from_config(req).disable_logging().build();
 
-        ready(Ok(client))
+        ready(client)
     }
 }
 
@@ -43,7 +42,7 @@ impl ClientBuilder {
         self
     }
 
-    fn build(self) -> TonlibjsonClient {
+    fn build(self) -> anyhow::Result<TonlibjsonClient> {
         if let Some(level) = self.logging {
             TonlibjsonClient::set_logging(level);
         }

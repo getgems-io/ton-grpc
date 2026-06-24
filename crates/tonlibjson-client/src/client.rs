@@ -1,5 +1,5 @@
 use crate::tl::{BlocksGetMasterchainInfo, Requestable, TonError};
-use anyhow::anyhow;
+use anyhow::{Context as ErrorContext, anyhow};
 use dashmap::DashMap;
 use futures::{FutureExt, ready};
 use pin_project::{pin_project, pinned_drop};
@@ -65,7 +65,7 @@ impl TonlibjsonClient {
         tonlibjson_sys::Client::set_verbosity_level(level);
     }
 
-    pub fn new(config: TonConfig) -> Self {
+    pub fn new(config: TonConfig) -> anyhow::Result<Self> {
         let client = Arc::new(tonlibjson_sys::Client::new());
         let client_recv = client.clone();
 
@@ -75,22 +75,21 @@ impl TonlibjsonClient {
         let cancel_token = CancellationToken::new();
         let child_token = cancel_token.child_token();
 
-        let (tx, rx) = watch::channel(State::Connecting);
+        let ping_id = Uuid::new_v4();
+        let ping = Request::with_id(ping_id, BlocksGetMasterchainInfo::default());
+        let ping_encoded = serde_json::to_string(&ping).context("failed to encode ping message")?;
 
+        client
+            .send(init_config(config).to_string().as_str())
+            .context("failed to send init message")?;
+        client_recv
+            .send(&ping_encoded)
+            .context("failed to send ping message")?;
+
+        let (tx, rx) = watch::channel(State::Connecting);
         std::thread::spawn(move || {
-            let ping_id = Uuid::new_v4();
             let timeout = Duration::from_secs(1);
             let mut should_continue = true;
-
-            {
-                let ping = Request::with_id(ping_id, BlocksGetMasterchainInfo::default());
-                client_recv
-                    .send(init_config(config).to_string().as_str())
-                    .unwrap();
-                client_recv
-                    .send(serde_json::to_string(&ping).unwrap().as_str())
-                    .unwrap();
-            }
 
             while should_continue && !child_token.is_cancelled() {
                 if let Ok(Some(packet)) = client_recv.receive(timeout) {
@@ -134,13 +133,13 @@ impl TonlibjsonClient {
             tracing::trace!("recv thread exited");
         });
 
-        TonlibjsonClient {
+        Ok(TonlibjsonClient {
             client,
             responses,
             drop_guard: Arc::new(cancel_token.drop_guard()),
             state: rx,
             ready: None,
-        }
+        })
     }
 }
 

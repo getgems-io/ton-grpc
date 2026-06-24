@@ -49,27 +49,48 @@ mod integration {
         let (server, mut adapter) = setup().await?;
         server.liteserver_stop().await?;
 
-        let request = timeout(
+        let response = timeout(
             Duration::from_secs(30),
             (&mut adapter).oneshot(GetMasterchainInfo::default()),
         )
         .await?;
         let readiness = ServiceExt::<GetMasterchainInfo>::ready(&mut adapter).await;
 
-        assert!(
-            request.is_err(),
-            "request must fail once the server is down, got: {request:?}"
+        assert_eq!(
+            response.unwrap_err().to_string(),
+            "Ton error occurred with code 500, message LITE_SERVER_NETWORK"
         );
-        assert!(
-            readiness.is_err(),
-            "poll_ready must report broken state after a lite server network failure"
-        );
+        assert_eq!(readiness.unwrap_err().to_string(), "connection is closed");
         Ok(())
     }
 
     #[tokio::test]
     #[tracing_test::traced_test]
-    async fn only_request_should_fail_with_timeout_when_server_hangs() -> anyhow::Result<()> {
+    async fn disconnect_should_invalidate_all_clones() -> anyhow::Result<()> {
+        let (server, mut adapter) = setup().await?;
+        let mut clone = adapter.clone();
+        <TonlibjsonAdapter as ServiceExt<GetMasterchainInfo>>::ready(&mut adapter).await?;
+        <TonlibjsonAdapter as ServiceExt<GetMasterchainInfo>>::ready(&mut clone).await?;
+        server.liteserver_stop().await?;
+
+        let response = timeout(
+            Duration::from_secs(30),
+            (&mut adapter).oneshot(GetMasterchainInfo::default()),
+        )
+        .await?;
+        let readiness = ServiceExt::<GetMasterchainInfo>::ready(&mut clone).await;
+
+        assert_eq!(
+            response.unwrap_err().to_string(),
+            "Ton error occurred with code 500, message LITE_SERVER_NETWORK"
+        );
+        assert_eq!(readiness.unwrap_err().to_string(), "connection is closed");
+        Ok(())
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn request_should_fail_with_timeout_when_server_hangs() -> anyhow::Result<()> {
         let (server, mut adapter) = setup().await?;
 
         server.liteserver_pause().await?;
