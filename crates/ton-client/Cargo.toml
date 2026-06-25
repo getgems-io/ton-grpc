@@ -12,7 +12,7 @@ ton-tower = { path = "../ton-tower" }
 async-stream = "0.3"
 anyhow = { version = "1.0", features = ["backtrace"] }
 futures = "0.3"
-itertools = "0.14"
+itertools = "0.15"
 tracing = "0.1"
 tower = { version = "0.5.3", features = ["full"] }
 tokio = { version = "1.50", features = ["sync", "rt", "time", "macros"] }
