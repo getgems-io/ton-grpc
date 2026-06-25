@@ -1,4 +1,4 @@
 [toolchain]
 channel = "1.96"
-components = [ "rustc", "cargo", "clippy" ]
+components = [ "rustc", "cargo", "clippy", "rust-analyzer" ]
 profile = "default"

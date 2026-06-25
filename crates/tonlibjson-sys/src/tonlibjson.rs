@@ -9,6 +9,7 @@ use std::{
 #[cfg(test)]
 mod tests {
     use crate::tonlibjson::Client;
+    use std::assert_matches;
     use std::time::Duration;
 
     #[test]
@@ -16,24 +17,36 @@ mod tests {
         let client = Client::new();
         let response = client.receive(Duration::from_micros(10));
 
-        assert!(response.is_err());
-        assert_eq!(response.unwrap_err().to_string(), "null received")
+        assert_matches!(response, Ok(None));
     }
 
     #[test]
-    fn call_send() {
+    fn call_send_invalid_query() {
         let client = Client::new();
         let response = client.send("query");
 
-        assert!(response.is_ok())
+        assert_matches!(response, Ok(()))
+    }
+
+    #[test]
+    fn call_execute_invalid_query() {
+        let client = Client::new();
+
+        let response = client.execute("query");
+
+        assert_eq!(response.unwrap_err().to_string(), "null received")
     }
 
     #[test]
     fn call_execute() {
         let client = Client::new();
-        let response = client.execute("query");
 
-        assert!(response.is_err())
+        let response = client.execute("{\"@type\": \"blocks.getMasterchainInfo\"}");
+
+        assert_eq!(
+            response.unwrap(),
+            "{\"@type\":\"error\",\"code\":400,\"message\":\"Function can't be executed synchronously\"}"
+        )
     }
 
     #[test]
@@ -85,17 +98,17 @@ impl Client {
         Ok(())
     }
 
-    pub fn receive(&self, timeout: Duration) -> Result<&str> {
+    pub fn receive(&self, timeout: Duration) -> Result<Option<&str>> {
         let response = unsafe {
             let ptr = tonlib_client_json_receive(self.pointer.as_ptr(), timeout.as_secs_f64());
             if ptr.is_null() {
-                return Err(anyhow!("null received"));
+                return Ok(None);
             }
 
             CStr::from_ptr(ptr)
         };
 
-        Ok(response.to_str()?)
+        Ok(Some(response.to_str()?))
     }
 
     pub fn execute(&self, request: &str) -> Result<&str> {

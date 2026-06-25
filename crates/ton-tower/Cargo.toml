@@ -15,3 +15,9 @@ metrics = "0.24.6"
 tokio = "1.52.3"
 tokio-retry = "0.3.2"
 tokio-util = { version = "0.7", features = ["rt"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1.52.3", features = ["macros", "rt"] }
+mockall = "0.14"
+tracing-test = "0.2.6"

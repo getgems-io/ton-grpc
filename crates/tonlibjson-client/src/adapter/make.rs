@@ -1,6 +1,6 @@
 use crate::TonlibjsonAdapter;
 use crate::make::MakeTonlibjsonClient;
-use futures::TryFutureExt;
+use futures::{FutureExt, TryFutureExt};
 use std::future::Future;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -12,7 +12,7 @@ pub struct MakeTonlibjsonAdapter;
 
 impl Service<TonConfig> for MakeTonlibjsonAdapter {
     type Response = TonlibjsonAdapter;
-    type Error = anyhow::Error;
+    type Error = <MakeTonlibjsonClient as Service<TonConfig>>::Error;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
@@ -20,10 +20,9 @@ impl Service<TonConfig> for MakeTonlibjsonAdapter {
     }
 
     fn call(&mut self, req: TonConfig) -> Self::Future {
-        Box::pin(
-            MakeTonlibjsonClient
-                .call(req)
-                .map_ok(TonlibjsonAdapter::new),
-        )
+        MakeTonlibjsonClient
+            .call(req)
+            .map_ok(TonlibjsonAdapter::new)
+            .boxed()
     }
 }
