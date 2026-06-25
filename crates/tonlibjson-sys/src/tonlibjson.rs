@@ -53,6 +53,11 @@ mod tests {
     fn set_verbosity_level() {
         Client::set_verbosity_level(0)
     }
+
+    #[test]
+    fn clear_thread_locals() {
+        Client::clear_thread_locals()
+    }
 }
 
 #[link(name = "tonlib")]
@@ -70,6 +75,10 @@ unsafe extern "C" {
     fn tonlib_client_set_verbosity_level(level: c_int);
 }
 
+unsafe extern "C" {
+    fn td_clear_thread_locals();
+}
+
 #[derive(Debug)]
 pub struct Client {
     pointer: NonNull<c_void>,
@@ -84,6 +93,10 @@ impl Client {
 
     pub fn set_verbosity_level(level: i32) {
         unsafe { tonlib_client_set_verbosity_level(level) }
+    }
+
+    pub fn clear_thread_locals() {
+        unsafe { td_clear_thread_locals() }
     }
 
     pub fn send(&self, request: &str) -> Result<()> {
@@ -135,12 +148,14 @@ impl Default for Client {
     }
 }
 
+// TODO[akostylev0]: clear_thread_locals
 impl Drop for Client {
     fn drop(&mut self) {
         unsafe { tonlib_client_json_destroy(self.pointer.as_ptr()) }
     }
 }
 
+// TODO[akostylev0]: thread local
 unsafe impl Send for Client {}
 
 unsafe impl Sync for Client {}

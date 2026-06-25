@@ -133,6 +133,8 @@ impl TonlibjsonClient {
             }
 
             tracing::trace!("recv thread exited");
+
+            tonlibjson_sys::Client::clear_thread_locals();
         });
 
         Ok(TonlibjsonClient {

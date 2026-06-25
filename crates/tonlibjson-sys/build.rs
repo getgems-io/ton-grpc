@@ -26,6 +26,7 @@ fn main() {
     println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_TARGET_CPU_NATIVE");
     println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_LLD");
     println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_LTO");
+    println!("cargo::rerun-if-env-changed=TONLIBJSON_SYS_BUILD_TYPE");
 
     let out_dir: PathBuf = env::var("OUT_DIR").unwrap().into();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
@@ -95,7 +96,13 @@ fn main() {
         // clang++: error: no such file or directory: '&&'
         // clang++: error: no such file or directory: 'dsymutil'
         // clang++: error: no such file or directory: 'generate_common'
-        .define("CMAKE_BUILD_TYPE", "Release")
+        .define(
+            "CMAKE_BUILD_TYPE",
+            env::var("TONLIBJSON_SYS_BUILD_TYPE")
+                .ok()
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| "Release".to_string()),
+        )
         // QUIC will require openssl 3.5+
         // but its not easy to install
         // https://github.com/getgems-io/ton-grpc/actions/runs/21245238777/job/61132760447?pr=1483
@@ -287,6 +294,16 @@ fn main() {
 
     let _ = cfg.build_target("emulator").build();
     println!("cargo:rustc-link-lib=static=emulator");
+
+    println!("cargo:rerun-if-changed=csrc/shim.cpp");
+    let mut shim = cc::Build::new();
+    shim.cpp(true)
+        .file("csrc/shim.cpp")
+        .flag_if_supported("-std=c++14");
+    if target_os == "macos" {
+        shim.flag_if_supported("-stdlib=libc++");
+    }
+    shim.compile("td_shim");
 }
 
 fn copy_dir_recursively(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> std::io::Result<()> {
