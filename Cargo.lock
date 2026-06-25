@@ -3920,6 +3920,7 @@ name = "tonlibjson-sys"
 version = "0.6.0"
 dependencies = [
  "anyhow",
+ "cc",
  "cmake",
  "libc",
  "pkg-config",
