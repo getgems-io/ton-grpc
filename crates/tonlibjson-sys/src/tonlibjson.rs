@@ -2,63 +2,12 @@ use anyhow::{Result, anyhow};
 use libc::{c_char, c_double, c_int};
 use std::{
     ffi::{CStr, CString, c_void},
+    marker::PhantomData,
+    mem::ManuallyDrop,
     ptr::NonNull,
+    sync::{Arc, Weak},
     time::Duration,
 };
-
-#[cfg(test)]
-mod tests {
-    use crate::tonlibjson::Client;
-    use std::assert_matches;
-    use std::time::Duration;
-
-    #[test]
-    fn receive_timeout() {
-        let client = Client::new();
-        let response = client.receive(Duration::from_micros(10));
-
-        assert_matches!(response, Ok(None));
-    }
-
-    #[test]
-    fn call_send_invalid_query() {
-        let client = Client::new();
-        let response = client.send("query");
-
-        assert_matches!(response, Ok(()))
-    }
-
-    #[test]
-    fn call_execute_invalid_query() {
-        let client = Client::new();
-
-        let response = client.execute("query");
-
-        assert_eq!(response.unwrap_err().to_string(), "null received")
-    }
-
-    #[test]
-    fn call_execute() {
-        let client = Client::new();
-
-        let response = client.execute("{\"@type\": \"blocks.getMasterchainInfo\"}");
-
-        assert_eq!(
-            response.unwrap(),
-            "{\"@type\":\"error\",\"code\":400,\"message\":\"Function can't be executed synchronously\"}"
-        )
-    }
-
-    #[test]
-    fn set_verbosity_level() {
-        Client::set_verbosity_level(0)
-    }
-
-    #[test]
-    fn clear_thread_locals() {
-        Client::clear_thread_locals()
-    }
-}
 
 #[link(name = "tonlib")]
 unsafe extern "C" {
@@ -91,12 +40,18 @@ impl Client {
         Self { pointer }
     }
 
-    pub fn set_verbosity_level(level: i32) {
-        unsafe { tonlib_client_set_verbosity_level(level) }
+    pub fn split() -> (Sender, ReceiverBuilder) {
+        let raw = Arc::new(Self::new());
+        (
+            Sender {
+                raw: Arc::downgrade(&raw),
+            },
+            ReceiverBuilder { raw },
+        )
     }
 
-    pub fn clear_thread_locals() {
-        unsafe { td_clear_thread_locals() }
+    pub fn set_verbosity_level(level: i32) {
+        unsafe { tonlib_client_set_verbosity_level(level) }
     }
 
     pub fn send(&self, request: &str) -> Result<()> {
@@ -148,14 +103,113 @@ impl Default for Client {
     }
 }
 
-// TODO[akostylev0]: clear_thread_locals
 impl Drop for Client {
     fn drop(&mut self) {
         unsafe { tonlib_client_json_destroy(self.pointer.as_ptr()) }
     }
 }
-
-// TODO[akostylev0]: thread local
 unsafe impl Send for Client {}
 
 unsafe impl Sync for Client {}
+
+#[derive(Clone, Debug)]
+pub struct Sender {
+    raw: Weak<Client>,
+}
+
+impl Sender {
+    pub fn send(&self, request: &str) -> Result<()> {
+        self.raw
+            .upgrade()
+            .ok_or_else(|| anyhow!("client closed"))?
+            .send(request)
+    }
+}
+
+pub struct Receiver {
+    raw: ManuallyDrop<Arc<Client>>,
+    _not_send_sync: PhantomData<*const ()>,
+}
+
+impl Receiver {
+    pub fn receive(&mut self, timeout: Duration) -> Result<Option<&str>> {
+        self.raw.receive(timeout)
+    }
+}
+
+impl Drop for Receiver {
+    fn drop(&mut self) {
+        unsafe {
+            ManuallyDrop::drop(&mut self.raw);
+            td_clear_thread_locals()
+        };
+    }
+}
+
+#[derive(Debug)]
+pub struct ReceiverBuilder {
+    raw: Arc<Client>,
+}
+
+impl ReceiverBuilder {
+    pub fn build(self) -> Receiver {
+        Receiver {
+            raw: ManuallyDrop::new(self.raw),
+            _not_send_sync: PhantomData,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tonlibjson::{Client, td_clear_thread_locals};
+    use std::assert_matches;
+    use std::time::Duration;
+
+    #[test]
+    fn receive_timeout() {
+        let client = Client::new();
+        let response = client.receive(Duration::from_micros(10));
+
+        assert_matches!(response, Ok(None));
+    }
+
+    #[test]
+    fn call_send_invalid_query() {
+        let client = Client::new();
+        let response = client.send("query");
+
+        assert_matches!(response, Ok(()))
+    }
+
+    #[test]
+    fn call_execute_invalid_query() {
+        let client = Client::new();
+
+        let response = client.execute("query");
+
+        assert_eq!(response.unwrap_err().to_string(), "null received")
+    }
+
+    #[test]
+    fn call_execute() {
+        let client = Client::new();
+
+        let response = client.execute("{\"@type\": \"blocks.getMasterchainInfo\"}");
+
+        assert_eq!(
+            response.unwrap(),
+            "{\"@type\":\"error\",\"code\":400,\"message\":\"Function can't be executed synchronously\"}"
+        )
+    }
+
+    #[test]
+    fn set_verbosity_level() {
+        Client::set_verbosity_level(0)
+    }
+
+    #[test]
+    fn clear_thread_locals() {
+        unsafe { td_clear_thread_locals() }
+    }
+}

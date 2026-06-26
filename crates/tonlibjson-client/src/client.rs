@@ -24,7 +24,7 @@ type RequestStorage = DashMap<RequestId, oneshot::Sender<Response>>;
 type ReadyFuture = Pin<Box<dyn Future<Output = Result<(), watch::error::RecvError>> + Send + Sync>>;
 
 pub struct TonlibjsonClient {
-    client: Arc<tonlibjson_sys::Client>,
+    sender: tonlibjson_sys::Sender,
     responses: Arc<RequestStorage>,
     drop_guard: Arc<DropGuard>,
 
@@ -35,7 +35,7 @@ pub struct TonlibjsonClient {
 impl Debug for TonlibjsonClient {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TonlibjsonClient")
-            .field("client", &self.client)
+            .field("sender", &self.sender)
             .field("responses", &self.responses)
             .field("drop_guard", &self.drop_guard)
             .field("state", &self.state)
@@ -46,7 +46,7 @@ impl Debug for TonlibjsonClient {
 impl Clone for TonlibjsonClient {
     fn clone(&self) -> Self {
         Self {
-            client: self.client.clone(),
+            sender: self.sender.clone(),
             responses: self.responses.clone(),
             drop_guard: self.drop_guard.clone(),
             state: self.state.clone(),
@@ -68,8 +68,7 @@ impl TonlibjsonClient {
     }
 
     pub fn new(config: TonConfig) -> anyhow::Result<Self> {
-        let client = Arc::new(tonlibjson_sys::Client::new());
-        let client_recv = client.clone();
+        let (sender, receiver_builder) = tonlibjson_sys::Client::split();
 
         let responses: Arc<RequestStorage> = Default::default();
         let responses_rcv = Arc::clone(&responses);
@@ -81,20 +80,21 @@ impl TonlibjsonClient {
         let ping = Request::with_id(ping_id, BlocksGetMasterchainInfo::default());
         let ping_encoded = serde_json::to_string(&ping).context("failed to encode ping message")?;
 
-        client
+        sender
             .send(init_config(config).to_string().as_str())
             .context("failed to send init message")?;
-        client_recv
+        sender
             .send(&ping_encoded)
             .context("failed to send ping message")?;
 
         let (tx, rx) = watch::channel(State::Connecting);
         std::thread::spawn(move || {
+            let mut receiver = receiver_builder.build();
             let timeout = Duration::from_secs(1);
             let mut should_continue = true;
 
             while should_continue && !child_token.is_cancelled() {
-                if let Ok(Some(packet)) = client_recv.receive(timeout) {
+                if let Ok(Some(packet)) = receiver.receive(timeout) {
                     let msg = serde_json::from_str::<Message>(packet);
                     if let Ok(ref msg) = msg {
                         if msg.is_disconnected_error() {
@@ -133,12 +133,10 @@ impl TonlibjsonClient {
             }
 
             tracing::trace!("recv thread exited");
-
-            tonlibjson_sys::Client::clear_thread_locals();
         });
 
         Ok(TonlibjsonClient {
-            client,
+            sender,
             responses,
             drop_guard: Arc::new(cancel_token.drop_guard()),
             state: rx,
@@ -188,7 +186,7 @@ where
                 let (tx, rx) = oneshot::channel::<Response>();
                 self.responses.insert(req.id, tx);
 
-                match self.client.send(&json) {
+                match self.sender.send(&json) {
                     Ok(_) => ResponseFuture::new(
                         rx,
                         Arc::clone(&self.drop_guard),
