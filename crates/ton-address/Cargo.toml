@@ -5,7 +5,7 @@ edition = "2024"
 rust-version.workspace = true
 
 [dependencies]
-anyhow = "1.0.102"
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 base64 = "0.22.1"
 bytes = "1.11.1"
 crc = "3.4.0"

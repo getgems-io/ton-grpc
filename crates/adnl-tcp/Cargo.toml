@@ -6,7 +6,7 @@ rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 tokio = { version = "1.52.3", features = ["full"] }
 tracing = "0.1.44"
 tokio-util = { version = "0.7.18", features = ["codec"] }
