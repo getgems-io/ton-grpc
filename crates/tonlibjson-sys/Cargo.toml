@@ -20,6 +20,9 @@ cmake = "0.1.58"
 pkg-config = "0.3.32"
 walkdir = "2.5"
 
+[dev-dependencies]
+static_assertions = "1.1.0"
+
 [features]
 default = []
 testnet = []
