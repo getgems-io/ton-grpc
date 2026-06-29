@@ -163,6 +163,8 @@ impl ReceiverBuilder {
 #[cfg(test)]
 mod tests {
     use crate::tonlibjson::{Client, td_clear_thread_locals};
+    use crate::{Receiver, ReceiverBuilder, Sender};
+    use static_assertions::{assert_impl_all, assert_not_impl_all};
     use std::assert_matches;
     use std::time::Duration;
 
@@ -211,5 +213,22 @@ mod tests {
     #[test]
     fn clear_thread_locals() {
         unsafe { td_clear_thread_locals() }
+    }
+
+    #[test]
+    fn split_send_dropped() {
+        let (tx, rx) = Client::split();
+        drop(rx);
+
+        let response = tx.send("query");
+
+        assert_eq!(response.unwrap_err().to_string(), "client closed");
+    }
+
+    #[test]
+    fn split_impls() {
+        assert_impl_all!(Sender: Send, Sync);
+        assert_impl_all!(ReceiverBuilder: Send, Sync);
+        assert_not_impl_all!(Receiver: Send, Sync);
     }
 }
