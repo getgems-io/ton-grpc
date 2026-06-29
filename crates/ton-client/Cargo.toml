@@ -32,4 +32,4 @@ testcontainers-ton = { path = "../testcontainers-ton" }
 tracing-test = "0.2.6"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5"
-mockall = "0.14"
+mockall = "0.15"

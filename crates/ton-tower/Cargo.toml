@@ -19,5 +19,5 @@ tracing = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1.52.3", features = ["macros", "rt"] }
-mockall = "0.14"
+mockall = "0.15"
 tracing-test = "0.2.6"
