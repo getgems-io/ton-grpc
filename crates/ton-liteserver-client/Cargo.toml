@@ -6,7 +6,7 @@ rust-version.workspace = true
 
 [build-dependencies]
 tl-parser = { path = "../tl-parser" }
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 quote = "1.0.45"
 syn = "2.0.117"
 prettyplease = "0.2.37"
@@ -19,7 +19,7 @@ ton-config = { path = "../ton-config" }
 toner = { workspace = true }
 toner-tlb-macros = { path = "../toner-tlb-macros" }
 ton-address = { path = "../ton-address" }
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 tokio = { version = "1.52.3", features = ["full"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }
 tower = { version = "0.5.3", features = ["full"] }

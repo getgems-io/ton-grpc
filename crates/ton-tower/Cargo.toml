@@ -8,7 +8,7 @@ rust-version.workspace = true
 ton-address = { path = "../ton-address" }
 pin-project = "1.1.13"
 tower = { version = "0.5.3", features = ["full"] }
-anyhow = "1.0.102"
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 futures = "0.3.32"
 thiserror = "2.0.18"
 metrics = "0.24.6"
@@ -19,5 +19,5 @@ tracing = "0.1"
 
 [dev-dependencies]
 tokio = { version = "1.52.3", features = ["macros", "rt"] }
-mockall = "0.14"
+mockall = "0.15.0"
 tracing-test = "0.2.6"
