@@ -8,17 +8,17 @@ use crate::tlb::ext_blk_ref::ExtBlkRef;
 use crate::tlb::shard_descr::ShardDescr;
 use crate::tlb::shard_ident::ShardIdent;
 use crate::tlb::transaction::Transaction;
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as base64_standard;
 use std::sync::Arc;
 use ton_address::SmartContractAddress;
-use ton_tower::response::ShortTxId;
+use ton_tower::response::{BlockIdExt, ShortTxId};
 use toner::tlb::ser::CellSerializeExt;
 use toner::tlb::{BagOfCellsArgs, BoC, Cell};
 use toner::ton::message::{CommonMsgInfo, InternalMsgInfo, Message};
 
-impl From<TonNodeBlockIdExt> for ton_tower::response::BlockIdExt {
+impl From<TonNodeBlockIdExt> for BlockIdExt {
     fn from(v: TonNodeBlockIdExt) -> Self {
         Self {
             workchain: v.workchain,
@@ -30,29 +30,30 @@ impl From<TonNodeBlockIdExt> for ton_tower::response::BlockIdExt {
     }
 }
 
-// TODO[akostylev0]: TryInto
-impl From<ton_tower::response::BlockIdExt> for TonNodeBlockIdExt {
-    fn from(v: ton_tower::response::BlockIdExt) -> Self {
-        Self {
+impl TryFrom<BlockIdExt> for TonNodeBlockIdExt {
+    type Error = anyhow::Error;
+
+    fn try_from(v: BlockIdExt) -> Result<Self, Self::Error> {
+        Ok(Self {
             workchain: v.workchain,
             shard: v.shard,
             seqno: v.seqno,
             root_hash: base64_standard
                 .decode(&v.root_hash)
-                .expect("valid base64 root_hash")
+                .context("failed to decode root_hash")?
                 .try_into()
-                .expect("root_hash must be 32 bytes"),
+                .map_err(|_| anyhow!("root_hash must be 32 bytes"))?,
             file_hash: base64_standard
                 .decode(&v.file_hash)
-                .expect("valid base64 file_hash")
+                .context("failed to decode file_hash")?
                 .try_into()
-                .expect("file_hash must be 32 bytes"),
-        }
+                .map_err(|_| anyhow!("file_hash must be 32 bytes"))?,
+        })
     }
 }
 
-impl From<ton_tower::response::BlockIdExt> for TonNodeBlockId {
-    fn from(v: ton_tower::response::BlockIdExt) -> Self {
+impl From<BlockIdExt> for TonNodeBlockId {
+    fn from(v: BlockIdExt) -> Self {
         Self {
             workchain: v.workchain,
             shard: v.shard,
@@ -66,7 +67,7 @@ impl From<LiteServerMasterchainInfo> for ton_tower::response::MasterchainInfo {
         Self {
             last: v.last.into(),
             state_root_hash: base64_standard.encode(v.state_root_hash),
-            init: ton_tower::response::BlockIdExt {
+            init: BlockIdExt {
                 workchain: v.init.workchain,
                 shard: 0,
                 seqno: 0,
@@ -77,11 +78,8 @@ impl From<LiteServerMasterchainInfo> for ton_tower::response::MasterchainInfo {
     }
 }
 
-fn ext_blk_ref_to_block_id_ext(
-    shard: &ShardIdent,
-    r: &ExtBlkRef,
-) -> ton_tower::response::BlockIdExt {
-    ton_tower::response::BlockIdExt {
+fn ext_blk_ref_to_block_id_ext(shard: &ShardIdent, r: &ExtBlkRef) -> BlockIdExt {
+    BlockIdExt {
         workchain: shard.workchain_id,
         shard: shard.shard_id() as i64,
         seqno: r.seq_no as i32,
@@ -90,10 +88,7 @@ fn ext_blk_ref_to_block_id_ext(
     }
 }
 
-fn blk_prev_info_to_block_ids(
-    shard: &ShardIdent,
-    prev: &BlkPrevInfo,
-) -> Vec<ton_tower::response::BlockIdExt> {
+fn blk_prev_info_to_block_ids(shard: &ShardIdent, prev: &BlkPrevInfo) -> Vec<BlockIdExt> {
     match prev {
         BlkPrevInfo::Ref(r) => vec![ext_blk_ref_to_block_id_ext(shard, r)],
         BlkPrevInfo::RefPair(a, b) => vec![
@@ -103,11 +98,8 @@ fn blk_prev_info_to_block_ids(
     }
 }
 
-pub fn shard_descr_to_block_id_ext(
-    workchain_id: i32,
-    shard: &ShardDescr,
-) -> ton_tower::response::BlockIdExt {
-    ton_tower::response::BlockIdExt {
+pub fn shard_descr_to_block_id_ext(workchain_id: i32, shard: &ShardDescr) -> BlockIdExt {
+    BlockIdExt {
         workchain: workchain_id,
         shard: shard.next_validator_shard as i64,
         seqno: shard.seq_no as i32,
@@ -117,7 +109,7 @@ pub fn shard_descr_to_block_id_ext(
 }
 
 pub fn block_header_to_ton_client(
-    id: ton_tower::response::BlockIdExt,
+    id: BlockIdExt,
     header: BlockHeader,
 ) -> ton_tower::response::BlockHeader {
     let info = &header.info;
