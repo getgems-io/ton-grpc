@@ -161,7 +161,9 @@ impl Service<GetShards> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetShards) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block_id.into();
+        let Ok(id): Result<TonNodeBlockIdExt, _> = req.block_id.try_into() else {
+            return futures::future::err(anyhow!("invalid block id")).boxed();
+        };
         if id.workchain != -1 {
             return futures::future::err(anyhow!("workchain must be -1")).boxed();
         }
@@ -206,7 +208,9 @@ impl Service<GetBlockHeader> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetBlockHeader) -> Self::Future {
-        let block_id: TonNodeBlockIdExt = req.id.clone().into();
+        let Ok(block_id): Result<TonNodeBlockIdExt, _> = req.id.clone().try_into() else {
+            return futures::future::err(anyhow!("invalid block id")).boxed();
+        };
         let expected_root_hash = block_id.root_hash;
 
         self.inner
@@ -247,7 +251,9 @@ impl Service<GetTransactionIds> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetTransactionIds) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block.into();
+        let Ok(id): Result<TonNodeBlockIdExt, _> = req.block.try_into() else {
+            return futures::future::err(anyhow!("invalid block id")).boxed();
+        };
         let expected_root_hash = id.root_hash;
 
         let mode = block::list_block_transactions_mode(req.after.is_some(), req.reverse, true);
@@ -286,7 +292,9 @@ impl Service<GetTransactions> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetTransactions) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block.into();
+        let Ok(id): Result<TonNodeBlockIdExt, _> = req.block.try_into() else {
+            return futures::future::err(anyhow!("invalid block id")).boxed();
+        };
         let expected_root_hash = id.root_hash;
 
         let mode = block::list_block_transactions_mode(req.after.is_some(), req.reverse, true);
@@ -429,7 +437,9 @@ impl Service<GetAccountStateOnBlock> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetAccountStateOnBlock) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block_id.into();
+        let Ok(id): Result<TonNodeBlockIdExt, _> = req.block_id.try_into() else {
+            return futures::future::err(anyhow!("invalid block id")).boxed();
+        };
         let request = account::account_state_request(&req.address, id);
 
         self.inner
@@ -571,7 +581,9 @@ impl Service<GetShardAccountCellOnBlock> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetShardAccountCellOnBlock) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block_id.into();
+        let Ok(id): Result<TonNodeBlockIdExt, _> = req.block_id.try_into() else {
+            return futures::future::err(anyhow!("invalid block id")).boxed();
+        };
         let request = account::account_state_request(&req.address, id);
 
         self.inner
