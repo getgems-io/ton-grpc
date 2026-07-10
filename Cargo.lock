@@ -3419,43 +3419,42 @@ dependencies = [
 
 [[package]]
 name = "tlb"
-version = "0.7.4"
-source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+version = "0.11.0"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#a818737b4d862b612da7c0af6913a63216c68e68"
 dependencies = [
  "array-util",
  "base64 0.21.7",
  "bitvec",
  "crc",
- "digest 0.10.7",
+ "digest 0.11.3",
  "hex",
  "impl-tools",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "tlbits",
 ]
 
 [[package]]
 name = "tlb-ton"
-version = "0.7.4"
-source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+version = "0.11.0"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#a818737b4d862b612da7c0af6913a63216c68e68"
 dependencies = [
  "base64 0.21.7",
- "chrono",
  "crc",
- "digest 0.10.7",
+ "digest 0.11.3",
  "hex",
  "impl-tools",
  "lazy_static",
  "num-bigint",
  "num-traits",
- "sha2 0.10.9",
+ "sha2 0.11.0",
  "strum",
  "tlb",
 ]
 
 [[package]]
 name = "tlbits"
-version = "0.7.4"
-source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+version = "0.11.0"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#a818737b4d862b612da7c0af6913a63216c68e68"
 dependencies = [
  "array-util",
  "bitvec",
@@ -3672,12 +3671,11 @@ dependencies = [
 
 [[package]]
 name = "ton-contracts"
-version = "0.7.4"
-source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+version = "0.11.0"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#a818737b4d862b612da7c0af6913a63216c68e68"
 dependencies = [
  "anyhow",
  "bitvec",
- "chrono",
  "hmac",
  "lazy_static",
  "nacl",
@@ -3777,8 +3775,8 @@ dependencies = [
 
 [[package]]
 name = "toner"
-version = "0.7.4"
-source = "git+https://github.com/akostylev0/toner.git?branch=hasher#9ca2779c890253da851ae2f3f823d4b7448ef440"
+version = "0.11.0"
+source = "git+https://github.com/akostylev0/toner.git?branch=hasher#a818737b4d862b612da7c0af6913a63216c68e68"
 dependencies = [
  "tlb",
  "tlb-ton",
