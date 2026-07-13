@@ -1938,7 +1938,7 @@ version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "35bd024e8b2ff75562e5f34e7f4905839deb4b22955ef5e73d2fea1b9813cb23"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-complex",
  "num-integer",
  "num-iter",
@@ -1951,6 +1951,16 @@ name = "num-bigint"
 version = "0.4.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c89e69e7e0f03bea5ef08013795c25018e101932225a656383bd384495ecc367"
+dependencies = [
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "93e7820bc0a80a0238e650327316f929ba18d5be054b647490a3a6a339f3e7c0"
 dependencies = [
  "num-integer",
  "num-traits",
@@ -1996,7 +2006,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
 dependencies = [
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-integer",
  "num-traits",
 ]
@@ -3415,7 +3425,7 @@ dependencies = [
  "hex",
  "impl-tools",
  "lazy_static",
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-traits",
  "sha2 0.11.0",
  "strum",
@@ -3431,7 +3441,7 @@ dependencies = [
  "bitvec",
  "either",
  "impl-tools",
- "num-bigint",
+ "num-bigint 0.4.8",
  "num-traits",
  "rustversion",
  "thiserror 1.0.69",
@@ -3626,7 +3636,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "lazy_static",
- "num-bigint",
+ "num-bigint 0.5.1",
  "testcontainers-ton",
  "thiserror 2.0.18",
  "tokio",
@@ -3650,7 +3660,7 @@ dependencies = [
  "hmac",
  "lazy_static",
  "nacl",
- "num-bigint",
+ "num-bigint 0.4.8",
  "pbkdf2",
  "sha2 0.10.9",
  "tlb-ton",
@@ -3699,7 +3709,7 @@ dependencies = [
  "crc",
  "futures",
  "hex",
- "num-bigint",
+ "num-bigint 0.5.1",
  "pin-project",
  "prettyplease",
  "quote",
