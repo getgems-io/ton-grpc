@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use lazy_static::lazy_static;
 use toner::{
     contracts::wallet::{PUBLIC_KEY_LENGTH, WalletVersion},
@@ -9,7 +8,7 @@ use toner::{
         de::{CellDeserialize, CellParser, CellParserError},
         ser::{CellBuilder, CellBuilderError, CellSerialize},
     },
-    ton::{BagOfCells, Cell, UnixTimestamp, action::SendMsgAction},
+    ton::{BagOfCells, Cell, action::SendMsgAction},
 };
 use toner_tlb_macros::{CellDeserialize, CellSerialize};
 
@@ -47,7 +46,7 @@ impl WalletVersion for V3R2 {
 
     fn create_sign_body(
         wallet_id: u32,
-        expire_at: DateTime<Utc>,
+        expire_at: u32,
         seqno: u32,
         msgs: impl IntoIterator<Item = SendMsgAction>,
     ) -> Self::SignBody {
@@ -77,7 +76,7 @@ pub struct WalletV3R2Data {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WalletV3R2SignBody {
     pub wallet_id: u32,
-    pub expire_at: DateTime<Utc>,
+    pub expire_at: u32,
     pub seqno: u32,
     pub msgs: Vec<SendMsgAction>,
 }
@@ -88,7 +87,7 @@ impl CellSerialize for WalletV3R2SignBody {
     fn store(&self, builder: &mut CellBuilder, _: Self::Args) -> Result<(), CellBuilderError> {
         builder
             .pack(self.wallet_id, ())?
-            .pack_as::<_, UnixTimestamp>(self.expire_at, ())?
+            .pack(self.expire_at, ())?
             .pack(self.seqno, ())?
             .store_many(&self.msgs, ())?;
         Ok(())
@@ -101,7 +100,7 @@ impl<'de> CellDeserialize<'de> for WalletV3R2SignBody {
     fn parse(parser: &mut CellParser<'de>, _: Self::Args) -> Result<Self, CellParserError<'de>> {
         Ok(Self {
             wallet_id: parser.unpack(())?,
-            expire_at: parser.unpack_as::<_, UnixTimestamp>(())?,
+            expire_at: parser.unpack(())?,
             seqno: parser.unpack(())?,
             msgs: core::iter::from_fn(|| {
                 if parser.no_references_left() {

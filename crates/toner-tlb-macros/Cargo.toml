@@ -8,11 +8,11 @@ rust-version.workspace = true
 proc-macro = true
 
 [dependencies]
-syn = { version = "2", features = ["full", "extra-traits"] }
-quote = "1"
-proc-macro2 = "1"
-darling = "0.23"
+syn = { version = "2.0.118", features = ["full", "extra-traits"] }
+quote = "1.0.46"
+proc-macro2 = "1.0.106"
+darling = "0.23.0"
 
 [dev-dependencies]
 toner = { workspace = true }
-trybuild = "1"
+trybuild = "1.0.118"
