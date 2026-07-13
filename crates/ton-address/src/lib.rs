@@ -56,19 +56,19 @@ impl FromStr for SmartContractAddress {
             // convert url safe to standard
             let s = s.replace('-', "+").replace('_', "/");
             let Ok(data) = base64_standard.decode(&s) else {
-                return Err(anyhow!("invalid base64 address: {}", &s));
+                return Err(anyhow!("invalid base64 address: {}", s));
             };
             if data.len() != 36 {
-                return Err(anyhow!("invalid base64 address: {}", &s));
+                return Err(anyhow!("invalid base64 address: {}", s));
             }
 
             let crc16 = CRC16.checksum(&data[..34]);
             let [flags, workchain_id, data @ .., crc16_l, crc16_r] = &data[..] else {
-                return Err(anyhow!("invalid base64 address: {}", &s));
+                return Err(anyhow!("invalid base64 address: {}", s));
             };
 
             if u16::from_be_bytes([*crc16_l, *crc16_r]) != crc16 {
-                return Err(anyhow!("invalid base64 address crc16: {}", &s));
+                return Err(anyhow!("invalid base64 address crc16: {}", s));
             }
 
             let mut bytes: [u8; 32] = [0; 32];

@@ -65,7 +65,7 @@ async fn should_send_ton_between_wallets() -> anyhow::Result<()> {
         .unwrap_or(0);
 
     let one_ton: i64 = 1_000_000_000;
-    let expire_at = Utc::now() + chrono::Duration::minutes(3);
+    let expire_at = (Utc::now() + chrono::Duration::minutes(3)).timestamp() as u32;
     let internal_msg = Message::<()>::transfer(
         receiver_wallet.address(),
         toner::ton::currency::ONE_TON.clone(),
@@ -140,7 +140,7 @@ async fn should_send_ton_between_wallets_via_liteserver_client() -> anyhow::Resu
         .unwrap_or(0);
 
     let one_ton: i64 = 1_000_000_000;
-    let expire_at = Utc::now() + chrono::Duration::minutes(3);
+    let expire_at = (Utc::now() + chrono::Duration::minutes(3)).timestamp() as u32;
     let internal_msg = Message::<()>::transfer(
         receiver_wallet.address(),
         toner::ton::currency::ONE_TON.clone(),
