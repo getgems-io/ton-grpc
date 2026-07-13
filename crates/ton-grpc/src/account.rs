@@ -226,7 +226,7 @@ mod integration {
         get_account_state_request, get_shard_account_cell_request,
     };
     use futures::StreamExt;
-    use testcontainers_ton::LocalLiteServer;
+    use testcontainers_ton::{LocalLiteServer, SharedLiteServer};
     use tokio::net::TcpListener;
     use ton_client::TonClientBuilder;
     use tonic::transport::Channel;
@@ -421,8 +421,8 @@ mod integration {
         }
     }
 
-    async fn setup() -> (LocalLiteServer, AccountServiceClient<Channel>) {
-        let server = LocalLiteServer::new().await.unwrap();
+    async fn setup() -> (SharedLiteServer, AccountServiceClient<Channel>) {
+        let server = LocalLiteServer::shared().await.unwrap();
         let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config(server.config())
             .build()
             .unwrap();

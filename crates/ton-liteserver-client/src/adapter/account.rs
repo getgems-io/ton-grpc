@@ -272,7 +272,7 @@ mod integration {
     use crate::client::LiteServerClient;
     use crate::tl::LiteServerGetMasterchainInfo;
     use std::str::FromStr;
-    use testcontainers_ton::LocalLiteServer;
+    use testcontainers_ton::{LocalLiteServer, SharedLiteServer};
     use ton_tower::request::*;
     use tower::ServiceExt;
     use tracing_test::traced_test;
@@ -410,8 +410,8 @@ mod integration {
         Ok(())
     }
 
-    async fn setup() -> anyhow::Result<(LiteServerAdapter, LocalLiteServer)> {
-        let server = LocalLiteServer::new().await?;
+    async fn setup() -> anyhow::Result<(LiteServerAdapter, SharedLiteServer)> {
+        let server = LocalLiteServer::shared().await?;
         let client = LiteServerClient::connect(server.addr(), server.server_key()).await?;
         Ok((LiteServerAdapter::new(client), server))
     }

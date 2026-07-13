@@ -176,7 +176,7 @@ mod integration {
         BlockId, GetLastBlockRequest, GetTransactionIdsRequest, GetTransactionsRequest,
     };
     use futures::StreamExt;
-    use testcontainers_ton::LocalLiteServer;
+    use testcontainers_ton::{LocalLiteServer, SharedLiteServer};
     use tokio::net::TcpListener;
     use ton_client::TonClientBuilder;
     use tonic::transport::Channel;
@@ -464,8 +464,8 @@ mod integration {
             && hex.chars().all(|c| c.is_ascii_hexdigit())
     }
 
-    async fn setup() -> (LocalLiteServer, BlockServiceClient<Channel>) {
-        let server = LocalLiteServer::new().await.unwrap();
+    async fn setup() -> (SharedLiteServer, BlockServiceClient<Channel>) {
+        let server = LocalLiteServer::shared().await.unwrap();
         let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config(server.config())
             .build()
             .unwrap();

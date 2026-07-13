@@ -255,7 +255,7 @@ mod integration {
     use crate::client::LiteServerClient;
     use rstest::rstest;
     use std::str::FromStr;
-    use testcontainers_ton::LocalLiteServer;
+    use testcontainers_ton::{LocalLiteServer, SharedLiteServer};
     use ton_tower::request::RunGetMethod;
     use tower::ServiceExt;
 
@@ -303,8 +303,8 @@ mod integration {
         assert_eq!(actual, expected);
     }
 
-    async fn setup() -> Result<(LiteServerAdapter, LocalLiteServer)> {
-        let server = LocalLiteServer::new().await?;
+    async fn setup() -> Result<(LiteServerAdapter, SharedLiteServer)> {
+        let server = LocalLiteServer::shared().await?;
         let client = LiteServerClient::connect(server.addr(), server.server_key()).await?;
         Ok((LiteServerAdapter::new(client), server))
     }
