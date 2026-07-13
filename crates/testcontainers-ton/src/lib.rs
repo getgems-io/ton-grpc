@@ -23,10 +23,10 @@ pub struct LocalLiteServer {
     config: TonConfig,
 }
 
-/// Read-only handle to the TON containers reused across test processes.
+/// Handle to the TON containers reused across test processes.
 pub struct SharedLiteServer {
     server: LocalLiteServer,
-    _exclusive_lock: Option<File>,
+    _access_lock: File,
 }
 
 impl LocalLiteServer {
@@ -41,6 +41,16 @@ impl LocalLiteServer {
     /// The pair persists between test runs. Remove stale containers with:
     /// `docker rm -f testcontainers-ton-genesis-v4-2-0 testcontainers-ton-liteserver-v4-2-0`.
     pub async fn shared() -> Result<SharedLiteServer> {
+        let access_lock = tokio::task::spawn_blocking(shared_access_lock).await??;
+        let server = Self::start_shared().await?;
+
+        Ok(SharedLiteServer {
+            server,
+            _access_lock: access_lock,
+        })
+    }
+
+    async fn start_shared() -> Result<Self> {
         let _lock = tokio::task::spawn_blocking(shared_startup_lock).await??;
         let genesis = Genesis::default()
             .with_container_name("testcontainers-ton-genesis-v4-2-0")
@@ -48,21 +58,20 @@ impl LocalLiteServer {
             .start()
             .await?;
 
-        Ok(SharedLiteServer {
-            server: Self::start(genesis, true).await?,
-            _exclusive_lock: None,
-        })
+        Self::start(genesis, true).await
     }
 
     /// Reuses the shared pair while preventing concurrent mutating tests.
     ///
     /// The exclusive lease is released when the returned handle is dropped.
     pub async fn shared_exclusive() -> Result<SharedLiteServer> {
-        let exclusive_lock = tokio::task::spawn_blocking(shared_exclusive_lock).await??;
-        let mut server = Self::shared().await?;
-        server._exclusive_lock = Some(exclusive_lock);
+        let access_lock = tokio::task::spawn_blocking(shared_exclusive_lock).await??;
+        let server = Self::start_shared().await?;
 
-        Ok(server)
+        Ok(SharedLiteServer {
+            server,
+            _access_lock: access_lock,
+        })
     }
 
     async fn start(genesis: ContainerAsync<Genesis>, shared: bool) -> Result<Self> {
@@ -139,11 +148,24 @@ impl SharedLiteServer {
 }
 
 fn shared_startup_lock() -> Result<File> {
-    shared_lock("testcontainers-ton-v4-2-0.lock")
+    let lock = shared_lock("testcontainers-ton-startup.lock")?;
+    lock.lock()?;
+
+    Ok(lock)
 }
 
 fn shared_exclusive_lock() -> Result<File> {
-    shared_lock("testcontainers-ton-v4-2-0-exclusive.lock")
+    let lock = shared_lock("testcontainers-ton-access.lock")?;
+    lock.lock()?;
+
+    Ok(lock)
+}
+
+fn shared_access_lock() -> Result<File> {
+    let lock = shared_lock("testcontainers-ton-access.lock")?;
+    lock.lock_shared()?;
+
+    Ok(lock)
 }
 
 fn shared_lock(name: &str) -> Result<File> {
@@ -152,7 +174,6 @@ fn shared_lock(name: &str) -> Result<File> {
         .read(true)
         .write(true)
         .open(std::env::temp_dir().join(name))?;
-    lock.lock()?;
 
     Ok(lock)
 }
@@ -182,6 +203,24 @@ mod integration {
 
         tokio::select! {
             _ = &mut second => panic!("second caller acquired lease early"),
+            () = tokio::time::sleep(Duration::from_millis(100)) => {}
+        }
+
+        drop(first);
+
+        let second = tokio::time::timeout(Duration::from_secs(5), second).await??;
+        assert!(second.addr().ip().is_loopback());
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn shared_exclusive_should_block_shared_callers() -> Result<()> {
+        let first = LocalLiteServer::shared_exclusive().await?;
+        let second = LocalLiteServer::shared();
+        tokio::pin!(second);
+
+        tokio::select! {
+            _ = &mut second => panic!("shared caller acquired lease early"),
             () = tokio::time::sleep(Duration::from_millis(100)) => {}
         }
 
