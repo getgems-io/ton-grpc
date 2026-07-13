@@ -18,7 +18,10 @@ mod integration {
     #[tokio::test]
     #[tracing_test::traced_test]
     async fn oneshot_should_complete_query() -> anyhow::Result<()> {
-        let (_server, adapter) = setup().await?;
+        let server = LocalLiteServer::shared().await?;
+        let adapter = MakeTonlibjsonAdapter
+            .oneshot(server.config().clone())
+            .await?;
 
         let masterchain_info = adapter.oneshot(GetMasterchainInfo::default()).await?;
 

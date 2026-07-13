@@ -82,7 +82,7 @@ mod integration {
     use crate::{Client, TonService};
     use rstest::{fixture, rstest};
     use std::time::Duration;
-    use testcontainers_ton::LocalLiteServer;
+    use testcontainers_ton::{LocalLiteServer, SharedLiteServer};
     use ton_liteserver_client::adapter::LiteServerAdapter;
     use ton_liteserver_client::client::LiteServerClient;
     use ton_tower::request::GetMasterchainInfo;
@@ -90,8 +90,8 @@ mod integration {
     use tracing_test::traced_test;
 
     #[fixture]
-    async fn server() -> LocalLiteServer {
-        LocalLiteServer::new().await.unwrap()
+    async fn server() -> SharedLiteServer {
+        LocalLiteServer::shared().await.unwrap()
     }
 
     #[rstest]
@@ -100,11 +100,11 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn should_store_shard_header<S, F>(
-        #[future(awt)] server: LocalLiteServer,
+        #[future(awt)] server: SharedLiteServer,
         #[case] make_client: F,
     ) where
         S: TonService,
-        F: AsyncFnOnce(LocalLiteServer) -> (LocalLiteServer, S),
+        F: AsyncFnOnce(SharedLiteServer) -> (SharedLiteServer, S),
     {
         let (_server, client) = make_client(server).await;
         let block_id = client
@@ -125,8 +125,8 @@ mod integration {
     }
 
     async fn tonlibjson_client(
-        server: LocalLiteServer,
-    ) -> (LocalLiteServer, Client<TonlibjsonAdapter>) {
+        server: SharedLiteServer,
+    ) -> (SharedLiteServer, Client<TonlibjsonAdapter>) {
         let adapter = MakeTonlibjsonAdapter
             .oneshot(server.config().clone())
             .await
@@ -136,8 +136,8 @@ mod integration {
     }
 
     async fn liteserver_client(
-        server: LocalLiteServer,
-    ) -> (LocalLiteServer, Client<LiteServerAdapter>) {
+        server: SharedLiteServer,
+    ) -> (SharedLiteServer, Client<LiteServerAdapter>) {
         let inner = LiteServerClient::connect(server.addr(), server.server_key())
             .await
             .unwrap();

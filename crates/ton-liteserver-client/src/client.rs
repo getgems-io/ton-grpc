@@ -269,7 +269,7 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn client_get_masterchain_info() -> anyhow::Result<()> {
-        let local_lite_server = LocalLiteServer::new().await?;
+        let local_lite_server = LocalLiteServer::shared().await?;
         let client =
             LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
                 .await?;
@@ -287,7 +287,7 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn client_wait_seqno_info() -> anyhow::Result<()> {
-        let local_lite_server = LocalLiteServer::new().await?;
+        let local_lite_server = LocalLiteServer::shared().await?;
         let mut client =
             LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
                 .await?;
@@ -311,7 +311,7 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn client_get_all_shards_info() -> anyhow::Result<()> {
-        let local_lite_server = LocalLiteServer::new().await?;
+        let local_lite_server = LocalLiteServer::shared().await?;
         let mut client =
             LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
                 .await?;
@@ -333,7 +333,7 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn client_get_version() -> anyhow::Result<()> {
-        let local_lite_server = LocalLiteServer::new().await?;
+        let local_lite_server = LocalLiteServer::shared().await?;
         let client =
             LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
                 .await?;
@@ -354,7 +354,7 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn client_error_test() -> anyhow::Result<()> {
-        let local_lite_server = LocalLiteServer::new().await?;
+        let local_lite_server = LocalLiteServer::shared().await?;
         let client =
             LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
                 .await?;
@@ -376,7 +376,7 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn client_get_block_proof_test() -> anyhow::Result<()> {
-        let local_lite_server = LocalLiteServer::new().await?;
+        let local_lite_server = LocalLiteServer::shared().await?;
         let mut client =
             LiteServerClient::connect(local_lite_server.addr(), local_lite_server.server_key())
                 .await?;
@@ -400,7 +400,7 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn client_drop_test() -> anyhow::Result<()> {
-        let local_lite_server = LocalLiteServer::new().await?;
+        let local_lite_server = LocalLiteServer::shared().await?;
 
         let future = {
             let client =

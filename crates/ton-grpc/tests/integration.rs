@@ -1,5 +1,5 @@
 use futures::StreamExt;
-use testcontainers_ton::LocalLiteServer;
+use testcontainers_ton::{LocalLiteServer, SharedLiteServer};
 use tokio::net::TcpListener;
 use ton_client::TonClientBuilder;
 use ton_grpc::account_service_server::AccountServiceServer;
@@ -220,11 +220,11 @@ async fn should_chain_block_header_to_shard_transactions_to_account_cell() {
 }
 
 async fn setup() -> (
-    LocalLiteServer,
+    SharedLiteServer,
     BlockServiceClient<Channel>,
     AccountServiceClient<Channel>,
 ) {
-    let server = LocalLiteServer::new().await.unwrap();
+    let server = LocalLiteServer::shared().await.unwrap();
     let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config(server.config())
         .build()
         .unwrap();
