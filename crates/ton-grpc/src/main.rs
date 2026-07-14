@@ -8,7 +8,6 @@ use ton_client::{ConfigSource, PoolTransport, TonClientBuilder, TonService};
 use ton_config::{TonConfig, default_ton_config_url};
 use ton_grpc::AccountService;
 use ton_grpc::BlockService;
-use ton_grpc::MakeComparingAdapter;
 use ton_grpc::MessageService;
 use ton_grpc::account_service_server::AccountServiceServer;
 use ton_grpc::block_service_server::BlockServiceServer;
@@ -26,8 +25,6 @@ use url::Url;
 enum ClientImpl {
     Tonlibjson,
     AdnlTcp,
-    ComparingTonlib,
-    ComparingAdnl,
 }
 
 #[derive(Args, Debug)]
@@ -120,20 +117,6 @@ async fn main() -> anyhow::Result<()> {
     match args.client {
         ClientImpl::Tonlibjson => serve(args, MakeTonlibjsonAdapter).await,
         ClientImpl::AdnlTcp => serve(args, MakeLiteServerAdapter).await,
-        ClientImpl::ComparingTonlib => {
-            serve(
-                args,
-                MakeComparingAdapter::new(MakeTonlibjsonAdapter, MakeLiteServerAdapter),
-            )
-            .await
-        }
-        ClientImpl::ComparingAdnl => {
-            serve(
-                args,
-                MakeComparingAdapter::new(MakeLiteServerAdapter, MakeTonlibjsonAdapter),
-            )
-            .await
-        }
     }
 }
 

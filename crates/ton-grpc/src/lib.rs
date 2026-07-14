@@ -1,6 +1,5 @@
 pub mod account;
 pub mod block;
-pub mod comparing;
 pub mod helpers;
 pub mod message;
 #[allow(clippy::enum_variant_names)]
@@ -8,7 +7,6 @@ pub mod ton;
 
 pub use account::AccountService;
 pub use block::BlockService;
-pub use comparing::{ComparingAdapter, MakeComparingAdapter};
 pub use message::MessageService;
 
 pub use ton::account_service_server;
