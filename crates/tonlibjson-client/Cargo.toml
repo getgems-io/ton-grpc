@@ -1,6 +1,6 @@
 [package]
 name = "tonlibjson-client"
-version = "0.22.1"
+version = "0.24.1"
 edition = "2024"
 rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
@@ -12,19 +12,17 @@ ton-config = { path = "../ton-config" }
 ton-tower = { path = "../ton-tower" }
 tower = { version = "0.5.3", features = ["full"] }
 tokio = { version = "1.52.3", features = ["full"] }
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 futures = "0.3.32"
 tracing = "0.1.44"
 serde = { version = "1.0.228", features = ["serde_derive"] }
 serde_json = "1.0.149"
 base64 = "0.22.1"
-uuid = { version = "1.23.0", features = ["v4", "fast-rng", "serde"] }
+uuid = { version = "1.23.5", features = ["v4", "fast-rng", "serde"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }
 dashmap = "6.1.0"
 pin-project = "1.1.10"
 derive-new = "0.7.0"
-url = "2.5.8"
-hex = "0.4.3"
 
 [dev-dependencies]
 tracing-test = "0.2.6"
@@ -33,7 +31,7 @@ testcontainers-ton = { path = "../testcontainers-ton" }
 
 [build-dependencies]
 tl-parser = { path = "../tl-parser" }
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 quote = "1.0.45"
 syn = "2.0.117"
 prettyplease = "0.2.37"

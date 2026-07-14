@@ -1,6 +1,6 @@
 [package]
 name = "ton-client"
-version = "0.2.0"
+version = "0.4.1"
 edition = "2024"
 rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
@@ -12,19 +12,17 @@ ton-tower = { path = "../ton-tower" }
 async-stream = "0.3"
 anyhow = { version = "1.0", features = ["backtrace"] }
 futures = "0.3"
-itertools = "0.14"
+itertools = "0.15.0"
 tracing = "0.1"
 tower = { version = "0.5.3", features = ["full"] }
 tokio = { version = "1.50", features = ["sync", "rt", "time", "macros"] }
 tokio-retry = "0.3"
 dashmap = "6.1"
 bitvec = "1.0"
-metrics = "0.24"
+metrics = "0.24.6"
 thiserror = "2.0"
 tokio-stream = { version = "0.1", features = ["sync"] }
-tokio-util = { version = "0.7", features = ["rt"] }
 url = { version = "2.5", features = ["serde"] }
-pin-project = "1.1"
 
 [dev-dependencies]
 ton-liteserver-client = { path = "../ton-liteserver-client"}
@@ -34,3 +32,4 @@ testcontainers-ton = { path = "../testcontainers-ton" }
 tracing-test = "0.2.6"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 url = "2.5"
+mockall = "0.15.0"

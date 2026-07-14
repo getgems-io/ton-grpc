@@ -1,7 +1,6 @@
 use aes::cipher::KeyIvInit;
 use aes::cipher::StreamCipher;
-use aes::cipher::generic_array::GenericArray;
-use anyhow::{anyhow, bail};
+use anyhow::bail;
 use ed25519_dalek::VerifyingKey;
 use ed25519_dalek::hazmat::ExpandedSecretKey;
 use sha2::{Digest, Sha256};
@@ -34,9 +33,7 @@ impl AesCtr {
 
         let mut cipher = Self::cipher(&x, checksum);
         let mut basis_decrypted = [0u8; 160];
-        cipher
-            .apply_keystream_b2b(basis, &mut basis_decrypted)
-            .map_err(|e| anyhow!(e))?;
+        cipher.apply_keystream_b2b(basis, &mut basis_decrypted);
 
         if Sha256::digest(basis_decrypted).as_slice() != checksum {
             bail!("wrong handshake checksum");
@@ -64,9 +61,7 @@ impl AesCtr {
 
         let mut cipher = Self::cipher(&x, &checksum);
         let mut basis_encrypted = [0u8; 160];
-        cipher
-            .apply_keystream_b2b(&self.basis, &mut basis_encrypted)
-            .unwrap();
+        cipher.apply_keystream_b2b(&self.basis, &mut basis_encrypted);
 
         (basis_encrypted, checksum)
     }
@@ -82,9 +77,6 @@ impl AesCtr {
             x[29], x[30], x[31],
         ];
 
-        Aes256Ctr128::new(
-            GenericArray::from_slice(&key),
-            GenericArray::from_slice(&ctr),
-        )
+        Aes256Ctr128::new((&key).into(), (&ctr).into())
     }
 }

@@ -1,28 +1,27 @@
 [package]
 name = "adnl-tcp"
-version = "0.5.1"
+version = "0.5.3"
 edition = "2024"
 rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
 
 [dependencies]
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 tokio = { version = "1.52.3", features = ["full"] }
 tracing = "0.1.44"
 tokio-util = { version = "0.7.18", features = ["codec"] }
-rand = "0.10.0"
+rand = "0.10.2"
 futures = "0.3.32"
 pin-project = "1.1.10"
-bytes = "1.11.1"
+bytes = "1.12.1"
 thiserror = "2.0.17"
 sha2 = "0.11.0"
 hex = "0.4.3"
-aes = "0.8.4"
-ctr = "0.9.2"
-ed25519-dalek = { version = "2.2.0", features = ["hazmat", "rand_core"] }
+aes = "0.9.1"
+ctr = "0.10.1"
+ed25519-dalek = { version = "3.0.0", features = ["hazmat", "rand_core"] }
 
 [dev-dependencies]
-base64 = "0.22.1"
 tracing-test = "0.2.6"
 testcontainers-ton = { path = "../testcontainers-ton" }
 

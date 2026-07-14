@@ -1,6 +1,6 @@
 [package]
 name = "ton-contract"
-version = "0.3.0"
+version = "0.4.2"
 edition = "2024"
 rust-version.workspace = true
 authors = [
@@ -11,7 +11,7 @@ authors = [
 [dependencies]
 ton-address = { path = "../ton-address" }
 ton-tower = { path = "../ton-tower" }
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 async-trait = "0.1.89"
 base64 = "0.22.1"
 chrono = { version = "0.4.44", default-features = false, features = ["clock"] }

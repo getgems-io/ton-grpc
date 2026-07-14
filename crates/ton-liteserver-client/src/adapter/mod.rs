@@ -34,6 +34,15 @@ use toner::tlb::BoC;
 use toner::tlb::bits::de::{unpack_bytes, unpack_bytes_fully};
 use tower::Service;
 
+macro_rules! ok_or_else {
+    ($expr:expr) => {
+        match $expr {
+            Ok(value) => value,
+            Err(e) => return futures::future::err(e.into()).boxed(),
+        }
+    };
+}
+
 #[derive(Clone)]
 pub struct LiteServerAdapter {
     inner: LiteServerClient,
@@ -66,8 +75,8 @@ impl Service<GetMasterchainInfo> for LiteServerAdapter {
     fn call(&mut self, _: GetMasterchainInfo) -> Self::Future {
         self.inner
             .call(LiteServerGetMasterchainInfo::default())
-            .map_ok(Into::into)
-            .map_err(Into::into)
+            .ok_into()
+            .err_into()
             .boxed()
     }
 }
@@ -86,7 +95,7 @@ impl Service<Sync> for LiteServerAdapter {
         self.inner
             .call(LiteServerGetMasterchainInfo::default())
             .map_ok(|info| ton_tower::response::MasterchainInfo::from(info).last)
-            .map_err(Into::into)
+            .err_into()
             .boxed()
     }
 }
@@ -109,7 +118,7 @@ impl Service<LookUpBlockBySeqno> for LiteServerAdapter {
             .call(LiteServerLookupBlock::seqno(TonNodeBlockId::new(
                 req.chain, req.shard, req.seqno,
             )))
-            .map_err(Into::into)
+            .err_into()
             .and_then(async |response| {
                 block::verify_header_proof(&response.header_proof, &response.id.root_hash)?;
 
@@ -140,7 +149,7 @@ impl Service<LookUpBlockByLt> for LiteServerAdapter {
                 lt: Some(req.lt),
                 utime: None,
             })
-            .map_err(Into::into)
+            .err_into()
             .and_then(async |response| {
                 block::verify_header_proof(&response.header_proof, &response.id.root_hash)?;
 
@@ -161,7 +170,7 @@ impl Service<GetShards> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetShards) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block_id.into();
+        let id: TonNodeBlockIdExt = ok_or_else!(req.block_id.try_into());
         if id.workchain != -1 {
             return futures::future::err(anyhow!("workchain must be -1")).boxed();
         }
@@ -169,7 +178,7 @@ impl Service<GetShards> for LiteServerAdapter {
 
         self.inner
             .call(LiteServerGetAllShardsInfo::new(id))
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |response| {
                 // TODO verify data inclusion in proof via ShardState traversal (needs MaybePruned)
                 block::verify_block_proof(&response.proof, &expected_root_hash)?;
@@ -206,12 +215,12 @@ impl Service<GetBlockHeader> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetBlockHeader) -> Self::Future {
-        let block_id: TonNodeBlockIdExt = req.id.clone().into();
-        let expected_root_hash = block_id.root_hash;
+        let id: TonNodeBlockIdExt = ok_or_else!(req.id.clone().try_into());
+        let expected_root_hash = id.root_hash;
 
         self.inner
-            .call(LiteServerGetBlockHeader::new(block_id))
-            .map_err(Into::into)
+            .call(LiteServerGetBlockHeader::new(id))
+            .err_into()
             .and_then(async move |response| {
                 let boc: BoC = unpack_bytes_fully(&response.header_proof, ())?;
                 let root = boc
@@ -247,7 +256,7 @@ impl Service<GetTransactionIds> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetTransactionIds) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block.into();
+        let id: TonNodeBlockIdExt = ok_or_else!(req.block.try_into());
         let expected_root_hash = id.root_hash;
 
         let mode = block::list_block_transactions_mode(req.after.is_some(), req.reverse, true);
@@ -261,7 +270,7 @@ impl Service<GetTransactionIds> for LiteServerAdapter {
                 reverse_order: if req.reverse { Some(True {}) } else { None },
                 want_proof: Some(True {}),
             })
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |response| {
                 // TODO verify transaction ids against proof via ShardAccountBlocks dict (needs MaybePruned)
                 block::verify_block_proof(&response.proof, &expected_root_hash)?;
@@ -286,7 +295,7 @@ impl Service<GetTransactions> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetTransactions) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block.into();
+        let id: TonNodeBlockIdExt = ok_or_else!(req.block.try_into());
         let expected_root_hash = id.root_hash;
 
         let mode = block::list_block_transactions_mode(req.after.is_some(), req.reverse, true);
@@ -300,7 +309,7 @@ impl Service<GetTransactions> for LiteServerAdapter {
                 reverse_order: if req.reverse { Some(True {}) } else { None },
                 want_proof: Some(True {}),
             })
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |response| {
                 let incomplete = matches!(response.incomplete, BoxedBool::BoolTrue(_));
                 let workchain = response.id.workchain;
@@ -338,24 +347,12 @@ impl Service<SendMessage> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: SendMessage) -> Self::Future {
-        let body = match message::decode_message_body(&req.body) {
-            Ok(body) => body,
-            Err(e) => return futures::future::err(e).boxed(),
-        };
+        let req = ok_or_else!(LiteServerSendMessage::from_base64(&req.body));
 
         self.inner
-            .call(LiteServerSendMessage { body })
-            .map_err(Into::into)
-            .and_then(async |response| {
-                if response.status != message::SEND_MSG_STATUS_OK {
-                    return Err(anyhow!(
-                        "unexpected liteServer.sendMsgStatus: {}",
-                        response.status
-                    ));
-                }
-
-                Ok(())
-            })
+            .call(req)
+            .err_into()
+            .and_then(async |response| response.ensure_ok())
             .boxed()
     }
 }
@@ -371,23 +368,14 @@ impl Service<SendMessageReturningHash> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: SendMessageReturningHash) -> Self::Future {
-        let (body, hash) = match message::decode_message_body(&req.body)
-            .and_then(|body| message::compute_message_hash(&body).map(|hash| (body, hash)))
-        {
-            Ok(pair) => pair,
-            Err(e) => return futures::future::err(e).boxed(),
-        };
+        let req = ok_or_else!(LiteServerSendMessage::from_base64(&req.body));
+        let hash = ok_or_else!(req.hash_base64());
 
         self.inner
-            .call(LiteServerSendMessage { body })
-            .map_err(Into::into)
-            .and_then(async move |response| {
-                if response.status != message::SEND_MSG_STATUS_OK {
-                    return Err(anyhow!(
-                        "unexpected liteServer.sendMsgStatus: {}",
-                        response.status
-                    ));
-                }
+            .call(req)
+            .err_into()
+            .and_then(async |response| {
+                response.ensure_ok()?;
 
                 Ok(hash)
             })
@@ -410,7 +398,7 @@ impl Service<GetAccountState> for LiteServerAdapter {
 
         self.inner
             .call(LiteServerGetMasterchainInfo::default())
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |mc| {
                 account::get_account_state_inner(client, req.address, mc.last).await
             })
@@ -429,12 +417,12 @@ impl Service<GetAccountStateOnBlock> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetAccountStateOnBlock) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block_id.into();
+        let id: TonNodeBlockIdExt = ok_or_else!(req.block_id.try_into());
         let request = account::account_state_request(&req.address, id);
 
         self.inner
             .call(request)
-            .map_err(Into::into)
+            .err_into()
             .and_then(async |response| account::account_state_from_response(response))
             .boxed()
     }
@@ -455,7 +443,7 @@ impl Service<GetAccountStateByTransaction> for LiteServerAdapter {
 
         self.inner
             .call(LiteServerGetMasterchainInfo::default())
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |mc| {
                 let address = req.address;
                 let tx = req.transaction_id;
@@ -485,10 +473,7 @@ impl Service<GetAccountTransactions> for LiteServerAdapter {
         let from = req.from;
 
         let workchain = address.workchain_id();
-        let hash: Int256 = match account::decode_tx_hash(&from.hash) {
-            Ok(hash) => hash,
-            Err(e) => return futures::future::err(e).boxed(),
-        };
+        let hash: Int256 = ok_or_else!(account::decode_tx_hash(&from.hash));
         let account = LiteServerAccountId {
             workchain,
             id: *address.to_internal(),
@@ -501,7 +486,7 @@ impl Service<GetAccountTransactions> for LiteServerAdapter {
                 lt: from.lt,
                 hash,
             })
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |response| {
                 let mut transactions: Vec<ton_tower::response::Transaction> = Vec::new();
                 let mut previous_transaction_id: Option<TransactionId> = None;
@@ -552,7 +537,7 @@ impl Service<GetShardAccountCell> for LiteServerAdapter {
 
         self.inner
             .call(LiteServerGetMasterchainInfo::default())
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |mc| {
                 account::get_shard_account_cell_inner(client, req.address, mc.last).await
             })
@@ -571,12 +556,12 @@ impl Service<GetShardAccountCellOnBlock> for LiteServerAdapter {
     }
 
     fn call(&mut self, req: GetShardAccountCellOnBlock) -> Self::Future {
-        let id: TonNodeBlockIdExt = req.block_id.into();
+        let id: TonNodeBlockIdExt = ok_or_else!(req.block_id.try_into());
         let request = account::account_state_request(&req.address, id);
 
         self.inner
             .call(request)
-            .map_err(Into::into)
+            .err_into()
             .and_then(async |response| account::shard_account_cell_from_response(response))
             .boxed()
     }
@@ -597,7 +582,7 @@ impl Service<GetShardAccountCellByTransaction> for LiteServerAdapter {
 
         self.inner
             .call(LiteServerGetMasterchainInfo::default())
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |mc| {
                 let address = req.address;
                 let tx = req.transaction_id;
@@ -624,7 +609,7 @@ impl Service<RunGetMethod> for LiteServerAdapter {
 
         self.inner
             .call(LiteServerGetMasterchainInfo::default())
-            .map_err(Into::into)
+            .err_into()
             .and_then(async move |mc| {
                 let address = req.address;
                 let method = req.method;

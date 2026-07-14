@@ -1,11 +1,10 @@
 use crate::RequestHandler;
-use crate::actor::Actor;
 use crate::route::registry::Registry;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
-use tokio_util::task::AbortOnDropHandle;
+use ton_tower::actor::{AbortOnDropHandle, Actor};
 use ton_tower::request::GetBlockHeader;
 use ton_tower::response::BlockIdExt;
 use tower::ServiceExt;
@@ -60,7 +59,7 @@ where
     async fn run(mut self) -> Self::Output {
         while let Some(block_id) = self.rx.recv().await {
             let retry_strategy = FibonacciBackoff::from_millis(32).map(jitter).take(16);
-            match Retry::spawn(retry_strategy, || {
+            match Retry::start(retry_strategy, || {
                 let client = self.client.clone();
                 let block_id = block_id.clone();
                 client.oneshot(GetBlockHeader { id: block_id })
@@ -83,7 +82,7 @@ mod integration {
     use crate::{Client, TonService};
     use rstest::{fixture, rstest};
     use std::time::Duration;
-    use testcontainers_ton::LocalLiteServer;
+    use testcontainers_ton::{LocalLiteServer, SharedLiteServer};
     use ton_liteserver_client::adapter::LiteServerAdapter;
     use ton_liteserver_client::client::LiteServerClient;
     use ton_tower::request::GetMasterchainInfo;
@@ -91,8 +90,8 @@ mod integration {
     use tracing_test::traced_test;
 
     #[fixture]
-    async fn server() -> LocalLiteServer {
-        LocalLiteServer::new().await.unwrap()
+    async fn server() -> SharedLiteServer {
+        LocalLiteServer::shared().await.unwrap()
     }
 
     #[rstest]
@@ -101,11 +100,11 @@ mod integration {
     #[tokio::test]
     #[traced_test]
     async fn should_store_shard_header<S, F>(
-        #[future(awt)] server: LocalLiteServer,
+        #[future(awt)] server: SharedLiteServer,
         #[case] make_client: F,
     ) where
         S: TonService,
-        F: AsyncFnOnce(LocalLiteServer) -> (LocalLiteServer, S),
+        F: AsyncFnOnce(SharedLiteServer) -> (SharedLiteServer, S),
     {
         let (_server, client) = make_client(server).await;
         let block_id = client
@@ -126,8 +125,8 @@ mod integration {
     }
 
     async fn tonlibjson_client(
-        server: LocalLiteServer,
-    ) -> (LocalLiteServer, Client<TonlibjsonAdapter>) {
+        server: SharedLiteServer,
+    ) -> (SharedLiteServer, Client<TonlibjsonAdapter>) {
         let adapter = MakeTonlibjsonAdapter
             .oneshot(server.config().clone())
             .await
@@ -137,8 +136,8 @@ mod integration {
     }
 
     async fn liteserver_client(
-        server: LocalLiteServer,
-    ) -> (LocalLiteServer, Client<LiteServerAdapter>) {
+        server: SharedLiteServer,
+    ) -> (SharedLiteServer, Client<LiteServerAdapter>) {
         let inner = LiteServerClient::connect(server.addr(), server.server_key())
             .await
             .unwrap();

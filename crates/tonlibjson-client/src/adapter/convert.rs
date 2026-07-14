@@ -119,9 +119,9 @@ impl TryFrom<tl::BlocksTransactions> for ton_tower::response::BlockTransactions 
                             v.id.workchain,
                             base64
                                 .decode(&tx.account)
-                                .context(format!("invalid base64 address: {}", &tx.account))?
+                                .context(format!("invalid base64 address: {}", tx.account))?
                                 .try_into()
-                                .map_err(|_| anyhow!("invalid address: {}", &tx.account))?,
+                                .map_err(|_| anyhow!("invalid address: {}", tx.account))?,
                         ),
                         lt: tx.lt,
                         hash: tx.hash,

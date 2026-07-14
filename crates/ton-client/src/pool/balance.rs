@@ -22,7 +22,7 @@ where
 
 impl<S, D> Balance<S, D>
 where
-    D: Discover<Service = S, Error: Debug> + Unpin,
+    D: Discover<Service = S, Error: Into<tower::BoxError>> + Unpin,
     D::Key: Hash,
 {
     pub fn new(discover: D) -> Self {

@@ -1,12 +1,10 @@
-use clap::Parser;
-use clap::ValueEnum;
+use clap::{Args, Parser, ValueEnum};
+use humantime::parse_duration;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
-use ton_client::ConfigSource;
-use ton_client::PoolTransport;
-use ton_client::TonClientBuilder;
+use ton_client::{ConfigSource, PoolTransport, TonClientBuilder};
 use ton_config::default_ton_config_url;
 use ton_grpc::AccountService;
 use ton_grpc::BlockService;
@@ -57,7 +55,7 @@ enum ClientImpl {
     ComparingAdnl,
 }
 
-#[derive(clap::Args, Debug)]
+#[derive(Args, Debug)]
 #[group(multiple = false)]
 struct TonConfigArgs {
     #[clap(long, value_parser = Url::parse)]
@@ -67,13 +65,13 @@ struct TonConfigArgs {
 }
 
 impl From<TonConfigArgs> for ConfigSource {
-    fn from(args: TonConfigArgs) -> Self {
-        if let Some(path) = args.ton_config_path {
+    fn from(value: TonConfigArgs) -> Self {
+        if let Some(path) = value.ton_config_path {
             return Self::File { path };
-        };
+        }
 
         Self::Url {
-            url: args.ton_config_url.unwrap_or(default_ton_config_url()),
+            url: value.ton_config_url.unwrap_or(default_ton_config_url()),
             interval: Duration::from_secs(60),
         }
     }
@@ -81,16 +79,16 @@ impl From<TonConfigArgs> for ConfigSource {
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
-struct Args {
+struct AppArgs {
     #[clap(long, default_value = "0.0.0.0:50052")]
     listen: SocketAddr,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "30s")]
+    #[clap(long, value_parser = parse_duration, default_value = "30s")]
     timeout: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "300s")]
+    #[clap(long, value_parser = parse_duration, default_value = "300s")]
     tcp_keepalive: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "120s")]
+    #[clap(long, value_parser = parse_duration, default_value = "120s")]
     http2_keepalive_interval: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "20s")]
+    #[clap(long, value_parser = parse_duration, default_value = "20s")]
     http2_keepalive_timeout: Duration,
     #[clap(long, default_value = "65535")]
     initial_connection_window_size: u32,
@@ -106,29 +104,29 @@ struct Args {
     client: ClientImpl,
 
     #[clap(flatten)]
-    ton_config: TonConfigArgs,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
+    ton_config_args: TonConfigArgs,
+    #[clap(long, value_parser = parse_duration, default_value = "10s")]
     ton_timeout: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "10s")]
+    #[clap(long, value_parser = parse_duration, default_value = "10s")]
     retry_budget_ttl: Duration,
     #[clap(long, default_value_t = 1)]
     retry_min_rps: u32,
     #[clap(long, default_value_t = 0.1)]
     retry_withdraw_percent: f32,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "128ms")]
+    #[clap(long, value_parser = parse_duration, default_value = "128ms")]
     retry_first_delay: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "4096ms")]
+    #[clap(long, value_parser = parse_duration, default_value = "4096ms")]
     retry_max_delay: Duration,
 
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "70ms")]
+    #[clap(long, value_parser = parse_duration, default_value = "70ms")]
     ewma_default_rtt: Duration,
-    #[clap(long, value_parser = humantime::parse_duration, default_value = "1ms")]
+    #[clap(long, value_parser = parse_duration, default_value = "1ms")]
     ewma_decay: Duration,
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let args = Args::parse();
+    let args = AppArgs::parse();
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
@@ -144,7 +142,7 @@ async fn main() -> anyhow::Result<()> {
         tracing::info!("Listening metrics on {:?}", &args.metrics_listen);
     }
 
-    let config_source = ConfigSource::from(args.ton_config);
+    let config_source = ConfigSource::from(args.ton_config_args);
     match &config_source {
         ConfigSource::File { path } => tracing::info!("TON Config path: {}", path.display()),
         ConfigSource::Url { url, .. } => tracing::info!("TON Config URL: {}", url),
@@ -207,7 +205,7 @@ async fn main() -> anyhow::Result<()> {
         .accept_compressed(Gzip)
         .send_compressed(Gzip);
 
-    type Client = PoolTransport<TonlibjsonAdapter>;
+    type Client = PoolTransport<AdapterFactory>;
 
     let (health_reporter, health_server) = tonic_health::server::health_reporter();
     health_reporter

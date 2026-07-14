@@ -1,13 +1,6 @@
 use crate::{
     Client, RoutedClient, TonService,
-    pool::{Balance, LiteServerDiscoverHandle},
-    service::{
-        error::{ErrorLayer, ErrorService},
-        metric::ConcurrencyMetric,
-        retry::RetryPolicy,
-        shared::{SharedLayer, SharedService},
-        timeout::{Timeout, TimeoutLayer},
-    },
+    pool::{Balance, LiteServerDiscoverError, LiteServerDiscoverHandle},
 };
 use futures::{Stream, StreamExt, TryStreamExt, stream};
 use std::{future::ready, path::PathBuf, pin::Pin, time::Duration};
@@ -16,30 +9,48 @@ use tokio_stream::wrappers::IntervalStream;
 use ton_config::{
     LiteServerId, TonConfig, default_ton_config_url, load_ton_config, read_ton_config,
 };
-use ton_tower::request::GetMasterchainInfo;
+use ton_tower::{
+    request::GetMasterchainInfo,
+    service::{
+        error::{ErrorLayer, ErrorService},
+        metric::ConcurrencyMetric,
+        reconnect::Reconnect,
+        retry::RetryPolicy,
+        shared::{SharedLayer, SharedService},
+        timeout::{Timeout, TimeoutLayer},
+    },
+};
 use tower::{
-    Service, ServiceBuilder, ServiceExt,
+    Service, ServiceBuilder,
     discover::Change,
-    limit::{ConcurrencyLimit, ConcurrencyLimitLayer},
+    limit::{ConcurrencyLimit, ConcurrencyLimitLayer, RateLimit},
     load::{CompleteOnResponse, PeakEwma, PeakEwmaDiscover},
     retry::{Retry, RetryLayer, budget::TpsBudget},
     util::Either,
 };
 use url::Url;
 
-pub type WrappedCursor<T> = RoutedClient<
-    ConcurrencyMetric<ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<T>>>>>>,
+pub type ReconnectingClient<F> = Reconnect<RateLimit<F>, TonConfig>;
+
+pub type WrappedCursor<F> = RoutedClient<
+    ConcurrencyMetric<
+        ConcurrencyLimit<SharedService<ErrorService<Timeout<PeakEwma<ReconnectingClient<F>>>>>>,
+    >,
 >;
 
-pub type BoxCursorClientDiscover<T> = Pin<
-    Box<dyn Stream<Item = Result<Change<LiteServerId, WrappedCursor<T>>, anyhow::Error>> + Send>,
+pub type BoxClientDiscover<F> = Pin<
+    Box<
+        dyn Stream<Item = Result<Change<LiteServerId, WrappedCursor<F>>, LiteServerDiscoverError>>
+            + Send,
+    >,
 >;
 
-pub type SharedBalance<T> = SharedService<Balance<WrappedCursor<T>, BoxCursorClientDiscover<T>>>;
+pub type SharedBalance<F> = SharedService<Balance<WrappedCursor<F>, BoxClientDiscover<F>>>;
 
-pub type PoolTransport<T> =
-    ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance<T>>, SharedBalance<T>>>>;
+pub type PoolTransport<F> =
+    ErrorService<Timeout<Either<Retry<RetryPolicy, SharedBalance<F>>, SharedBalance<F>>>>;
 
+#[derive(Debug)]
 pub enum ConfigSource {
     File { path: PathBuf },
     Url { url: Url, interval: Duration },
@@ -60,6 +71,12 @@ pub struct TonClientBuilder<F> {
     retry_max_delay: Duration,
 }
 
+impl<F: Default> Default for TonClientBuilder<F> {
+    fn default() -> Self {
+        Self::from_config_url(default_ton_config_url(), Duration::from_secs(60))
+    }
+}
+
 impl<F: Default> TonClientBuilder<F> {
     pub fn from_config_path(path: PathBuf) -> Self {
         Self::with_factory_and_source(F::default(), ConfigSource::File { path })
@@ -78,14 +95,8 @@ impl<F: Default> TonClientBuilder<F> {
         )
     }
 
-    pub fn default_config() -> Self {
-        Self::with_factory_and_source(
-            F::default(),
-            ConfigSource::Url {
-                url: default_ton_config_url(),
-                interval: Duration::from_secs(60),
-            },
-        )
+    pub fn from_config_source(config_source: impl Into<ConfigSource>) -> Self {
+        Self::with_factory_and_source(F::default(), config_source.into())
     }
 }
 
@@ -151,12 +162,15 @@ impl<F> TonClientBuilder<F> {
         self
     }
 
-    pub fn build<T>(self) -> anyhow::Result<Client<PoolTransport<T>>>
+    pub fn build(self) -> anyhow::Result<Client<PoolTransport<F>>>
     where
-        F: Service<TonConfig, Response = T, Error = anyhow::Error> + Clone + Send + 'static,
-        F::Future: Send,
-        T: TonService,
+        F: Service<TonConfig, Response: TonService, Error: Send + Sync, Future: Send + Unpin>
+            + Clone
+            + Send
+            + 'static,
+        anyhow::Error: From<F::Error>,
     {
+        tracing::debug!(config_source = ?self.config_source);
         let stream: Pin<Box<dyn Stream<Item = Result<TonConfig, anyhow::Error>> + Send>> =
             match self.config_source {
                 ConfigSource::File { path } => {
@@ -171,15 +185,16 @@ impl<F> TonClientBuilder<F> {
                 }
                 ConfigSource::Config { config } => stream::once(ready(Ok(config))).boxed(),
             };
-        let lite_server_discover = LiteServerDiscoverHandle::new(TonConfig::default(), stream);
+        let lite_server_discover = LiteServerDiscoverHandle::new(stream);
         let factory = self.factory;
-        let client_discover = lite_server_discover.then(move |s| {
-            let factory = factory.clone();
-            async move {
-                match s {
-                    Change::Insert(k, v) => factory.oneshot(v).await.map(|v| Change::Insert(k, v)),
-                    Change::Remove(k) => Ok(Change::Remove(k)),
-                }
+        let client_discover = lite_server_discover.map_ok(move |change| {
+            let mk = ServiceBuilder::new()
+                .rate_limit(1, Duration::from_secs(60))
+                .service(factory.clone());
+
+            match change {
+                Change::Insert(k, config) => Change::Insert(k, Reconnect::new(mk, config)),
+                Change::Remove(k) => Change::Remove(k),
             }
         });
 

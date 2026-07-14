@@ -34,7 +34,7 @@ mod integration {
     use crate::ton::SendRequest;
     use crate::ton::message_service_client::MessageServiceClient;
     use crate::ton::message_service_server::MessageServiceServer;
-    use testcontainers_ton::LocalLiteServer;
+    use testcontainers_ton::{LocalLiteServer, SharedLiteServer};
     use tokio::net::TcpListener;
     use ton_client::TonClientBuilder;
     use tonic::transport::Channel;
@@ -56,8 +56,8 @@ mod integration {
         assert_eq!(status.code(), tonic::Code::Internal);
     }
 
-    async fn setup() -> (LocalLiteServer, MessageServiceClient<Channel>) {
-        let server = LocalLiteServer::new().await.unwrap();
+    async fn setup() -> (SharedLiteServer, MessageServiceClient<Channel>) {
+        let server = LocalLiteServer::shared().await.unwrap();
         let mut client = TonClientBuilder::<MakeTonlibjsonAdapter>::from_config(server.config())
             .build()
             .unwrap();

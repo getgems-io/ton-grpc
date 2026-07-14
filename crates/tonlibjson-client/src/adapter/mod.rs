@@ -23,7 +23,7 @@ use ton_tower::request::{
 use tower::{Service, ServiceExt};
 pub mod make;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct TonlibjsonAdapter {
     inner: TonlibjsonClient,
 }

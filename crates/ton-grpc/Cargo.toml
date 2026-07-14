@@ -1,6 +1,6 @@
 [package]
 name = "ton-grpc"
-version = "0.14.0"
+version = "0.16.1"
 edition = "2024"
 rust-version.workspace = true
 authors = ["Andrei Kostylev <a.kostylev@pm.me>"]
@@ -18,7 +18,7 @@ tonlibjson-client = { path = "../tonlibjson-client" }
 ton-liteserver-client = { path = "../ton-liteserver-client" }
 tokio = { version = "1.52.3", features = ["full"] }
 futures = "0.3.32"
-anyhow = { version = "1.0.102", features = ["backtrace"] }
+anyhow = { version = "1.0.103", features = ["backtrace"] }
 tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 tonic = { version = "0.14.5", features = ["gzip"] }
@@ -27,12 +27,12 @@ tonic-reflection = "0.14.5"
 tonic-health = "0.14.5"
 prost = "0.14.3"
 url = { version = "2.5.7", features = ["serde"] }
-clap = { version = "4.6.0", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive"] }
 humantime = "2.3.0"
 derive-new = "0.7.0"
 tower = "0.5.3"
 similar = "3.1.1"
-metrics-exporter-prometheus = { version = "0.18.1", features = ["http-listener"], default-features = false }
+metrics-exporter-prometheus = { version = "0.18.3", features = ["http-listener"], default-features = false }
 
 [dev-dependencies]
 static_assertions = "1.1.0"

@@ -65,7 +65,7 @@ mod integration {
     #[traced_test]
     #[tokio::test]
     async fn client_connect() -> anyhow::Result<()> {
-        let server = LocalLiteServer::new().await?;
+        let server = LocalLiteServer::shared().await?;
 
         let _ = Client::connect(server.addr(), server.server_key()).await?;
 
@@ -75,7 +75,7 @@ mod integration {
     #[traced_test]
     #[tokio::test]
     async fn client_connect_wrong_key() -> anyhow::Result<()> {
-        let server = LocalLiteServer::new().await?;
+        let server = LocalLiteServer::shared().await?;
         let mut invalid_key: ServerKey = server.server_key();
         invalid_key[0] ^= 1;
 
@@ -93,7 +93,7 @@ mod integration {
     #[traced_test]
     #[tokio::test]
     async fn client_ping() -> anyhow::Result<()> {
-        let server = LocalLiteServer::new().await?;
+        let server = LocalLiteServer::shared().await?;
         let mut client = Client::connect(server.addr(), server.server_key()).await?;
 
         let sent = client.send(ping_packet()).await;

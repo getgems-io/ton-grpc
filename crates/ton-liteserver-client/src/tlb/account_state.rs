@@ -62,26 +62,18 @@ impl<'de> CellDeserialize<'de> for RawStateInit {
         // special:(Maybe TickTock)
         let _special: Option<TickTock> = parser.unpack(())?;
         // code:(Maybe ^Cell)
-        let code = parse_maybe_ref(parser).context("code")?;
+        let code = parser
+            .parse_as::<_, Option<Ref<Same>>>(())
+            .context("code")?;
         // data:(Maybe ^Cell)
-        let data = parse_maybe_ref(parser).context("data")?;
+        let data = parser
+            .parse_as::<_, Option<Ref<Same>>>(())
+            .context("data")?;
         // library:(HashmapE 256 SimpleLib)
         let _library: HashmapE<SimpleLib> =
             parser.parse_as::<_, HashmapE<Same, Same>>((256, (), ()))?;
 
         Ok(RawStateInit { code, data })
-    }
-}
-
-fn parse_maybe_ref<'de>(
-    parser: &mut CellParser<'de>,
-) -> Result<Option<Arc<Cell>>, CellParserError<'de>> {
-    let present: bool = parser.unpack(())?;
-    if present {
-        let cell: Cell = parser.parse_as::<_, Ref>(())?;
-        Ok(Some(Arc::new(cell)))
-    } else {
-        Ok(None)
     }
 }
 

@@ -15,7 +15,7 @@ use toner::ton::{BagOfCellsArgs, BoC, MsgAddress};
 
 #[tokio::test]
 async fn should_get_balance_of_preinstalled_wallet() -> anyhow::Result<()> {
-    let (_server, mut client) = setup().await?;
+    let (_server, mut client) = shared_setup().await?;
     let wallet = wallet_from_mnemonic(GENESIS_MNEMONIC, -1, 42);
     let expected_address = SmartContractAddress::from_str(
         "-1:6744e92c6f71c776fbbcef299e31bf76f39c245cd56f2075b89c6a22026b4131",
@@ -32,40 +32,48 @@ async fn should_get_balance_of_preinstalled_wallet() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn should_get_seqno() -> anyhow::Result<()> {
-    let (_server, client) = setup().await?;
+    let (_server, client) = shared_exclusive_setup().await?;
     let wallet = wallet_from_mnemonic(GENESIS_MNEMONIC, -1, 42);
     let contract = TonContract::new(client, wallet.address());
 
     let seqno = contract.seqno().await?;
+    let repeated = contract.seqno().await?;
 
-    assert_eq!(seqno, 0);
+    assert_eq!(seqno, repeated);
 
     Ok(())
 }
 
 #[tokio::test]
 async fn should_send_ton_between_wallets() -> anyhow::Result<()> {
-    let (_server, mut client) = setup().await?;
+    let (server, mut client) = shared_exclusive_setup().await?;
     let sender_wallet = wallet_from_mnemonic(GENESIS_MNEMONIC, -1, 42);
     let receiver_wallet = wallet_from_mnemonic(VALIDATOR1_MNEMONIC, -1, 42);
     let sender_smc_address = SmartContractAddress::from_str(&sender_wallet.address().to_hex())?;
     let sender_msg_address = MsgAddress::from_str(&sender_wallet.address().to_hex())?;
     let receiver_smc_address = SmartContractAddress::from_str(&receiver_wallet.address().to_hex())?;
-    let contract = TonContract::new(client.clone(), sender_msg_address);
+    let inner = ton_liteserver_client::client::LiteServerClient::connect(
+        server.addr(),
+        server.server_key(),
+    )
+    .await?;
+    let mut authoritative_client =
+        ton_client::Client::new(ton_liteserver_client::LiteServerAdapter::new(inner));
+    let contract = TonContract::new(authoritative_client.clone(), sender_msg_address);
     let seqno = contract.seqno().await?;
-    let sender_balance_before = client
+    let sender_balance_before = authoritative_client
         .get_account_state(&sender_smc_address)
         .await?
         .balance
         .unwrap_or(0);
-    let receiver_balance_before = client
+    let receiver_balance_before = authoritative_client
         .get_account_state(&receiver_smc_address)
         .await?
         .balance
         .unwrap_or(0);
 
     let one_ton: i64 = 1_000_000_000;
-    let expire_at = Utc::now() + chrono::Duration::minutes(3);
+    let expire_at = (Utc::now() + chrono::Duration::minutes(3)).timestamp() as u32;
     let internal_msg = Message::<()>::transfer(
         receiver_wallet.address(),
         toner::ton::currency::ONE_TON.clone(),
@@ -86,12 +94,12 @@ async fn should_send_ton_between_wallets() -> anyhow::Result<()> {
         .await?;
     tokio::time::sleep(Duration::from_secs(5)).await;
 
-    let sender_balance_after = client
+    let sender_balance_after = authoritative_client
         .get_account_state(&sender_smc_address)
         .await?
         .balance
         .unwrap_or(0);
-    let receiver_balance_after = client
+    let receiver_balance_after = authoritative_client
         .get_account_state(&receiver_smc_address)
         .await?
         .balance
@@ -114,7 +122,7 @@ async fn should_send_ton_between_wallets() -> anyhow::Result<()> {
 
 #[tokio::test]
 async fn should_send_ton_between_wallets_via_liteserver_client() -> anyhow::Result<()> {
-    let server = testcontainers_ton::LocalLiteServer::new().await?;
+    let server = testcontainers_ton::LocalLiteServer::shared_exclusive().await?;
     let inner = ton_liteserver_client::client::LiteServerClient::connect(
         server.addr(),
         server.server_key(),
@@ -140,7 +148,7 @@ async fn should_send_ton_between_wallets_via_liteserver_client() -> anyhow::Resu
         .unwrap_or(0);
 
     let one_ton: i64 = 1_000_000_000;
-    let expire_at = Utc::now() + chrono::Duration::minutes(3);
+    let expire_at = (Utc::now() + chrono::Duration::minutes(3)).timestamp() as u32;
     let internal_msg = Message::<()>::transfer(
         receiver_wallet.address(),
         toner::ton::currency::ONE_TON.clone(),
@@ -220,13 +228,28 @@ where
     )
 }
 
-async fn setup() -> anyhow::Result<(
-    testcontainers_ton::LocalLiteServer,
+async fn shared_setup() -> anyhow::Result<(
+    testcontainers_ton::SharedLiteServer,
     ton_client::Client<tonlibjson_client::TonlibjsonAdapter>,
 )> {
     use tower::ServiceExt;
 
-    let server = testcontainers_ton::LocalLiteServer::new().await?;
+    let server = testcontainers_ton::LocalLiteServer::shared().await?;
+    let adapter = tonlibjson_client::MakeTonlibjsonAdapter
+        .oneshot(server.config().clone())
+        .await?;
+    let mut client = ton_client::Client::new(adapter);
+    client.wait_ready().await?;
+    Ok((server, client))
+}
+
+async fn shared_exclusive_setup() -> anyhow::Result<(
+    testcontainers_ton::SharedLiteServer,
+    ton_client::Client<tonlibjson_client::TonlibjsonAdapter>,
+)> {
+    use tower::ServiceExt;
+
+    let server = testcontainers_ton::LocalLiteServer::shared_exclusive().await?;
     let adapter = tonlibjson_client::MakeTonlibjsonAdapter
         .oneshot(server.config().clone())
         .await?;

@@ -1,18 +1,16 @@
 use crate::RequestHandler;
-use crate::actor::Actor;
+use crate::algo::binary_search::{BinarySearch, BlockAvailability};
 use crate::route::discover::last_block::LastBlockDiscoverActorHandle;
 use crate::route::registry::Registry;
 use futures::never::Never;
-use futures::try_join;
 use std::borrow::BorrowMut;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::{MissedTickBehavior, interval};
-use tokio_util::task::AbortOnDropHandle;
-use ton_tower::request::{GetBlockHeader, GetShards, LookUpBlockBySeqno};
+use ton_tower::actor::{AbortOnDropHandle, Actor};
+use ton_tower::request::{GetBlockHeader, GetMasterchainInfo, GetShards, LookUpBlockBySeqno};
 use ton_tower::response::{BlockHeader, BlockIdExt};
 use tower::ServiceExt;
-use tracing::instrument;
 
 #[derive(Clone)]
 pub struct FirstBlockDiscoverActorHandle {
@@ -27,10 +25,10 @@ impl FirstBlockDiscoverActorHandle {
         rx: LastBlockDiscoverActorHandle,
     ) -> Self
     where
-        S: RequestHandler<GetShards>
+        S: RequestHandler<GetMasterchainInfo>
+            + RequestHandler<GetShards>
             + RequestHandler<LookUpBlockBySeqno>
             + RequestHandler<GetBlockHeader>
-            + Clone
             + Send
             + 'static,
     {
@@ -52,10 +50,10 @@ struct FirstBlockDiscover<S> {
 
 impl<S> Actor for FirstBlockDiscover<S>
 where
-    S: RequestHandler<GetShards>
+    S: RequestHandler<GetMasterchainInfo>
+        + RequestHandler<GetShards>
         + RequestHandler<LookUpBlockBySeqno>
         + RequestHandler<GetBlockHeader>
-        + Clone
         + Send
         + 'static,
 {
@@ -86,10 +84,10 @@ where
 
 impl<S> FirstBlockDiscover<S>
 where
-    S: RequestHandler<GetShards>
+    S: RequestHandler<GetMasterchainInfo>
+        + RequestHandler<GetShards>
         + RequestHandler<LookUpBlockBySeqno>
         + RequestHandler<GetBlockHeader>
-        + Clone
         + Send
         + 'static,
 {
@@ -126,120 +124,27 @@ where
             }
         }
 
-        let lhs = self.current.as_ref().map(|n| n.id.seqno + 1);
+        let lhs = self.current.as_ref().map(|n| n.id.seqno);
         let cur = self.current.as_ref().map(|n| n.id.seqno + 32);
-        let (mfb, wfb) = find_first_blocks(self.client.borrow_mut(), &start, lhs, cur).await?;
+        let headers = BlockAvailability::new(&mut self.client)
+            .starting_at(cur.unwrap_or(start.seqno - 200000))
+            .with_tolerance(4)
+            .from(lhs)
+            .to(Some(start.into()))
+            .find()
+            .await?;
+
+        for header in &headers {
+            self.registry.upsert_left(header);
+        }
+
+        let Some(mfb) = headers.into_iter().next() else {
+            return Ok(None);
+        };
 
         metrics::counter!("ton_liteserver_first_seqno", "liteserver_id" => self.id.clone())
             .absolute(mfb.id.seqno as u64);
 
-        self.registry.upsert_left(&mfb);
-        for header in &wfb {
-            self.registry.upsert_left(header);
-        }
-
         Ok(Some(mfb))
     }
-}
-
-#[instrument(skip_all, err, level = "trace")]
-async fn find_first_blocks<S>(
-    client: &mut S,
-    start: &BlockIdExt,
-    lhs: Option<i32>,
-    cur: Option<i32>,
-) -> anyhow::Result<(BlockHeader, Vec<BlockHeader>)>
-where
-    S: RequestHandler<GetShards>
-        + RequestHandler<LookUpBlockBySeqno>
-        + RequestHandler<GetBlockHeader>
-        + Clone
-        + Send
-        + 'static,
-{
-    let length = start.seqno;
-    let mut rhs = length;
-    let mut lhs = lhs.unwrap_or(1);
-    let mut cur = cur.unwrap_or(start.seqno - 200000);
-
-    let workchain = start.workchain;
-    let shard = start.shard;
-
-    let mut block = check_block_available(client, workchain, shard, cur).await;
-    let mut success = None;
-
-    let mut hops = 0;
-
-    while lhs < rhs {
-        if block.is_err() {
-            lhs = cur + 1;
-        } else {
-            rhs = cur;
-        }
-
-        cur = (lhs + rhs) / 2;
-        if cur == 0 {
-            break;
-        }
-
-        block = check_block_available(client, workchain, shard, cur).await;
-        if let Ok(inner) = &block {
-            success = Some(inner.clone());
-        }
-
-        hops += 1;
-    }
-
-    let delta = 4;
-    let (master, work) = match block {
-        Ok(b) => b,
-        Err(e) => match success {
-            Some(b) if b.0.id.seqno - cur <= delta => b,
-            _ => return Err(e),
-        },
-    };
-
-    tracing::trace!(hops = hops, seqno = master.id.seqno, "first seqno");
-
-    Ok((master, work))
-}
-
-// TODO[akostylev0]: remove Clone
-async fn check_block_available<S>(
-    client: &mut S,
-    workchain: i32,
-    shard: i64,
-    seqno: i32,
-) -> anyhow::Result<(BlockHeader, Vec<BlockHeader>)>
-where
-    S: RequestHandler<GetShards>
-        + RequestHandler<LookUpBlockBySeqno>
-        + RequestHandler<GetBlockHeader>
-        + Clone
-        + Send
-        + 'static,
-{
-    let block_id = client
-        .oneshot(LookUpBlockBySeqno {
-            chain: workchain,
-            shard,
-            seqno,
-        })
-        .await?;
-    let shards = client
-        .oneshot(GetShards {
-            block_id: block_id.clone(),
-        })
-        .await?;
-
-    let requests = shards.into_iter().map(|id| {
-        let client = client.clone();
-        client.oneshot(GetBlockHeader { id })
-    });
-
-    // TODO[akostylev0]: use `ServiceExt::call_all`
-    try_join!(
-        client.clone().oneshot(GetBlockHeader { id: block_id }),
-        futures::future::try_join_all(requests)
-    )
 }

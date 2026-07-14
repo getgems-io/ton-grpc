@@ -1,4 +1,3 @@
-use crate::route::Error as RouteError;
 use futures::TryFutureExt;
 use futures::future::MapErr;
 use std::task::{Context, Poll};
@@ -7,8 +6,6 @@ use tower::{Layer, Service};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error(transparent)]
-    Route(#[from] RouteError),
     #[error(transparent)]
     Custom(#[from] anyhow::Error),
     #[error(transparent)]

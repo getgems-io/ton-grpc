@@ -1,4 +1,3 @@
-use crate::actor::Actor;
 use crate::route::discover::shard_header::ShardHeaderActorHandle;
 use crate::route::registry::Registry;
 use crate::{RequestHandler, ShardId, shard_id_of};
@@ -7,7 +6,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio_retry::Retry;
 use tokio_retry::strategy::{FibonacciBackoff, jitter};
-use tokio_util::task::AbortOnDropHandle;
+use ton_tower::actor::{AbortOnDropHandle, Actor};
 use ton_tower::request::{GetBlockHeader, GetShards};
 use ton_tower::response::BlockIdExt;
 use tower::ServiceExt;
@@ -62,7 +61,7 @@ where
         let mut channels: HashMap<ShardId, ShardHeaderActorHandle> = Default::default();
         while let Some(block_id) = self.rx.recv().await {
             let retry_strategy = FibonacciBackoff::from_millis(32).map(jitter).take(8);
-            let shards = Retry::spawn(retry_strategy, || {
+            let shards = Retry::start(retry_strategy, || {
                 let client = self.client.clone();
                 let block_id = block_id.clone();
                 client.oneshot(GetShards { block_id })
