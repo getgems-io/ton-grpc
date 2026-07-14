@@ -171,6 +171,7 @@ fn shared_access_lock() -> Result<File> {
 fn shared_lock(name: &str) -> Result<File> {
     let lock = OpenOptions::new()
         .create(true)
+        .truncate(true)
         .read(true)
         .write(true)
         .open(std::env::temp_dir().join(name))?;

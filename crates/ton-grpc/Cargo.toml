@@ -11,9 +11,9 @@ testnet = ["tonlibjson-client/testnet", "ton-config/testnet"]
 
 [dependencies]
 ton-address = { path = "../ton-address" }
-ton-tower = { path = "../ton-tower" }
 ton-client = { path = "../ton-client" }
 ton-config = { path = "../ton-config" }
+ton-tower = { path = "../ton-tower" }
 tonlibjson-client = { path = "../tonlibjson-client" }
 ton-liteserver-client = { path = "../ton-liteserver-client" }
 tokio = { version = "1.52.3", features = ["full"] }
