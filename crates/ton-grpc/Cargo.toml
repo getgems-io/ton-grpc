@@ -15,6 +15,7 @@ ton-client = { path = "../ton-client" }
 ton-config = { path = "../ton-config" }
 ton-tower = { path = "../ton-tower" }
 tonlibjson-client = { path = "../tonlibjson-client" }
+ton-liteserver-client = { path = "../ton-liteserver-client" }
 tokio = { version = "1.52.3", features = ["full"] }
 futures = "0.3.32"
 anyhow = { version = "1.0.103", features = ["backtrace"] }
@@ -29,14 +30,13 @@ url = { version = "2.5.7", features = ["serde"] }
 clap = { version = "4.6.1", features = ["derive"] }
 humantime = "2.3.0"
 derive-new = "0.7.0"
+tower = "0.5.3"
 metrics-exporter-prometheus = { version = "0.18.3", features = ["http-listener"], default-features = false }
 
 [dev-dependencies]
-tower = "0.5.3"
 tracing-test = "0.2.6"
 testcontainers-ton = { path = "../testcontainers-ton" }
 tokio-stream = { version = "0.1", features = ["net"] }
-ton-liteserver-client = { path = "../ton-liteserver-client" }
 
 [build-dependencies]
 tonic-prost-build = "0.14.5"
