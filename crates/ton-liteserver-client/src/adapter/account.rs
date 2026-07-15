@@ -118,34 +118,6 @@ async fn fetch_account_state_raw(
         .map_err(|e| anyhow!(e))
 }
 
-pub(super) async fn get_emulator_state_inner(
-    client: &LiteServerClient,
-    address: &SmartContractAddress,
-    block_id: TonNodeBlockIdExt,
-) -> anyhow::Result<(Arc<Cell>, Arc<Cell>)> {
-    let response = fetch_account_state_raw(client, address, block_id).await?;
-    verify_account_proofs(&response)?;
-    let account = BoC::deserialize(&response.state)?
-        .single_root()
-        .ok_or_else(|| anyhow!("account state: single root expected"))?
-        .parse_fully::<Account>(())?;
-
-    let Account::Account { storage, .. } = account else {
-        return Err(anyhow!("cannot run get method for a missing account"));
-    };
-    let TlbAccountState::Active { state_init } = storage.state else {
-        return Err(anyhow!("cannot run get method for an inactive account"));
-    };
-    let code = state_init
-        .code
-        .ok_or_else(|| anyhow!("active account has no code"))?;
-    let data = state_init
-        .data
-        .ok_or_else(|| anyhow!("active account has no data"))?;
-
-    Ok((code, data))
-}
-
 pub(super) async fn lookup_block_by_transaction(
     client: &LiteServerClient,
     mc_last: TonNodeBlockIdExt,

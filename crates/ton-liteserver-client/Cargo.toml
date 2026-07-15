@@ -19,7 +19,6 @@ ton-config = { path = "../ton-config" }
 toner = { workspace = true }
 toner-tlb-macros = { path = "../toner-tlb-macros" }
 ton-address = { path = "../ton-address" }
-ton-emulator = { path = "../ton-emulator" }
 anyhow = { version = "1.0.103", features = ["backtrace"] }
 tokio = { version = "1.52.3", features = ["full"] }
 tokio-util = { version = "0.7.18", features = ["codec"] }
@@ -44,4 +43,4 @@ testcontainers-ton = { path = "../testcontainers-ton" }
 rstest = "0.26.1"
 
 [features]
-testnet = ["ton-emulator/testnet"]
+testnet = []
