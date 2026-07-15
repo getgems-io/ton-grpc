@@ -5,7 +5,7 @@ edition = "2024"
 rust-version.workspace = true
 
 [dependencies]
-anyhow = { version = "1.0.103", features = ["backtrace"] }
+thiserror = "2.0.17"
 tonlibjson-sys = { path = "../tonlibjson-sys" }
 tracing = "0.1.44"
 

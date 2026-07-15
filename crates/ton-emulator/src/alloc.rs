@@ -1,7 +1,5 @@
-use anyhow::Result;
-use std::ffi::CStr;
-// Native character type used by the allocation boundary.
-use std::ffi::c_char;
+use crate::error::{Error, Result};
+use std::ffi::{CStr, c_char};
 use std::ptr::NonNull;
 use tonlibjson_sys::tonemulator as ffi;
 
@@ -24,8 +22,7 @@ impl Drop for TvmAllocation {
 }
 
 pub(crate) fn non_null(pointer: *const c_char) -> Result<NonNull<c_char>> {
-    NonNull::new(pointer.cast_mut())
-        .ok_or_else(|| anyhow::anyhow!("emulator returned a null pointer"))
+    NonNull::new(pointer.cast_mut()).ok_or(Error::NativeCallFailed)
 }
 
 pub struct TvmString {
@@ -55,7 +52,7 @@ impl TvmString {
         }
     }
 
-    pub(crate) unsafe fn from_raw(pointer: NonNull<c_char>) -> Result<Self, std::str::Utf8Error> {
+    pub(crate) unsafe fn from_raw(pointer: NonNull<c_char>) -> Result<Self> {
         let allocation = unsafe { TvmAllocation::from_raw(pointer) };
         let len = unsafe { CStr::from_ptr(pointer.as_ptr()) }.to_bytes().len();
         std::str::from_utf8(unsafe { std::slice::from_raw_parts(pointer.as_ptr().cast(), len) })?;

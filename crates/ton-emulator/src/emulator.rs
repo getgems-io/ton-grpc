@@ -1,8 +1,6 @@
 use crate::alloc::{TvmBuffer, TvmString};
-use anyhow::Result;
-use std::ffi::CString;
-// Raw C types used by the emulator calls.
-use std::ffi::{c_char, c_void};
+use crate::error::{Error, Result};
+use std::ffi::{CString, c_char, c_void};
 use tonlibjson_sys::tonemulator as ffi;
 
 #[derive(Debug)]
@@ -17,7 +15,7 @@ impl TransactionEmulator {
         let pointer =
             unsafe { ffi::transaction_emulator_create(config_boc.as_ptr(), vm_log_verbosity) };
         if pointer.is_null() {
-            return Err(anyhow::anyhow!("pointer is null"));
+            return Err(Error::NativeCallFailed);
         }
 
         Ok(Self { pointer })
@@ -33,7 +31,7 @@ impl TransactionEmulator {
                 shard_account_boc.as_ptr(),
                 message_boc.as_ptr(),
             );
-            Ok(TvmString::from_raw(crate::alloc::non_null(ptr)?)?)
+            TvmString::from_raw(crate::alloc::non_null(ptr)?)
         }
     }
 
@@ -83,8 +81,9 @@ pub struct TvmEmulator {
 
 impl TvmEmulator {
     pub fn run_get_method_once(params_boc: &[u8], gas_limit: i64) -> Result<TvmBuffer> {
-        let len = u32::try_from(params_boc.len())
-            .map_err(|_| anyhow::anyhow!("params BoC is too large"))?;
+        let len = u32::try_from(params_boc.len()).map_err(|_| Error::ParamsBocTooLarge {
+            len: params_boc.len(),
+        })?;
 
         unsafe {
             let pointer = ffi::tvm_emulator_emulate_run_method(
@@ -107,7 +106,7 @@ impl TvmEmulator {
         let pointer =
             unsafe { ffi::tvm_emulator_create(code.as_ptr(), data.as_ptr(), vm_log_verbosity) };
         if pointer.is_null() {
-            return Err(anyhow::anyhow!("pointer is null"));
+            return Err(Error::NativeCallFailed);
         }
 
         Ok(Self { pointer })
@@ -152,7 +151,7 @@ impl TvmEmulator {
 
         unsafe {
             let ptr = ffi::tvm_emulator_run_get_method(self.pointer, method_id, stack_boc.as_ptr());
-            Ok(TvmString::from_raw(crate::alloc::non_null(ptr)?)?)
+            TvmString::from_raw(crate::alloc::non_null(ptr)?)
         }
     }
 
@@ -162,7 +161,7 @@ impl TvmEmulator {
         unsafe {
             let ptr =
                 ffi::tvm_emulator_send_external_message(self.pointer, message_body_boc.as_ptr());
-            Ok(TvmString::from_raw(crate::alloc::non_null(ptr)?)?)
+            TvmString::from_raw(crate::alloc::non_null(ptr)?)
         }
     }
 
@@ -175,7 +174,7 @@ impl TvmEmulator {
                 message_body_boc.as_ptr(),
                 amount,
             );
-            Ok(TvmString::from_raw(crate::alloc::non_null(ptr)?)?)
+            TvmString::from_raw(crate::alloc::non_null(ptr)?)
         }
     }
 }
@@ -189,6 +188,14 @@ impl Drop for TvmEmulator {
 #[cfg(test)]
 mod tests {
     use super::{TransactionEmulator, TvmEmulator};
+    use crate::error::Error;
+
+    #[test]
+    fn tvm_emulator_rejects_interior_nul() {
+        let result = TvmEmulator::new("bad\0code", "data", 0);
+
+        assert!(matches!(result, Err(Error::InvalidCString(_))));
+    }
 
     #[test]
     fn tvm_string_len_matches_payload() {
@@ -229,8 +236,7 @@ mod tests {
 
         let p = TvmEmulator::new(code, data, 1);
 
-        assert!(p.is_err());
-        assert_eq!(p.unwrap_err().to_string(), "pointer is null");
+        assert!(matches!(p, Err(Error::NativeCallFailed)));
     }
 
     #[test]
@@ -298,10 +304,6 @@ mod tests {
 
         let result = TvmEmulator::run_get_method_once(params, gas_limit);
 
-        assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "emulator returned a null pointer"
-        );
+        assert!(matches!(result, Err(Error::NativeCallFailed)));
     }
 }
