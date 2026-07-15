@@ -1,4 +1,5 @@
-pub use tonlibjson_sys::TransactionEmulator;
-pub use tonlibjson_sys::TvmBuffer;
-pub use tonlibjson_sys::TvmEmulator;
-pub use tonlibjson_sys::TvmString;
+mod alloc;
+mod emulator;
+
+pub use self::alloc::{TvmBuffer, TvmString};
+pub use self::emulator::{TransactionEmulator, TvmEmulator};
