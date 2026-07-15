@@ -22,7 +22,7 @@ impl Drop for TvmAllocation {
 }
 
 pub(crate) fn non_null(pointer: *const c_char) -> Result<NonNull<c_char>> {
-    NonNull::new(pointer.cast_mut()).ok_or(Error::NativeCallFailed)
+    NonNull::new(pointer.cast_mut()).ok_or(Error::Ffi)
 }
 
 pub struct TvmString {

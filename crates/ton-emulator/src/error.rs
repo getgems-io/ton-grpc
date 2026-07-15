@@ -3,8 +3,8 @@ pub enum Error {
     #[error("input contains an interior NUL byte")]
     InvalidCString(#[from] std::ffi::NulError),
 
-    #[error("native emulator call failed")]
-    NativeCallFailed,
+    #[error("emulator FFI call failed")]
+    Ffi,
 
     #[error("native emulator returned invalid UTF-8")]
     InvalidUtf8(#[from] std::str::Utf8Error),

@@ -15,7 +15,7 @@ impl TransactionEmulator {
         let pointer =
             unsafe { ffi::transaction_emulator_create(config_boc.as_ptr(), vm_log_verbosity) };
         if pointer.is_null() {
-            return Err(Error::NativeCallFailed);
+            return Err(Error::Ffi);
         }
 
         Ok(Self { pointer })
@@ -106,7 +106,7 @@ impl TvmEmulator {
         let pointer =
             unsafe { ffi::tvm_emulator_create(code.as_ptr(), data.as_ptr(), vm_log_verbosity) };
         if pointer.is_null() {
-            return Err(Error::NativeCallFailed);
+            return Err(Error::Ffi);
         }
 
         Ok(Self { pointer })
@@ -236,7 +236,7 @@ mod tests {
 
         let p = TvmEmulator::new(code, data, 1);
 
-        assert!(matches!(p, Err(Error::NativeCallFailed)));
+        assert!(matches!(p, Err(Error::Ffi)));
     }
 
     #[test]
@@ -304,6 +304,6 @@ mod tests {
 
         let result = TvmEmulator::run_get_method_once(params, gas_limit);
 
-        assert!(matches!(result, Err(Error::NativeCallFailed)));
+        assert!(matches!(result, Err(Error::Ffi)));
     }
 }
