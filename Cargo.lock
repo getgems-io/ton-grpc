@@ -3657,6 +3657,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-emulator"
+version = "0.1.0"
+dependencies = [
+ "tonlibjson-sys",
+]
+
+[[package]]
 name = "ton-grpc"
 version = "0.17.0"
 dependencies = [
@@ -3716,6 +3723,7 @@ dependencies = [
  "tokio-util",
  "ton-address",
  "ton-config",
+ "ton-emulator",
  "ton-tower",
  "toner",
  "toner-tlb-macros",
@@ -3900,7 +3908,6 @@ dependencies = [
  "anyhow",
  "cc",
  "cmake",
- "libc",
  "pkg-config",
  "static_assertions",
  "tracing",
@@ -4075,12 +4082,12 @@ dependencies = [
  "serde_json",
  "tokio",
  "tokio-stream",
+ "ton-emulator",
  "tonic",
  "tonic-health",
  "tonic-prost",
  "tonic-prost-build",
  "tonic-reflection",
- "tonlibjson-sys",
  "tracing",
  "tracing-subscriber",
  "uuid",

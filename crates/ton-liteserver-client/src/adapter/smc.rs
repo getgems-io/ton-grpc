@@ -1,3 +1,4 @@
+use crate::adapter::account::get_emulator_state_inner;
 use crate::client::LiteServerClient;
 use crate::tl::{Int31, LiteServerAccountId, LiteServerRunSmcMethod, TonNodeBlockIdExt};
 use crate::tlb::vm_stack::{VmCellSlice, VmStack, VmStackValue, VmStkTuple};
@@ -9,21 +10,17 @@ use num_bigint::BigUint;
 use std::str::FromStr;
 use ton_address::SmartContractAddress;
 use ton_tower::response::{SmcRunResult, StackEntry};
+use toner::tlb::bits::NBits;
+use toner::tlb::bits::de::BitReaderExt;
+use toner::tlb::bits::ser::BitWriterExt;
 use toner::tlb::ser::CellSerializeExt;
-use toner::tlb::{BagOfCellsArgs, BoC};
+use toner::tlb::{BagOfCellsArgs, BoC, Ref};
 use tower::ServiceExt;
 
-// `mode.2` -> include `result` (serialized VM stack) in the response.
-// We do not request any proofs (`mode.0`/`mode.1`) or auxiliary VM context
-// (`mode.3` init_c7, `mode.4` lib_extras) here. Proof verification can be added
-// later, analogous to `verify_account_proofs` in `account.rs`.
-const RUN_METHOD_MODE_RESULT: Int31 = 0x4;
-
-// liteServer.runSmcMethod does not expose VM gas usage. tonlibjson's
-// `smc.runResult` carries `gas_used` because it runs the VM locally; the
-// liteServer also runs it but returns only `exit_code` + `result`.
-// TODO[smc]: populate `gas_used` if/when an emulator path is integrated.
-pub(super) const GAS_USED_PLACEHOLDER: i64 = 0;
+// Request the result and the complete c7 tuple used by the lite server. The
+// latter lets libemulator repeat the execution with identical VM context.
+const RUN_METHOD_MODE_RESULT_WITH_FULL_CONTEXT: Int31 = 0x4 | 0x8 | 0x10 | 0x20;
+const GET_METHOD_GAS_LIMIT: i64 = 10_000_000;
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -45,30 +42,99 @@ pub(super) async fn run_get_method_inner(
     let method_id = method_id_from_name(method);
     let params = encode_input_stack(stack)?;
 
-    let response = client
-        .oneshot(LiteServerRunSmcMethod {
-            mode: RUN_METHOD_MODE_RESULT,
-            id: block_id,
-            account,
-            method_id,
-            params,
-        })
-        .await
-        .map_err(|e| anyhow!(e))?;
+    let run_method = client.clone().oneshot(LiteServerRunSmcMethod {
+        mode: RUN_METHOD_MODE_RESULT_WITH_FULL_CONTEXT,
+        id: block_id.clone(),
+        account,
+        method_id,
+        params: params.clone(),
+    });
+    let account_state = get_emulator_state_inner(&client, &address, block_id);
+    let (response, (code, data)) = tokio::try_join!(
+        async { run_method.await.map_err(|e| anyhow!(e)) },
+        account_state,
+    )?;
 
     // TODO[smc]: verify shard_proof/proof/state_proof bind to block_id when the mode
     // includes bits 0/1. Mirrors `verify_account_proofs` in adapter/account.rs.
 
+    let (emulator_exit_code, gas_used) = emulate_get_method(
+        &code,
+        &data,
+        &params,
+        response
+            .init_c_7
+            .as_deref()
+            .ok_or_else(|| anyhow!("lite server omitted requested init_c7"))?,
+        response.lib_extras.as_deref().unwrap_or_default(),
+        method_id,
+    )?;
+    if emulator_exit_code != response.exit_code {
+        return Err(anyhow!(
+            "emulator exit code {emulator_exit_code} differs from lite server exit code {}",
+            response.exit_code
+        ));
+    }
     let stack = match response.result.as_deref() {
         Some(bytes) if !bytes.is_empty() => decode_result_stack(bytes)?,
         _ => Vec::new(),
     };
 
     Ok(SmcRunResult {
-        gas_used: GAS_USED_PLACEHOLDER,
+        gas_used,
         exit_code: response.exit_code,
         stack,
     })
+}
+
+fn emulate_get_method(
+    code: &toner::tlb::Cell,
+    data: &toner::tlb::Cell,
+    stack_boc: &[u8],
+    c7_boc: &[u8],
+    libraries_boc: &[u8],
+    method_id: i64,
+) -> Result<(i32, i64)> {
+    let stack = decode_boc_root(stack_boc, "input stack")?;
+    let c7_value: VmStackValue = decode_boc_root(c7_boc, "init_c7")?
+        .parse_fully(())
+        .map_err(|e| anyhow!("init_c7: parse VmStackValue: {e}"))?;
+    let c7 = VmStack(vec![c7_value])
+        .to_cell(())
+        .map_err(|e| anyhow!("init_c7: serialize VmStack: {e}"))?;
+    let libraries = if libraries_boc.is_empty() {
+        toner::tlb::Cell::new()
+    } else {
+        decode_boc_root(libraries_boc, "libraries")?
+    };
+    let method_id = i32::try_from(method_id).map_err(|_| anyhow!("method id exceeds i32"))?;
+
+    let mut context = toner::tlb::Cell::builder();
+    context
+        .store_as::<_, Ref>(c7, ())?
+        .store_as::<_, Ref>(libraries, ())?;
+    let mut request = toner::tlb::Cell::builder();
+    request
+        .store_as::<_, Ref>(code, ())?
+        .store_as::<_, Ref>(data, ())?
+        .store_as::<_, Ref>(stack, ())?
+        .store_as::<_, Ref>(context.into_cell(), ())?
+        .pack_as::<_, NBits<32>>(method_id, ())?;
+    let request = BoC::from_root(request.into_cell()).serialize(BagOfCellsArgs::default())?;
+    let response = ton_emulator::TvmEmulator::run_get_method_once(&request, GET_METHOD_GAS_LIMIT)?;
+    let root = decode_boc_root(response.as_ref(), "emulator result")?;
+    let mut parser = root.parser();
+    let exit_code: i32 = parser.unpack_as::<_, NBits<32>>(())?;
+    let gas_used: i64 = parser.unpack_as::<_, NBits<64>>(())?;
+
+    Ok((exit_code, gas_used))
+}
+
+fn decode_boc_root(bytes: &[u8], name: &str) -> Result<toner::tlb::Cell> {
+    BoC::deserialize(bytes)?
+        .single_root()
+        .map(|cell| (**cell).clone())
+        .ok_or_else(|| anyhow!("{name}: BoC must have exactly one root"))
 }
 
 fn encode_input_stack(stack: Vec<StackEntry>) -> Result<Vec<u8>> {
@@ -246,6 +312,11 @@ mod tests {
 
         assert!(format!("{err}").contains(msg_contains));
     }
+
+    #[test]
+    fn full_context_mode_requests_result_c7_and_libraries() {
+        assert_eq!(RUN_METHOD_MODE_RESULT_WITH_FULL_CONTEXT, 0x3c);
+    }
 }
 
 #[cfg(test)]
@@ -264,14 +335,14 @@ mod integration {
 
     #[rstest]
     #[case::seqno("seqno", SmcRunResult {
-        gas_used: GAS_USED_PLACEHOLDER,
+        gas_used: 549,
         exit_code: 0,
         stack: vec![StackEntry::Number {
             number: "0".to_string()
         }]
     })]
     #[case::unknown_method("definitely_not_a_method_xyz", SmcRunResult {
-        gas_used: 0,
+        gas_used: 328,
         exit_code: 32,
         stack: vec![StackEntry::Number {
             number: "0".to_string()
@@ -279,7 +350,7 @@ mod integration {
     })]
     // public key is "880db994b01ecd06fccc6099bf094997e94f5ada0f31f5604148f098ca037402"
     #[case::public_key("get_public_key", SmcRunResult {
-        gas_used: 0,
+        gas_used: 549,
         exit_code: 0,
         stack: vec![StackEntry::Number {
             number: "61538797250860244891658288584886086813375283594678556485491459892974908044290".to_string()
