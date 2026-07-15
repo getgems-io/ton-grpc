@@ -31,24 +31,20 @@ pub struct TvmString {
 }
 
 impl TvmString {
-    #[must_use]
     pub const fn len(&self) -> usize {
         self.len
     }
 
-    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
 
     pub const fn as_str(&self) -> &str {
-        let str = std::str::from_utf8(unsafe {
-            std::slice::from_raw_parts(self.allocation.as_ptr().cast(), self.len)
-        });
-
-        match str {
-            Ok(str) => str,
-            Err(_) => panic!("unreachable"),
+        unsafe {
+            std::str::from_utf8_unchecked(std::slice::from_raw_parts(
+                self.allocation.as_ptr().cast(),
+                self.len,
+            ))
         }
     }
 
@@ -79,12 +75,10 @@ pub struct TvmBuffer {
 }
 
 impl TvmBuffer {
-    #[must_use]
     pub const fn len(&self) -> usize {
         self.len
     }
 
-    #[must_use]
     pub const fn is_empty(&self) -> bool {
         self.len == 0
     }
