@@ -155,12 +155,17 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
     ) -> Result<Response<crate::tvm::RunGetMethodResponse>, Status> {
         let req = request.into_inner();
 
-        let result = ton_emulator::TvmEmulator::run_get_method_once(&req.params_boc, req.gas_limit)
-            .map_err(|e| Status::internal(e.to_string()))?;
+        let result = ton_emulator::TvmEmulator::run_get_method_once(
+            req.params_boc.as_bytes(),
+            req.gas_limit,
+        )
+        .map_err(|e| Status::internal(e.to_string()))?;
+        let result = result
+            .as_str()
+            .map_err(|e| Status::internal(e.to_string()))?
+            .to_owned();
 
-        Ok(Response::new(crate::tvm::RunGetMethodResponse {
-            result: result.as_ref().to_vec(),
-        }))
+        Ok(Response::new(crate::tvm::RunGetMethodResponse { result }))
     }
 }
 

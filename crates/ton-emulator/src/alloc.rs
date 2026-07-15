@@ -89,6 +89,10 @@ impl TvmBuffer {
         self.len == 0
     }
 
+    pub fn as_str(&self) -> std::result::Result<&str, std::str::Utf8Error> {
+        std::str::from_utf8(self.as_ref())
+    }
+
     pub(crate) unsafe fn from_raw(pointer: NonNull<c_char>) -> Self {
         let allocation = unsafe { TvmAllocation::from_raw(pointer) };
         let len = unsafe {
