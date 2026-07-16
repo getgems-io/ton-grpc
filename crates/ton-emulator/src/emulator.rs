@@ -80,7 +80,8 @@ pub struct TvmEmulator {
 }
 
 impl TvmEmulator {
-    pub fn run_get_method_once(params_boc: &[u8], gas_limit: i64) -> Result<TvmBuffer> {
+    pub fn run_get_method_once(params_boc: impl AsRef<[u8]>, gas_limit: i64) -> Result<TvmBuffer> {
+        let params_boc = params_boc.as_ref();
         let len = u32::try_from(params_boc.len()).map_err(|_| Error::ParamsBocTooLarge {
             len: params_boc.len(),
         })?;
