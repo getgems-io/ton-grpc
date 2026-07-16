@@ -18,6 +18,7 @@ pub mod global_version;
 mod hash_update;
 mod in_msg;
 mod in_msg_descr;
+pub mod mc_state_extra;
 pub mod merkle_proof;
 pub mod merkle_update;
 pub mod msg_address_int;

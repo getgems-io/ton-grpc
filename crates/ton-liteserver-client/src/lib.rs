@@ -1,4 +1,5 @@
 pub mod adapter;
+pub mod api;
 pub mod client;
 pub mod make;
 pub mod tl;
