@@ -1,0 +1,15 @@
+[package]
+name = "ton-emulator"
+version = "0.1.0"
+edition = "2024"
+rust-version.workspace = true
+
+[dependencies]
+thiserror = "2.0.17"
+tonlibjson-sys = { path = "../tonlibjson-sys" }
+tracing = "0.1.44"
+
+[features]
+default = []
+testnet = ["tonlibjson-sys/testnet"]
+bundled = ["tonlibjson-sys/bundled"]

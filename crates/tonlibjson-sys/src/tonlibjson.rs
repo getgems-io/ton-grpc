@@ -1,7 +1,7 @@
-use anyhow::{Result, anyhow};
-use libc::{c_char, c_double, c_int};
+use anyhow::Result;
+use std::ffi::{c_char, c_double, c_int, c_void};
 use std::{
-    ffi::{CStr, CString, c_void},
+    ffi::{CStr, CString},
     marker::PhantomData,
     mem::ManuallyDrop,
     ptr::NonNull,
@@ -85,7 +85,7 @@ impl Client {
         let response = unsafe {
             let ptr = tonlib_client_json_execute(self.pointer.as_ptr(), req.into_raw());
             if ptr.is_null() {
-                return Err(anyhow!("null received"));
+                return Err(anyhow::anyhow!("null received"));
             }
 
             CStr::from_ptr(ptr)
@@ -121,7 +121,7 @@ impl Sender {
     pub fn send(&self, request: &str) -> Result<()> {
         self.raw
             .upgrade()
-            .ok_or_else(|| anyhow!("client closed"))?
+            .ok_or_else(|| anyhow::anyhow!("client closed"))?
             .send(request)
     }
 }
@@ -162,7 +162,7 @@ impl ReceiverBuilder {
 
 #[cfg(test)]
 mod tests {
-    use crate::tonlibjson::{Client, td_clear_thread_locals};
+    use crate::tonlibjson::Client;
     use crate::{Receiver, ReceiverBuilder, Sender};
     use static_assertions::{assert_impl_all, assert_not_impl_all};
     use std::assert_matches;
@@ -212,7 +212,7 @@ mod tests {
 
     #[test]
     fn clear_thread_locals() {
-        unsafe { td_clear_thread_locals() }
+        unsafe { crate::tonlibjson::td_clear_thread_locals() }
     }
 
     #[test]

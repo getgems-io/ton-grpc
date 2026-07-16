@@ -11,9 +11,9 @@ use crate::tvm_emulator::TvmEmulatorService;
 use clap::Parser;
 use std::net::SocketAddr;
 use std::time::Duration;
+use ton_emulator::TvmEmulator;
 use tonic::codec::CompressionEncoding::Gzip;
 use tonic::transport::Server;
-use tonlibjson_sys::TvmEmulator;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::fmt::format::FmtSpan;
 

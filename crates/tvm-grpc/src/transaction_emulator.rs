@@ -36,7 +36,7 @@ pub struct TransactionEmulatorService {
 
 #[derive(Default)]
 struct State {
-    emulator: Option<tonlibjson_sys::TransactionEmulator>,
+    emulator: Option<ton_emulator::TransactionEmulator>,
 }
 
 fn lru_cache() -> &'static Cache<String, Arc<String>> {
@@ -165,7 +165,7 @@ fn prepare(
         Arc::new(req.config_boc)
     };
 
-    let emulator = tonlibjson_sys::TransactionEmulator::new(&config, req.vm_log_level)
+    let emulator = ton_emulator::TransactionEmulator::new(&config, req.vm_log_level)
         .map_err(|e| Status::internal(e.to_string()))?;
 
     let _ = state.emulator.replace(emulator);
@@ -184,10 +184,11 @@ fn emulate(
     let response = emu
         .emulate(&req.shard_account_boc, &req.message_boc)
         .map_err(|e| Status::internal(e.to_string()))?;
+    let response = response.as_ref();
 
     tracing::trace!(method = "emulate", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TransactionEmulatorEmulateResponse>>(&response)
+    let response = serde_json::from_str::<TvmResult<TransactionEmulatorEmulateResponse>>(response)
         .map_err(|e| Status::internal(e.to_string()))?;
 
     response.into()

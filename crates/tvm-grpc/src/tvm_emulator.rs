@@ -28,7 +28,6 @@ use std::time::Duration;
 use tokio::sync::mpsc::UnboundedSender;
 use tokio_stream::StreamExt;
 use tonic::{Request, Response, Status, Streaming, async_trait};
-use tonlibjson_sys::emulate_run_method;
 use tracing::instrument;
 
 #[derive(Debug)]
@@ -90,7 +89,7 @@ impl Default for TvmEmulatorService {
 
 #[derive(Default)]
 struct State {
-    emulator: Option<tonlibjson_sys::TvmEmulator>,
+    emulator: Option<ton_emulator::TvmEmulator>,
 }
 
 fn lru_cache() -> &'static Cache<String, Arc<String>> {
@@ -156,8 +155,12 @@ impl BaseTvmEmulatorService for TvmEmulatorService {
     ) -> Result<Response<crate::tvm::RunGetMethodResponse>, Status> {
         let req = request.into_inner();
 
-        let result = emulate_run_method(&req.params_boc, req.gas_limit)
+        let result = ton_emulator::TvmEmulator::run_get_method_once(req.params_boc, req.gas_limit)
             .map_err(|e| Status::internal(e.to_string()))?;
+        let result = result
+            .as_str()
+            .map_err(|e| Status::internal(e.to_string()))?
+            .to_owned();
 
         Ok(Response::new(crate::tvm::RunGetMethodResponse { result }))
     }
@@ -168,7 +171,7 @@ fn prepare_emu(
     req: TvmEmulatorPrepareRequest,
 ) -> Result<TvmEmulatorPrepareResponse, Status> {
     let emulator =
-        tonlibjson_sys::TvmEmulator::new(&req.code_boc, &req.data_boc, req.vm_log_verbosity)
+        ton_emulator::TvmEmulator::new(&req.code_boc, &req.data_boc, req.vm_log_verbosity)
             .map_err(|e| Status::internal(e.to_string()))?;
 
     state.emulator.replace(emulator);
@@ -187,9 +190,10 @@ fn run_get_method(
     let response = emu
         .run_get_method(req.method_id, &req.stack_boc)
         .map_err(|e| Status::internal(e.to_string()))?;
+    let response = response.as_ref();
     tracing::trace!(method = "run_get_method", "{}", response);
 
-    let response = serde_json::from_str::<TvmResult<TvmEmulatorRunGetMethodResponse>>(&response)
+    let response = serde_json::from_str::<TvmResult<TvmEmulatorRunGetMethodResponse>>(response)
         .map_err(|e| Status::internal(e.to_string()))?;
 
     response.into()
@@ -206,10 +210,11 @@ fn send_external_message(
     let response = emu
         .send_external_message(&req.message_body_boc)
         .map_err(|e| Status::internal(e.to_string()))?;
+    let response = response.as_ref();
     tracing::trace!(method = "send_external_message", "{}", response);
 
     let response =
-        serde_json::from_str::<TvmResult<TvmEmulatorSendExternalMessageResponse>>(&response)
+        serde_json::from_str::<TvmResult<TvmEmulatorSendExternalMessageResponse>>(response)
             .map_err(|e| Status::internal(e.to_string()))?;
 
     response.into()
@@ -226,10 +231,11 @@ fn send_internal_message(
     let response = emu
         .send_internal_message(&req.message_body_boc, req.amount)
         .map_err(|e| Status::internal(e.to_string()))?;
+    let response = response.as_ref();
     tracing::trace!(method = "send_internal_message", "{}", response);
 
     let response =
-        serde_json::from_str::<TvmResult<TvmEmulatorSendInternalMessageResponse>>(&response)
+        serde_json::from_str::<TvmResult<TvmEmulatorSendInternalMessageResponse>>(response)
             .map_err(|e| Status::internal(e.to_string()))?;
 
     response.into()
