@@ -146,6 +146,20 @@ impl TvmEmulator {
         })
     }
 
+    pub fn set_extra_currencies(&self, extra_currencies: &str) -> Result<bool> {
+        let extra_currencies = CString::new(extra_currencies)?;
+
+        Ok(unsafe {
+            ffi::tvm_emulator_set_extra_currencies(self.pointer, extra_currencies.as_ptr())
+        })
+    }
+
+    pub fn set_prev_blocks_info(&self, info_boc: &str) -> Result<bool> {
+        let info_boc = CString::new(info_boc)?;
+
+        Ok(unsafe { ffi::tvm_emulator_set_prev_blocks_info(self.pointer, info_boc.as_ptr()) })
+    }
+
     pub fn run_get_method(&self, method_id: i32, stack_boc: &str) -> Result<TvmString> {
         let stack_boc = CString::new(stack_boc)?;
 
@@ -195,6 +209,42 @@ mod tests {
         let result = TvmEmulator::new("bad\0code", "data", 0);
 
         assert!(matches!(result, Err(Error::InvalidCString(_))));
+    }
+
+    #[test]
+    fn tvm_emulator_extra_currencies_rejects_interior_nul() {
+        let emulator = test_tvm_emulator();
+
+        let result = emulator.set_extra_currencies("1=100\0 2=200");
+
+        assert!(matches!(result, Err(Error::InvalidCString(_))));
+    }
+
+    #[test]
+    fn tvm_emulator_sets_empty_extra_currencies() {
+        let emulator = test_tvm_emulator();
+
+        let result = emulator.set_extra_currencies("").unwrap();
+
+        assert!(result);
+    }
+
+    #[test]
+    fn tvm_emulator_prev_blocks_info_rejects_interior_nul() {
+        let emulator = test_tvm_emulator();
+
+        let result = emulator.set_prev_blocks_info("invalid\0boc");
+
+        assert!(matches!(result, Err(Error::InvalidCString(_))));
+    }
+
+    #[test]
+    fn tvm_emulator_rejects_invalid_prev_blocks_info() {
+        let emulator = test_tvm_emulator();
+
+        let result = emulator.set_prev_blocks_info("invalid boc").unwrap();
+
+        assert!(!result);
     }
 
     #[test]
@@ -305,5 +355,12 @@ mod tests {
         let result = TvmEmulator::run_get_method_once(params, gas_limit);
 
         assert!(matches!(result, Err(Error::Ffi)));
+    }
+
+    fn test_tvm_emulator() -> TvmEmulator {
+        let code = "te6cckEBBAEAIAABFP8A9KQT9LzyyAsBAgFiAwIAEaE2DeWGEwIGEwAC0EJ6zz0=";
+        let data = "te6cckEBAQEAAgAAAEysuc0=";
+
+        TvmEmulator::new(code, data, 0).unwrap()
     }
 }

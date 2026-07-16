@@ -48,6 +48,13 @@ unsafe extern "C" {
         config: *const c_char,
     ) -> bool;
 
+    pub fn tvm_emulator_set_extra_currencies(
+        p: *mut c_void,
+        extra_currencies: *const c_char,
+    ) -> bool;
+
+    pub fn tvm_emulator_set_prev_blocks_info(p: *mut c_void, info_boc: *const c_char) -> bool;
+
     pub fn tvm_emulator_run_get_method(
         p: *mut c_void,
         method_id: c_int,
