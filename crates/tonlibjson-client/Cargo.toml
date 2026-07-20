@@ -34,7 +34,7 @@ tl-parser = { path = "../tl-parser" }
 anyhow = { version = "1.0.103", features = ["backtrace"] }
 quote = "1.0.45"
 syn = "2.0.117"
-prettyplease = "0.2.37"
+prettyplease = "0.3.0"
 convert_case = "0.11.0"
 
 [features]
