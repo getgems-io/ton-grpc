@@ -1,3 +1,4 @@
+use crate::tlb::mc_state_extra::McStateExtra;
 use crate::tlb::shard_ident::ShardIdent;
 use toner::tlb::Cell;
 use toner::tlb::Ref;
@@ -49,7 +50,6 @@ pub struct ShardStateUnsplit {
     //   (overload_history, underload_history, total_balance, total_validator_fees, libraries, master_ref)
     #[tlb(cell, as = "Ref")]
     pub stats: Cell,
-    // TODO[akostylev0]: typed struct for McStateExtra
     #[tlb(cell, as = "Option<Ref>")]
-    pub custom: Option<Cell>,
+    pub custom: Option<McStateExtra>,
 }
