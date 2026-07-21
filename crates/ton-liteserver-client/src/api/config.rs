@@ -1,9 +1,8 @@
 use crate::tl::{Int31, LiteServerConfigInfo, LiteServerGetConfigAll, TonNodeBlockIdExt};
 use crate::tlb::ext_blk_ref::ExtBlkRef;
 use crate::tlb::global_version::GlobalVersion;
-use crate::tlb::mc_state_extra::{
-    CellLookup, McStateExtraInfo, OldMcBlockLookup, lookup_cell_hashmap,
-};
+use crate::tlb::hashmap::{Hashmap, HashmapLookup};
+use crate::tlb::mc_state_extra::McStateExtraInfo;
 use crate::tlb::merkle_proof::MerkleProof;
 use crate::tlb::shard_state::ShardStateUnsplit;
 use crate::tlb::vm_stack::{VmStackValue, VmStkTuple};
@@ -28,7 +27,7 @@ pub enum ConfigError<E> {
 pub struct MasterchainConfig {
     block_id: TonNodeBlockIdExt,
     config_addr: [u8; 32],
-    params: Cell,
+    params: Hashmap<u32, Cell, 32>,
     state_extra: McStateExtraInfo,
 }
 
@@ -41,7 +40,7 @@ impl MasterchainConfig {
         &self.config_addr
     }
 
-    pub const fn params(&self) -> &Cell {
+    pub const fn params(&self) -> &Hashmap<u32, Cell, 32> {
         &self.params
     }
 
@@ -50,13 +49,13 @@ impl MasterchainConfig {
     }
 
     pub fn global_version(&self) -> anyhow::Result<u32> {
-        match lookup_cell_hashmap(&self.params, 8)? {
-            CellLookup::Found(cell) => {
+        match self.params.lookup(&8_u32) {
+            HashmapLookup::Found(cell) => {
                 let version: GlobalVersion = unpack_fully(cell.data.as_bitslice(), ())?;
                 Ok(version.version)
             }
-            CellLookup::Absent => Ok(0),
-            CellLookup::Pruned => Err(anyhow!("global version config parameter is pruned")),
+            HashmapLookup::Absent => Ok(0),
+            HashmapLookup::Pruned(_) => Err(anyhow!("global version config parameter is pruned")),
         }
     }
 
@@ -123,9 +122,9 @@ impl MasterchainConfig {
 
     fn old_block_to_tuple(&self, seqno: u32) -> anyhow::Result<VmStackValue> {
         match self.state_extra.prev_blocks.lookup(seqno)? {
-            OldMcBlockLookup::Found(block) => Ok(ext_block_to_tuple(&block.blk_ref)),
-            OldMcBlockLookup::Absent => Err(anyhow!("old masterchain block {seqno} is absent")),
-            OldMcBlockLookup::Pruned => Err(anyhow!("old masterchain block {seqno} is pruned")),
+            HashmapLookup::Found(block) => Ok(ext_block_to_tuple(&block.blk_ref)),
+            HashmapLookup::Absent => Err(anyhow!("old masterchain block {seqno} is absent")),
+            HashmapLookup::Pruned(_) => Err(anyhow!("old masterchain block {seqno} is pruned")),
         }
     }
 }
@@ -363,7 +362,7 @@ mod integration {
         };
 
         assert_eq!(parsed.block_id(), &block_id);
-        assert!(parsed.state_extra().prev_blocks.root.is_some());
+        assert!(!parsed.state_extra().prev_blocks.0.hashmap.is_empty());
         assert_eq!(outer.0.len(), if global_version >= 9 { 3 } else { 2 });
         assert_eq!(
             last_mc_blocks.0.len(),

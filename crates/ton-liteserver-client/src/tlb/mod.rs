@@ -16,6 +16,7 @@ mod extra_currency_collection;
 pub mod future_split_merge;
 pub mod global_version;
 mod hash_update;
+pub mod hashmap;
 mod in_msg;
 mod in_msg_descr;
 pub mod mc_state_extra;
