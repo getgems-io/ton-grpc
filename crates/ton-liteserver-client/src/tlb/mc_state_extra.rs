@@ -1,30 +1,16 @@
 use crate::tlb::currency_collection::CurrencyCollection;
-use toner::tlb::bits::NBits;
-use toner::tlb::bits::de::BitReaderExt;
-use toner::tlb::de::{CellDeserialize, CellParser, CellParserError};
-use toner::tlb::{Cell, Error, Ref};
+use toner::tlb::{Cell, Ref};
+use toner_tlb_macros::CellDeserialize;
 
 /// ```tlb
 /// _ config_addr:bits256 config:^(Hashmap 32 ^Cell) = ConfigParams;
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, CellDeserialize)]
 pub struct ConfigParams {
+    #[tlb(bits)]
     pub config_addr: [u8; 32],
+    #[tlb(cell, as = "Ref")]
     pub config: Cell,
-}
-
-impl<'de> CellDeserialize<'de> for ConfigParams {
-    type Args = ();
-
-    fn parse(
-        parser: &mut CellParser<'de>,
-        _args: Self::Args,
-    ) -> Result<Self, CellParserError<'de>> {
-        Ok(Self {
-            config_addr: parser.unpack(())?,
-            config: parser.parse_as::<_, Ref>(())?,
-        })
-    }
 }
 
 /// ```tlb
@@ -38,41 +24,15 @@ impl<'de> CellDeserialize<'de> for ConfigParams {
 ///   global_balance:CurrencyCollection
 ///   = McStateExtra;
 /// ```
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, CellDeserialize)]
+#[tlb(tag = "0xcc26")]
 pub struct McStateExtra {
+    #[tlb(cell, as = "Option<Ref>")]
     pub shard_hashes: Option<Cell>,
     pub config: ConfigParams,
+    #[tlb(cell, as = "Ref")]
     pub state_extra: Cell,
     pub global_balance: CurrencyCollection,
-}
-
-impl<'de> CellDeserialize<'de> for McStateExtra {
-    type Args = ();
-
-    fn parse(
-        parser: &mut CellParser<'de>,
-        _args: Self::Args,
-    ) -> Result<Self, CellParserError<'de>> {
-        let tag: u16 = parser.unpack_as::<_, NBits<16>>(())?;
-        if tag != 0xcc26 {
-            return Err(Error::custom(format!(
-                "invalid McStateExtra tag: 0x{tag:04x}"
-            )));
-        }
-
-        let shard_hashes = if parser.unpack(())? {
-            Some(parser.parse_as::<_, Ref>(())?)
-        } else {
-            None
-        };
-
-        Ok(Self {
-            shard_hashes,
-            config: parser.parse(())?,
-            state_extra: parser.parse_as::<_, Ref>(())?,
-            global_balance: parser.parse(())?,
-        })
-    }
 }
 
 #[cfg(test)]
