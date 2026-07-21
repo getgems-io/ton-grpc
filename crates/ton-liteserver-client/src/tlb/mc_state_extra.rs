@@ -1,8 +1,11 @@
 use crate::tlb::currency_collection::CurrencyCollection;
 use crate::tlb::ext_blk_ref::ExtBlkRef;
+use toner::tlb::bits::bitvec::order::Msb0;
+use toner::tlb::bits::bitvec::slice::BitSlice;
+use toner::tlb::bits::bitvec::vec::BitVec;
 use toner::tlb::bits::de::BitReaderExt;
 use toner::tlb::de::{CellDeserialize as CellDeserializeTrait, CellParser, CellParserError};
-use toner::tlb::{Cell, Ref};
+use toner::tlb::{Cell, Ref, StringError};
 use toner_tlb_macros::{BitUnpack, CellDeserialize};
 
 /// ```tlb
@@ -50,6 +53,159 @@ pub struct KeyExtBlkRef {
 pub struct OldMcBlocksInfo {
     pub root: Option<Cell>,
     pub extra: KeyMaxLt,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OldMcBlockLookup {
+    Found(KeyExtBlkRef),
+    Absent,
+    Pruned,
+}
+
+pub(crate) enum CellLookup {
+    Found(Cell),
+    Absent,
+    Pruned,
+}
+
+pub(crate) fn lookup_cell_hashmap(root: &Cell, key: u32) -> Result<CellLookup, StringError> {
+    let key = BitVec::<u8, Msb0>::from_vec(key.to_be_bytes().to_vec());
+
+    lookup_cell_hashmap_edge(root, key.as_bitslice(), 32)
+}
+
+impl OldMcBlocksInfo {
+    pub fn lookup(&self, seqno: u32) -> Result<OldMcBlockLookup, StringError> {
+        let Some(root) = &self.root else {
+            return Ok(OldMcBlockLookup::Absent);
+        };
+        let key = BitVec::<u8, Msb0>::from_vec(seqno.to_be_bytes().to_vec());
+
+        lookup_old_mc_block(root, key.as_bitslice(), 32, seqno)
+    }
+}
+
+fn lookup_old_mc_block(
+    cell: &Cell,
+    key: &BitSlice<u8, Msb0>,
+    n: u32,
+    seqno: u32,
+) -> Result<OldMcBlockLookup, StringError> {
+    if cell.is_exotic {
+        return if cell.data.as_raw_slice().first() == Some(&1) {
+            Ok(OldMcBlockLookup::Pruned)
+        } else {
+            Err(toner::tlb::Error::custom("unexpected exotic hashmap cell"))
+        };
+    }
+
+    let mut parser = cell.parser();
+    let label = parse_hm_label(&mut parser, n)?;
+    if !key.starts_with(&label) {
+        return Ok(OldMcBlockLookup::Absent);
+    }
+    let m = n
+        .checked_sub(label.len() as u32)
+        .ok_or_else(|| toner::tlb::Error::custom("hashmap label exceeds remaining key"))?;
+    let remaining = &key[label.len()..];
+    let _: KeyMaxLt = parser.unpack(())?;
+
+    if m == 0 {
+        let value: KeyExtBlkRef = parser.unpack(())?;
+        parser.ensure_empty()?;
+        if value.blk_ref.seq_no != seqno {
+            return Err(toner::tlb::Error::custom(format!(
+                "old masterchain block seqno mismatch: expected {seqno}, got {}",
+                value.blk_ref.seq_no
+            )));
+        }
+        return Ok(OldMcBlockLookup::Found(value));
+    }
+
+    let Some((is_right, remaining)) = remaining.split_first() else {
+        return Err(toner::tlb::Error::custom("hashmap key ended before fork"));
+    };
+    if cell.references.len() != 2 {
+        return Err(toner::tlb::Error::custom(format!(
+            "hashmap fork must have 2 references, got {}",
+            cell.references.len()
+        )));
+    }
+
+    lookup_old_mc_block(
+        &cell.references[usize::from(*is_right)],
+        remaining,
+        m - 1,
+        seqno,
+    )
+}
+
+fn lookup_cell_hashmap_edge(
+    cell: &Cell,
+    key: &BitSlice<u8, Msb0>,
+    n: u32,
+) -> Result<CellLookup, StringError> {
+    if cell.is_exotic {
+        return if cell.data.as_raw_slice().first() == Some(&1) {
+            Ok(CellLookup::Pruned)
+        } else {
+            Err(toner::tlb::Error::custom("unexpected exotic hashmap cell"))
+        };
+    }
+
+    let mut parser = cell.parser();
+    let label = parse_hm_label(&mut parser, n)?;
+    if !key.starts_with(&label) {
+        return Ok(CellLookup::Absent);
+    }
+    let m = n
+        .checked_sub(label.len() as u32)
+        .ok_or_else(|| toner::tlb::Error::custom("hashmap label exceeds remaining key"))?;
+    let remaining = &key[label.len()..];
+
+    if m == 0 {
+        let value = parser.parse_as::<Cell, Ref>(())?;
+        parser.ensure_empty()?;
+        return Ok(CellLookup::Found(value));
+    }
+
+    let Some((is_right, remaining)) = remaining.split_first() else {
+        return Err(toner::tlb::Error::custom("hashmap key ended before fork"));
+    };
+    if cell.references.len() != 2 {
+        return Err(toner::tlb::Error::custom(format!(
+            "hashmap fork must have 2 references, got {}",
+            cell.references.len()
+        )));
+    }
+
+    lookup_cell_hashmap_edge(&cell.references[usize::from(*is_right)], remaining, m - 1)
+}
+
+fn parse_hm_label(parser: &mut CellParser<'_>, m: u32) -> Result<BitVec<u8, Msb0>, StringError> {
+    if !parser.unpack::<bool>(())? {
+        let n: u32 = parser.unpack_as::<_, toner::tlb::bits::Unary>(())?;
+        if n > m {
+            return Err(toner::tlb::Error::custom("hashmap label exceeds key"));
+        }
+        return parser.unpack(n as usize);
+    }
+
+    let n_bits = m.checked_ilog2().unwrap_or(0) + 1;
+    if !parser.unpack::<bool>(())? {
+        let n: u32 = parser.unpack_as::<_, toner::tlb::bits::VarNBits>(n_bits)?;
+        if n > m {
+            return Err(toner::tlb::Error::custom("hashmap label exceeds key"));
+        }
+        return parser.unpack(n as usize);
+    }
+
+    let value: bool = parser.unpack(())?;
+    let n: u32 = parser.unpack_as::<_, toner::tlb::bits::VarNBits>(n_bits)?;
+    if n > m {
+        return Err(toner::tlb::Error::custom("hashmap label exceeds key"));
+    }
+    Ok(BitVec::repeat(value, n as usize))
 }
 
 impl<'de> CellDeserializeTrait<'de> for OldMcBlocksInfo {
@@ -178,7 +334,11 @@ pub struct McStateExtra {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlockCreateStats, McStateExtra, McStateExtraInfo};
+    use super::{
+        BlockCreateStats, KeyMaxLt, McStateExtra, McStateExtraInfo, OldMcBlockLookup,
+        OldMcBlocksInfo,
+    };
+    use crate::tlb::ext_blk_ref::ExtBlkRef;
     use num_bigint::BigUint;
     use toner::tlb::bits::bitvec::order::Msb0;
     use toner::tlb::bits::bitvec::vec::BitVec;
@@ -242,6 +402,61 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn should_lookup_old_mc_block() {
+        let block = old_mc_block(0);
+        let root = TestOldMcBlock(block.blk_ref.clone()).to_cell(()).unwrap();
+        let old_blocks = OldMcBlocksInfo {
+            root: Some(root),
+            extra: KeyMaxLt {
+                key: false,
+                max_end_lt: 0,
+            },
+        };
+
+        let actual = old_blocks.lookup(0).unwrap();
+
+        assert_eq!(actual, OldMcBlockLookup::Found(block));
+    }
+
+    #[test]
+    fn should_report_absent_old_mc_block() {
+        let root = TestOldMcBlock(old_mc_block(0).blk_ref).to_cell(()).unwrap();
+        let old_blocks = OldMcBlocksInfo {
+            root: Some(root),
+            extra: KeyMaxLt {
+                key: false,
+                max_end_lt: 0,
+            },
+        };
+
+        let actual = old_blocks.lookup(1).unwrap();
+
+        assert_eq!(actual, OldMcBlockLookup::Absent);
+    }
+
+    #[test]
+    fn should_report_pruned_old_mc_block() {
+        let mut data = vec![0_u8; 36];
+        data[0] = 1;
+        let root = Cell {
+            is_exotic: true,
+            data: BitVec::from_vec(data),
+            references: Vec::new(),
+        };
+        let old_blocks = OldMcBlocksInfo {
+            root: Some(root),
+            extra: KeyMaxLt {
+                key: false,
+                max_end_lt: 0,
+            },
+        };
+
+        let actual = old_blocks.lookup(0).unwrap();
+
+        assert_eq!(actual, OldMcBlockLookup::Pruned);
+    }
+
     struct TestMcStateExtra {
         config: Cell,
         state_extra: Cell,
@@ -275,6 +490,40 @@ mod tests {
 
     enum TestBlockCreateStats {
         Extended { root: Cell, extra: u32 },
+    }
+
+    struct TestOldMcBlock(ExtBlkRef);
+
+    impl CellSerialize for TestOldMcBlock {
+        type Args = ();
+
+        fn store(
+            &self,
+            builder: &mut CellBuilder,
+            _args: Self::Args,
+        ) -> Result<(), CellBuilderError> {
+            builder
+                .pack_as::<_, toner::tlb::bits::NBits<2>>(0b11_u8, ())?
+                .pack(false, ())?
+                .pack_as::<_, toner::tlb::bits::VarNBits>(32_u32, 6)?
+                .pack(false, ())?
+                .pack(0_u64, ())?
+                .pack(false, ())?
+                .pack(&self.0, ())?;
+            Ok(())
+        }
+    }
+
+    fn old_mc_block(seq_no: u32) -> super::KeyExtBlkRef {
+        super::KeyExtBlkRef {
+            key: false,
+            blk_ref: ExtBlkRef {
+                end_lt: 100,
+                seq_no,
+                root_hash: [1; 32],
+                file_hash: [2; 32],
+            },
+        }
     }
 
     impl CellSerialize for TestMcStateExtraInfo {

@@ -1,8 +1,15 @@
 use crate::tl::{Int31, LiteServerConfigInfo, LiteServerGetConfigAll, TonNodeBlockIdExt};
-use crate::tlb::mc_state_extra::McStateExtraInfo;
+use crate::tlb::ext_blk_ref::ExtBlkRef;
+use crate::tlb::global_version::GlobalVersion;
+use crate::tlb::mc_state_extra::{
+    CellLookup, McStateExtraInfo, OldMcBlockLookup, lookup_cell_hashmap,
+};
 use crate::tlb::merkle_proof::MerkleProof;
 use crate::tlb::shard_state::ShardStateUnsplit;
+use crate::tlb::vm_stack::{VmStackValue, VmStkTuple};
 use anyhow::anyhow;
+use num_bigint::BigUint;
+use toner::tlb::bits::de::unpack_fully;
 use toner::tlb::{BoC, Cell};
 use tower::{Service, ServiceExt};
 
@@ -40,6 +47,129 @@ impl MasterchainConfig {
 
     pub const fn state_extra(&self) -> &McStateExtraInfo {
         &self.state_extra
+    }
+
+    pub fn global_version(&self) -> anyhow::Result<u32> {
+        match lookup_cell_hashmap(&self.params, 8)? {
+            CellLookup::Found(cell) => {
+                let version: GlobalVersion = unpack_fully(cell.data.as_bitslice(), ())?;
+                Ok(version.version)
+            }
+            CellLookup::Absent => Ok(0),
+            CellLookup::Pruned => Err(anyhow!("global version config parameter is pruned")),
+        }
+    }
+
+    pub fn prev_blocks_info(&self) -> anyhow::Result<VmStackValue> {
+        let current_seqno = u32::try_from(self.block_id.seqno)
+            .map_err(|_| anyhow!("invalid masterchain block seqno: {}", self.block_id.seqno))?;
+        let mut last_mc_blocks = vec![block_id_to_tuple(
+            self.block_id.workchain,
+            self.block_id.shard,
+            current_seqno,
+            self.block_id.root_hash,
+            self.block_id.file_hash,
+        )];
+
+        let mut seqno = current_seqno;
+        while seqno > 0 && last_mc_blocks.len() < 16 {
+            seqno -= 1;
+            last_mc_blocks.push(self.old_block_to_tuple(seqno)?);
+        }
+
+        let prev_key_block = if self.state_extra.after_key_block {
+            block_id_to_tuple(
+                self.block_id.workchain,
+                self.block_id.shard,
+                current_seqno,
+                self.block_id.root_hash,
+                self.block_id.file_hash,
+            )
+        } else {
+            let block = self
+                .state_extra
+                .last_key_block
+                .as_ref()
+                .ok_or_else(|| anyhow!("masterchain config has no previous key block"))?;
+            ext_block_to_tuple(block)
+        };
+
+        let mut result = vec![tuple(last_mc_blocks), prev_key_block];
+        if self.global_version()? >= 9 {
+            let mut last_mc_blocks_100 = Vec::with_capacity(16);
+            let mut seqno = current_seqno / 100 * 100;
+            while last_mc_blocks_100.len() < 16 {
+                last_mc_blocks_100.push(if seqno == current_seqno {
+                    block_id_to_tuple(
+                        self.block_id.workchain,
+                        self.block_id.shard,
+                        current_seqno,
+                        self.block_id.root_hash,
+                        self.block_id.file_hash,
+                    )
+                } else {
+                    self.old_block_to_tuple(seqno)?
+                });
+                if seqno < 100 {
+                    break;
+                }
+                seqno -= 100;
+            }
+            result.push(tuple(last_mc_blocks_100));
+        }
+
+        Ok(tuple(result))
+    }
+
+    fn old_block_to_tuple(&self, seqno: u32) -> anyhow::Result<VmStackValue> {
+        match self.state_extra.prev_blocks.lookup(seqno)? {
+            OldMcBlockLookup::Found(block) => Ok(ext_block_to_tuple(&block.blk_ref)),
+            OldMcBlockLookup::Absent => Err(anyhow!("old masterchain block {seqno} is absent")),
+            OldMcBlockLookup::Pruned => Err(anyhow!("old masterchain block {seqno} is pruned")),
+        }
+    }
+}
+
+fn ext_block_to_tuple(block: &ExtBlkRef) -> VmStackValue {
+    block_id_to_tuple(-1, i64::MIN, block.seq_no, block.root_hash, block.file_hash)
+}
+
+fn block_id_to_tuple(
+    workchain: i32,
+    shard: i64,
+    seqno: u32,
+    root_hash: [u8; 32],
+    file_hash: [u8; 32],
+) -> VmStackValue {
+    tuple(vec![
+        VmStackValue::TinyInt {
+            value: i64::from(workchain),
+        },
+        unsigned_integer(shard as u64),
+        VmStackValue::TinyInt {
+            value: i64::from(seqno),
+        },
+        VmStackValue::Int {
+            value: BigUint::from_bytes_be(&root_hash),
+        },
+        VmStackValue::Int {
+            value: BigUint::from_bytes_be(&file_hash),
+        },
+    ])
+}
+
+fn unsigned_integer(value: u64) -> VmStackValue {
+    match i64::try_from(value) {
+        Ok(value) => VmStackValue::TinyInt { value },
+        Err(_) => VmStackValue::Int {
+            value: BigUint::from(value),
+        },
+    }
+}
+
+fn tuple(items: Vec<VmStackValue>) -> VmStackValue {
+    VmStackValue::Tuple {
+        tuple: VmStkTuple(items),
     }
 }
 
@@ -199,6 +329,7 @@ mod integration {
     use super::ConfigClient;
     use crate::client::LiteServerClient;
     use crate::tl::LiteServerGetMasterchainInfo;
+    use crate::tlb::vm_stack::VmStackValue;
     use anyhow::anyhow;
     use testcontainers_ton::LocalLiteServer;
     use tower::ServiceExt;
@@ -219,9 +350,25 @@ mod integration {
             .get_all(block_id.clone())
             .await
             .map_err(|error| anyhow!(error))?;
+        let global_version = parsed.global_version()?;
+        let prev_blocks_info = parsed.prev_blocks_info()?;
+        let VmStackValue::Tuple { tuple: outer } = &prev_blocks_info else {
+            unreachable!("prev_blocks_info must be a tuple")
+        };
+        let VmStackValue::Tuple {
+            tuple: last_mc_blocks,
+        } = &outer.0[0]
+        else {
+            unreachable!("last_mc_blocks must be a tuple")
+        };
 
         assert_eq!(parsed.block_id(), &block_id);
         assert!(parsed.state_extra().prev_blocks.root.is_some());
+        assert_eq!(outer.0.len(), if global_version >= 9 { 3 } else { 2 });
+        assert_eq!(
+            last_mc_blocks.0.len(),
+            usize::try_from(block_id.seqno + 1)?.min(16)
+        );
         Ok(())
     }
 }
