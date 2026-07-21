@@ -1,4 +1,5 @@
 use crate::tl::{Int31, LiteServerConfigInfo, LiteServerGetConfigAll, TonNodeBlockIdExt};
+use crate::tlb::mc_state_extra::McStateExtraInfo;
 use crate::tlb::merkle_proof::MerkleProof;
 use crate::tlb::shard_state::ShardStateUnsplit;
 use anyhow::anyhow;
@@ -21,7 +22,7 @@ pub struct MasterchainConfig {
     block_id: TonNodeBlockIdExt,
     config_addr: [u8; 32],
     params: Cell,
-    state_extra: Cell,
+    state_extra: McStateExtraInfo,
 }
 
 impl MasterchainConfig {
@@ -37,7 +38,7 @@ impl MasterchainConfig {
         &self.params
     }
 
-    pub const fn state_extra(&self) -> &Cell {
+    pub const fn state_extra(&self) -> &McStateExtraInfo {
         &self.state_extra
     }
 }
@@ -220,6 +221,7 @@ mod integration {
             .map_err(|error| anyhow!(error))?;
 
         assert_eq!(parsed.block_id(), &block_id);
+        assert!(parsed.state_extra().prev_blocks.root.is_some());
         Ok(())
     }
 }
