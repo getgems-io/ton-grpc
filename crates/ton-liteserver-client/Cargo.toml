@@ -8,7 +8,7 @@ rust-version.workspace = true
 tl-parser = { path = "../tl-parser" }
 anyhow = { version = "1.0.103", features = ["backtrace"] }
 quote = "1.0.45"
-syn = "2.0.117"
+syn = "3.0.3"
 prettyplease = "0.2.37"
 convert_case = "0.11.0"
 
