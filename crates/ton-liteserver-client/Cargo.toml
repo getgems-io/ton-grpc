@@ -32,7 +32,7 @@ tokio-stream = { version = "0.1.18", features = ["sync"] }
 tokio-retry = "0.3.0"
 hex = "0.4.3"
 num-bigint = "0.4.6"
-base64 = "0.22.1"
+base64 = "0.23.0"
 crc = "3.4.0"
 
 [dev-dependencies]
