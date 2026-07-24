@@ -6,7 +6,7 @@ rust-version.workspace = true
 
 [dependencies]
 anyhow = { version = "1.0.103", features = ["backtrace"] }
-base64 = "0.22.1"
+base64 = "0.23.0"
 bytes = "1.12.1"
 crc = "3.4.0"
 hex = "0.4.3"

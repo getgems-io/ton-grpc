@@ -13,7 +13,7 @@ ton-address = { path = "../ton-address" }
 ton-tower = { path = "../ton-tower" }
 anyhow = { version = "1.0.103", features = ["backtrace"] }
 async-trait = "0.1.89"
-base64 = "0.22.1"
+base64 = "0.23.0"
 chrono = { version = "0.4.44", default-features = false, features = ["clock"] }
 lazy_static = "1.5.0"
 num-bigint = "0.4.6"
