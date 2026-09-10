@@ -27,7 +27,7 @@ url = { version = "2.5", features = ["serde"] }
 [dev-dependencies]
 ton-liteserver-client = { path = "../ton-liteserver-client"}
 tonlibjson-client = { path = "../tonlibjson-client"}
-rstest = "0.26.1"
+rstest = "0.27.0"
 testcontainers-ton = { path = "../testcontainers-ton" }
 tracing-test = "0.2.6"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
