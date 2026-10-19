@@ -3589,7 +3589,7 @@ dependencies = [
 
 [[package]]
 name = "ton-client"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3631,7 +3631,7 @@ dependencies = [
 
 [[package]]
 name = "ton-contract"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3670,7 +3670,7 @@ dependencies = [
 
 [[package]]
 name = "ton-emulator"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "thiserror 2.0.18",
  "tonlibjson-sys",
@@ -3679,7 +3679,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.17.0"
+version = "0.17.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -3885,7 +3885,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.25.0"
+version = "0.25.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3916,7 +3916,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-sys"
-version = "0.7.0"
+version = "0.8.0"
 dependencies = [
  "anyhow",
  "cc",
@@ -4082,7 +4082,7 @@ dependencies = [
 
 [[package]]
 name = "tvm-grpc"
-version = "0.8.5"
+version = "0.9.0"
 dependencies = [
  "anyhow",
  "async-stream",
