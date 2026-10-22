@@ -10,7 +10,7 @@ checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
 name = "adnl-tcp"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "aes",
  "anyhow",
@@ -3277,7 +3277,7 @@ dependencies = [
 
 [[package]]
 name = "testcontainers-ton"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3392,7 +3392,7 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tl-parser"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "crc32fast",
@@ -3577,7 +3577,7 @@ checksum = "756daf9b1013ebe47a8776667b466417e2d4c5679d441c26230efd9ef78692db"
 
 [[package]]
 name = "ton-address"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3589,7 +3589,7 @@ dependencies = [
 
 [[package]]
 name = "ton-client"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-stream",
@@ -3619,7 +3619,7 @@ dependencies = [
 
 [[package]]
 name = "ton-config"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "reqwest",
@@ -3631,7 +3631,7 @@ dependencies = [
 
 [[package]]
 name = "ton-contract"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3670,7 +3670,7 @@ dependencies = [
 
 [[package]]
 name = "ton-emulator"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "thiserror 2.0.18",
  "tonlibjson-sys",
@@ -3679,7 +3679,7 @@ dependencies = [
 
 [[package]]
 name = "ton-grpc"
-version = "0.17.1"
+version = "0.17.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -3711,7 +3711,7 @@ dependencies = [
 
 [[package]]
 name = "ton-liteserver-client"
-version = "0.7.0"
+version = "0.7.1"
 dependencies = [
  "adnl-tcp",
  "anyhow",
@@ -3748,7 +3748,7 @@ dependencies = [
 
 [[package]]
 name = "ton-tower"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "futures",
@@ -3885,7 +3885,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-client"
-version = "0.25.1"
+version = "0.25.2"
 dependencies = [
  "anyhow",
  "base64 0.22.1",
@@ -3916,7 +3916,7 @@ dependencies = [
 
 [[package]]
 name = "tonlibjson-sys"
-version = "0.8.0"
+version = "0.8.1"
 dependencies = [
  "anyhow",
  "cc",
@@ -4082,7 +4082,7 @@ dependencies = [
 
 [[package]]
 name = "tvm-grpc"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "async-stream",
