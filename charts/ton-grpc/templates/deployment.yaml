@@ -44,6 +44,10 @@ spec:
             {{- if .Values.metrics.enabled }}
             - --enable-metrics
             {{- end }}
+            {{- if .Values.experimentalAdnl.enabled }}
+            - --client
+            - adnl-tcp
+            {{- end }}
             {{- if .Values.tonConfigUrl }}
             - --ton-config-url
             - {{ .Values.tonConfigUrl }}
