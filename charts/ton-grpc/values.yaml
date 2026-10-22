@@ -109,4 +109,4 @@ metrics:
 logLevel: "error,ton_grpc=info,tonlibjson_client=info"
 
 experimentalAdnl:
-    enabled: false
+  enabled: false
