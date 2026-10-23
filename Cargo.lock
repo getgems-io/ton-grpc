@@ -23,7 +23,7 @@ dependencies = [
  "rand 0.10.2",
  "sha2 0.11.1",
  "testcontainers-ton",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-util",
  "tracing",
@@ -345,7 +345,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_urlencoded",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "time",
  "tokio",
  "tokio-stream",
@@ -1647,7 +1647,7 @@ dependencies = [
  "jni-sys",
  "log",
  "simd_cesu8",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "walkdir",
  "windows-link",
 ]
@@ -1827,7 +1827,7 @@ dependencies = [
  "metrics",
  "metrics-util",
  "quanta",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
 ]
@@ -2367,7 +2367,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "socket2",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tokio",
  "tracing",
  "web-time",
@@ -2390,7 +2390,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tinyvec",
  "tracing",
  "web-time",
@@ -3268,7 +3268,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_with",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -3297,11 +3297,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.18"
+version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
+checksum = "09e52cb86a36cede5cb101bf8908837b3e4c6e5e59fe7fd85c23fb56200d189e"
 dependencies = [
- "thiserror-impl 2.0.18",
+ "thiserror-impl 2.0.21",
 ]
 
 [[package]]
@@ -3317,13 +3317,13 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.18"
+version = "2.0.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
+checksum = "fe5197923287db20a58125f0bc85c062f7f2c892de97b18c356f9efb14b28524"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.118",
+ "syn 3.0.3",
 ]
 
 [[package]]
@@ -3601,7 +3601,7 @@ dependencies = [
  "mockall",
  "rstest",
  "testcontainers-ton",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-retry",
  "tokio-stream",
@@ -3640,7 +3640,7 @@ dependencies = [
  "lazy_static",
  "num-bigint",
  "testcontainers-ton",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tokio",
  "ton-address",
  "ton-client",
@@ -3672,7 +3672,7 @@ dependencies = [
 name = "ton-emulator"
 version = "0.1.2"
 dependencies = [
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tonlibjson-sys",
  "tracing",
 ]
@@ -3729,7 +3729,7 @@ dependencies = [
  "syn 2.0.118",
  "testcontainers",
  "testcontainers-ton",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tl-parser",
  "tokio",
  "tokio-retry",
@@ -3755,7 +3755,7 @@ dependencies = [
  "metrics",
  "mockall",
  "pin-project",
- "thiserror 2.0.18",
+ "thiserror 2.0.21",
  "tokio",
  "tokio-retry",
  "tokio-util",
