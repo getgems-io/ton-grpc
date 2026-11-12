@@ -38,7 +38,7 @@ crc = "3.4.0"
 [dev-dependencies]
 tracing-test = "0.2.6"
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
-testcontainers = "0.27.1"
+testcontainers = "0.28.0"
 testcontainers-ton = { path = "../testcontainers-ton" }
 rstest = "0.26.1"
 
