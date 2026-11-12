@@ -20,7 +20,8 @@
             "release-type": "rust"
         },
         "crates/ton-grpc": {
-            "release-type": "rust"
+            "release-type": "rust",
+            "release-as": "0.18.0"
         },
         "crates/tonlibjson-sys": {
             "release-type": "rust"
