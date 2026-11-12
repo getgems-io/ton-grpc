@@ -46,9 +46,6 @@
         "crates/ton-client": {
             "release-type": "rust"
         },
-        "crates/ton-client-util": {
-            "release-type": "rust"
-        },
         "crates/ton-contract": {
             "release-type": "rust"
         },
